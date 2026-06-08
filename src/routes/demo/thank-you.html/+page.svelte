@@ -5,5 +5,5 @@
 <TitlePage>
 	<span slot="title">That's the demo</span>
 	<span slot="subtitle">A second presentation, fully independent of the main one</span>
-	<span slot="subsubtitle"><a href="../slides/title.html" style="font-size: 0.7em; opacity: 0.85; color: inherit;">← back to the main presentation</a></span>
+	<span slot="subsubtitle"><a href="../" style="font-size: 0.7em; opacity: 0.85; color: inherit;">↑ back to the home page</a></span>
 </TitlePage>

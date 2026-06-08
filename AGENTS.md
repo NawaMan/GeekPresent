@@ -36,6 +36,49 @@ Read the `README.md` first for the user-facing overview. This file is the *opera
   `NavigationBar`, `TableOfContent`, `SizeMode`.
 - Package manager is **pnpm** (`pnpm dev` / `build` / `deploy`). Dev server: `http://localhost:5173`.
 
+## Two kinds of artifact: presentations and texts
+
+Everything above describes **presentations**. There is a second artifact type, the
+**Text** — *one long page* (a fixed **1280px** wide; height grows with the content)
+that you author by hand and scroll, built from the same `$lib` components. It is
+the read-at-your-own-pace counterpart to a slide deck.
+
+- Both types publish a **mode** via Svelte context (`$lib/presentation` —
+  `setMode('presentation' | 'text')` / `getMode()`, default `'presentation'`).
+  Reused components read it to adapt — e.g. in a Text the `NavigationBar` collapses
+  to a single **TOP** control that scrolls the page up. This is the seam for
+  handling slide-oriented components (overlays, slide-anchored hints) in a Text
+  later, one at a time.
+- A Text is a route folder with its **own** `+layout.svelte` (the "Text shell":
+  a `100vw × 100vh` scroll container holding the 1280px column, and `setMode('text')`),
+  the standard `+layout.js`, and a `+page.svelte` of content. The shell owns its
+  own scroll so the document opens at the top and isn't affected by the slide
+  centering — see **`src/routes/text.html/`** as the worked example.
+- A Text is **not** listed in any `pages.ts` (it isn't a slide), and the shell is
+  currently copied per Text artifact (like a presentation's `+layout.svelte`). With
+  more than one, factor the shell into `$lib`.
+
+### The landing page — `src/routes/(home)/`
+
+The site root `/` is itself a Text artifact: the project's **index/home page**,
+linking to the sample Text (`/text.html`) and the two presentations.
+
+- `(home)` is a SvelteKit **route group** — the parentheses mean the folder name is
+  *not* part of the URL, so `(home)/+page.svelte` is served at `/` (and prerenders
+  to `docs/index.html`).
+- The group exists so `/` can have its **own** `+layout.svelte` (the Text shell)
+  *without* that layout wrapping the presentations (`slides/`, `demo/`) or the other
+  Text (`text.html/`) — each of those brings its own layout. The top-level
+  `src/routes/+layout.svelte` / `+layout.js` (global CSS + prerender) still wrap
+  everything; the group's layout nests inside them for `/` only.
+- Because `/` renders the landing directly, there is **no root redirect** — the old
+  `src/routes/+page.svelte` redirect and `redirect-index.html` (copied over
+  `docs/index.html`) were removed, and `package.json`'s `build` no longer does that
+  copy. (Per-presentation index redirects like `slides/+page.svelte` → first slide
+  are unrelated and still in place.)
+- To add another standalone Text, copy `src/routes/text.html/` to a new route (e.g.
+  `src/routes/my-text/`); the root stays the landing.
+
 ## Rules you must follow
 
 1. **Keep `pages.ts` in sync.** Any time you add, remove, or rename a slide folder, update *that
