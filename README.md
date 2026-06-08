@@ -234,9 +234,13 @@ The nav bar (FIRST / PREV / NEXT / LAST) and the **Table of Contents** (top-left
 
 The presentation is print-friendly — the navigation, Table of Contents, and mode toggle are hidden under `@media print`. Use your browser's print (Ctrl/Cmd-P) to print or export to PDF.
 
-## Article view
+## Text view (long-form)
 
-The Table of Contents has a "View as article" link to an article-style view of the presentation. This is **not fully implemented yet** — it currently shows a placeholder that links back to the slides.
+Alongside slides, NawaPresent builds a second artifact type — a **Text**: *one long page* (a fixed 1280px wide, height grows with the content) that you author by hand and scroll, reusing the same components. It's the read-at-your-own-pace counterpart to a deck.
+
+- The site's **landing page** (`/`) and the sample at **`/text.html`** are Text artifacts — see `src/routes/(home)/` and `src/routes/text.html/`.
+- The Table of Contents' "View as article" link opens `/text.html`.
+- A Text renders the same components but in a flowing document; the on-slide navigation bar becomes a single **TOP** button. To start your own, copy the `src/routes/text.html/` route folder.
 
 ## Building & deploying to GitHub Pages
 

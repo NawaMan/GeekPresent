@@ -4,7 +4,7 @@
 	"private": true,
 	"scripts": {
 		"dev": "vite dev",
-		"build": "vite build && rm -Rf ../docs && mv docs ../docs && cp redirect-index.html ../docs/index.html",
+		"build": "vite build && rm -Rf ../docs && mv docs ../docs",
 		"preview": "vite preview",
 		"deploy": "pnpm build && pnpx gh-pages -d ../docs -t true",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",

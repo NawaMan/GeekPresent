@@ -1,16 +1,12 @@
 <!--
-  Text artifact shell.
+  Landing shell (route group "(home)").
 
-  A Text is the second kind of NawaPresent artifact: ONE long page, a fixed
-  1280px wide, whose height grows with the content that flows down it. It is
-  authored by hand (in +page.svelte) and reuses the same $lib components as the
-  slides — it is NOT generated from a presentation.
-
-  Layout: an own scroll container sized to the viewport holds the 1280px column.
-  This keeps the document clear of the global slide-centering (which would push a
-  tall page's start to its vertical middle) and needs no JS — the page opens at
-  the top and scrolls down, or sideways when the window is narrower than 1280
-  (FIXED mode). To make another Text, copy this whole folder.
+  This layout applies only to the site root `/` — the route group keeps the
+  Text shell off the presentations (slides/ demo/) and the other Text artifact
+  (text.html/), which bring their own layouts. The root `/` is the project's
+  index/home page, built as a Text artifact (one long 1280px-wide page) so it
+  shares the look and machinery of text.html. Mirrors src/routes/text.html;
+  if a third Text artifact appears, factor the shell into $lib.
 -->
 <script lang="ts">
 	import '$lib/styles/global.css';
@@ -19,8 +15,6 @@
 	import { setMode }   from '$lib/presentation';
 	import NavigationBar from '$lib/components/NavigationBar.svelte';
 
-	// Publish this artifact's mode so reused components can adapt (e.g. the slide
-	// nav bar becomes a single TOP control that scrolls this container up).
 	setMode('text');
 </script>
 
@@ -51,9 +45,6 @@
 		font-family: 'Noto Sans', 'Cormorant Garamond', serif;
 	}
 
-	/* Base typography for the authored content. Slotted markup isn't scoped to
-	   this component, so reach it with :global under .text-page. A specific Text
-	   artifact can override any of this in its own +page.svelte. */
 	.text-page :global(h1) {
 		font-size: 3em;
 		margin: 0 0 0.2em;
@@ -71,8 +62,6 @@
 	}
 	.text-page :global(p) {
 		margin: 0.8em 0;
-		text-align: justify;
-		text-justify: inter-word;
 	}
 	.text-page :global(a) {
 		color: #7fd9ff;
