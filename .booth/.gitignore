@@ -1,0 +1,12 @@
+# Secrets - never commit
+.booth.password
+.env
+
+# Local persistent state (not committed)
+cache/
+
+# Runtime temp files
+.tmp/
+
+# Lock file is version-controlled
+# Binaries are in ~/.cache/codingbooth/ (not here)
