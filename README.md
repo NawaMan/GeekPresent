@@ -1,1 +1,250 @@
-# NawaPresent
+<div align="center">
+
+# 📽️ NawaPresent
+
+**Slides for people who'd rather write HTML than wrestle a slide editor.**
+
+Build presentations with HTML, CSS, and Svelte components — each slide is a route,<br/>
+the whole presentation is a static site, and it deploys to GitHub Pages.
+
+`SvelteKit` · `Static site` · `1280×720 canvas, auto-scaled` · `Deploys to GitHub Pages`
+
+</div>
+
+---
+
+## Why this project exists
+
+If you do any front-end work you already know HTML + CSS + JS, and you've probably wished you could just *use* that to make slides instead of fighting a WYSIWYG tool. NawaPresent lets you do exactly that — and takes care of the tedious parts:
+
+- **No manual paging or navigation.** List your slides once in `pages.ts`; arrow keys, the on-screen nav bar, and the Table of Contents are wired up for you.
+- **Fixed canvas, automatic scaling.** You design on a fixed **1280×720** canvas and position things with normal CSS — including absolute positioning at exact pixels — and the framework scales the whole slide to fit any screen. You think in one size; it handles the rest.
+- **Colocation, your choice.** Global CSS/JS/assets work, but each page can also keep its *own* assets (images, etc.) right next to it. Pick whatever keeps cognitive load low.
+- **Real componentization.** Svelte is excellent at components, so reusable slide pieces (boxes, code viewers, notes…) are just imports.
+- **Navigation built in.** Arrow keys, on-screen buttons, and a Table of Contents — no wiring required.
+- **SCALED / FIXED modes.** Present scaled-to-fit, or switch to a fixed 1280×720 view with speaker notes visible below.
+- **It's just text.** Slides are Svelte files, so they diff cleanly, version-control nicely, and hot-reload while you edit.
+
+## Quick start
+
+```bash
+pnpm install
+pnpm dev        # http://localhost:5173/slides/title.html
+```
+
+```bash
+pnpm build      # static site -> ../docs/
+pnpm preview    # preview the build
+pnpm deploy     # publish ../docs to GitHub Pages
+```
+
+---
+
+## How to use
+
+### Slides: define the order, then add files
+
+List your slides, in order, in the presentation's `pages.ts` (`src/routes/slides/pages.ts`):
+
+```ts
+export const pages = [
+    { path: "title.html", title: "Title" },
+    { path: "intro.html", title: "Introduction" },
+    { path: "demo.html",  title: "Demo" },
+];
+```
+
+Each entry is a folder under `src/routes/slides/<name>.html/` with two files:
+
+```
+src/routes/slides/intro.html/
+  +layout.js      # export const prerender = true; export const trailingSlash = "never";
+  +page.svelte    # your slide content
+```
+
+> **Multiple presentations:** `slides/` is just one presentation — its route folder. To add another, create a
+> sibling folder (e.g. `src/routes/talk2/`) with its own `pages.ts`, `+layout.svelte`, and slides.
+> Navigation and the Table of Contents are scoped per presentation, and each presentation can have its **own
+> theme** (fonts, colours, background image, favicon) in its `+layout.svelte`. See the `demo/` presentation
+> (`/demo/title.html`) for a fully independent, differently-themed example.
+
+### Title and content pages
+
+Two templates cover most slides.
+
+**TitlePage** — for title slides and section dividers; three named slots:
+
+```svelte
+<script>
+  import TitlePage from '$lib/templates/TitlePage.svelte';
+</script>
+
+<TitlePage>
+  <span slot="title">NawaPresent</span>
+  <span slot="subtitle">How to Build Presentations</span>
+  <span slot="subsubtitle">Your Name</span>
+</TitlePage>
+```
+
+**ContentPage** — for everything else; `title` + `subtitle` props and a default slot:
+
+```svelte
+<script>
+  import ContentPage from '$lib/templates/ContentPage.svelte';
+</script>
+
+<ContentPage title="Introduction" subtitle="What we'll cover">
+  <ul>
+    <li>First point</li>
+    <li>Second point</li>
+  </ul>
+</ContentPage>
+```
+
+Both templates add the navigation bar automatically.
+
+### Positioning & size
+
+Every slide lives on a fixed **1280×720** canvas. Lay out with whatever CSS suits the slide:
+
+- **Normal flow** — `ContentPage` centers your content; just write HTML.
+- **Absolute positioning** — when you want pixel-precise placement, position elements absolutely within the 1280×720 canvas. Because the size is fixed, `left: 640px` means the same thing on every screen.
+
+You never write scaling code: in **SCALED** mode the framework transforms the whole canvas to fit the window (keeping the 16:9 ratio); in **FIXED** mode it stays exactly 1280×720.
+
+### Interactivity (it's just Svelte)
+
+Slides are Svelte components, so state and events work as usual — perfect for click-to-reveal, toggles, or anything interactive:
+
+```svelte
+<script>
+  import Box from '$lib/components/Box.svelte';
+  let show = false;
+</script>
+
+<button on:click={() => show = true}>Show the answer</button>
+
+<Box bind:expanded={show} width={600} height={400}>
+  <img src="answer.png" alt="the answer" />
+</Box>
+```
+
+### Box — expandable overlay
+
+`Box` pops its content up as a dimmed overlay. It opens when you set `expanded`, and closes on **CLOSE**, a click **outside**, or **Escape** — clicks *inside* are left alone, so the content stays interactive (e.g. selecting text).
+
+```svelte
+<Box bind:expanded={show} width={600} height={400}>
+  <!-- any HTML or components -->
+</Box>
+```
+
+Common props: `width`, `height`, `expanded`, `showClose`, `scrollable`, `top` / `left` / `bottom` / `right` (custom position), `shadowOpacity`.
+
+### Code
+
+Read-only code viewers built on the Monaco editor:
+
+```svelte
+<script>
+  import Code    from '$lib/components/Code.svelte';
+  import CodeBox from '$lib/components/CodeBox.svelte';
+  let show = false;
+</script>
+
+<!-- inline, any language -->
+<Code code={src} language="python" width="900px" height="300px" />
+
+<!-- pop-up overlay, with an optional title bar -->
+<CodeBox code={src} language="python" title="solution.py" bind:expanded={show} />
+```
+
+- `Code` / `CodeBox` — any language (via `language`), using Monaco's built-in folding.
+- `JavaCode` / `JavaCodeBox` — Java-specialized, with a custom `import`/brace folding provider.
+
+> Monaco is loaded from a CDN, so the code components need an internet connection.
+
+### Local assets
+
+Keep a page's images next to its `+page.svelte` and `import` them — Vite bundles each one and hands you its URL:
+
+```svelte
+<script>
+  import diagram from './diagram.png';
+</script>
+
+<img src={diagram} alt="diagram" />
+```
+
+(`static/` is still there for truly site-wide files.)
+
+There's also a helper that fetches a YouTube thumbnail and generates a QR code straight into a page folder:
+
+```bash
+cd src/routes/slides/my-slide.html
+../../../../utils/prepare-youtube.sh https://youtu.be/<id> . my-video
+```
+
+then feed them to the `YouTube` component (which shows the thumbnail with a QR overlay that links to the video):
+
+```svelte
+<script>
+  import YouTube   from '$lib/components/YouTube.svelte';
+  import thumbnail from './my-video-TN.png';
+  import qr        from './my-video-QR.png';
+</script>
+
+<YouTube {thumbnail} {qr} alt="My talk" youtubeId="<id>" />
+```
+
+### Other components
+
+The presentation under `src/routes/slides/` is itself a working reference — open any slide and read its source. Beyond the above you'll find **Note** (speaker notes), **Hint** (bottom-of-slide cue), **Label** (hoverable inline highlight), **WideDiv** (wheel-scrollable wide container), and **Copyright** (auto-added corner notice).
+
+---
+
+## Display modes & speaker notes
+
+Toggle **SCALED / FIXED** in the top-right corner:
+
+- **SCALED** — the slide scales to fit the window. Use this to present.
+- **FIXED** — the slide stays at 1280×720 and **speaker notes** become visible below it.
+
+Add notes with the `Note` component (hidden in SCALED mode and when printing):
+
+```svelte
+<script>
+  import Note from '$lib/components/Note.svelte';
+</script>
+
+<Note><p>Remember to mention X.</p></Note>
+```
+
+## Navigation & keyboard shortcuts
+
+The nav bar (FIRST / PREV / NEXT / LAST) and the **Table of Contents** (top-left button) are added to every slide automatically.
+
+| Key         | Action          |
+|-------------|-----------------|
+| Arrow Left  | Previous slide  |
+| Arrow Right | Next slide      |
+| Escape      | Close ToC / Box |
+
+## Printing
+
+The presentation is print-friendly — the navigation, Table of Contents, and mode toggle are hidden under `@media print`. Use your browser's print (Ctrl/Cmd-P) to print or export to PDF.
+
+## Article view
+
+The Table of Contents has a "View as article" link to an article-style view of the presentation. This is **not fully implemented yet** — it currently shows a placeholder that links back to the slides.
+
+## Building & deploying to GitHub Pages
+
+It's a fully static site (`@sveltejs/adapter-static`, every route prerendered):
+
+```bash
+pnpm build      # outputs the static site to ../docs/
+pnpm deploy     # publishes ../docs to GitHub Pages (via gh-pages)
+```
+
+The build writes to `../docs/`; `static/.nojekyll` ensures GitHub Pages serves SvelteKit's `_app/` directory (files starting with `_`) correctly.
