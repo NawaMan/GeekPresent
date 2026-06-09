@@ -18,7 +18,8 @@
 		/* functional */
 		position: absolute;
 		top: 0px;
-		right: 0px;
+		/* Horizontal position knob: negative = further right, positive = further left. */
+		right: 5px;
 		margin-right: 0.5em;
 	}
 </style>

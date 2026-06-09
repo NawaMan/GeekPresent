@@ -18,14 +18,14 @@
 			Open Box
 		</button>
 		<div style="font-family: 'Fira Code', monospace; font-size: 0.85em; background: #111; padding: 0.5em 1em; border-radius: 5px; line-height: 1.8em; margin-top: 0.5em;">
-			&lt;Box expanded=&#123;showBox&#125; width=&#123;500&#125; height=&#123;300&#125;&gt;<br/>
+			&lt;Box expanded=&#123;showBox&#125; width=&#123;750&#125; height=&#123;450&#125;&gt;<br/>
 			&nbsp;&nbsp;&lt;img src="image.png" alt="demo" /&gt;<br/>
 			&lt;/Box&gt;
 		</div>
 	</div>
 </ContentPage>
 
-<Box bind:expanded={showBox} width={500} height={200}>
+<Box bind:expanded={showBox} width={750} height={300}>
 	<div style="padding: 2em; text-align: center; color: white; font-size: 1.5em;">
 		This is inside a Box!<br/>
 		Press any key or click CLOSE to dismiss.

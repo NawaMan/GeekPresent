@@ -8,8 +8,9 @@
 
 	export let code           = '';
 	export let language       = 'java';
-	export let width          = '800px';
-	export let height         = '400px';
+	export let width          = '1200px';
+	export let height         = '600px';
+	export let fontSize       = 20;   // Monaco's font (fixed px); overridable per usage.
 	export let foldAllAtStart = false;
 
 	// @ts-ignore
@@ -100,6 +101,9 @@
 				// @ts-ignore
 				editor = monaco.editor.create(editorElement, {
 					value: code,
+					// Monaco sizes its own font in fixed px, so it ignores the canvas
+					// font-size lever — it comes from the `fontSize` prop instead.
+					fontSize,
 					language: language,
 					minimap: { enabled: true },
 					folding: true,

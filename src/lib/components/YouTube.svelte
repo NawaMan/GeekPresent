@@ -6,7 +6,7 @@
     export let thumbnail;
     export let qr;
     export let youtubeId;
-    export let width = "600px";
+    export let width = "900px";
     export let alt   = "";
 
     $: videoUrl = `https://www.youtube.com/watch?v=${youtubeId}`;
@@ -32,8 +32,8 @@ img {
     margin-left: auto;
     margin-right: auto;
     margin-bottom: 1em;
-    border: 2px white solid;
-    border-radius: 5px;
+    border: 3px white solid;
+    border-radius: 7.5px;
 }
 .youtube {
     position: relative;
@@ -45,20 +45,20 @@ img {
 }
 .qr-block {
     position: absolute;
-    bottom: 10px;
-    left: 10px;
+    bottom: 15px;
+    left: 15px;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
 }
 .watch-id {
     font-family: monospace;
-    font-size: 14px;
+    font-size: 21px;
     line-height: 1;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
 }
 .qr {
-    width: 100px;
+    width: 150px;
     margin-bottom: 0;
 }
 </style>

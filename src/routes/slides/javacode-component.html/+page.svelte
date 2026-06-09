@@ -22,7 +22,7 @@ public class Greeter {
 <ContentPage title="JavaCode" subtitle="Read-only Monaco editor specialised for Java">
 	<div style="font-size: 0.8em;">
 		<p>Displays Java with syntax highlighting, code folding and a minimap (read-only):</p>
-		<JavaCode javaCode={code} width="900px" height="270px" />
+		<JavaCode javaCode={code} width="100%" height="10em" />
 		<p style="margin-top: 0.5em; opacity: 0.8; font-size: 0.85em;">
 			Unlike the generic <b>Code</b>, JavaCode adds a <b>custom Java folding provider</b>
 			(folding <code>import</code> groups and brace blocks).

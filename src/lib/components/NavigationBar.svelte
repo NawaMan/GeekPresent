@@ -55,12 +55,19 @@
 	.nav {
 		/* functional */
 		position: absolute;
-		bottom: 0px;
+		/* Vertical position knob: negative = lower, positive = higher. */
+		bottom: -10px;
 		left: 0px;
 	}
 	.nav.text {
 		/* Pinned to the viewport so it stays reachable while scrolling. */
 		position: fixed;
+		/* Keep the text-mode TOP control flush with the viewport bottom (the slide
+		   nav's downward nudge above doesn't apply here). */
+		bottom: 0px;
+		/* In text mode the bar is rendered outside the .text-page font-size lever,
+		   so set the same base here to keep the TOP control sized like slide nav. */
+		font-size: 1.5em;
 	}
 </style>
 

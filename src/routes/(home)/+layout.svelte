@@ -4,7 +4,7 @@
   This layout applies only to the site root `/` — the route group keeps the
   Text shell off the presentations (slides/ demo/) and the other Text artifact
   (text.html/), which bring their own layouts. The root `/` is the project's
-  index/home page, built as a Text artifact (one long 1280px-wide page) so it
+  index/home page, built as a Text artifact (one long 1920px-wide page) so it
   shares the look and machinery of text.html. Mirrors src/routes/text.html;
   if a third Text artifact appears, factor the shell into $lib.
 -->
@@ -35,10 +35,13 @@
 	}
 
 	.text-page {
-		width: 1280px;
+		/* Base font-size lever: column widened x1.5 (1280 -> 1920), so the
+		   em-based component/typography sizes scale x1.5 from here. */
+		font-size: 1.5em;
+		width: 1920px;
 		min-height: 100%;
 		margin: 0 auto;
-		padding: 64px 56px;
+		padding: 96px 84px;
 		box-sizing: border-box;
 		color: #c0f1ff;
 		background: #181818;

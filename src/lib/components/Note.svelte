@@ -23,18 +23,18 @@
 .note:not(.scale-mode) {
     position: absolute;
     display: block;
-    width: calc(1280px - 20px);
-    top: 740px;
-    padding: 10px;
+    width: calc(1920px - 30px);
+    top: 1110px;
+    padding: 15px;
 
     color: #000;
     background-color: beige;
 
-    border: 1px solid #fff;
-    border-radius: 5px;
+    border: 1.5px solid #fff;
+    border-radius: 7.5px;
 
-    min-height: 150px;
-    max-height: 150px;
+    min-height: 225px;
+    max-height: 225px;
     overflow-y: scroll;
 
     font-size: larger;

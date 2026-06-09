@@ -23,8 +23,8 @@ export function getPages(): Array<Page> {
 // Artifact mode.
 //
 // There are two kinds of artifact, both built from the same components:
-//   - 'presentation' — many discrete 1280x720 slide pages (the default).
-//   - 'text'         — one long page, 1280 wide, height grows with content.
+//   - 'presentation' — many discrete 1920x1080 slide pages (the default).
+//   - 'text'         — one long page, 1920 wide, height grows with content.
 // A reused component reads this to decide how to render in each context (e.g.
 // hide the slide nav bar, anchor to the document instead of the slide). An
 // artifact's +layout.svelte publishes its mode with setMode(); anything that

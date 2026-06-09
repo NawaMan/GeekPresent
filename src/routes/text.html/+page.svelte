@@ -2,7 +2,7 @@
   Sample Text artifact.
 
   One long page authored by hand: prose, an imported (colocated) image, code
-  blocks and reused $lib components, all flowing down a fixed 1280px column.
+  blocks and reused $lib components, all flowing down a fixed 1920px column.
   It is deliberately taller than one screen to show the continuous scroll.
 -->
 <script lang="ts">
@@ -15,8 +15,8 @@
 <p>
 	This page is a <Label style="color: #7fd9ff;">Text artifact</Label> — the
 	second kind of thing NawaPresent builds. A presentation is many discrete
-	slides, each a fixed 1280&times;720 canvas. A Text is one single page: a fixed
-	1280px wide, with a flexible height that grows as you add content. You author
+	slides, each a fixed 1920&times;1080 canvas. A Text is one single page: a fixed
+	1920px wide, with a flexible height that grows as you add content. You author
 	it by hand and it scrolls.
 </p>
 
@@ -52,7 +52,7 @@
 
 <pre><code>src/routes/text.html/
   +layout.js       prerender = true; trailingSlash = "never"
-  +layout.svelte   the Text shell: 1280-wide column, mode = 'text'
+  +layout.svelte   the Text shell: 1920-wide column, mode = 'text'
   +page.svelte     this content
   presentation-vs-text.svg   a colocated image, imported below</code></pre>
 
@@ -72,7 +72,7 @@
 <h2>Fixed width</h2>
 
 <p>
-	The column is a fixed 1280px and does not scale to the window (its
+	The column is a fixed 1920px and does not scale to the window (its
 	&ldquo;FIXED&rdquo; mode). On a narrow window the page simply scrolls
 	sideways, the same way a presentation&rsquo;s FIXED display shows a slide at
 	native size. Because the width never changes, anything you lay out
@@ -114,9 +114,9 @@
 <style>
 	pre {
 		background: #0e1112;
-		border: 1px solid #2a3a40;
-		border-radius: 8px;
-		padding: 18px 22px;
+		border: 1.5px solid #2a3a40;
+		border-radius: 12px;
+		padding: 27px 33px;
 		overflow-x: auto;
 		margin: 1em 0;
 	}
@@ -134,7 +134,7 @@
 	img {
 		display: block;
 		width: 100%;
-		max-width: 1000px;
+		max-width: 1500px;
 		margin: 1.5em 0;
 	}
 </style>

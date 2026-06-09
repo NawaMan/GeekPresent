@@ -3,8 +3,9 @@
 	import { browser } from '$app/environment';
 
 	export let javaCode       = '';
-	export let width          = '800px';
-	export let height         = '400px';
+	export let width          = '1200px';
+	export let height         = '600px';
+	export let fontSize       = 20;   // Monaco's font (fixed px); overridable per usage.
 	export let foldAllAtStart = false;
 
 	// @ts-ignore
@@ -110,7 +111,7 @@
 			window.require(['vs/editor/editor.main'], function () {
 				// @ts-ignore
 				editor = monaco.editor.create(editorElement, {
-					value: javaCode,
+					value: javaCode, fontSize,   // Monaco's font from the `fontSize` prop (fixed px, ignores the canvas lever).
 					language: 'java',
 					minimap: { enabled: true },
 					folding: true,

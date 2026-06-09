@@ -56,15 +56,15 @@
     .page .subtitle::after {
         content: '';
         display: block;
-        margin-top: 10px; /* Adjust space after <br> */
-        border-bottom: 3px solid aliceblue; /* Add a line after <br> */
+        margin-top: 15px; /* Adjust space after <br> */
+        border-bottom: 4.5px solid aliceblue; /* Add a line after <br> */
     }
     .page .content {
         /* cosmetic */
         margin-top: 1em;
         margin-bottom: 2em;
-        font-size: 1.5em;
-        line-height: 1.5em;
+        font-size: 1.6em;
+        line-height: 1.1em;
         text-align: justify;
         text-justify: inter-word;
     }

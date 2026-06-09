@@ -9,7 +9,7 @@
 <ContentPage title="What is NawaPresent?" subtitle="A SvelteKit-based presentation framework">
 	<ul>
 		<li><b>SvelteKit</b> static site &mdash; each slide is a route</li>
-		<li><b>1280x720</b> fixed canvas that scales to fit any screen</li>
+		<li><b>1920x1080</b> fixed canvas that scales to fit any screen</li>
 		<li><b>Keyboard navigation</b> with arrow keys</li>
 		<li><b>Table of Contents</b> sidebar (top-left button)</li>
 		<li><b>Speaker notes</b> below the slide in FIXED mode</li>

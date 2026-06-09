@@ -9,8 +9,8 @@
 
 <p>
 	This project holds two kinds of artifact, both built from the same components:
-	<b>presentations</b> &mdash; many fixed 1280&times;720 slides &mdash; and
-	<b>texts</b> &mdash; one long, 1280-wide page that flows downward. Choose where
+	<b>presentations</b> &mdash; many fixed 1920&times;1080 slides &mdash; and
+	<b>texts</b> &mdash; one long, 1920-wide page that flows downward. Choose where
 	to go.
 </p>
 

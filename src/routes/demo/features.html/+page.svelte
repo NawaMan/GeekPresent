@@ -16,7 +16,7 @@
 	</div>
 </ContentPage>
 
-<Box bind:expanded={show} width={520} height={200}>
+<Box bind:expanded={show} width={780} height={300}>
 	<div style="padding: 2em; text-align: center; color: white; font-size: 1.4em;">
 		This Box lives in the <b>demo</b> presentation.<br/>
 		Click CLOSE, click outside, or press Escape.

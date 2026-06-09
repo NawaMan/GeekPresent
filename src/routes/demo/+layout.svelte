@@ -25,15 +25,15 @@
 
 	let   isScaled    = $scaleMode;
 	let   initialized = false;
-	const aspectRatio = 1280 / 720;
+	const aspectRatio = 1920 / 1080;
 
 	function adjustSize() {
 		if (!container)
 			return;
 
 		if (!isScaled) {
-			container.style.width   = '1280px';
-			container.style.height  =  '720px';
+			container.style.width   = '1920px';
+			container.style.height  = '1080px';
 			content.style.transform = `scale(1)`;
 			content.style.transformOrigin = 'top left';
 			return;
@@ -50,7 +50,7 @@
 			container.style.width = 'calc(100vw - 10px)';
 			container.style.height = `${Math.round(container.offsetWidth / aspectRatio)}px`;
 		}
-		let scale = (container.offsetWidth - 30) / 1280.0;
+		let scale = (container.offsetWidth - 45) / 1920.0;
 		content.style.transform = `scale(${scale})`;
 		content.style.transformOrigin = 'top left';
 	}
@@ -94,13 +94,13 @@
 
 <style>
 	.container {
-		width: 1280px;
-		height: 720px;
+		width: 1920px;
+		height: 1080px;
 		margin: 0 auto;
 		display: flex;
 		flex-direction: column;
 		background: #0c0a07;          /* demo theme: warm near-black */
-		border: 1px solid #5a4a36;    /* demo theme: warm border */
+		border: 1.5px solid #5a4a36;  /* demo theme: warm border */
 		position: relative;
 	}
 	.container.scale-mode {
@@ -110,12 +110,17 @@
 		max-height: 100vh;
 	}
 	.content {
-		width: calc(1280px - 20px);
-		height: calc(720px - 20px);
-		min-width: calc(1280px - 20px);
-		min-height: calc(720px - 20px);
+		/* Base font-size lever: the canvas grew x1.5 (1280x720 -> 1920x1080), so
+		   every em-based size in the reused components scales x1.5 from here in
+		   one place, instead of editing each component. px values are scaled
+		   individually; %/vw/vh already track the canvas. */
+		font-size: 1.5em;
+		width: calc(1920px + 20px);
+		height: calc(1080px - 30px);
+		min-width: calc(1920px - 30px);
+		min-height: calc(1080px - 30px);
 		overflow: visible;
-		padding: 10px;
+		padding: 15px;
 		margin: 0px;
 		display: flex;
 		justify-content: center;
@@ -128,7 +133,7 @@
 
 	.container:not(.scale-mode) {
 		/** Bookmark : Here is where we control how much the slide shift up. */
-		transform: translateY(-80px);
+		transform: translateY(-120px);
 	}
 
 </style>

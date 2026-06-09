@@ -20,6 +20,11 @@
 		cursor: pointer;
 
 		/* cosmetic */
+		/* A <button> ignores the inherited font-size by default, so it skipped the
+		   canvas font-size lever and stayed tiny. Opt in so the control tracks its
+		   context; 0.85em keeps it chrome-sized (~1.5x its old browser-default size
+		   on the 1920x1080 canvas) and scales with any future portrait layout. */
+		font-size: 0.85em;
 		padding-left: 0.5em;
 		padding-right: 0.5em;
 		margin-left: 0.5em;
@@ -44,8 +49,8 @@
 	}
 	button:active:not(:disabled) {
 		/* cosmetic */
-		box-shadow: 0 2px #0056b3;
-		transform: translateY(3px);
+		box-shadow: 0 3px #0056b3;
+		transform: translateY(4.5px);
 	}
 	button:disabled {
 		/* functional */

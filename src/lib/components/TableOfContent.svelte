@@ -80,8 +80,8 @@
 		padding-bottom: 0em;
 		margin: 0em;
 		margin-left: 0.2em;
-		border: 1px solid #ccc;
-		border-radius: 2px;
+		border: 1.5px solid #ccc;
+		border-radius: 3px;
 		color: #111;
 		background-color: #eee;
 	}

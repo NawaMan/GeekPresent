@@ -2,14 +2,14 @@
   Text artifact shell.
 
   A Text is the second kind of NawaPresent artifact: ONE long page, a fixed
-  1280px wide, whose height grows with the content that flows down it. It is
+  1920px wide, whose height grows with the content that flows down it. It is
   authored by hand (in +page.svelte) and reuses the same $lib components as the
   slides — it is NOT generated from a presentation.
 
-  Layout: an own scroll container sized to the viewport holds the 1280px column.
+  Layout: an own scroll container sized to the viewport holds the 1920px column.
   This keeps the document clear of the global slide-centering (which would push a
   tall page's start to its vertical middle) and needs no JS — the page opens at
-  the top and scrolls down, or sideways when the window is narrower than 1280
+  the top and scrolls down, or sideways when the window is narrower than 1920
   (FIXED mode). To make another Text, copy this whole folder.
 -->
 <script lang="ts">
@@ -41,10 +41,13 @@
 	}
 
 	.text-page {
-		width: 1280px;
+		/* Base font-size lever: column widened x1.5 (1280 -> 1920), so the
+		   em-based component/typography sizes scale x1.5 from here. */
+		font-size: 1.5em;
+		width: 1920px;
 		min-height: 100%;
 		margin: 0 auto;
-		padding: 64px 56px;
+		padding: 96px 84px;
 		box-sizing: border-box;
 		color: #c0f1ff;
 		background: #181818;

@@ -3,7 +3,7 @@
 
   <!-- Presentation: many fixed slides -->
   <text x="60" y="56" fill="#c0f1ff" font-size="26" font-weight="700">Presentation</text>
-  <text x="60" y="84" fill="#7f9aa3" font-size="17">many discrete 1280×720 slides</text>
+  <text x="60" y="84" fill="#7f9aa3" font-size="17">many discrete 1920×1080 slides</text>
 
   <g stroke="#7fd9ff" stroke-width="2" fill="#16201f">
     <rect x="60"  y="120" width="200" height="113" rx="8"/>
@@ -17,7 +17,7 @@
 
   <!-- Text: one long page -->
   <text x="700" y="56" fill="#c0f1ff" font-size="26" font-weight="700">Text</text>
-  <text x="700" y="84" fill="#7f9aa3" font-size="17">one page, 1280 wide, grows down</text>
+  <text x="700" y="84" fill="#7f9aa3" font-size="17">one page, 1920 wide, grows down</text>
 
   <rect x="760" y="110" width="220" height="250" rx="8" stroke="#7fd9ff" stroke-width="2" fill="#16201f"/>
   <g stroke="#3f5a60" stroke-width="6" stroke-linecap="round">

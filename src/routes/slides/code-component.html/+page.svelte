@@ -18,7 +18,7 @@ if __name__ == "__main__":
 <ContentPage title="Code" subtitle="Read-only Monaco editor for any language">
 	<div style="font-size: 0.8em;">
 		<p>Same editor as JavaCode, but the <code>language</code> prop picks the grammar &mdash; here, Python:</p>
-		<Code code={code} language="python" width="900px" height="270px" />
+		<Code code={code} language="python" width="100%" height="7em" />
 		<p style="margin-top: 0.5em; opacity: 0.7; font-size: 0.85em;">
 			Props: <code>code</code>, <code>language</code> (default <code>"java"</code>),
 			<code>width</code>, <code>height</code>, <code>foldAllAtStart</code>,

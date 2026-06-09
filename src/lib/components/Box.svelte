@@ -114,13 +114,17 @@
 
     .parent .close,
     .parent .link {
-		font-size: small;
+		/* Was the absolute keyword `small`, which ignored the canvas font-size
+		   lever and stayed tiny. Use a relative size so the button (its width,
+		   height and offsets are all em, i.e. relative to this) scales with the
+		   canvas. */
+		font-size: 0.85em;
         position: absolute;
         overflow: hidden;
         cursor: pointer;
 		background-color: lightblue;
 		color: black;
-        border-radius: 3px;
+        border-radius: 4.5px;
         align-content: center;
         text-align: center;
         top: calc(50% - var(--full-height) / 2);
@@ -128,13 +132,13 @@
     }
 
 	.parent .close {
-		right: calc(100% - 6px - 0.5 * var(--full-width));
+		right: calc(100% - 9px - 0.5 * var(--full-width));
 		width: 5.5em;
 		padding: 0px;
 	}
 
     .parent .link {
-        left: calc(50% + 3px - var(--full-width) / 2);
+        left: calc(50% + 4.5px - var(--full-width) / 2);
         padding-top: 0px;
         padding-bottom: 0px;
         padding-left: 1em;
@@ -152,9 +156,9 @@
 	}
 
 	.parent.expanded .close {
-		top: calc(50% - 1.5em - 3px - var(--full-height) / 2);
+		top: calc(50% - 1.5em - 4.5px - var(--full-height) / 2);
 		height: 1.5em;
-		padding: 3px;
+		padding: 4.5px;
 		transition:
             /* Duration         Delay */
 			var(--box-ani-time) calc(1 * var(--box-ani-time)) top,
@@ -163,10 +167,10 @@
 	}
 
 	.parent.expanded .link {
-		top: calc(50% - 1.5em - 3px - var(--full-height) / 2);
+		top: calc(50% - 1.5em - 4.5px - var(--full-height) / 2);
 		height: 1.5em;
-		padding-top: 3px;
-		padding-bottom: 3px;
+		padding-top: 4.5px;
+		padding-bottom: 4.5px;
 		padding-left: 1em;
 		padding-right: 1em;
 		transition:
@@ -188,7 +192,7 @@
 		margin-top: calc(50% - var(--full-height) / 2);
 		margin-left: 50%;
 		box-shadow:
-			2px 2px 0px black,
+			3px 3px 0px black,
 			0 0 0 9999px rgb(0, 0, 0, 0);
 		transition:
             /* Duration         Delay */
@@ -201,14 +205,14 @@
 	}
 
 	.parent.expanded .img-box {
-		border-radius: 3px;
-		border: 5px solid lightblue;
+		border-radius: 4.5px;
+		border: 7.5px solid lightblue;
 		width: var(--full-width);
 		height: var(--full-height);
 		margin-top: calc(50% - var(--full-height) / 2);
 		margin-left: calc(50% - var(--full-width) / 2);
 		box-shadow:
-			2px 2px 10px black,
+			3px 3px 15px black,
 			0 0 0 9999px rgb(0, 0, 0, var(--shadow-opacity));
 		transition:
 			var(--box-ani-time) calc(0 * var(--box-ani-time)) width,

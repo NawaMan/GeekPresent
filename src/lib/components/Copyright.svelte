@@ -21,8 +21,10 @@
 		position: absolute;
 		padding-left: 0.5em;
 		padding-right: 0px;
-		bottom: 0px;
-		right: 0px;
+		/* Vertical position knob: negative = lower, positive = higher. */
+		bottom: -10px;
+		/* Horizontal position knob: negative = further right, positive = further left. */
+		right: 5px;
 		margin-right: 0.5em;
 		font-size: 1.5em;
 		font-weight: bold;
