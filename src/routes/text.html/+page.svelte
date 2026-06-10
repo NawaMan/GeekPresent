@@ -2,8 +2,9 @@
   Sample Text artifact.
 
   One long page authored by hand: prose, an imported (colocated) image, code
-  blocks and reused $lib components, all flowing down a fixed 1920px column.
-  It is deliberately taller than one screen to show the continuous scroll.
+  blocks and reused $lib components, all flowing down a fluid column that follows
+  the window (capped at 1080px). It is deliberately taller than one screen to
+  show the continuous scroll.
 -->
 <script lang="ts">
 	import Label from '$lib/components/Label.svelte';
@@ -15,9 +16,9 @@
 <p>
 	This page is a <Label style="color: #7fd9ff;">Text artifact</Label> — the
 	second kind of thing NawaPresent builds. A presentation is many discrete
-	slides, each a fixed 1920&times;1080 canvas. A Text is one single page: a fixed
-	1920px wide, with a flexible height that grows as you add content. You author
-	it by hand and it scrolls.
+	slides, each a fixed 1920&times;1080 canvas. A Text is one single page: a fluid
+	column that follows the window (up to 1080px), with a flexible height that
+	grows as you add content. You author it by hand and it scrolls.
 </p>
 
 <img src={diagram} alt="A presentation is many fixed slides; a text is one long page that scrolls." />
@@ -52,7 +53,7 @@
 
 <pre><code>src/routes/text.html/
   +layout.js       prerender = true; trailingSlash = "never"
-  +layout.svelte   the Text shell: 1920-wide column, mode = 'text'
+  +layout.svelte   wraps the content in the shared &lt;TextPage&gt; shell
   +page.svelte     this content
   presentation-vs-text.svg   a colocated image, imported below</code></pre>
 
@@ -69,14 +70,15 @@
 &lt;img src=&#123;diagram&#125; alt="..." /&gt;
 &lt;p&gt;Text with an inline &lt;Label&gt;highlight&lt;/Label&gt;.&lt;/p&gt;</code></pre>
 
-<h2>Fixed width</h2>
+<h2>Fluid width</h2>
 
 <p>
-	The column is a fixed 1920px and does not scale to the window (its
-	&ldquo;FIXED&rdquo; mode). On a narrow window the page simply scrolls
-	sideways, the same way a presentation&rsquo;s FIXED display shows a slide at
-	native size. Because the width never changes, anything you lay out
-	horizontally — columns, wide images, code — keeps its proportions on every
+	The column follows the window rather than staying a fixed size: it grows and
+	shrinks with the browser, keeping equal margins on each side, and caps at
+	1080px so lines never run too long on a wide monitor (past that it simply
+	centers). On a narrow window the text reflows to fit instead of scrolling
+	sideways. Unlike a slide — which is a fixed 1920&times;1080 canvas scaled to
+	fit — a Text is a real document that lays itself out to the reader&rsquo;s
 	screen.
 </p>
 
@@ -134,7 +136,8 @@
 	img {
 		display: block;
 		width: 100%;
-		max-width: 1500px;
+		/* Size knob: caps the diagram so it sits in proportion with the text. */
+		max-width: 900px;
 		margin: 1.5em 0;
 	}
 </style>

@@ -236,7 +236,7 @@ The presentation is print-friendly — the navigation, Table of Contents, and mo
 
 ## Text view (long-form)
 
-Alongside slides, NawaPresent builds a second artifact type — a **Text**: *one long page* (a fixed 1280px wide, height grows with the content) that you author by hand and scroll, reusing the same components. It's the read-at-your-own-pace counterpart to a deck.
+Alongside slides, NawaPresent builds a second artifact type — a **Text**: *one long page* (fluid width that follows the window, capped at 1080px; height grows with the content) that you author by hand and scroll, reusing the same components. It's the read-at-your-own-pace counterpart to a deck.
 
 - The site's **landing page** (`/`) and the sample at **`/text.html`** are Text artifacts — see `src/routes/(home)/` and `src/routes/text.html/`.
 - The Table of Contents' "View as article" link opens `/text.html`.
