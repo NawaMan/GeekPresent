@@ -5,7 +5,7 @@
   presentations. Links are relative to `/`, so they resolve to the sibling
   routes (/text.html, /slides/title.html, /demo/title.html).
 -->
-<h1>NawaPresent</h1>
+<h1>GeekPresent</h1>
 
 <p>
 	This project holds two kinds of artifact, both built from the same components:
@@ -26,7 +26,7 @@
 <h2>Presentations</h2>
 <ul>
 	<li>
-		<a href="slides/title.html">NawaPresent</a> &mdash; the main presentation:
+		<a href="slides/title.html">GeekPresent</a> &mdash; the main presentation:
 		a guide to building decks with this framework.
 	</li>
 	<li>
@@ -34,7 +34,7 @@
 		presentation with its own theme.
 	</li>
 	<li>
-		<a href="tall/title.html">NawaTall</a> &mdash; a portrait
+		<a href="tall/title.html">GeekPortrait</a> &mdash; a portrait
 		1080&times;1920 deck for YouTube Shorts: same components, taller frame.
 	</li>
 </ul>

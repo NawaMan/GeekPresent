@@ -1,7 +1,7 @@
 <!--
   TextPage — the reusable shell for a Text artifact.
 
-  A Text is the second kind of NawaPresent artifact: ONE long page whose height
+  A Text is the second kind of GeekPresent artifact: ONE long page whose height
   grows with the content that flows down it, authored by hand and reusing the
   same $lib components as the slides (it is NOT generated from a presentation).
 

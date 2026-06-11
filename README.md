@@ -1,6 +1,6 @@
 <div align="center">
 
-# 📽️ NawaPresent
+# 📽️ GeekPresent
 
 **Slides for people who'd rather write HTML than wrestle a slide editor.**
 
@@ -15,7 +15,7 @@ the whole presentation is a static site, and it deploys to GitHub Pages.
 
 ## Why this project exists
 
-If you do any front-end work you already know HTML + CSS + JS, and you've probably wished you could just *use* that to make slides instead of fighting a WYSIWYG tool. NawaPresent lets you do exactly that — and takes care of the tedious parts:
+If you do any front-end work you already know HTML + CSS + JS, and you've probably wished you could just *use* that to make slides instead of fighting a WYSIWYG tool. GeekPresent lets you do exactly that — and takes care of the tedious parts:
 
 - **No manual paging or navigation.** List your slides once in `pages.ts`; arrow keys, the on-screen nav bar, and the Table of Contents are wired up for you.
 - **Fixed canvas, automatic scaling.** You design on a fixed **1280×720** canvas and position things with normal CSS — including absolute positioning at exact pixels — and the framework scales the whole slide to fit any screen. You think in one size; it handles the rest.
@@ -80,7 +80,7 @@ Two templates cover most slides.
 </script>
 
 <TitlePage>
-  <span slot="title">NawaPresent</span>
+  <span slot="title">GeekPresent</span>
   <span slot="subtitle">How to Build Presentations</span>
   <span slot="subsubtitle">Your Name</span>
 </TitlePage>
@@ -236,7 +236,7 @@ The presentation is print-friendly — the navigation, Table of Contents, and mo
 
 ## Text view (long-form)
 
-Alongside slides, NawaPresent builds a second artifact type — a **Text**: *one long page* (fluid width that follows the window, capped at 1080px; height grows with the content) that you author by hand and scroll, reusing the same components. It's the read-at-your-own-pace counterpart to a deck.
+Alongside slides, GeekPresent builds a second artifact type — a **Text**: *one long page* (fluid width that follows the window, capped at 1080px; height grows with the content) that you author by hand and scroll, reusing the same components. It's the read-at-your-own-pace counterpart to a deck.
 
 - The site's **landing page** (`/`) and the sample at **`/text.html`** are Text artifacts — see `src/routes/(home)/` and `src/routes/text.html/`.
 - The Table of Contents' "View as article" link opens `/text.html`.

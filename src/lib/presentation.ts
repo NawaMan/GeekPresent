@@ -8,7 +8,7 @@
 import { getContext, setContext } from 'svelte';
 import type { Page } from '$lib/utils/navigate';
 
-const PAGES_KEY = Symbol('nawapresent.pages');
+const PAGES_KEY = Symbol('geekpresent.pages');
 
 /** Publish this presentation's slide list. Call from its +layout.svelte. */
 export function setPages(pages: Array<Page>): void {
@@ -31,7 +31,7 @@ export function getPages(): Array<Page> {
 // doesn't is treated as a presentation.
 export type Mode = 'presentation' | 'text';
 
-const MODE_KEY = Symbol('nawapresent.mode');
+const MODE_KEY = Symbol('geekpresent.mode');
 
 /** Publish this artifact's mode. Call from its +layout.svelte. */
 export function setMode(mode: Mode): void {

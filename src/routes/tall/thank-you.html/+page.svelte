@@ -6,5 +6,5 @@
 <TitlePage>
 	<span slot="title">Thank You</span>
 	<span slot="subtitle">Like &amp; subscribe</span>
-	<span slot="subsubtitle">Built with NawaPresent</span>
+	<span slot="subsubtitle">Built with GeekPresent</span>
 </TitlePage>

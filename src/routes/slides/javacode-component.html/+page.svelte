@@ -10,7 +10,7 @@
 
 public class Greeter {
     public static void main(String[] args) {
-        List.of("world", "NawaPresent").forEach(Greeter::greet);
+        List.of("world", "GeekPresent").forEach(Greeter::greet);
     }
 
     static void greet(String name) {

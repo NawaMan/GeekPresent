@@ -1,12 +1,12 @@
 <!--
   Example: Content Page - Introduction
-  File: src/routes/slides/what-is-nawapresent.html/+page.svelte
+  File: src/routes/slides/what-is-geekpresent.html/+page.svelte
 -->
 <script>
 	import ContentPage from '$lib/templates/ContentPage.svelte';
 </script>
 
-<ContentPage title="What is NawaPresent?" subtitle="A SvelteKit-based presentation framework">
+<ContentPage title="What is GeekPresent?" subtitle="A SvelteKit-based presentation framework">
 	<ul>
 		<li><b>SvelteKit</b> static site &mdash; each slide is a route</li>
 		<li><b>1920x1080</b> fixed canvas that scales to fit any screen</li>

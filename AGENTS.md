@@ -1,4 +1,4 @@
-# AGENTS.md — Working on NawaPresent
+# AGENTS.md — Working on GeekPresent
 
 Guidance for an AI agent (Claude Code or similar) helping a user build a presentation with this
 framework. The user will usually ask in plain language ("help me add a YouTube link",

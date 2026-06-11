@@ -1,7 +1,7 @@
 <!--
   Text artifact route.
 
-  A Text is the second kind of NawaPresent artifact: ONE long page, whose height
+  A Text is the second kind of GeekPresent artifact: ONE long page, whose height
   grows with the content that flows down it. It is authored by hand (in
   +page.svelte) and reuses the same $lib components as the slides — it is NOT
   generated from a presentation.

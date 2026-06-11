@@ -13,7 +13,7 @@
 </script>
 
 <TitlePage>
-	<span slot="title">NawaPresent</span>
+	<span slot="title">GeekPresent</span>
 	<span slot="subtitle">How to Build Presentations</span>
 	<span slot="subsubtitle">A quick guide to get you started<br/>
 		<a href="../" style="font-size: 0.55em; opacity: 0.85; color: inherit;">↑ back to the home page</a></span>

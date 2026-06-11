@@ -15,7 +15,7 @@
 
 <p>
 	This page is a <Label style="color: #7fd9ff;">Text artifact</Label> — the
-	second kind of thing NawaPresent builds. A presentation is many discrete
+	second kind of thing GeekPresent builds. A presentation is many discrete
 	slides, each a fixed 1920&times;1080 canvas. A Text is one single page: a fluid
 	column that follows the window (up to 1080px), with a flexible height that
 	grows as you add content. You author it by hand and it scrolls.
@@ -97,7 +97,7 @@
 <p>
 	The same material often wants two shapes. A talk is a sequence of slides you
 	advance through, one idea per frame. An article is a continuous read you
-	scroll at your own pace. Rather than force one into the other, NawaPresent
+	scroll at your own pace. Rather than force one into the other, GeekPresent
 	lets you author both from the same toolbox — a presentation when you are on
 	stage, a Text when someone wants to read it later.
 </p>

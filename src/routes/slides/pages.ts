@@ -1,6 +1,6 @@
 export const pages = [
     { path: "title.html",             title: "Title" },
-    { path: "what-is-nawapresent.html", title: "What is NawaPresent?" },
+    { path: "what-is-geekpresent.html", title: "What is GeekPresent?" },
     { path: "project-structure.html", title: "Project Structure" },
     { path: "title-page.html",        title: "Using TitlePage" },
     { path: "content-page.html",      title: "Using ContentPage" },
