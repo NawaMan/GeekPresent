@@ -1,6 +1,6 @@
 <script lang="ts">
     export let name    = 'NawaMan';
-    export let url     = 'https://nawaman.net/contact.html';
+    export let url     = 'https://nawaman.net/contact';
     export let year    = new Date().getFullYear().toString();
 </script>
 

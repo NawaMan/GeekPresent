@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 320" fill="none">
+  <!-- Landscape frame: 1920x1080 (16:9) -->
+  <rect x="22" y="93" width="240" height="135" rx="10"
+        stroke="#9fb6c2" stroke-width="3"/>
+  <text x="142" y="166" text-anchor="middle" fill="#9fb6c2"
+        font-family="sans-serif" font-size="18">1920&#215;1080</text>
+
+  <!-- Arrow: same deck, reframed -->
+  <line x1="288" y1="160" x2="352" y2="160" stroke="#9fb6c2" stroke-width="3"/>
+  <path d="M352 160 l-14 -8 v16 z" fill="#9fb6c2"/>
+
+  <!-- Portrait frame: 1080x1920 (9:16) -->
+  <rect x="420" y="40" width="135" height="240" rx="10"
+        stroke="#7fd9ff" stroke-width="3.5"/>
+  <text x="487" y="166" text-anchor="middle" fill="#7fd9ff"
+        font-family="sans-serif" font-size="16"
+        transform="rotate(90 487 160)">1080&#215;1920</text>
+</svg>
