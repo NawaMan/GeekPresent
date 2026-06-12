@@ -27,6 +27,6 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-<SlideDeck {pages} width={1920} height={1080} fill>
+<SlideDeck {pages} title="GeekPresent" width={1920} height={1080} fill>
 	<slot />
 </SlideDeck>

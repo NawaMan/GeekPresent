@@ -57,7 +57,7 @@
         content: '';
         display: block;
         margin-top: 15px; /* Adjust space after <br> */
-        border-bottom: 4.5px solid aliceblue; /* Add a line after <br> */
+        border-bottom: 4.5px solid var(--subtitle-rule, #F0F8FF); /* Add a line after <br> */
     }
     .page .content {
         /* cosmetic */

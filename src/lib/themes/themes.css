@@ -1,0 +1,47 @@
+/*
+  Theme palettes — Tier 1, "the few knobs".
+
+  Each theme is just a block of BASE colors. The role tokens (Tier 2, in
+  roles.css) reference these, so changing one base color here moves every role
+  that points at it. A deck opts into a theme by putting its class on the same
+  element that carries the role tokens (the deck's `.content`), e.g.
+
+      <div class="content theme-light"> ... </div>
+
+  Switch a deck dark<->light by changing that one class. Add a new palette by
+  copying a block and renaming it. For a one-off deviation a theme may also set a
+  role token directly (e.g. `--box-border: #ADD8E6;`) — see the dark block.
+
+  All values are 6-digit UPPERCASE hex by convention.
+*/
+
+.theme-dark {
+	--INK:          #C0F1FF;  /* body text, most foregrounds        */
+	--INK-DIM:      #333333;  /* idle/disabled text                 */
+	--PAPER:        #181818;  /* slide surface                      */
+	--PAPER-RAISED: #1E1E1E;  /* buttons, code title bar            */
+	--PANEL:        #EEEEEE;  /* TOC popover                        */
+	--LINE:         #CCCCCC;  /* borders / dividers                 */
+	--ACCENT:       #2980B9;  /* hover, links, box border, rule     */
+	--ACCENT-2:     #00B356;  /* selected / success                 */
+	--ON-ACCENT:    #FFFFFF;  /* text over an accent fill           */
+	--BACKDROP:     #000000;  /* letterbox + box overlay surface    */
+
+	/* Role deviations: keep the classic light-blue box chrome in dark. */
+	--box-border:   #ADD8E6;
+	--box-btn-bg:   #ADD8E6;
+	--box-btn-fg:   #000000;
+}
+
+.theme-light {
+	--INK:          #2B2B2B;
+	--INK-DIM:      #6B6B6B;
+	--PAPER:        #F4EFE4;
+	--PAPER-RAISED: #E8E0CC;
+	--PANEL:        #F6F1E4;
+	--LINE:         #C9BFA6;
+	--ACCENT:       #5B8FB0;
+	--ACCENT-2:     #5A9367;
+	--ON-ACCENT:    #FFFFFF;
+	--BACKDROP:     #E7DFCC;
+}

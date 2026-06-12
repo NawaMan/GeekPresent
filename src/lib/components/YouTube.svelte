@@ -32,7 +32,7 @@ img {
     margin-left: auto;
     margin-right: auto;
     margin-bottom: 1em;
-    border: 3px white solid;
+    border: 3px var(--media-frame, #FFFFFF) solid;
     border-radius: 7.5px;
 }
 .youtube {

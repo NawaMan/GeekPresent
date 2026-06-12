@@ -80,10 +80,10 @@
 		padding-bottom: 0em;
 		margin: 0em;
 		margin-left: 0.2em;
-		border: 1.5px solid #ccc;
+		border: 1.5px solid var(--toc-border, #CCCCCC);
 		border-radius: 3px;
-		color: #111;
-		background-color: #eee;
+		color: var(--toc-fg, #111111);
+		background-color: var(--toc-bg, #EEEEEE);
 	}
 
 	.toc .content ol {
@@ -103,6 +103,6 @@
 	}
 	#article:hover,
 	.toc .content ol li:hover {
-		background-color: #ddd;
+		background-color: var(--toc-row-hover-bg, #DDDDDD);
 	}
 </style>

@@ -24,6 +24,6 @@
 	setPages(pages);
 </script>
 
-<SlideDeck {pages} width={1080} height={1920} baseFontSize="1.8em" fill>
+<SlideDeck {pages} title="GeekPortrait" width={1080} height={1920} baseFontSize="1.8em" fill>
 	<slot />
 </SlideDeck>

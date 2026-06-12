@@ -122,8 +122,8 @@
         position: absolute;
         overflow: hidden;
         cursor: pointer;
-		background-color: lightblue;
-		color: black;
+		background-color: var(--box-btn-bg, #ADD8E6);
+		color: var(--box-btn-fg, #000000);
         border-radius: 4.5px;
         align-content: center;
         text-align: center;
@@ -184,9 +184,9 @@
 		padding: 0px;
 		overflow-x: hidden;
 		overflow-y: var(--scrollable);
-		background-color: black;
+		background-color: var(--box-bg, #000000);
 
-		border: 0px solid lightblue;
+		border: 0px solid var(--box-border, #ADD8E6);
 		width: 0px;
 		height: 0px;
 		margin-top: calc(50% - var(--full-height) / 2);
@@ -206,7 +206,7 @@
 
 	.parent.expanded .img-box {
 		border-radius: 4.5px;
-		border: 7.5px solid lightblue;
+		border: 7.5px solid var(--box-border, #ADD8E6);
 		width: var(--full-width);
 		height: var(--full-height);
 		margin-top: calc(50% - var(--full-height) / 2);

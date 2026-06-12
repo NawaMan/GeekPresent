@@ -16,12 +16,23 @@
 	import '$lib/styles/tooltip.css';
 
 	import { setMode }   from '$lib/presentation';
+	import { SITE_TITLE } from '$lib/utils/navigate';
 	import NavigationBar from '$lib/components/NavigationBar.svelte';
 
 	// Publish this artifact's mode so reused components can adapt (e.g. the slide
 	// nav bar becomes a single TOP control that scrolls this container up).
 	setMode('text');
+
+	// Browser-tab <title> for this Text artifact. A Text is one page, so there is no
+	// page-vs-presentation cascade — just this one title, defaulting to the site
+	// name (the same default a deck falls back to). A route can override it via
+	// <TextPage title="...">.
+	export let title: string = SITE_TITLE;
 </script>
+
+<svelte:head>
+	<title>{title}</title>
+</svelte:head>
 
 <div class="text-scroll" data-text-scroll>
 	<div class="text-page">
@@ -36,7 +47,7 @@
 		width: 100vw;
 		height: 100vh;
 		overflow: auto;
-		background: #181818;
+		background: var(--surface-bg, #181818);
 	}
 
 	.text-page {
@@ -52,8 +63,8 @@
 		margin: 0 auto;
 		padding: 36px 60px 96px;
 		box-sizing: border-box;
-		color: #c0f1ff;
-		background: #181818;
+		color: var(--surface-fg, #C0F1FF);
+		background: var(--surface-bg, #181818);
 		font-family: 'Noto Sans', 'Cormorant Garamond', serif;
 	}
 </style>

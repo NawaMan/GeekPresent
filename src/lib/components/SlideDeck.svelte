@@ -32,10 +32,16 @@
 	import { page }       from '$app/stores';
 	import { onMount }    from 'svelte';
 	import { scaleMode }  from '$lib/stores/scaleMode';
+	import { documentTitle } from '$lib/utils/navigate';
 	import type { Page }  from '$lib/utils/navigate';
 
 	/** This deck's slide list — for the Table of Contents rendered in the shell. */
 	export let pages: Array<Page> = [];
+	/** Presentation-level document title (the deck name) — the <title> counterpart
+	    to the presentation favicon a +layout.svelte sets. Composed with the current
+	    slide's own `title` into the browser-tab <title>; falls back to the site
+	    default (SITE_TITLE) when left undefined. */
+	export let title: string | undefined = undefined;
 	/** Canvas size in px. Landscape: 1920x1080. Portrait (Tall): 1080x1920. */
 	export let width  = 1920;
 	export let height = 1080;
@@ -65,6 +71,12 @@
 	// site default (app.html) and any presentation favicon set in the deck's layout.
 	$: currentSlide   = $page.url.pathname.replace(/\/+$/, '').split('/').pop();
 	$: currentFavicon = pages.find((p) => p.path === currentSlide)?.favicon;
+	// Page-level document title, same cascade idea as the favicon above but emitted
+	// as ONE <title> (the browser uses the FIRST <title>, so it can't stack the way
+	// the favicon links do): the current slide's own `title` from pages.ts, composed
+	// with this deck's `title` prop into "Slide — Deck". See documentTitle.
+	$: currentTitle   = pages.find((p) => p.path === currentSlide)?.title;
+	$: docTitle       = documentTitle(currentTitle, title);
 
 	function adjustSize() {
 		if (!container)
@@ -122,6 +134,7 @@
 </script>
 
 <svelte:head>
+	<title>{docTitle}</title>
 	{#if currentFavicon}
 		<link rel="icon" href={currentFavicon} />
 	{/if}
@@ -150,8 +163,8 @@
 		margin: 0 auto;
 		display: flex;
 		flex-direction: column;
-		background: #181818;
-		border: 1.5px solid #ccc;
+		background: var(--surface-bg, #181818);
+		border: 1.5px solid var(--frame-border, #CCCCCC);
 		position: relative;
 	}
 	.container.scale-mode {
@@ -183,8 +196,8 @@
 		display: flex;
 		justify-content: center;
 		align-items: center;
-		color: #C0F1FF;
-		background: #181818;
+		color: var(--surface-fg, #C0F1FF);
+		background: var(--surface-bg, #181818);
 		font-family: 'Noto Sans', 'Cormorant Garamond', serif;
 	}
 	/* Keep the content OUT OF LAYOUT until JS has applied the scale transform (the

@@ -14,6 +14,6 @@
 	import TextPage from '$lib/components/TextPage.svelte';
 </script>
 
-<TextPage>
+<TextPage title="Text — GeekPresent">
 	<slot />
 </TextPage>

@@ -37,4 +37,8 @@
 		<a href="tall/title.html">GeekPortrait</a> &mdash; a portrait
 		1080&times;1920 deck for YouTube Shorts: same components, taller frame.
 	</li>
+	<li>
+		<a href="geeklight/title.html">GeekLight</a> &mdash; a light-theme
+		presentation: same components on a light watercolor background.
+	</li>
 </ul>

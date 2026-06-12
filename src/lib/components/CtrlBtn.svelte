@@ -31,30 +31,30 @@
 		text-justify: center;
 		text-align: center;
 		/* background-color: #061e30; */
-		background: #181818;
-		color: #333;
+		background: var(--ctrl-bg, #181818);
+		color: var(--ctrl-fg, #333333);
 		font-weight: bold;
 		border: 0px;
 	}
 
 	button:hover:not(:disabled) {
 		/* cosmetic */
-		color: #fff;
-		background-color: #2980b9;
+		color: var(--on-accent, #FFFFFF);
+		background-color: var(--ctrl-hover-bg, #2980B9);
 	}
 	button.selected {
 		/* cosmetic */
-		color: #fff;
-		background-color: #00b356;
+		color: var(--on-accent, #FFFFFF);
+		background-color: var(--ctrl-selected-bg, #00B356);
 	}
 	button:active:not(:disabled) {
 		/* cosmetic */
-		box-shadow: 0 3px #0056b3;
+		box-shadow: 0 3px var(--ctrl-active-shadow, #0056B3);
 		transform: translateY(4.5px);
 	}
 	button:disabled {
 		/* functional */
-		color: #222;
+		color: var(--ctrl-disabled-fg, #222222);
 		cursor: default;
 	}
 

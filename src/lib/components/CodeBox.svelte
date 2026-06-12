@@ -29,8 +29,8 @@
         padding: 0 0.8em;
         font-family: 'Fira Code', monospace;
         font-weight: bold;
-        color: #fff;
-        background: #1e1e1e;
-        border-bottom: 1.5px solid #333;
+        color: var(--code-title-fg, #FFFFFF);
+        background: var(--code-title-bg, #1E1E1E);
+        border-bottom: 1.5px solid var(--code-title-border, #333333);
     }
 </style>

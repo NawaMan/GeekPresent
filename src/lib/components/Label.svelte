@@ -33,7 +33,7 @@
 <style>
 .label {
     font-weight: bold;
-    color: burlywood;
+    color: var(--label-fg, #DEB887);
     cursor: help;
 }
 </style>

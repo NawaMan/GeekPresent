@@ -14,6 +14,7 @@
 	import { pages }      from './pages';
 	import { setPages }   from '$lib/presentation';
 	import { scaleMode }  from '$lib/stores/scaleMode';
+	import { documentTitle } from '$lib/utils/navigate';
 
 	// This presentation's own favicon, colocated in the folder.
 	import favicon from './favicon.png';
@@ -24,6 +25,10 @@
 	// Current slide's optional favicon (declared in pages.ts) — see <svelte:head>.
 	$: currentSlide   = $page.url.pathname.replace(/\/+$/, '').split('/').pop();
 	$: currentFavicon = pages.find((p) => p.path === currentSlide)?.favicon;
+	// Browser-tab <title>: this slide's own `title` composed with the deck name
+	// ("Demo") into "Slide — Demo". Emitted as ONE <title> below (the browser uses
+	// the first <title>, so it can't stack like the favicon links). See documentTitle.
+	$: docTitle       = documentTitle(pages.find((p) => p.path === currentSlide)?.title, 'Demo');
 
 	let container: HTMLElement;
 	let content:   HTMLElement;
@@ -91,6 +96,7 @@
   onMount, so a page's own <svelte:head> would only apply after hydration.)
 -->
 <svelte:head>
+	<title>{docTitle}</title>
 	<link rel="icon" href={favicon} />
 	{#if currentFavicon}
 		<link rel="icon" href={currentFavicon} />
