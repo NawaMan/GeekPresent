@@ -9,6 +9,7 @@
 	import SizeMode       from '$lib/components/SizeMode.svelte';
 
 	import { browser }    from '$app/environment';
+	import { page }       from '$app/stores';
 	import { onMount }    from 'svelte';
 	import { pages }      from './pages';
 	import { setPages }   from '$lib/presentation';
@@ -19,6 +20,10 @@
 
 	// Publish this presentation's slide list to its slides (nav + ToC read it).
 	setPages(pages);
+
+	// Current slide's optional favicon (declared in pages.ts) — see <svelte:head>.
+	$: currentSlide   = $page.url.pathname.replace(/\/+$/, '').split('/').pop();
+	$: currentFavicon = pages.find((p) => p.path === currentSlide)?.favicon;
 
 	let container: HTMLElement;
 	let content:   HTMLElement;
@@ -75,9 +80,21 @@
 
 </script>
 
-<!-- Per-presentation theming: this presentation's own favicon + a custom web font. -->
+<!--
+  The favicon cascade, all emitted from this (non-gated) layout head so it lands
+  in the prerendered HTML — last <link rel="icon"> wins:
+    1. site default        — src/app.html (rendered before %sveltekit.head%)
+    2. presentation default — {favicon}, this deck's own icon (overrides the site)
+    3. page override        — {currentFavicon}, the current slide's own icon from
+                              pages.ts, if any (overrides the presentation)
+  (Emitted here, not from each +page.svelte: this deck gates the slide <slot> on
+  onMount, so a page's own <svelte:head> would only apply after hydration.)
+-->
 <svelte:head>
 	<link rel="icon" href={favicon} />
+	{#if currentFavicon}
+		<link rel="icon" href={currentFavicon} />
+	{/if}
 	<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&display=swap" />
 </svelte:head>
 

@@ -1,5 +1,7 @@
 <script>
 	import TitlePage from '$lib/templates/TitlePage.svelte';
+	// This slide's favicon is declared in demo/pages.ts (favicon: ./favicon.svg)
+	// and emitted by the deck shell, so it lands in the prerendered HTML.
 </script>
 
 <TitlePage>

@@ -29,6 +29,7 @@
 	import SizeMode       from '$lib/components/SizeMode.svelte';
 
 	import { browser }    from '$app/environment';
+	import { page }       from '$app/stores';
 	import { onMount }    from 'svelte';
 	import { scaleMode }  from '$lib/stores/scaleMode';
 	import type { Page }  from '$lib/utils/navigate';
@@ -57,6 +58,14 @@
 	let   initialized = false;
 	$: aspectRatio = width / height;
 
+	// Page-level favicon. The shell renders at SSR (only the slide *content* below
+	// is gated on onMount), so emitting the current slide's favicon HERE puts it in
+	// the prerendered HTML — no flicker, works without JS. Last <link rel="icon">
+	// wins, so a slide's favicon (declared in its pages.ts entry) overrides both the
+	// site default (app.html) and any presentation favicon set in the deck's layout.
+	$: currentSlide   = $page.url.pathname.replace(/\/+$/, '').split('/').pop();
+	$: currentFavicon = pages.find((p) => p.path === currentSlide)?.favicon;
+
 	function adjustSize() {
 		if (!container)
 			return;
@@ -80,12 +89,13 @@
 			container.style.width = 'calc(100vw - 10px)';
 			container.style.height = `${Math.round(container.offsetWidth / aspectRatio)}px`;
 		}
-		// fill: content box == canvas, so scale straight to the container's INNER
-		// width (clientWidth excludes the 1.5px border) and it fills the area inside
-		// the frame on both axes — keeping the white border line visible.
-		// Legacy: the -45 compensates for the +20/padding fudge.
+		// fill: content box == full canvas (same aspect as the frame), so fit it to
+		// the container's INNER box (client* excludes the 1.5px border) by the
+		// binding axis. The two ratios are equal up to rounding; Math.min guarantees
+		// the box never overflows the border on either axis. Result: edge-to-edge.
+		// Legacy (non-fill): the -45 compensates for the +20/padding width fudge.
 		let scale = fill
-			? container.clientWidth / width
+			? Math.min(container.clientWidth / width, container.clientHeight / height)
 			: (container.offsetWidth - 45) / width;
 		content.style.transform = `scale(${scale})`;
 		content.style.transformOrigin = 'top left';
@@ -111,13 +121,19 @@
 
 </script>
 
+<svelte:head>
+	{#if currentFavicon}
+		<link rel="icon" href={currentFavicon} />
+	{/if}
+</svelte:head>
+
 <div
 	class="container"
 	class:scale-mode={isScaled}
-	style="--canvas-w:{width}px; --canvas-h:{height}px; --base-font:{baseFontSize};"
+	style="--canvas-w:{width}px; --canvas-h:{height}px; --aspect:{aspectRatio}; --base-font:{baseFontSize};"
 	bind:this={container}
 >
-	<div class="content" class:fill bind:this={content}>
+	<div class="content" class:fill class:ready={initialized} bind:this={content}>
 		{#if initialized}
 		<slot />
 		<TableOfContent {pages} />
@@ -139,10 +155,17 @@
 		position: relative;
 	}
 	.container.scale-mode {
-		width: 100%;
-		height: 100%;
-		max-width: 100vw;
-		max-height: 100vh;
+		/* Fit the frame to the window by ASPECT, in pure CSS, so first paint is
+		   already the right shape — before onMount/adjustSize() runs. Without this
+		   the frame starts at width:100% (full window width) and then JS snaps it
+		   to the fitted size: a barely-visible nudge on a ~landscape window, but a
+		   jarring wide->narrow blink on a portrait (Tall) canvas. adjustSize() still
+		   sets equivalent px inline (and tracks resize); this just owns first paint.
+		   Both axes are set EXPLICITLY (not width:auto + aspect-ratio) so the inner
+		   content's min-width can't inflate the frame back to canvas width. --aspect
+		   is canvas w/h as a unitless number, so length/number is valid in calc(). */
+		width:  min(calc(100vw - 10px), calc((100vh - 10px) * var(--aspect)));
+		height: min(calc(100vh - 10px), calc((100vw - 10px) / var(--aspect)));
 	}
 	.content {
 		/* Base font-size lever (see baseFontSize prop): every em-based size in the
@@ -164,17 +187,36 @@
 		background: #181818;
 		font-family: 'Noto Sans', 'Cormorant Garamond', serif;
 	}
+	/* Keep the content OUT OF LAYOUT until JS has applied the scale transform (the
+	   `ready` class flips on at onMount, right after the first adjustSize()). At its
+	   native px size (e.g. 1080x1920 for a Tall) the unscaled box overflows the
+	   fitted frame; with visibility:hidden it still triggers scrollbars and a
+	   wide->narrow "blink" on navigation. display:none removes it from layout
+	   entirely — adjustSize() only measures the CONTAINER, so this is safe. The
+	   container stays visible (correctly sized in CSS), so the gap shows an empty
+	   fitted frame, never an overflowing box. */
+	.content:not(.ready) {
+		display: none;
+	}
 	.content.fill {
-		/* Exact-fit width: the box IS the canvas width (padding folded in via
-		   border-box), so it fills inside the left/right border with no fudge.
-		   Height keeps the same -30 bottom slack as landscape so the slide chrome
-		   (nav bar / copyright, which hang at bottom:-10) sits INSIDE the bottom
-		   border instead of spilling over it. */
+		/* Exact-fit: the box IS the full canvas (padding folded in via border-box),
+		   so it fills the frame edge to edge on BOTH axes with no fudge — no aspect
+		   mismatch, no reserved bottom lane. The slide chrome (nav / copyright) would
+		   otherwise hang past the bottom border at its default bottom:-10, so it is
+		   pulled back inside below. */
 		box-sizing: border-box;
 		width: var(--canvas-w);
-		height: calc(var(--canvas-h) - 30px);
+		height: var(--canvas-h);
 		min-width: var(--canvas-w);
-		min-height: calc(var(--canvas-h) - 30px);
+		min-height: var(--canvas-h);
+	}
+	/* With a full-canvas fill box the chrome that normally hangs at bottom:-10 (in
+	   the content's own unscaled coords) would spill past the bottom border. Nudge
+	   it just inside, so it floats over the slide's bottom corners. Scoped to .fill,
+	   so non-fill landscape and the fixed text-mode nav are left untouched. */
+	.content.fill :global(.nav),
+	.content.fill :global(.copyright) {
+		bottom: 20px;
 	}
 
 	.container:not(.scale-mode) {

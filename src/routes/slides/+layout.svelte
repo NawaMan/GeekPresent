@@ -11,12 +11,22 @@
 	import { pages }    from './pages';
 	import { setPages } from '$lib/presentation';
 
+	// Presentation-level favicon for the whole main deck — overrides the site
+	// default (static/favicon.png) on every /slides/* page. The layout's head
+	// renders at SSR (only the slide content is onMount-gated), so it lands in the
+	// prerendered HTML. A single slide can still override this via its pages.ts entry.
+	import favicon from '$lib/assets/codecat-zoom.png';
+
 	// Publish this presentation's slide list to its slides (nav + ToC read it).
 	// Must be set here, not in SlideDeck: the slotted slides read THIS layout's
 	// context, not the shell's.
 	setPages(pages);
 </script>
 
-<SlideDeck {pages} width={1920} height={1080}>
+<svelte:head>
+	<link rel="icon" href={favicon} />
+</svelte:head>
+
+<SlideDeck {pages} width={1920} height={1080} fill>
 	<slot />
 </SlideDeck>

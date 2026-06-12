@@ -1,6 +1,10 @@
 export interface Page {
     path: string;
     title: string;
+    /** Optional page-level favicon (import a colocated asset so Vite bundles it).
+        Overrides the presentation/site favicon for just this slide; emitted by the
+        deck shell's <svelte:head>. See SlideDeck.svelte / demo/+layout.svelte. */
+    favicon?: string;
 }
 export interface PageNavigation {
     first: string | undefined;
