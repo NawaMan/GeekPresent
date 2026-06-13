@@ -38,6 +38,11 @@ pnpm preview    # preview the build
 pnpm deploy     # publish docs/ to GitHub Pages
 ```
 
+```bash
+./build-static.sh ./dist        # build the static site into any folder you choose
+./build-static.sh ./dist demo   # ...or just one presentation/text
+```
+
 ---
 
 ## How to use
@@ -280,3 +285,71 @@ pnpm deploy     # publishes docs/ to GitHub Pages (via gh-pages)
 ### Notes
 
 The build writes to `docs/`; `static/.nojekyll` ensures GitHub Pages serves SvelteKit's `_app/` directory (files starting with `_`) correctly. The site is served under the repo subpath (e.g. `/GeekPresent/`); adapter-static emits relative asset paths, so no `paths.base` configuration is required.
+
+## Build to a static folder of your choice
+
+GitHub Pages is just *one* consumer of the static build. Because every route is
+prerendered with **relative** asset paths, the output is fully portable — you can
+drop it on any static host, serve it from any sub-path, or open it straight off
+disk. The `build-static.sh` helper builds into a folder you name, without touching
+the committed `docs/`:
+
+```bash
+./build-static.sh <output-dir> [route]
+```
+
+- **`<output-dir>`** (required) — where to write the site. Created if missing; if it
+  already exists it must be empty or a previous output of this script (pass
+  `--force` to overwrite anything else).
+- **`[route]`** (optional) — build only **one** presentation/text instead of the
+  whole site. Use the route name as it appears in the URL (`demo`, `geeklight`,
+  `slides`, `tall`, `text.html`, …). Omit it to build everything (the home/landing
+  page and every presentation).
+
+Flags: `--zip` also packages the result into `<output-dir>.zip`; `--force`
+overwrites a non-empty folder; `--precompress` keeps the `.br`/`.gz` copies (see
+below); `-h`/`--help` prints full usage.
+
+```bash
+./build-static.sh ./dist                 # whole site            -> ./dist
+./build-static.sh /tmp/out demo          # just the demo deck    -> /tmp/out
+./build-static.sh ./out text.html        # just the text sample  -> ./out
+./build-static.sh --force ./dist         # overwrite a non-empty ./dist
+./build-static.sh --zip ./dist           # build ./dist and ./dist.zip
+```
+
+Either way the result is self-contained. For a single presentation, the script
+also writes a root `index.html` that redirects to that deck's first slide, and
+includes the shared runtime (`_app/`), fonts, and favicon it needs.
+
+### Preview the output
+
+Serve the folder with any static server (don't open `index.html` over `file://` —
+the routing and the CDN-loaded `Code` components expect `http://`):
+
+```bash
+npx http-server ./dist -p 8000        # then open http://127.0.0.1:8000/
+# or:  python3 -m http.server 8000 --directory ./dist
+```
+
+Point the server at the folder you built — if you've already `cd`'d **into** it,
+serve `.` (e.g. `npx http-server . -p 8000`) rather than `./dist`. (`pnpm preview`
+only serves the adapter's `docs/` dir, not a custom output folder.)
+
+### No precompressed clutter
+
+`build-static.sh` skips the `.br`/`.gz` files by default, so the output stays lean
+(e.g. the whole site is ~170 files instead of ~490). Those precompressed copies are
+only useful when the host serves them directly (nginx `gzip_static`, Caddy, …); for
+opening off disk, a simple static server, or GitHub Pages / Netlify / S3 (which
+compress on the fly) they're dead weight. Pass `--precompress` if your server
+actually consumes them:
+
+```bash
+./build-static.sh --precompress ./dist
+```
+
+> Under the hood the script sets `GEEKPRESENT_OUT` and `GEEKPRESENT_PRECOMPRESS`
+> (both consumed by `svelte.config.js`). With those unset, `pnpm build` still writes
+> to `docs/` with precompression on — exactly as before, so the GitHub Pages flow is
+> unchanged.

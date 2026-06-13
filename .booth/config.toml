@@ -1,6 +1,6 @@
-# Configured by: booth config --no-tui --overwrite --variant notebook --port 31000 --expose 31173:5173 --select nodejs+npmrc+vscode-ext+pnpm-install/claude-code+auto-accept+credential+settings-cache
+# Configured by: booth config --no-tui --overwrite --variant base --port 31000 --expose 31173:5173 --select nodejs+npmrc+vscode-ext+pnpm-install/claude-code+auto-accept+credential+settings-cache
 
-variant = "notebook"
+variant = "base"
 port = "31000"
 
 run-args = [

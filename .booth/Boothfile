@@ -1,12 +1,7 @@
 # syntax=codingbooth/boothfile:1
-# Configured by: booth config --no-tui --overwrite --variant notebook --port 31000 --expose 31173:5173 --select nodejs+npmrc+vscode-ext+pnpm-install/claude-code+auto-accept+credential+settings-cache
+# Configured by: booth config --no-tui --overwrite --variant base --port 31000 --expose 31173:5173 --select nodejs+npmrc+vscode-ext+pnpm-install/claude-code+auto-accept+credential+settings-cache
 
 arg NODE_VERSION=22
-
-# TEMP: system tools needed by utils/prepare-youtube.sh (qrencode for the QR,
-# imagemagick's `convert` for JPG->PNG). Should move to a proper setup script.
-# CodingBooth has no `apt--install.sh`, so use a raw RUN with apt-get.
-run apt-get update && apt-get install -y --no-install-recommends qrencode imagemagick && rm -rf /var/lib/apt/lists/*
 
 setup claude-code
 setup nodejs ${NODE_VERSION}
