@@ -1,3 +1,10 @@
+# Single-package repo, but the presence of this file makes pnpm treat the root as
+# a workspace — so it requires a `packages` field. Stock pnpm (e.g. in CI / GitHub
+# Actions) errors with "packages field missing or empty" without it; declare the
+# root itself as the one workspace package.
+packages:
+  - '.'
+
 allowBuilds:
   esbuild: set this to true or false
   svelte-preprocess: set this to true or false

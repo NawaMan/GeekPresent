@@ -4,14 +4,13 @@
 	"private": true,
 	"scripts": {
 		"dev": "vite dev",
-		"build": "vite build && rm -Rf ../docs && mv docs ../docs",
+		"build": "vite build",
 		"preview": "vite preview",
-		"deploy": "pnpm build && pnpx gh-pages -d ../docs -t true",
+		"deploy": "pnpm build && pnpx gh-pages -d docs -t true",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --check . && eslint .",
-		"format": "prettier --write .",
-		"postbuild": "mv ../docs/.nojekyll\\  ../docs/.nojekyll"
+		"format": "prettier --write ."
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^3.0.0",

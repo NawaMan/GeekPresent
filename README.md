@@ -33,9 +33,9 @@ pnpm dev        # http://localhost:5173/slides/title.html
 ```
 
 ```bash
-pnpm build      # static site -> ../docs/
+pnpm build      # static site -> docs/
 pnpm preview    # preview the build
-pnpm deploy     # publish ../docs to GitHub Pages
+pnpm deploy     # publish docs/ to GitHub Pages
 ```
 
 ---
@@ -247,8 +247,13 @@ Alongside slides, GeekPresent builds a second artifact type — a **Text**: *one
 It's a fully static site (`@sveltejs/adapter-static`, every route prerendered):
 
 ```bash
-pnpm build      # outputs the static site to ../docs/
-pnpm deploy     # publishes ../docs to GitHub Pages (via gh-pages)
+pnpm build      # outputs the static site to docs/
+pnpm deploy     # publishes docs/ to GitHub Pages (via gh-pages)
 ```
 
-The build writes to `../docs/`; `static/.nojekyll` ensures GitHub Pages serves SvelteKit's `_app/` directory (files starting with `_`) correctly.
+**Automatic deploy:** every push to `main` triggers
+[`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml), which
+builds the site and publishes it to GitHub Pages — no manual `pnpm deploy` needed.
+Enable it once under **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+
+The build writes to `docs/`; `static/.nojekyll` ensures GitHub Pages serves SvelteKit's `_app/` directory (files starting with `_`) correctly. The site is served under the repo subpath (`/GeekPresent/`); adapter-static emits relative asset paths, so no `paths.base` configuration is required.
