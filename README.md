@@ -244,16 +244,39 @@ Alongside slides, GeekPresent builds a second artifact type — a **Text**: *one
 
 ## Building & deploying to GitHub Pages
 
-It's a fully static site (`@sveltejs/adapter-static`, every route prerendered):
+It's a fully static site (`@sveltejs/adapter-static`, every route prerendered).
+
+### ⚠️ One-time setup: enable Pages (required before the first deploy)
+
+GitHub Pages is **off by default** on a new repo or fork. Until you turn it on, the
+deploy workflow fails at the **Setup Pages** step with
+`Get Pages site failed ... Not Found`. Enable it once — pick either path:
+
+- **Web UI:** open **Settings → Pages → Build and deployment**, and set
+  **Source** to **GitHub Actions** (not "Deploy from a branch"). It applies
+  immediately — there's no Save button.
+- **CLI** (needs a token with `repo` scope on a repo you admin):
+
+  ```bash
+  gh api --method POST repos/<owner>/<repo>/pages -f build_type=workflow
+  ```
+
+Both set the same flag: Pages source = GitHub Actions. You only do this once per repo.
+
+### Automatic deploy
+
+Once Pages is enabled, every push to `main` triggers
+[`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml), which
+builds the site and publishes it to GitHub Pages — no manual step needed. The site
+goes live at `https://<owner>.github.io/<repo>/`.
+
+### Manual deploy (optional)
 
 ```bash
 pnpm build      # outputs the static site to docs/
 pnpm deploy     # publishes docs/ to GitHub Pages (via gh-pages)
 ```
 
-**Automatic deploy:** every push to `main` triggers
-[`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml), which
-builds the site and publishes it to GitHub Pages — no manual `pnpm deploy` needed.
-Enable it once under **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+### Notes
 
-The build writes to `docs/`; `static/.nojekyll` ensures GitHub Pages serves SvelteKit's `_app/` directory (files starting with `_`) correctly. The site is served under the repo subpath (`/GeekPresent/`); adapter-static emits relative asset paths, so no `paths.base` configuration is required.
+The build writes to `docs/`; `static/.nojekyll` ensures GitHub Pages serves SvelteKit's `_app/` directory (files starting with `_`) correctly. The site is served under the repo subpath (e.g. `/GeekPresent/`); adapter-static emits relative asset paths, so no `paths.base` configuration is required.

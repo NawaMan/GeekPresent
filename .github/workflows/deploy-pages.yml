@@ -35,6 +35,9 @@ jobs:
       - name: Build
         run: pnpm install && pnpm build
 
+      # Requires Pages to be enabled once: Settings -> Pages -> Source: GitHub Actions
+      # (or: gh api --method POST repos/<owner>/<repo>/pages -f build_type=workflow).
+      # Without it, this step fails with "Get Pages site failed ... Not Found".
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
