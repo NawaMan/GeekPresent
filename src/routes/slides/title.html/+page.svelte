@@ -9,12 +9,12 @@
     export const trailingSlash = "never";
 -->
 <script>
-	import TitlePage from '$lib/templates/TitlePage.svelte';
+	import TitlePage  from '$lib/templates/TitlePage.svelte';
 </script>
 
 <TitlePage>
 	<span slot="title">GeekPresent</span>
 	<span slot="subtitle">How to Build Presentations</span>
 	<span slot="subsubtitle">A quick guide to get you started<br/>
-		<a href="../" style="font-size: 0.55em; opacity: 0.85; color: inherit;">↑ back to the home page</a></span>
+		<a href="../" style="opacity: 0.85;">↑ back to the home page</a></span>
 </TitlePage>

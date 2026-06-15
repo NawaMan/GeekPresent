@@ -7,12 +7,12 @@
   (short, big, vertically-stacked) — orientation is fixed per deck, never toggled.
 
   baseFontSize is the per-deck typography lever, and it is the ONE knob that
-  makes a Tall readable. The reusable templates/components are sized for the
-  wide 1920 landscape canvas seen on a monitor; a Tall is the opposite — a
+  makes a Portrait readable. The reusable templates/components are sized for the
+  wide 1920 landscape canvas seen on a monitor; a Portrait is the opposite — a
   narrow 1080 canvas seen full-screen on a phone, so the SAME text needs to be
   MUCH bigger relative to the frame (counter-intuitively larger than landscape's
   1.5em, not smaller). This lever scales all the em-based text up at once, here,
-  without touching any shared component. Keep Tall slides to a few large words.
+  without touching any shared component. Keep Portrait slides to a few large words.
 -->
 <script lang="ts">
 	import SlideDeck    from '$lib/components/SlideDeck.svelte';

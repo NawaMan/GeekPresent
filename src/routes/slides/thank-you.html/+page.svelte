@@ -10,5 +10,5 @@
 	<span slot="title">Thank You!</span>
 	<span slot="subtitle">Now go build your presentation</span>
 	<span slot="subsubtitle">Copy these examples into src/routes/slides/<br/>
-		<a href="../" style="font-size: 0.55em; opacity: 0.85; color: inherit;">↑ back to the home page</a></span>
+		<a href="../" style="opacity: 0.85;">↑ back to the home page</a></span>
 </TitlePage>

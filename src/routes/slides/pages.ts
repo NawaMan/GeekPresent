@@ -14,7 +14,6 @@ export const pages = [
     { path: "code-component.html",    title: "Code" },
     { path: "javacode-component.html", title: "JavaCode" },
     { path: "codebox-component.html", title: "CodeBox" },
-    { path: "javacodebox-component.html", title: "JavaCodeBox" },
     { path: "speaker-notes.html",     title: "Speaker Notes" },
     { path: "keyboard-shortcuts.html", title: "Keyboard Shortcuts" },
     { path: "thank-you.html",         title: "Thank You" },

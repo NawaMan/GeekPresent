@@ -4,7 +4,7 @@
   All the canvas + scaling machinery lives in <SlideDeck>; this layout just picks
   the dimension and publishes the slide list. To make a portrait deck (e.g. a
   YouTube Short), copy this file and pass a portrait width/height instead — see
-  src/routes/tall/+layout.svelte.
+  src/routes/portrait/+layout.svelte.
 -->
 <script lang="ts">
 	import SlideDeck    from '$lib/components/SlideDeck.svelte';

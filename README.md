@@ -40,7 +40,7 @@ pnpm deploy     # publish docs/ to GitHub Pages
 
 ```bash
 ./build-static.sh ./dist        # build the static site into any folder you choose
-./build-static.sh ./dist demo   # ...or just one presentation/text
+./build-static.sh ./dist geeklight   # ...or just one presentation/text
 ```
 
 ---
@@ -70,8 +70,8 @@ src/routes/slides/intro.html/
 > **Multiple presentations:** `slides/` is just one presentation — its route folder. To add another, create a
 > sibling folder (e.g. `src/routes/talk2/`) with its own `pages.ts`, `+layout.svelte`, and slides.
 > Navigation and the Table of Contents are scoped per presentation, and each presentation can have its **own
-> theme** (fonts, colours, background image, favicon) in its `+layout.svelte`. See the `demo/` presentation
-> (`/demo/title.html`) for a fully independent, differently-themed example.
+> theme** (fonts, colours, background image, favicon) in its `+layout.svelte`. See the `geeklight/` presentation
+> (`/geeklight/title.html`) for a fully independent, differently-themed example.
 
 ### Title and content pages
 
@@ -169,6 +169,26 @@ Read-only code viewers built on the Monaco editor:
 
 > Monaco is loaded from a CDN, so the code components need an internet connection.
 
+### View source
+
+`ViewSource` adds a small **`</> Source`** button in the bottom-right corner of a slide that pops the page's *own* source into a `CodeBox`, titled with its file path. Because the deck is its own documentation, this lets a viewer read exactly the text that produced the slide they're on.
+
+```svelte
+<script>
+  import ViewSource from '$lib/components/ViewSource.svelte';
+  import source     from './+page.svelte?raw';   // Vite hands back the file's bytes
+</script>
+
+<!-- ...slide content... -->
+
+<ViewSource {source} path="src/routes/slides/title.html/+page.svelte" />
+```
+
+- The source comes from Vite's `?raw` import, so what's shown can never drift from the real file.
+- The path can't be auto-derived inside the component, so each page passes its own `source` (the `?raw` import) and `path` string — one import plus one line per slide.
+- Props: `source` (required), `path`, `language` (defaults to `html` — Monaco has no native `svelte` mode, so a `.svelte` file reads best as HTML; the text itself is exact), and `text` (button label, defaults to `</> Source`).
+- It sits in the bottom-right — the one corner not already used by the ToC (top-left), the SCALED/FIXED toggle (top-right), or the nav bar (bottom-left).
+
 ### Local assets
 
 Keep a page's images next to its `+page.svelte` and `import` them — Vite bundles each one and hands you its URL:
@@ -204,7 +224,7 @@ then feed them to the `YouTube` component (which shows the thumbnail with a QR o
 
 ### Other components
 
-The presentation under `src/routes/slides/` is itself a working reference — open any slide and read its source. Beyond the above you'll find **Note** (speaker notes), **Hint** (bottom-of-slide cue), **Label** (hoverable inline highlight), **WideDiv** (wheel-scrollable wide container), and **Copyright** (auto-added corner notice).
+The presentation under `src/routes/slides/` is itself a working reference — open any slide and read its source. Beyond the above you'll find **Note** (speaker notes), **Hint** (bottom-of-slide cue), **Label** (hoverable inline highlight), **WideDiv** (wheel-scrollable wide container), **QuickCode** (small dark monospace box for short hand-written snippets — use `Code`/`CodeBox` for real syntax-highlighted code), and **Copyright** (auto-added corner notice).
 
 ---
 
@@ -302,8 +322,8 @@ the committed `docs/`:
   already exists it must be empty or a previous output of this script (pass
   `--force` to overwrite anything else).
 - **`[route]`** (optional) — build only **one** presentation/text instead of the
-  whole site. Use the route name as it appears in the URL (`demo`, `geeklight`,
-  `slides`, `tall`, `text.html`, …). Omit it to build everything (the home/landing
+  whole site. Use the route name as it appears in the URL (`geeklight`,
+  `slides`, `portrait`, `text.html`, …). Omit it to build everything (the home/landing
   page and every presentation).
 
 Flags: `--zip` also packages the result into `<output-dir>.zip`; `--force`
@@ -312,7 +332,7 @@ below); `-h`/`--help` prints full usage.
 
 ```bash
 ./build-static.sh ./dist                 # whole site            -> ./dist
-./build-static.sh /tmp/out demo          # just the demo deck    -> /tmp/out
+./build-static.sh /tmp/out geeklight     # just the geeklight deck -> /tmp/out
 ./build-static.sh ./out text.html        # just the text sample  -> ./out
 ./build-static.sh --force ./dist         # overwrite a non-empty ./dist
 ./build-static.sh --zip ./dist           # build ./dist and ./dist.zip

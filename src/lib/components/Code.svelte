@@ -92,6 +92,23 @@
 
 	function initMonaco() {
 		if (browser) {
+			// Worker-backed languages (javascript / typescript) spin up the TS
+			// language service in a Web Worker for diagnostics. Monaco is loaded
+			// cross-origin from a CDN, so the default worker URL is cross-origin and
+			// the browser blocks creating a Worker from it — which throws and leaves
+			// the editor blank (java / python are tokenizer-only, so they were fine).
+			// Point getWorkerUrl at a same-origin data-URL shim that importScripts the
+			// CDN's workerMain, the standard cross-origin workaround for AMD Monaco.
+			const monacoBase = 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.21.2/min/';
+			// @ts-ignore
+			window.MonacoEnvironment = {
+				getWorkerUrl: function () {
+					return 'data:text/javascript;charset=utf-8,' + encodeURIComponent(
+						`self.MonacoEnvironment = { baseUrl: '${monacoBase}' };\n` +
+						`importScripts('${monacoBase}vs/base/worker/workerMain.js');`
+					);
+				}
+			};
 			// @ts-ignore
 			window.require.config({
 				paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.21.2/min/vs' }

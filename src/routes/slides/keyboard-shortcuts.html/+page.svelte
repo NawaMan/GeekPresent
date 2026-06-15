@@ -7,7 +7,7 @@
 </script>
 
 <ContentPage title="Keyboard Shortcuts" subtitle="Built-in key bindings">
-	<div style="font-size: 0.8em; line-height: 2em;">
+	<div style="line-height: 2em;">
 		<table style="width: 100%; border-collapse: collapse;">
 			<tr style="border-bottom: 1px solid #444;">
 				<td style="padding: 0.2em 1em;"><b>Arrow Left</b></td>

@@ -11,12 +11,12 @@
 #                  this script (use --force to overwrite anything else).
 #   [route]        (optional) build only ONE presentation/text instead of the
 #                  whole site. Use the route name as it appears in the URL, e.g.
-#                  demo, geeklight, slides, tall, text.html. Omit to build the
+#                  geeklight, slides, portrait, text.html. Omit to build the
 #                  whole site (the home/landing page and every presentation).
 #
 # Examples:
 #   ./build-static.sh ./dist                 # whole site            -> ./dist
-#   ./build-static.sh /tmp/out demo          # just the demo deck    -> /tmp/out
+#   ./build-static.sh /tmp/out geeklight     # just the geeklight deck -> /tmp/out
 #   ./build-static.sh ./out text.html        # just the text sample  -> ./out
 #   ./build-static.sh --force ./dist         # overwrite a non-empty ./dist
 #   ./build-static.sh --zip ./dist           # also produce ./dist.zip
@@ -50,7 +50,7 @@ Arguments:
                  this script (use --force to overwrite anything else).
   [route]        (optional) build only ONE presentation/text instead of the
                  whole site. Use the route name as it appears in the URL, e.g.
-                 demo, geeklight, slides, tall, text.html. Omit to build the
+                 geeklight, slides, portrait, text.html. Omit to build the
                  whole site (the home/landing page and every presentation).
 
 Flags:
@@ -63,7 +63,7 @@ Flags:
 
 Examples:
   ./build-static.sh ./dist                 # whole site            -> ./dist
-  ./build-static.sh /tmp/out demo          # just the demo deck    -> /tmp/out
+  ./build-static.sh /tmp/out geeklight     # just the geeklight deck -> /tmp/out
   ./build-static.sh ./out text.html        # just the text sample  -> ./out
   ./build-static.sh --force ./dist         # overwrite a non-empty ./dist
   ./build-static.sh --zip ./dist           # also produce ./dist.zip

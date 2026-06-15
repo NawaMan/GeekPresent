@@ -7,7 +7,7 @@ export interface Page {
     title: string;
     /** Optional page-level favicon (import a colocated asset so Vite bundles it).
         Overrides the presentation/site favicon for just this slide; emitted by the
-        deck shell's <svelte:head>. See SlideDeck.svelte / demo/+layout.svelte. */
+        deck shell's <svelte:head>. See SlideDeck.svelte / slides/+layout.svelte. */
     favicon?: string;
 }
 

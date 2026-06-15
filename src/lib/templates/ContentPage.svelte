@@ -44,13 +44,14 @@
         font-size: 2.5em;
         margin-bottom: 0em;
         font-family: 'Playfair Display Bolds', 'Cormorant Garamond', serif;
+        color: var(--page-title-fg, #F0A33E);
     }
     .page .subtitle {
         /* cosmetic */
         display: block;
         margin-left: 0em;
         margin-top: 0.5em;
-        font-size: 1.5em;
+        font-size: 1.2em;
     }
 
     .page .subtitle::after {
@@ -63,7 +64,7 @@
         /* cosmetic */
         margin-top: 1em;
         margin-bottom: 2em;
-        font-size: 1.6em;
+        font-size: 1.28em;   /* 80% of the former 1.6em default */
         line-height: 1.1em;
         text-align: justify;
         text-justify: inter-word;

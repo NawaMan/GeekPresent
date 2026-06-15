@@ -73,14 +73,14 @@
 
 {#if mode === 'text'}
 <div class="nav text no-print">
-	<CtrlBtn text="TOP" on:click={onTop} />
+	<CtrlBtn chrome text="TOP" on:click={onTop} />
 </div>
 {:else}
 <div class="nav no-print">
-	<CtrlBtn text="FIRST"    on:click={onFirst}    isDisabled={!firstLink} />
-	<CtrlBtn text="PREV"     on:click={onPrev}     isDisabled={!prevLink} />
-	<CtrlBtn text="CONTINUE" on:click={onContinue} isDisabled={!onContinue} />
-	<CtrlBtn text="NEXT"     on:click={onNext}     isDisabled={!nextLink} />
-	<CtrlBtn text="LAST"     on:click={onLast}     isDisabled={!lastLink}/>
+	<CtrlBtn chrome text="FIRST"    on:click={onFirst}    isDisabled={!firstLink} />
+	<CtrlBtn chrome text="PREV"     on:click={onPrev}     isDisabled={!prevLink} />
+	<CtrlBtn chrome text="CONTINUE" on:click={onContinue} isDisabled={!onContinue} />
+	<CtrlBtn chrome text="NEXT"     on:click={onNext}     isDisabled={!nextLink} />
+	<CtrlBtn chrome text="LAST"     on:click={onLast}     isDisabled={!lastLink}/>
 </div>
 {/if}

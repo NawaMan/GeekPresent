@@ -4,7 +4,7 @@
   Built as a Text artifact (shares the TextPage shell). Its job is to say what
   GeekPresent IS and why you'd use it, then point at the artifacts. Links are
   relative to `/`, so they resolve to the sibling routes (/text.html,
-  /slides/title.html, /demo/title.html, /tall/title.html, /geeklight/title.html).
+  /slides/title.html, /portrait/title.html, /geeklight/title.html).
 -->
 <script lang="ts">
 	import Label from '$lib/components/Label.svelte';
@@ -110,20 +110,43 @@
 	</li>
 </ul>
 
+<h2>What makes it great</h2>
+
+<ul>
+	<li>
+		<b>Fixed canvas with auto-scaling.</b> Anyone who has tried to build a raw
+		HTML/CSS deck knows the nightmare of responsive design wrecking slide layouts
+		across projector resolutions. Locking the design to a fixed aspect ratio
+		(1920&times;1080) and auto-scaling it to fit the screen gives you the absolute
+		positioning power of a traditional slide editor without losing the flexibility
+		of web code.
+	</li>
+	<li>
+		<b>Dual-purpose artifacts.</b> The same source components compile into either
+		a slide deck or a long-form, scrollable text. Give the talk on stage, then
+		publish a reader-friendly version as a blog post or docs page &mdash; no
+		rewriting.
+	</li>
+	<li>
+		<b>Git- and AI-friendly.</b> Plain-text Svelte/HTML files mean real version
+		control &mdash; clean diffs, branches, pull requests &mdash; and they make it
+		easy to point an LLM at your slides to scaffold, edit, or translate them. AI
+		is far better at writing code than at generating opaque
+		<code>.pptx</code> binaries.
+	</li>
+	<li>
+		<b>Portrait mode for modern content.</b> A 1080&times;1920 layout targets
+		mobile and short-form video (YouTube Shorts, TikTok) &mdash; the same
+		components, a taller frame.
+	</li>
+</ul>
+
 <h2>Explore</h2>
 
 <p>
 	The best reference is the source itself &mdash; open any slide below and read
 	its <code>+page.svelte</code>.
 </p>
-
-<h3>Text</h3>
-<ul>
-	<li>
-		<a href="text.html">Text view</a> &mdash; a sample Text artifact: one long
-		page, authored by hand, that scrolls.
-	</li>
-</ul>
 
 <h3>Presentations</h3>
 <ul>
@@ -132,16 +155,20 @@
 		guide to building decks with this framework.
 	</li>
 	<li>
-		<a href="demo/title.html">Demo</a> &mdash; a second, standalone presentation
-		with its own theme.
-	</li>
-	<li>
-		<a href="tall/title.html">GeekPortrait</a> &mdash; a portrait
+		<a href="portrait/title.html">GeekPortrait</a> &mdash; a portrait
 		1080&times;1920 deck for YouTube Shorts: same components, taller frame.
 	</li>
 	<li>
 		<a href="geeklight/title.html">GeekLight</a> &mdash; a light-theme
 		presentation: same components on a light watercolor background.
+	</li>
+</ul>
+
+<h3>Text</h3>
+<ul>
+	<li>
+		<a href="text.html">Text view</a> &mdash; a sample Text artifact: one long
+		page, authored by hand, that scrolls.
 	</li>
 </ul>
 

@@ -1,6 +1,6 @@
 <!--
   Portrait content slide using the shared ContentPage template. Keep it short and
-  punchy — a Tall slide is read in a couple of seconds on a phone. The colocated
+  punchy — a Portrait slide is read in a couple of seconds on a phone. The colocated
   frame.svg is imported below so Vite bundles and hashes it.
 -->
 <script>
