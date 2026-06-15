@@ -65,9 +65,10 @@
 		gap: 2em;
 		align-items: flex-start;
 		/* Overall size knob for this slide: lower = shorter (content fits the page),
-		   higher = bigger text. */
-		font-size: 0.6em;
-	}
+		   higher = bigger text. Dropped below the template's 1.28em default so this
+		   content-heavy slide fits the canvas. */
+		font-size: 0.75em;
+		}
 	.explain {
 		flex: 1 1 0;
 		min-width: 0;
@@ -95,7 +96,6 @@
 	}
 	.snippet {
 		font-family: 'Fira Code', monospace;
-		font-size: 0.9em;
 		line-height: 1.6em;
 		background: #111;
 		color: #cfe9f1;

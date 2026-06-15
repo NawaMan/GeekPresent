@@ -1,3 +1,14 @@
+<!--
+  JavaCode — Monaco viewer with a hand-rolled Java folding-range provider
+  (imports + brace blocks; see customFoldingRangeProvider below).
+
+  STATUS: legacy / unverified. Prefer <Code> (or <CodeBox>) for new slides —
+  Monaco's built-in language-aware folding covers Java too. This custom logic was
+  written for an early, specific use of GeekPresent that is no longer in this
+  project, so nothing here exercises it and it can't be tested against its
+  original case. Left untouched on purpose; to be revisited later. Don't refactor
+  casually.
+-->
 <script lang="javascript">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';

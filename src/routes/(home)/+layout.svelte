@@ -2,7 +2,7 @@
   Landing shell (route group "(home)").
 
   This layout applies only to the site root `/` — the route group keeps the
-  Text shell off the presentations (slides/ demo/) and the other Text artifact
+  Text shell off the presentations (slides/, geeklight/, …) and the other Text artifact
   (text.html/), which bring their own layouts. The root `/` is the project's
   index/home page, built as a Text artifact (one long page that grows down) so
   it shares the look and machinery of text.html via the shared TextPage shell.

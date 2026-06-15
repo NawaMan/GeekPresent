@@ -25,5 +25,5 @@
 </style>
 
 <div class="mode no-print">
-	<CtrlBtn text={isScaled ? 'SCALED' : 'FIXED'} hoverText={isScaled ? 'To FIXED mode' : 'To SCALED mode'}  on:click={toggleScale} />
+	<CtrlBtn chrome text={isScaled ? 'SCALED' : 'FIXED'} hoverText={isScaled ? 'To FIXED mode' : 'To SCALED mode'}  on:click={toggleScale} />
 </div>

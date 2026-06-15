@@ -2,7 +2,7 @@
 	import ContentPage from '$lib/templates/ContentPage.svelte';
 </script>
 
-<ContentPage title="Brittle, fragile setups" subtitle="One wrong install and the whole thing tips over">
+<ContentPage title="Brittle, fragile setups (example content)" subtitle="One wrong install and the whole thing tips over">
 	<div style="font-size: 0.85em;">
 		<p>
 			A Python project that runs today is no guarantee it runs tomorrow. Most setups are

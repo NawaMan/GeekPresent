@@ -24,6 +24,7 @@
 	--LINE:         #CCCCCC;  /* borders / dividers                 */
 	--ACCENT:       #2980B9;  /* hover, links, box border, rule     */
 	--ACCENT-2:     #00B356;  /* selected / success                 */
+	--ACCENT-WARM:  #F0A33E;  /* warm complement to ACCENT (titles) */
 	--ON-ACCENT:    #FFFFFF;  /* text over an accent fill           */
 	--BACKDROP:     #000000;  /* letterbox + box overlay surface    */
 
@@ -42,6 +43,7 @@
 	--LINE:         #C9BFA6;
 	--ACCENT:       #5B8FB0;
 	--ACCENT-2:     #5A9367;
+	--ACCENT-WARM:  #B5712A;  /* deeper orange, readable on light paper */
 	--ON-ACCENT:    #FFFFFF;
 	--BACKDROP:     #E7DFCC;
 }

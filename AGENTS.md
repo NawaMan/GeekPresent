@@ -32,7 +32,9 @@ Read the `README.md` first for the user-facing overview. This file is the *opera
   fixed **1280×720** canvas; SCALED mode transforms it to fit the window, FIXED keeps it 1:1 and shows
   speaker notes. Text color is `#C0F1FF` on `#181818`.
 - **Components** (`src/lib/components/`): `Box`, `Note`, `Hint`, `Label`, `YouTube`, `WideDiv`,
-  `Code`, `JavaCode`, `CodeBox`, `JavaCodeBox`, plus framework-internal `Copyright`, `CtrlBtn`,
+  `Code`, `JavaCode`, `CodeBox`, `JavaCodeBox`, `QuickCode` (small dark monospace box for short
+  hand-written snippets; not Monaco), `ViewSource` (corner `</> Source` button that shows a page's
+  own `?raw` source in a `CodeBox`), plus framework-internal `Copyright`, `CtrlBtn`,
   `NavigationBar`, `TableOfContent`, `SizeMode`.
 - Package manager is **pnpm** (`pnpm dev` / `build` / `deploy`). Dev server: `http://localhost:5173`.
 

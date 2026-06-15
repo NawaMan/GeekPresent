@@ -42,6 +42,7 @@
 		text-align: center;
 		font-size: 5em;
 		font-family: 'Playfair Display Bold', 'Cormorant Garamond', serif;
+		color: var(--page-title-fg, #F0A33E);
 	}
 	.page .subtitle {
 		text-align: center;

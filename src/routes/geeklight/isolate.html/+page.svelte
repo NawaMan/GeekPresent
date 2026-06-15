@@ -35,4 +35,4 @@ pip freeze > requirements.txt`;
 	</div>
 </ContentPage>
 
-<CodeBox code={code} language="bash" title="setup.sh" bind:expanded={show} revealedLines={[1]} />
+<CodeBox code={code} language="shell" title="setup.sh" bind:expanded={show} revealedLines={[1]} />

@@ -7,7 +7,7 @@
 </script>
 
 <ContentPage title="Project Structure" subtitle="Key files you need to know">
-	<div style="font-size: 0.75em; line-height: 1.6em; font-family: 'Fira Code', monospace;">
+	<div style="line-height: 1.6em; font-family: 'Fira Code', monospace;">
 		src/routes/<b>pages.ts</b> &mdash; Define your slide order here<br/>
 		src/routes/slides/<b>my-slide.html/</b>+page.svelte &mdash; Each slide<br/>
 		src/lib/templates/<b>TitlePage.svelte</b> &mdash; Title slide template<br/>

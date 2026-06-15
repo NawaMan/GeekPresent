@@ -1,3 +1,19 @@
+<!--
+  JavaCodeBox — JavaCode (Monaco) inside an expandable Box.
+
+  STATUS: legacy / unverified. Prefer <CodeBox> for new slides.
+
+  This wraps <JavaCode>, which carries custom Java-specific folding logic (a
+  hand-rolled folding-range provider for imports + brace blocks — see
+  JavaCode.svelte). That logic was written for an early, specific use of
+  GeekPresent that is no longer part of this project, so there is no longer a
+  slide here that exercises it. Because it can't be tested against its original
+  use case, it's left untouched on purpose — don't refactor it casually.
+
+  If you just need to show code (any language, including Java), use <CodeBox>:
+  it uses Monaco's built-in, language-aware folding and is the supported path.
+  JavaCodeBox/JavaCode will be revisited (kept, fixed, or removed) later.
+-->
 <script lang="ts">
     import Box      from '$lib/components/Box.svelte';
     import JavaCode from '$lib/components/JavaCode.svelte';

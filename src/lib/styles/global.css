@@ -23,6 +23,24 @@ a {
     color: inherit;
 }
 
+/* Breathing room between list items on every slide. Scoped to the slide
+   templates' `.page` wrapper, so it applies across all decks (slides, tall, …)
+   while leaving the Table of Contents and other chrome lists untouched. */
+.page li {
+    margin-bottom: 0.6em;
+}
+
+/* Unvisited links only — a darker blue. visited / other states keep the
+   inherited color above (left unchanged on purpose). */
+a:link {
+    color: var(--link-fg, #1E6FB0);
+}
+
+/* TRY: default orange for every heading. Experimental — we may revert. */
+h1, h2, h3, h4, h5, h6 {
+    color: #fc962f;
+}
+
 /** Fonts **/
 
 @font-face {
