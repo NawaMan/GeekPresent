@@ -141,6 +141,61 @@
 	</li>
 </ul>
 
+<h2>What makes it unique</h2>
+
+<p>
+	HTML-based slides aren't new &mdash; reveal.js, Slidev, Spectacle and Marp all
+	exist. What no mainstream tool focuses on is the particular set of choices
+	GeekPresent combines:
+</p>
+
+<ul>
+	<li>
+		<b>One slide = one route = one folder.</b> Slides aren't sections of a single
+		giant document or fenced blocks in one markdown file &mdash; each slide is its
+		own route folder. So slides diff cleanly one file at a time, each can
+		<b>colocate its own assets</b> (images, QR codes) right beside it, and every
+		slide is independently URL-addressable and prerendered to its own HTML.
+	</li>
+	<li>
+		<b>A fixed canvas with pixel-exact positioning <i>and</i> auto-scaling.</b>
+		You design against one fixed 1920&times;1080 size &mdash; <code>left: 960px</code>
+		means the same thing on every screen &mdash; and the framework scales the whole
+		canvas to fit any window. Most HTML-slide tools push you toward responsive flow;
+		GeekPresent gives you a fixed pixel coordinate space and does the scaling for you.
+	</li>
+	<li>
+		<b>Slides that are their own documentation.</b> A
+		<Label style="color: #7fd9ff;">&lt;/&gt; Source</Label> button pops a slide's
+		<i>own</i> source into a Monaco viewer titled with its file path &mdash; pulled
+		straight from the file, so it can never drift from what you see.
+	</li>
+	<li>
+		<b>Two artifact types from one component set.</b> The same components compile
+		into either a click-through presentation or a long-form, scrollable Text &mdash;
+		give the talk, then publish the reader-friendly version with no rewrite.
+	</li>
+	<li>
+		<b>Multiple independent presentations in one project.</b> Navigation and the
+		Table of Contents are scoped <i>per presentation</i>, not a single global config.
+		Sibling decks each carry their own slide list, theme, fonts, background, and
+		favicon, and coexist without interfering.
+	</li>
+	<li>
+		<b>Genuinely portable, lean static output.</b> Every route prerenders with
+		relative asset paths, so the build runs from GitHub Pages, any sub-path, or
+		straight off disk &mdash; and the build can emit the whole site or just a single
+		presentation.
+	</li>
+</ul>
+
+<p>
+	<b>The trade-off:</b> slide-to-slide navigation is a full page load, not
+	client-side routing &mdash; so animations live <i>within</i> a slide; cross-slide
+	transitions don't work out of the box. That's the cost of the route-per-slide
+	design.
+</p>
+
 <h2>Explore</h2>
 
 <p>
@@ -153,6 +208,11 @@
 	<li>
 		<a href="slides/title.html">GeekPresent</a> &mdash; the main presentation: a
 		guide to building decks with this framework.
+	</li>
+	<li>
+		<a href="unique/title.html">What Makes It Unique</a> &mdash; a short deck on what
+		sets GeekPresent apart from mainstream slide tools (and it demonstrates each
+		point as it makes it).
 	</li>
 	<li>
 		<a href="portrait/title.html">GeekPortrait</a> &mdash; a portrait

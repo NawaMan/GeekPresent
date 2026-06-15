@@ -25,6 +25,20 @@ If you do any front-end work you already know HTML + CSS + JS, and you've probab
 - **SCALED / FIXED modes.** Present scaled-to-fit, or switch to a fixed 1280×720 view with speaker notes visible below.
 - **It's just text.** Slides are Svelte files, so they diff cleanly, version-control nicely, and hot-reload while you edit.
 
+## What makes it unique
+
+HTML-based slides aren't new — reveal.js, Slidev, Spectacle and Marp all exist. What no mainstream tool focuses on is the particular set of choices GeekPresent combines:
+
+- **One slide = one route = one folder.** Slides aren't sections of a single giant document or fenced blocks in one markdown file — each slide is its own SvelteKit route folder (`src/routes/<name>.html/`). So slides diff cleanly one file at a time, each slide can **colocate its own assets** (images, QR codes) right next to it, and every slide is independently URL-addressable and prerendered to its own HTML.
+- **A fixed 1280×720 canvas with pixel-exact positioning *and* auto-scaling.** You design against one fixed size — `left: 640px` means the same thing on every screen — and the framework scales the whole canvas to fit any window (SCALED) or pins it 1:1 with speaker notes (FIXED). Most HTML-slide tools push you toward responsive flow; GeekPresent deliberately gives you a fixed pixel coordinate space and does the scaling math for you.
+- **Slides that are their own documentation.** `ViewSource` adds a `</> Source` button that pops a slide's *own* source (via Vite's `?raw` import, so it can never drift from the real file) into a Monaco viewer titled with its file path. The deck documents itself with guaranteed-accurate code.
+- **Two artifact types from one component set.** The same `$lib` components compile into either a click-through **presentation** or a long-form, scrollable **Text** — give the talk, then publish the reader-friendly version with no rewrite. A mode flag (`setMode`) lets shared components adapt (e.g. the nav bar collapses to a single TOP button).
+- **Multiple independent presentations in one project.** Navigation and the Table of Contents are scoped *per presentation* via Svelte context (`setPages` / `getPages`), not a single global config. Sibling route folders (`slides/`, `portrait/`, `geeklight/`) each carry their own slide list, theme, fonts, background, and favicon, and coexist without interfering.
+- **Genuinely portable, lean static output.** Every route prerenders with **relative** asset paths, so the build runs from GitHub Pages, any sub-path, S3, or straight off disk. `build-static.sh` can emit the whole site *or a single presentation*, and skips precompressed `.br`/`.gz` files by default (~170 files instead of ~490).
+- **Presenting-specific touches.** A helper (`utils/prepare-youtube.sh`) fetches a video's thumbnail and generates a QR code into a slide folder, so the `YouTube` component shows a scannable QR overlay linking to the video.
+
+> **The trade-off:** slide-to-slide navigation is a full page load, not client-side routing — so animations live *within* a slide; cross-slide transitions don't work out of the box. That's the cost of the route-per-slide design.
+
 ## Quick start
 
 ```bash
