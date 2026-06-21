@@ -9,6 +9,18 @@ export interface Page {
         Overrides the presentation/site favicon for just this slide; emitted by the
         deck shell's <svelte:head>. See SlideDeck.svelte / slides/+layout.svelte. */
     favicon?: string;
+    /** Optional leave-transition for a View-Transition deck (see setViewTransitions).
+        Names the animation used when paging AWAY from this slide — so a slide can be
+        animated with the very transition it discusses. NavigationBar exposes it as
+        `html[data-vt-kind="…"]`, which view-transitions.css keys its keyframes off.
+        Ignored by decks that don't opt into view transitions. Defaults to 'slide'. */
+    transition?: string;
+    /** Optional leave-transition specifically for paging BACKWARD (← / PREV) away
+        from this slide; `transition` is used for forward (→ / NEXT). Lets a slide
+        be neutral going forward but replay an effect on the way back (e.g. a "(to)"
+        slide that bridges forward with a plain slide yet re-runs its effect on ←).
+        Defaults to 'slide' when unset. */
+    transitionBack?: string;
 }
 
 /** Site-wide default document title — the deck/site name used when neither a

@@ -2,8 +2,10 @@
 	import CtrlBtn from './CtrlBtn.svelte';
 
 	import { browser }            from '$app/environment';
+	import { goto }               from '$app/navigation';
+	import { page }               from '$app/stores';
 	import { onMount, onDestroy } from 'svelte';
-	import { getMode }            from '$lib/presentation';
+	import { getMode, getViewTransitions, getPages } from '$lib/presentation';
 
 	export let firstLink = '';
 	export let prevLink  = '';
@@ -15,10 +17,59 @@
 	// to a single TOP control that jumps back up the document.
 	const mode = getMode();
 
-	$: onFirst = () => firstLink && (window.location.href = firstLink);
-	$: onPrev  = () => prevLink  && (window.location.href = prevLink);
-	$: onNext  = () => nextLink  && (window.location.href = nextLink);
-	$: onLast  = () => lastLink  && (window.location.href = lastLink);
+	// Most decks page with a full-page load (route-per-slide, honest reload). A
+	// deck that opted into setViewTransitions(true) instead navigates client-side
+	// (goto) wrapped in the View Transitions API, so a slide animates into the next.
+	const viewTransitions = getViewTransitions();
+	const pages = getPages();
+
+	// The current slide's chosen leave-transition, picked per DIRECTION: `transition`
+	// going forward (→), `transitionBack` going back (←). Both default to 'slide'.
+	// So a slide can show an effect forward and replay (or stay neutral) on the way
+	// back. See pages.ts / view-transitions.css.
+	$: currentPath = $page.url.pathname.replace(/\/+$/, '').split('/').pop() || '';
+	$: currentPage = pages.find((p) => p.path === currentPath);
+
+	type Dir = 'forward' | 'back';
+
+	function kindFor(direction: Dir): string {
+		return (direction === 'back' ? currentPage?.transitionBack : currentPage?.transition) ?? 'slide';
+	}
+
+	// Navigate to `href`, animating in `direction` when this deck uses view
+	// transitions and the browser supports them. Falls back, in order, to a plain
+	// client-side goto (still no reload/blink), then to a full-page load.
+	function navigate(href: string, direction: Dir) {
+		if (!href) return;
+
+		if (!viewTransitions) {
+			window.location.href = href;
+			return;
+		}
+		// @ts-ignore — startViewTransition is not in older lib.dom typings.
+		if (!browser || typeof document.startViewTransition !== 'function') {
+			goto(href);
+			return;
+		}
+
+		// These attributes key the keyframes in view-transitions.css: data-vt-kind
+		// picks the effect (the leaving slide's own), data-vt its direction. Both are
+		// cleared once the transition settles.
+		const root = document.documentElement;
+		root.dataset.vtKind = kindFor(direction);
+		root.dataset.vt = direction;
+		// @ts-ignore
+		const transition = document.startViewTransition(() => goto(href));
+		transition.finished.finally(() => {
+			delete root.dataset.vt;
+			delete root.dataset.vtKind;
+		});
+	}
+
+	$: onFirst = () => navigate(firstLink, 'back');
+	$: onPrev  = () => navigate(prevLink,  'back');
+	$: onNext  = () => navigate(nextLink,  'forward');
+	$: onLast  = () => navigate(lastLink,  'forward');
 
 	function onTop() {
 		// A Text artifact scrolls inside its own container; fall back to the window.
@@ -29,11 +80,11 @@
 	function handleGlobalKeydown(event: KeyboardEvent) {
 		if (event.key === 'ArrowLeft' && prevLink) {
 			event.preventDefault();
-			window.location.href = prevLink;
+			navigate(prevLink, 'back');
 
 		} else if (event.key === 'ArrowRight' && nextLink) {
 			event.preventDefault();
-			window.location.href = nextLink;
+			navigate(nextLink, 'forward');
 		}
 	}
 

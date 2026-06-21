@@ -49,6 +49,11 @@
 	   from here in one place. The landscape canvas grew x1.5 from the original
 	   1280x720, hence 1.5em; a narrower portrait canvas wants a smaller base. */
 	export let baseFontSize = '1.5em';
+	/* Optional extra classes for the outer frame — the hook a deck uses to opt into
+	   a theme. Pass "gp-deck theme-green" (and import themes.css + roles.css in the
+	   deck's +layout.svelte) to recolour the whole canvas via the role tokens. Left
+	   empty by default, so existing decks render exactly as before. */
+	export let deckClass = '';
 	/* Exact-fit mode. When false (the landscape default) the content box keeps its
 	   legacy fudge (+20 width / -30 height / -45 scale offset) — values hand-tuned
 	   for the 1920 canvas, which leave a small margin. That margin is a tiny
@@ -141,7 +146,7 @@
 </svelte:head>
 
 <div
-	class="container"
+	class="container {deckClass}"
 	class:scale-mode={isScaled}
 	style="--canvas-w:{width}px; --canvas-h:{height}px; --aspect:{aspectRatio}; --base-font:{baseFontSize};"
 	bind:this={container}
