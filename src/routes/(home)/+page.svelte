@@ -227,6 +227,11 @@
 		<a href="geeklight/title.html">GeekLight</a> &mdash; a light-theme
 		presentation: same components on a light watercolor background.
 	</li>
+	<li>
+		<a href="seo.html">SEO &amp; social cards</a> &mdash; how every page gets real
+		search and social-share metadata; the page shows off its own emitted
+		<code>&lt;head&gt;</code> tags, live.
+	</li>
 </ul>
 
 <h3>Text</h3>

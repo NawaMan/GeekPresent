@@ -320,6 +320,33 @@ pnpm deploy     # publishes docs/ to GitHub Pages (via gh-pages)
 
 The build writes to `docs/`; `static/.nojekyll` ensures GitHub Pages serves SvelteKit's `_app/` directory (files starting with `_`) correctly. The site is served under the repo subpath (e.g. `/GeekPresent/`); adapter-static emits relative asset paths, so no `paths.base` configuration is required.
 
+## SEO & social metadata
+
+Every prerendered page carries SEO + social metadata in its **static HTML**: a
+`<title>`, a `description`, OpenGraph + Twitter cards, and a `<link rel="canonical">`.
+The build also emits a `sitemap.xml` (every prerendered route) and a `robots.txt`
+into the site output. A reusable [`Seo.svelte`](src/lib/components/Seo.svelte)
+component renders the tags; presentations set defaults via their `+layout.svelte`,
+and a `pages.ts` entry can add a per-slide `description` / `image`.
+
+In-page **assets stay relative** (so the build is portable to any sub-path or off
+disk), but a handful of metadata fields — `og:url`, `og:image`, `twitter:image`,
+`canonical`, and the sitemap — **must be absolute** (scrapers and search engines
+can't resolve relative URLs). One build-time variable supplies that base URL:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `GEEKPRESENT_SITE_URL` | `https://nawaman.github.io/GeekPresent` | Absolute base URL for the absolute-only metadata. Set it to your custom domain (`GEEKPRESENT_SITE_URL=https://my.site pnpm build`). Set it **empty** (`GEEKPRESENT_SITE_URL=`) to omit the absolute-only tags entirely — useful when you don't yet know the deploy URL, so no half-formed `og:url`/`canonical` ships. |
+
+It flows through `build-static.sh` too (env is inherited), e.g.
+`GEEKPRESENT_SITE_URL=https://my.site ./build-static.sh ./dist`. A single-route
+build (`./build-static.sh ./out text.html`) omits the sitemap by design.
+
+The default social image is [`static/og-default.png`](static/og-default.png)
+(1200×630); per-page images aren't auto-generated (a possible follow-up). Fonts
+are still loaded from the Google Fonts CDN — self-hosting them is a separate
+follow-up, not part of the SEO work.
+
 ## Build to a static folder of your choice
 
 GitHub Pages is just *one* consumer of the static build. Because every route is
@@ -386,4 +413,6 @@ actually consumes them:
 > Under the hood the script sets `GEEKPRESENT_OUT` and `GEEKPRESENT_PRECOMPRESS`
 > (both consumed by `svelte.config.js`). With those unset, `pnpm build` still writes
 > to `docs/` with precompression on — exactly as before, so the GitHub Pages flow is
-> unchanged.
+> unchanged. A third build var, `GEEKPRESENT_SITE_URL` (the absolute base URL for SEO
+> metadata — see [SEO & social metadata](#seo--social-metadata)), is read by the SEO
+> layer and is inherited by `build-static.sh` if you export it.

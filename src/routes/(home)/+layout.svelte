@@ -11,6 +11,11 @@
 	import TextPage from '$lib/components/TextPage.svelte';
 </script>
 
-<TextPage>
+<!-- The landing page is the project's highest-SEO surface: give it a descriptive
+     title and description (the rest of the social/canonical tags are derived). -->
+<TextPage
+	title="GeekPresent — presentation slides & long-form texts in HTML, CSS and Svelte"
+	description="GeekPresent turns HTML, CSS and Svelte into presentation slides and long-form texts — each slide a route, each component yours, all in a portable static site."
+>
 	<slot />
 </TextPage>

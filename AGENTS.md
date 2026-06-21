@@ -35,7 +35,8 @@ Read the `README.md` first for the user-facing overview. This file is the *opera
   `Code`, `JavaCode`, `CodeBox`, `JavaCodeBox`, `QuickCode` (small dark monospace box for short
   hand-written snippets; not Monaco), `ViewSource` (corner `</> Source` button that shows a page's
   own `?raw` source in a `CodeBox`), plus framework-internal `Copyright`, `CtrlBtn`,
-  `NavigationBar`, `TableOfContent`, `SizeMode`.
+  `NavigationBar`, `TableOfContent`, `SizeMode`, `Seo` (renders SEO/social metadata
+  into `<svelte:head>` — see the SEO note under *Gotchas*).
 - Package manager is **pnpm** (`pnpm dev` / `build` / `deploy`). Dev server: `http://localhost:5173`.
 
 ## Two kinds of artifact: presentations and texts
@@ -259,6 +260,17 @@ componentization style. If it wraps Monaco (`Code`/`JavaCode`), remember Monaco 
 
 - **Monaco needs internet.** `Code` / `JavaCode` / `CodeBox` / `JavaCodeBox` load the editor from a
   CDN at runtime. Note this whenever you use them.
+- **SEO metadata is automatic; absolute URLs need a base URL.** `SlideDeck` and `TextPage` already
+  render the `Seo` component, so every slide/text gets `<title>`, `description`, OpenGraph/Twitter
+  cards, and `canonical` in its prerendered HTML. Set per-deck defaults with the `description` /
+  `image` props in a deck's `+layout.svelte`, and per-slide overrides via `description` / `image`
+  in `pages.ts`. The absolute-only tags (`og:url`, `og:image`, `twitter:image`, `canonical`) and the
+  emitted `sitemap.xml` / `robots.txt` are built from `GEEKPRESENT_SITE_URL` (default: the GitHub
+  Pages URL; set it empty to omit those tags). Keep in-page **assets relative** — only metadata URLs
+  are absolute. The base URL is injected via Vite `define` (see `vite.config.ts` → `$lib/seo/config.ts`).
+  When you add a presentation, its slides are picked up by the sitemap automatically (it reads every
+  `pages.ts`); a brand-new standalone Text route must be added to `TEXT_ROUTES` in
+  `src/lib/seo/routes.ts`.
 - **`name` ending in `.html` is intentional.** Route folders are literally `title.html/`, so the URL is
   `/slides/title.html`. Don't "fix" it.
 - **No `pnpm install` purge in CI sandboxes.** If `pnpm install` wants to wipe `node_modules`, prefer
