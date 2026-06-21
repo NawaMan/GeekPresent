@@ -25,4 +25,6 @@ export const pages = [
     { path: "morph-to.html",         title: "Shared-Element Morph (to)",     transition: "slide", transitionBack: "morph" },
 
     { path: "limitations.html",      title: "Limits & Browser Support",      transition: "slide" },
+
+    { path: "thank-you.html",        title: "Now Go Animate Your Deck",      transition: "slide" },
 ];
