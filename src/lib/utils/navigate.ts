@@ -57,8 +57,8 @@ export function getPageNavigation(pages: Array<Page>, currentPath: string, prefi
     function addPrefix(path: string | null): string | undefined { return path ? prefix + path : undefined; }
 
     return {
-        first: addPrefix(pages[0]?.path),
-        last:  addPrefix(pages[pages.length - 1]?.path),
+        first: addPrefix(index > 0                ? pages[0]?.path : null),
+        last:  addPrefix(index < pages.length - 1 ? pages[pages.length - 1]?.path : null),
         prev:  addPrefix(index > 0                ? pages[index - 1]?.path : null),
         next:  addPrefix(index < pages.length - 1 ? pages[index + 1]?.path : null),
     };
