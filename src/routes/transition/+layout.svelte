@@ -36,6 +36,14 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-<SlideDeck {pages} title="Page Transitions" width={1920} height={1080} fill deckClass="gp-deck theme-green">
+<SlideDeck
+	{pages}
+	title="Page Transitions"
+	description="Animating slide-to-slide with the View Transitions API in GeekPresent — each effect performed live by paging through its own from → to pair."
+	width={1920}
+	height={1080}
+	fill
+	deckClass="gp-deck theme-green"
+>
 	<slot />
 </SlideDeck>

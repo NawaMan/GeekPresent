@@ -27,6 +27,8 @@
 	import Copyright      from '$lib/components/Copyright.svelte';
 	import TableOfContent from '$lib/components/TableOfContent.svelte';
 	import SizeMode       from '$lib/components/SizeMode.svelte';
+	import Seo            from '$lib/components/Seo.svelte';
+	import { SITE_DESCRIPTION } from '$lib/seo/config';
 
 	import { browser }    from '$app/environment';
 	import { page }       from '$app/stores';
@@ -42,6 +44,15 @@
 	    slide's own `title` into the browser-tab <title>; falls back to the site
 	    default (SITE_TITLE) when left undefined. */
 	export let title: string | undefined = undefined;
+	/** Presentation-level SEO description, used for every slide that doesn't set its
+	    own in pages.ts. Defaults to the site description. */
+	export let description: string = SITE_DESCRIPTION;
+	/** Presentation-level social/OG image (absolute URL or site-relative path), used
+	    for slides without their own. Undefined falls back to the site-default image. */
+	export let image: string | undefined = undefined;
+	/** Presentation-level alt text for the social image, used for slides without
+	    their own. Undefined falls back to the default card alt (see Seo). */
+	export let imageAlt: string | undefined = undefined;
 	/** Canvas size in px. Landscape: 1920x1080. Portrait (Tall): 1080x1920. */
 	export let width  = 1920;
 	export let height = 1080;
@@ -82,6 +93,11 @@
 	// with this deck's `title` prop into "Slide — Deck". See documentTitle.
 	$: currentTitle   = pages.find((p) => p.path === currentSlide)?.title;
 	$: docTitle       = documentTitle(currentTitle, title);
+	// SEO description/image cascade: the current slide's own pages.ts value, else
+	// the deck-level default. Emitted (with title/canonical/og/twitter) by <Seo>.
+	$: currentDescription = pages.find((p) => p.path === currentSlide)?.description ?? description;
+	$: currentImage       = pages.find((p) => p.path === currentSlide)?.image ?? image;
+	$: currentImageAlt    = pages.find((p) => p.path === currentSlide)?.imageAlt ?? imageAlt;
 
 	function adjustSize() {
 		if (!container)
@@ -138,8 +154,17 @@
 
 </script>
 
+<!-- Seo owns the <title> + SEO/social tags; the favicon link stays here (its
+     last-one-wins cascade is separate from the single <title> Seo emits). -->
+<Seo
+	title={docTitle}
+	description={currentDescription}
+	image={currentImage}
+	imageAlt={currentImageAlt}
+	type="website"
+/>
+
 <svelte:head>
-	<title>{docTitle}</title>
 	{#if currentFavicon}
 		<link rel="icon" href={currentFavicon} />
 	{/if}

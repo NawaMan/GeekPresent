@@ -9,6 +9,16 @@ export interface Page {
         Overrides the presentation/site favicon for just this slide; emitted by the
         deck shell's <svelte:head>. See SlideDeck.svelte / slides/+layout.svelte. */
     favicon?: string;
+    /** Optional page-level SEO description. Falls back to the deck's description
+        (the `description` prop on SlideDeck) when omitted. */
+    description?: string;
+    /** Optional page-level social/OG image — an absolute URL or a site-relative
+        path (e.g. 'slides/title-og.png'). Resolved to absolute by the SEO layer;
+        falls back to the deck image, then the site-default OG image. */
+    image?: string;
+    /** Optional alt text for this slide's social image; falls back to the deck's
+        imageAlt, then a default describing the site card. */
+    imageAlt?: string;
     /** Optional leave-transition for a View-Transition deck (see setViewTransitions).
         Names the animation used when paging AWAY from this slide — so a slide can be
         animated with the very transition it discusses. NavigationBar exposes it as

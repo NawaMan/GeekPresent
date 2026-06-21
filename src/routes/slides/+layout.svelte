@@ -27,6 +27,13 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-<SlideDeck {pages} title="GeekPresent" width={1920} height={1080} fill>
+<SlideDeck
+	{pages}
+	title="GeekPresent"
+	description="A guided tour of GeekPresent — build presentation decks from HTML, CSS and Svelte, one route per slide, with components you own."
+	width={1920}
+	height={1080}
+	fill
+>
 	<slot />
 </SlideDeck>

@@ -24,6 +24,14 @@
 	setPages(pages);
 </script>
 
-<SlideDeck {pages} title="GeekPortrait" width={1080} height={1920} baseFontSize="1.8em" fill>
+<SlideDeck
+	{pages}
+	title="GeekPortrait"
+	description="GeekPortrait — a 1080×1920 portrait deck for YouTube Shorts and mobile, built from the same GeekPresent components in a taller frame."
+	width={1080}
+	height={1920}
+	baseFontSize="1.8em"
+	fill
+>
 	<slot />
 </SlideDeck>

@@ -13,6 +13,7 @@
 	import Copyright      from '$lib/components/Copyright.svelte';
 	import TableOfContent from '$lib/components/TableOfContent.svelte';
 	import SizeMode       from '$lib/components/SizeMode.svelte';
+	import Seo            from '$lib/components/Seo.svelte';
 
 	import { browser }    from '$app/environment';
 	import { page }       from '$app/stores';
@@ -86,8 +87,15 @@
 
 </script>
 
+<!-- Seo owns the <title> + SEO/social tags (this deck has its own canvas rather
+     than SlideDeck, so it wires Seo directly). -->
+<Seo
+	title={docTitle}
+	description="GeekLight — a light-theme GeekPresent deck: the same components on a soft watercolor background."
+	type="website"
+/>
+
 <svelte:head>
-	<title>{docTitle}</title>
 	<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&display=swap" />
 </svelte:head>
 

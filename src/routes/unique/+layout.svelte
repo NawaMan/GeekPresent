@@ -22,6 +22,13 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-<SlideDeck {pages} title="What Makes GeekPresent Unique" width={1920} height={1080} fill>
+<SlideDeck
+	{pages}
+	title="What Makes GeekPresent Unique"
+	description="What sets GeekPresent apart from mainstream slide tools: route-per-slide decks, a fixed auto-scaling canvas, and two artifacts from one component set — demonstrated as it goes."
+	width={1920}
+	height={1080}
+	fill
+>
 	<slot />
 </SlideDeck>

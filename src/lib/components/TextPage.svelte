@@ -17,7 +17,9 @@
 
 	import { setMode }   from '$lib/presentation';
 	import { SITE_TITLE } from '$lib/utils/navigate';
+	import { SITE_DESCRIPTION } from '$lib/seo/config';
 	import NavigationBar from '$lib/components/NavigationBar.svelte';
+	import Seo           from '$lib/components/Seo.svelte';
 
 	// Publish this artifact's mode so reused components can adapt (e.g. the slide
 	// nav bar becomes a single TOP control that scrolls this container up).
@@ -28,11 +30,19 @@
 	// name (the same default a deck falls back to). A route can override it via
 	// <TextPage title="...">.
 	export let title: string = SITE_TITLE;
+	/** SEO description for this Text; defaults to the site description. */
+	export let description: string = SITE_DESCRIPTION;
+	/** Social/OG image (absolute URL or site-relative path); undefined uses the
+	    site-default OG image. */
+	export let image: string | undefined = undefined;
+	/** Alt text for the social image; undefined uses the default card alt. */
+	export let imageAlt: string | undefined = undefined;
+	/** OpenGraph type — 'website' for the landing page, 'article' for a long-form Text. */
+	export let type: 'website' | 'article' = 'website';
 </script>
 
-<svelte:head>
-	<title>{title}</title>
-</svelte:head>
+<!-- Seo emits the <title> + full SEO/social metadata for this Text. -->
+<Seo {title} {description} {image} {imageAlt} {type} />
 
 <div class="text-scroll" data-text-scroll>
 	<div class="text-page">

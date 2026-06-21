@@ -14,6 +14,10 @@
 	import TextPage from '$lib/components/TextPage.svelte';
 </script>
 
-<TextPage title="Text — GeekPresent">
+<TextPage
+	title="Text — GeekPresent"
+	description="A sample GeekPresent Text artifact: one long, hand-authored page that scrolls — the read-at-your-own-pace counterpart to a slide deck, built from the same components."
+	type="article"
+>
 	<slot />
 </TextPage>
