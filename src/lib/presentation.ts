@@ -42,3 +42,24 @@ export function setMode(mode: Mode): void {
 export function getMode(): Mode {
 	return getContext<Mode>(MODE_KEY) ?? 'presentation';
 }
+
+// View-transition navigation.
+//
+// By default a deck pages between slides with a full-page load (window.location)
+// — route-per-slide, honest reload. A deck may instead opt into client-side
+// navigation (SvelteKit goto) wrapped in the View Transitions API, so pressing
+// next/prev animates one slide into the next WITHIN a single document (both
+// slides are live, so there is no blank-snapshot problem the JS-mounted canvas
+// would otherwise cause). The NavigationBar reads this to pick its strategy; a
+// deck turns it on from its +layout.svelte with setViewTransitions(true).
+const VIEW_TRANSITIONS_KEY = Symbol('geekpresent.viewTransitions');
+
+/** Opt this deck into client-side, View-Transition-animated paging. */
+export function setViewTransitions(on: boolean): void {
+	setContext(VIEW_TRANSITIONS_KEY, on);
+}
+
+/** Whether this deck uses client-side View-Transition paging (default false). */
+export function getViewTransitions(): boolean {
+	return getContext<boolean>(VIEW_TRANSITIONS_KEY) ?? false;
+}

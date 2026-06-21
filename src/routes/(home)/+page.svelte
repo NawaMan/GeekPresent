@@ -203,11 +203,16 @@
 	its <code>+page.svelte</code>.
 </p>
 
-<h3>Presentations</h3>
+<h3>Example Presentation</h3>
 <ul>
 	<li>
 		<a href="slides/title.html">GeekPresent</a> &mdash; the main presentation: a
 		guide to building decks with this framework.
+	</li>
+	<li>
+		<a href="transition/title.html">Page Transitions</a> &mdash; a green-themed deck
+		on animating slide-to-slide with the View Transitions API; each effect is
+		performed live by paging through its own &ldquo;from &rarr; to&rdquo; pair.
 	</li>
 	<li>
 		<a href="unique/title.html">What Makes It Unique</a> &mdash; a short deck on what

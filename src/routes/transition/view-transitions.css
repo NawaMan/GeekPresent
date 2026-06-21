@@ -1,0 +1,164 @@
+/*
+  Per-slide same-document View Transitions for the Transition deck.
+
+  NavigationBar wraps each goto() in document.startViewTransition() and, for the
+  duration, sets two attributes on <html>:
+    - data-vt-kind = the LEAVING slide's own transition
+      ('slide' | 'fade' | 'morph' | 'zoom' | 'flip' | 'reveal')
+    - data-vt      = direction ('forward' = NEXT/→, 'back' = PREV/←)
+  So every slide animates away with the very effect it discusses (see pages.ts).
+
+  The browser snapshots the whole viewport (old + new) as the `root` group; these
+  rules animate those snapshots. Defined globally (not in a Svelte <style>, which
+  would mangle the ::view-transition pseudo-elements); inert until NavigationBar
+  sets the attributes, so importing this file affects nothing else. A browser
+  without the API just navigates instantly.
+
+  Durations are deliberately leisurely (~0.7–1.2s) so each effect is easy to watch.
+*/
+
+/* Shared timing for the root animations (per-kind overrides below). */
+html[data-vt]::view-transition-old(root),
+html[data-vt]::view-transition-new(root) {
+	animation-duration: 700ms;
+	animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+	animation-fill-mode: both;
+}
+
+/* ── slide: old slide exits, new enters, in the paging direction ───────────── */
+html[data-vt-kind="slide"][data-vt="forward"]::view-transition-old(root) { animation-name: vt-exit-left; }
+html[data-vt-kind="slide"][data-vt="forward"]::view-transition-new(root) { animation-name: vt-enter-right; }
+html[data-vt-kind="slide"][data-vt="back"]::view-transition-old(root)    { animation-name: vt-exit-right; }
+html[data-vt-kind="slide"][data-vt="back"]::view-transition-new(root)    { animation-name: vt-enter-left; }
+
+@keyframes vt-exit-left   { to   { transform: translateX(-100%); opacity: 0.25; } }
+@keyframes vt-enter-right { from { transform: translateX(100%);  opacity: 0.25; } }
+@keyframes vt-exit-right  { to   { transform: translateX(100%);  opacity: 0.25; } }
+@keyframes vt-enter-left  { from { transform: translateX(-100%); opacity: 0.25; } }
+
+/* ── fade: straight cross-fade, no movement (direction ignored) ────────────── */
+html[data-vt-kind="fade"]::view-transition-old(root) { animation-name: vt-fade-out; }
+html[data-vt-kind="fade"]::view-transition-new(root) { animation-name: vt-fade-in; }
+
+@keyframes vt-fade-out { to   { opacity: 0; } }
+@keyframes vt-fade-in  { from { opacity: 0; } }
+
+/* ── morph: the heading is a SHARED element, driven hard so it's unmistakable —
+      the outgoing heading scales up and blurs out while the incoming heading
+      hurtles in from far; the slide body cross-fades underneath. ─────────────── */
+html[data-vt-kind="morph"]::view-transition-old(root),
+html[data-vt-kind="morph"]::view-transition-new(root) {
+	animation-duration: 1000ms;
+}
+html[data-vt-kind="morph"]::view-transition-old(root) { animation-name: vt-fade-out; }
+html[data-vt-kind="morph"]::view-transition-new(root) { animation-name: vt-fade-in; }
+
+/* Name each slide's heading so the browser pairs them across the navigation. */
+html[data-vt-kind="morph"] .page h1 { view-transition-name: deck-heading; }
+
+html[data-vt-kind="morph"]::view-transition-old(deck-heading),
+html[data-vt-kind="morph"]::view-transition-new(deck-heading) {
+	animation-duration: 1000ms;
+	animation-timing-function: cubic-bezier(0.5, 0, 0.2, 1);
+	animation-fill-mode: both;
+	transform-origin: left center;
+}
+html[data-vt-kind="morph"]::view-transition-old(deck-heading) { animation-name: vt-morph-out; }
+html[data-vt-kind="morph"]::view-transition-new(deck-heading) { animation-name: vt-morph-in; }
+
+@keyframes vt-morph-out { to   { transform: scale(2.4) translateY(-26px); opacity: 0; filter: blur(10px); } }
+@keyframes vt-morph-in  { from { transform: scale(0.15) translateY(34px); opacity: 0; filter: blur(10px); } }
+
+/* Multi-element morph showcase: name each of the four cards so they're all paired
+   and morph at once — in BOTH directions, so ← replays the morph. Safe because the
+   'morph' kind now fires ONLY between the two morph slides (morph-from forward and
+   morph-to back, per pages.ts); every other navigation touching them is a 'slide',
+   so the names are never left dangling against a card-less slide. */
+html[data-vt-kind="morph"] .m1 { view-transition-name: morph-1; }
+html[data-vt-kind="morph"] .m2 { view-transition-name: morph-2; }
+html[data-vt-kind="morph"] .m3 { view-transition-name: morph-3; }
+html[data-vt-kind="morph"] .m4 { view-transition-name: morph-4; }
+
+html[data-vt-kind="morph"]::view-transition-group(morph-1),
+html[data-vt-kind="morph"]::view-transition-group(morph-2),
+html[data-vt-kind="morph"]::view-transition-group(morph-3),
+html[data-vt-kind="morph"]::view-transition-group(morph-4) {
+	animation-duration: 1000ms;
+	animation-timing-function: cubic-bezier(0.5, 0, 0.2, 1);
+}
+
+/* ── zoom: forward pushes IN — the new slide grows from small while the old blooms
+      past you. Back pulls OUT — the old slide shrinks away while the new settles in
+      from large. So ← genuinely reverses the motion (zoom-out, not zoom-in again). */
+html[data-vt-kind="zoom"][data-vt="forward"]::view-transition-old(root) { animation-name: vt-zoom-grow-out; }
+html[data-vt-kind="zoom"][data-vt="forward"]::view-transition-new(root) { animation-name: vt-zoom-grow-in; }
+html[data-vt-kind="zoom"][data-vt="back"]::view-transition-old(root)    { animation-name: vt-zoom-shrink-out; }
+html[data-vt-kind="zoom"][data-vt="back"]::view-transition-new(root)    { animation-name: vt-zoom-shrink-in; }
+
+@keyframes vt-zoom-grow-out   { to   { transform: scale(1.35); opacity: 0; } }  /* forward: old blooms past */
+@keyframes vt-zoom-grow-in    { from { transform: scale(0.65); opacity: 0; } }  /* forward: new grows in    */
+@keyframes vt-zoom-shrink-out { to   { transform: scale(0.65); opacity: 0; } }  /* back: old shrinks away    */
+@keyframes vt-zoom-shrink-in  { from { transform: scale(1.35); opacity: 0; } }  /* back: new settles from big*/
+
+/* ── flip: a 3D card flip, STAGED so the faces never overlap — the old face
+      swings fully away (first 600ms), then the new face swings in (next 600ms via
+      a matching delay; it's held off-screen at opacity 0 until then). ─────────── */
+html[data-vt-kind="flip"]::view-transition-old(root) {
+	animation-duration: 600ms;
+}
+html[data-vt-kind="flip"]::view-transition-new(root) {
+	animation-duration: 600ms;
+	animation-delay: 600ms;
+}
+/* Forward turns one way; back turns the OTHER way, so ← unwinds the flip. */
+html[data-vt-kind="flip"][data-vt="forward"]::view-transition-old(root) { animation-name: vt-flip-out; }
+html[data-vt-kind="flip"][data-vt="forward"]::view-transition-new(root) { animation-name: vt-flip-in; }
+html[data-vt-kind="flip"][data-vt="back"]::view-transition-old(root)    { animation-name: vt-flip-out-rev; }
+html[data-vt-kind="flip"][data-vt="back"]::view-transition-new(root)    { animation-name: vt-flip-in-rev; }
+
+@keyframes vt-flip-out     { to   { transform: perspective(1800px) rotateY(-90deg); opacity: 0; } }
+@keyframes vt-flip-in      { from { transform: perspective(1800px) rotateY(90deg);  opacity: 0; } }
+@keyframes vt-flip-out-rev { to   { transform: perspective(1800px) rotateY(90deg);  opacity: 0; } }
+@keyframes vt-flip-in-rev  { from { transform: perspective(1800px) rotateY(-90deg); opacity: 0; } }
+
+/* ── reveal: an iris. Forward, the NEW slide irises IN over the old (a growing
+      circle on top). Back, we reverse it: the OLD slide (the one you're leaving)
+      sits ON TOP and irises OUT — a shrinking circle — to uncover the destination
+      held beneath. The on-top side is forced with z-index, since the new snapshot
+      otherwise always paints above the old. ───────────────────────────────────── */
+
+/* forward: new on top, irises in; old holds beneath (default stacking). */
+html[data-vt-kind="reveal"][data-vt="forward"]::view-transition-new(root) {
+	animation-name: vt-circle-reveal;
+	animation-duration: 900ms;
+}
+html[data-vt-kind="reveal"][data-vt="forward"]::view-transition-old(root) {
+	animation-name: vt-hold;
+	animation-duration: 900ms;
+}
+
+/* back: old on top (z-index), irises OUT; new holds beneath. */
+html[data-vt-kind="reveal"][data-vt="back"]::view-transition-old(root) {
+	animation-name: vt-circle-conceal;
+	animation-duration: 900ms;
+	z-index: 2;
+}
+html[data-vt-kind="reveal"][data-vt="back"]::view-transition-new(root) {
+	animation-name: vt-hold;
+	animation-duration: 900ms;
+	z-index: 1;
+}
+
+@keyframes vt-circle-reveal  { from { clip-path: circle(0%   at 50% 50%); } to { clip-path: circle(150% at 50% 50%); } }
+@keyframes vt-circle-conceal { from { clip-path: circle(150% at 50% 50%); } to { clip-path: circle(0%   at 50% 50%); } }
+@keyframes vt-hold { from { opacity: 1; } to { opacity: 1; } }
+
+/* Respect users who ask for less motion: every kind drops to a quick cross-fade. */
+@media (prefers-reduced-motion: reduce) {
+	/* !important so this beats the per-kind, per-direction rules above regardless of
+	   their (higher) specificity — an accessibility override should always win. */
+	html[data-vt]::view-transition-old(root) { animation-name: vt-fade-out !important; animation-delay: 0ms !important; }
+	html[data-vt]::view-transition-new(root) { animation-name: vt-fade-in  !important; animation-delay: 0ms !important; }
+	html[data-vt-kind="morph"]::view-transition-old(deck-heading) { animation-name: vt-fade-out !important; transform: none; filter: none; }
+	html[data-vt-kind="morph"]::view-transition-new(deck-heading) { animation-name: vt-fade-in  !important; transform: none; filter: none; }
+}
