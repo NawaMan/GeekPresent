@@ -91,8 +91,9 @@
 		required.
 	</li>
 	<li>
-		<b>SCALED / FIXED modes.</b> Present scaled-to-fit, or switch to a fixed
-		1920&times;1080 view with speaker notes visible below.
+		<b>FITTED / SCALED modes.</b> Present fit-to-window, or switch to an exact
+		zoom (1:1 and beyond) you can pan, with a minimap; speaker notes show below
+		when zoomed out.
 	</li>
 	<li>
 		<b>A component toolbox.</b> Box (pop-up overlays), Code / CodeBox (Monaco

@@ -28,9 +28,10 @@ Read the `README.md` first for the user-facing overview. This file is the *opera
 - **Templates** (`src/lib/templates/`): `TitlePage` (named slots `title` / `subtitle` / `subsubtitle`)
   and `ContentPage` (`title` + `subtitle` props + default slot). Both auto-insert the nav bar.
 - **The slides layout** (`src/routes/slides/+layout.svelte`) auto-adds the Table of Contents, the
-  SCALED/FIXED toggle, and the Copyright notice, and does all the scaling. Slides are authored on a
-  fixed **1280×720** canvas; SCALED mode transforms it to fit the window, FIXED keeps it 1:1 and shows
-  speaker notes. Text color is `#C0F1FF` on `#181818`.
+  display-mode control, and the Copyright notice, and does all the scaling. Slides are authored on a
+  fixed **1920×1080** canvas; FITTED mode transforms it to fit the window, SCALED shows it at an exact
+  factor (1:1 and beyond, centered and pannable, with a minimap) and reveals speaker notes below the
+  slide when zoomed out. Display mode lives in the `displayMode` store. Text color is `#C0F1FF` on `#181818`.
 - **Components** (`src/lib/components/`): `Box`, `Note`, `Hint`, `Label`, `YouTube`, `WideDiv`,
   `Code`, `JavaCode`, `CodeBox`, `JavaCodeBox`, `QuickCode` (small dark monospace box for short
   hand-written snippets; not Monaco), `ViewSource` (corner `</> Source` button that shows a page's
@@ -243,8 +244,9 @@ presentations are themed independently; **`demo/+layout.svelte` is a worked exam
   `background: url('./bg.png') center / cover` (Vite resolves the relative `url()`).
 - **Favicon** — colocate a `favicon.png`, `import` it, and set it with
   `<svelte:head><link rel="icon" href={favicon} /></svelte:head>`.
-- **Canvas size** — the `1280 / 720` lives in the same `+layout.svelte` (`aspectRatio` + the
-  `.container` / `.content` CSS); change all together if you resize.
+- **Canvas size** — set per deck via the `width` / `height` props passed to `SlideDeck` in the
+  deck's `+layout.svelte` (default **1920×1080**; portrait decks pass `1080×1920`). SlideDeck derives
+  `aspectRatio` and all the scaling from them.
 
 Shared base styles are in `src/lib/styles/`. (Note: `src/app.html` still points at a non-existent
 `static/favicon.png` as the global default — a per-presentation `<svelte:head>` icon overrides it.)

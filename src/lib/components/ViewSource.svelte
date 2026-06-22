@@ -42,7 +42,7 @@
 
 <style>
 	/* Bottom-right corner — the one piece of chrome not already taken (ToC is
-	   top-left, the SCALED/FIXED toggle top-right, the nav bar bottom-left). */
+	   top-left, the display-mode control top-right, the nav bar bottom-left). */
 	.view-source {
 		position: absolute;
 		bottom: 0px;
