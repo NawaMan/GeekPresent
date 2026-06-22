@@ -8,7 +8,7 @@
 
 <ContentPage title="How To Use This" subtitle="Capture → measure → compare">
 	<ol style="line-height: 1.5em;">
-		<li>Open the next slide (the <strong>1920&times;1080 target</strong>) in SCALED view mode.</li>
+		<li>Open the next slide (the <strong>1920&times;1080 target</strong>) in <strong>FITTED</strong> mode (fit to window).</li>
 		<li>Maximise the window &mdash; ideally also try a window that is <em>not</em> 16:9
 			(wide-and-short, or narrow-and-tall) to stress the opposite binding axis.</li>
 		<li>Take a screenshot of the slide and open it in GIMP.</li>

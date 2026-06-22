@@ -16,7 +16,7 @@
 		<b>UI Components</b>
 		<ul>
 			<li><b>Box</b> &mdash; expandable overlay with animation (for images, code, etc.)</li>
-			<li><b>Note</b> &mdash; speaker notes (visible in FIXED mode below the slide)</li>
+			<li><b>Note</b> &mdash; speaker notes (visible below the slide in SCALED mode)</li>
 			<li><b>Hint</b> &mdash; hint text at the bottom of a slide</li>
 			<li><b>Label</b> &mdash; hoverable highlighted text</li>
 			<li><b>YouTube</b> &mdash; YouTube thumbnail with QR code link</li>

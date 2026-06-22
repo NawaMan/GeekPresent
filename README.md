@@ -7,7 +7,7 @@
 Build presentations with HTML, CSS, and Svelte components — each slide is a route,<br/>
 the whole presentation is a static site, and it deploys to GitHub Pages.
 
-`SvelteKit` · `Static site` · `1280×720 canvas, auto-scaled` · `Deploys to GitHub Pages`
+`SvelteKit` · `Static site` · `1920×1080 canvas, auto-scaled` · `Deploys to GitHub Pages`
 
 </div>
 
@@ -18,11 +18,11 @@ the whole presentation is a static site, and it deploys to GitHub Pages.
 If you do any front-end work you already know HTML + CSS + JS, and you've probably wished you could just *use* that to make slides instead of fighting a WYSIWYG tool. GeekPresent lets you do exactly that — and takes care of the tedious parts:
 
 - **No manual paging or navigation.** List your slides once in `pages.ts`; arrow keys, the on-screen nav bar, and the Table of Contents are wired up for you.
-- **Fixed canvas, automatic scaling.** You design on a fixed **1280×720** canvas and position things with normal CSS — including absolute positioning at exact pixels — and the framework scales the whole slide to fit any screen. You think in one size; it handles the rest.
+- **Fixed canvas, automatic scaling.** You design on a fixed **1920×1080** canvas and position things with normal CSS — including absolute positioning at exact pixels — and the framework scales the whole slide to fit any screen. You think in one size; it handles the rest.
 - **Colocation, your choice.** Global CSS/JS/assets work, but each page can also keep its *own* assets (images, etc.) right next to it. Pick whatever keeps cognitive load low.
 - **Real componentization.** Svelte is excellent at components, so reusable slide pieces (boxes, code viewers, notes…) are just imports.
 - **Navigation built in.** Arrow keys, on-screen buttons, and a Table of Contents — no wiring required.
-- **SCALED / FIXED modes.** Present scaled-to-fit, or switch to a fixed 1280×720 view with speaker notes visible below.
+- **FITTED / SCALED modes.** Present fit-to-window, or switch to an exact zoom (1:1 and beyond) you can pan, with a minimap; speaker notes show below when zoomed out.
 - **It's just text.** Slides are Svelte files, so they diff cleanly, version-control nicely, and hot-reload while you edit.
 
 ## What makes it unique
@@ -30,7 +30,7 @@ If you do any front-end work you already know HTML + CSS + JS, and you've probab
 HTML-based slides aren't new — reveal.js, Slidev, Spectacle and Marp all exist. What no mainstream tool focuses on is the particular set of choices GeekPresent combines:
 
 - **One slide = one route = one folder.** Slides aren't sections of a single giant document or fenced blocks in one markdown file — each slide is its own SvelteKit route folder (`src/routes/<name>.html/`). So slides diff cleanly one file at a time, each slide can **colocate its own assets** (images, QR codes) right next to it, and every slide is independently URL-addressable and prerendered to its own HTML.
-- **A fixed 1280×720 canvas with pixel-exact positioning *and* auto-scaling.** You design against one fixed size — `left: 640px` means the same thing on every screen — and the framework scales the whole canvas to fit any window (SCALED) or pins it 1:1 with speaker notes (FIXED). Most HTML-slide tools push you toward responsive flow; GeekPresent deliberately gives you a fixed pixel coordinate space and does the scaling math for you.
+- **A fixed 1920×1080 canvas with pixel-exact positioning *and* auto-scaling.** You design against one fixed size — `left: 960px` means the same thing on every screen — and the framework scales the whole canvas to fit any window (FITTED) or shows it at an exact zoom you can pan (SCALED), with speaker notes below when zoomed out. Most HTML-slide tools push you toward responsive flow; GeekPresent deliberately gives you a fixed pixel coordinate space and does the scaling math for you.
 - **Slides that are their own documentation.** `ViewSource` adds a `</> Source` button that pops a slide's *own* source (via Vite's `?raw` import, so it can never drift from the real file) into a Monaco viewer titled with its file path. The deck documents itself with guaranteed-accurate code.
 - **Two artifact types from one component set.** The same `$lib` components compile into either a click-through **presentation** or a long-form, scrollable **Text** — give the talk, then publish the reader-friendly version with no rewrite. A mode flag (`setMode`) lets shared components adapt (e.g. the nav bar collapses to a single TOP button).
 - **Multiple independent presentations in one project.** Navigation and the Table of Contents are scoped *per presentation* via Svelte context (`setPages` / `getPages`), not a single global config. Sibling route folders (`slides/`, `portrait/`, `geeklight/`) each carry their own slide list, theme, fonts, background, and favicon, and coexist without interfering.
@@ -124,12 +124,12 @@ Both templates add the navigation bar automatically.
 
 ### Positioning & size
 
-Every slide lives on a fixed **1280×720** canvas. Lay out with whatever CSS suits the slide:
+Every slide lives on a fixed **1920×1080** canvas. Lay out with whatever CSS suits the slide:
 
 - **Normal flow** — `ContentPage` centers your content; just write HTML.
-- **Absolute positioning** — when you want pixel-precise placement, position elements absolutely within the 1280×720 canvas. Because the size is fixed, `left: 640px` means the same thing on every screen.
+- **Absolute positioning** — when you want pixel-precise placement, position elements absolutely within the 1920×1080 canvas. Because the size is fixed, `left: 960px` means the same thing on every screen.
 
-You never write scaling code: in **SCALED** mode the framework transforms the whole canvas to fit the window (keeping the 16:9 ratio); in **FIXED** mode it stays exactly 1280×720.
+You never write scaling code: in **FITTED** mode the framework transforms the whole canvas to fit the window (keeping the aspect ratio); in **SCALED** mode it shows the canvas at an exact factor (1:1 and beyond), centered and pannable.
 
 ### Interactivity (it's just Svelte)
 
@@ -201,7 +201,7 @@ Read-only code viewers built on the Monaco editor:
 - The source comes from Vite's `?raw` import, so what's shown can never drift from the real file.
 - The path can't be auto-derived inside the component, so each page passes its own `source` (the `?raw` import) and `path` string — one import plus one line per slide.
 - Props: `source` (required), `path`, `language` (defaults to `html` — Monaco has no native `svelte` mode, so a `.svelte` file reads best as HTML; the text itself is exact), and `text` (button label, defaults to `</> Source`).
-- It sits in the bottom-right — the one corner not already used by the ToC (top-left), the SCALED/FIXED toggle (top-right), or the nav bar (bottom-left).
+- It sits in the bottom-right — the one corner not already used by the ToC (top-left), the display-mode control (top-right), or the nav bar (bottom-left).
 
 ### Local assets
 
@@ -244,12 +244,12 @@ The presentation under `src/routes/slides/` is itself a working reference — op
 
 ## Display modes & speaker notes
 
-Toggle **SCALED / FIXED** in the top-right corner:
+Pick **FITTED / SCALED** from the control in the top-right corner:
 
-- **SCALED** — the slide scales to fit the window. Use this to present.
-- **FIXED** — the slide stays at 1280×720 and **speaker notes** become visible below it.
+- **FITTED** — the slide scales to fit the window. Use this to present.
+- **SCALED** — the slide shows at an exact factor (1:1 and beyond), centered and pannable, with a minimap when it overflows. Pick a % or a target resolution from the menu. **Speaker notes** appear below the slide when you zoom out below the fit.
 
-Add notes with the `Note` component (hidden in SCALED mode and when printing):
+Add notes with the `Note` component (shown below the slide in SCALED mode; hidden in FITTED and when printing):
 
 ```svelte
 <script>
