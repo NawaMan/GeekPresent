@@ -246,8 +246,23 @@
 <h2>Get started</h2>
 
 <p>
-	Clone the repo, then <code>pnpm install</code> and <code>pnpm dev</code> &mdash;
-	list your slides in <code>pages.ts</code>, drop a <code>+page.svelte</code> next
-	to each, and <code>pnpm build</code> when you're ready to ship. See the
-	<code>README</code> for the full walkthrough.
+	<b>Add it to an existing project.</b> From the root of the repo you want to
+	document, run this &mdash; it drops GeekPresent into a subfolder, ready to author
+	and deploy to GitHub Pages:
+</p>
+
+<pre><code>curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh | bash</code></pre>
+
+<p>
+	It's interactive (the prompts reach your terminal even through the pipe); pass
+	flags after <code>bash -s --</code> for an unattended run, e.g.
+	<code>bash -s -- --dir docs-site --mode minimal --keep slides --yes</code>.
+	Nothing is committed &mdash; review, then <code>git add</code> what you want.
+</p>
+
+<p>
+	<b>Or work on it directly.</b> Clone the repo, then <code>pnpm install</code> and
+	<code>pnpm dev</code> &mdash; list your slides in <code>pages.ts</code>, drop a
+	<code>+page.svelte</code> next to each, and <code>pnpm build</code> when you're
+	ready to ship. See the <code>README</code> for the full walkthrough.
 </p>
