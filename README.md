@@ -59,6 +59,42 @@ pnpm deploy     # publish docs/ to GitHub Pages
 
 ---
 
+## Use GeekPresent in another project
+
+GeekPresent is **copy-and-own**, not an npm dependency: you drop it into your repo as a
+subfolder and author your docs / slides / promo site there, building to a static site you host
+on GitHub Pages. The `adopt-geekpresent.sh` script bootstraps that in one step.
+
+From the **root of the project you want to add it to**:
+
+```bash
+# interactive — asks for the subfolder, sample handling, etc. (works through the pipe):
+curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh | bash
+
+# non-interactive — pass flags after `bash -s --`:
+curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh \
+  | bash -s -- --dir docs-site --mode minimal --keep slides --yes
+```
+
+It clones GeekPresent into a subfolder, removes its `.git` (so it becomes part of *your* repo),
+optionally trims the sample decks, and can scaffold a GitHub Actions workflow that builds the
+subfolder and deploys it. **Nothing is committed** — review, then `git add` what you want.
+
+| Flag | What it does | Default |
+| --- | --- | --- |
+| `--dir <name>` | subfolder to create | `geekpresent` |
+| `--mode minimal\|full` | `minimal`: keep one deck, move the rest to a gitignored `.samples-ref/`; `full`: keep everything | `minimal` |
+| `--keep <deck>` | which deck to keep in minimal mode | `slides` |
+| `--base </path>` | GitHub Pages base path for a project site | none |
+| `--ci` / `--no-ci` | scaffold the deploy workflow | prompted |
+| `--yes`, `-y` | accept defaults, skip prompts (for CI / `curl … \| bash`) | off |
+
+> **Deploy at a domain root** (user/org Pages or a custom domain). A project sub-path (`--base`)
+> currently breaks prerender, because the SEO wiring emits a root-absolute `/sitemap.xml`. See
+> [`AGENT.md`](AGENT.md) for the full adoption + authoring guide (and the base-path details).
+
+---
+
 ## How to use
 
 ### Slides: define the order, then add files
