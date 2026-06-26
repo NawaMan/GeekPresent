@@ -130,7 +130,7 @@
 <div class="nav no-print">
 	<CtrlBtn chrome text="FIRST"    on:click={onFirst}    isDisabled={!firstLink} />
 	<CtrlBtn chrome text="PREV"     on:click={onPrev}     isDisabled={!prevLink} />
-	<CtrlBtn chrome text="CONTINUE" on:click={onContinue} isDisabled={!onContinue} />
+	<CtrlBtn chrome text="CONTINUE" on:click={() => onContinue?.()} isDisabled={!onContinue} />
 	<CtrlBtn chrome text="NEXT"     on:click={onNext}     isDisabled={!nextLink} />
 	<CtrlBtn chrome text="LAST"     on:click={onLast}     isDisabled={!lastLink}/>
 </div>
