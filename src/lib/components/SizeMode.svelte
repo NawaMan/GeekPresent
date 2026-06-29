@@ -10,6 +10,7 @@
 <script lang="ts">
 	import CtrlBtn from './CtrlBtn.svelte';
 	import { displayMode, displayFactor, clampFactor, MIN_FACTOR, MAX_FACTOR } from '$lib/stores/displayMode';
+	import { layoutMode, canLayout } from '$lib/stores/layoutMode';
 	import { browser } from '$app/environment';
 	import { onMount, onDestroy } from 'svelte';
 
@@ -79,6 +80,17 @@
 </script>
 
 <div class="mode no-print" class:expanded={open} bind:this={rootRef}>
+	<!-- LAYOUT toggle (authoring only). Sits just left of the display control so the
+	     two view/edit-state controls cluster together. Hidden unless canLayout. -->
+	{#if $canLayout}
+		<CtrlBtn
+			chrome
+			text="LAYOUT"
+			hoverText={$layoutMode ? 'LAYOUT on — drag to place' : 'LAYOUT off'}
+			isSelected={$layoutMode}
+			on:click={() => layoutMode.update((v) => !v)}
+		/>
+	{/if}
 	<CtrlBtn chrome text={label} hoverText={`Display: ${label}`} on:click={() => (open = !open)} isSelected={open} />
 
 	{#if open}

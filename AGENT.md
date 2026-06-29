@@ -71,6 +71,10 @@ defaults. **Destructive steps confirm** unless `--yes` is set. Nothing is commit
   and add a `{ path, title }` entry to the deck's `pages.ts`. Follow `<dir>/AGENTS.md`.
 - **Reference, don't ship, the samples.** In minimal mode the originals are in `<dir>/.samples-ref/`
   — read them to learn the components, but they are gitignored and not built.
+- **Place elements visually with LAYOUT mode.** To position things at exact canvas pixels, wrap
+  them in `Block` / `ImageBlock` and toggle **LAYOUT mode** (an authoring aid, on in `pnpm dev`)
+  to drag/resize, then Copy the tag back into source. It saves nothing and is OFF on the deployed
+  site (a sticky `?layout` flag re-enables it there). Full playbook in `<dir>/AGENTS.md`.
 - **Build locally** (no host toolchain needed if CodingBooth is present):
   ```bash
   cd <dir> && ./booth -- ./build-static.sh ./dist --zip   # or: pnpm install && ./build-static.sh ./dist

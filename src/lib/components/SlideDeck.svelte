@@ -39,6 +39,7 @@
 	import { onMount }    from 'svelte';
 	import { displayMode, displayFactor, clampFactor } from '$lib/stores/displayMode';
 	import type { DisplayMode } from '$lib/stores/displayMode';
+	import { applyLayoutParam } from '$lib/stores/layoutMode';
 	import { documentTitle } from '$lib/utils/navigate';
 	import type { Page }  from '$lib/utils/navigate';
 
@@ -130,6 +131,9 @@
 	// prerender (SvelteKit forbids it — a prerendered page can't vary by query
 	// string). Client hydration re-evaluates with browser=true and picks up ?clean.
 	$: clean = browser && $page.url.searchParams.has('clean');
+	// Sticky `?layout` opt-in for the authoring LAYOUT control (see layoutMode).
+	// browser-guarded so url.searchParams is never read during prerender.
+	$: if (browser) applyLayoutParam($page.url);
 	// Page-level document title, same cascade idea as the favicon above but emitted
 	// as ONE <title> (the browser uses the FIRST <title>, so it can't stack the way
 	// the favicon links do): the current slide's own `title` from pages.ts, composed
