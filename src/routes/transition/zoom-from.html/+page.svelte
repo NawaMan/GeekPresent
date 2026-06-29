@@ -1,6 +1,7 @@
 <script>
 	import TransitionFrom from '../TransitionFrom.svelte';
 	import SourceView     from '../SourceView.svelte';
+	import EffectDemo     from '../EffectDemo.svelte';
 	import source         from './+page.svelte?raw';
 
 	const css = `@view-transition { navigation: auto; }
@@ -26,5 +27,7 @@
 >
 	Forward feels like moving <i>into</i> the content; back pulls you out of it.
 </TransitionFrom>
+
+<EffectDemo kind="zoom" />
 
 <SourceView {source} />

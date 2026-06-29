@@ -27,6 +27,8 @@
 	export let source: string;
 	/** Override the auto-derived path shown in the title bar. */
 	export let path: string = '';
+	/** Recede into the frame like the other chrome controls. Default on. */
+	export let chrome: boolean = true;
 
 	let expanded = false;
 	let html = '';
@@ -43,7 +45,7 @@
 </script>
 
 <div class="view-source no-print">
-	<CtrlBtn text="</> Source" hoverText="View this slide's source" isSelected={expanded} on:click={() => (expanded = true)} />
+	<CtrlBtn {chrome} text="</> Source" hoverText="View this slide's source" isSelected={expanded} on:click={() => (expanded = true)} />
 </div>
 
 <Box bind:expanded width={1500} height={975} scrollable>

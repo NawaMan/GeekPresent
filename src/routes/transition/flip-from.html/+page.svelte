@@ -1,6 +1,7 @@
 <script>
 	import TransitionFrom from '../TransitionFrom.svelte';
 	import SourceView     from '../SourceView.svelte';
+	import EffectDemo     from '../EffectDemo.svelte';
 	import source         from './+page.svelte?raw';
 
 	const css = `@view-transition { navigation: auto; }
@@ -34,5 +35,7 @@
 >
 	Two beats, so you never see both faces at once.
 </TransitionFrom>
+
+<EffectDemo kind="flip" />
 
 <SourceView {source} />

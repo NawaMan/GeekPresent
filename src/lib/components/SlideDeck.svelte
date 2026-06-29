@@ -31,6 +31,7 @@
 	import TableOfContent from '$lib/components/TableOfContent.svelte';
 	import SizeMode       from '$lib/components/SizeMode.svelte';
 	import SlideMap       from '$lib/components/SlideMap.svelte';
+	import CtrlBtn        from '$lib/components/CtrlBtn.svelte';
 	import Seo            from '$lib/components/Seo.svelte';
 	import { SITE_DESCRIPTION } from '$lib/seo/config';
 
@@ -39,7 +40,7 @@
 	import { onMount }    from 'svelte';
 	import { displayMode, displayFactor, clampFactor } from '$lib/stores/displayMode';
 	import type { DisplayMode } from '$lib/stores/displayMode';
-	import { applyLayoutParam } from '$lib/stores/layoutMode';
+	import { layoutMode, canLayout, applyLayoutParam } from '$lib/stores/layoutMode';
 	import { documentTitle } from '$lib/utils/navigate';
 	import type { Page }  from '$lib/utils/navigate';
 
@@ -268,6 +269,23 @@
 	>
 		<div class="content" class:fill class:ready={initialized} bind:this={content}>
 			{#if initialized}
+			<!-- LAYOUT toggle (authoring only). Lives HERE, inside the content layer and
+			     BEFORE the slot, so the slide's own blocks (in the slot) paint ON TOP of
+			     it instead of being covered by it — while the opaque slide surface still
+			     sits behind it so it stays visible/clickable. (It used to live next to
+			     MODE in the screen-fixed overlay, which is above all content and so
+			     obscured whatever block sat under it.) -->
+			{#if $canLayout && !clean}
+			<div class="layout-ctrl no-print">
+				<CtrlBtn
+					chrome
+					text="LAYOUT"
+					hoverText={$layoutMode ? 'LAYOUT on' : 'LAYOUT off'}
+					isSelected={$layoutMode}
+					on:click={() => layoutMode.update((v) => !v)}
+				/>
+			</div>
+			{/if}
 			<slot />
 			<TableOfContent {pages} />
 			<Copyright />
@@ -354,6 +372,18 @@
 	   frame, never an overflowing box. */
 	.content:not(.ready) {
 		display: none;
+	}
+	/* LAYOUT toggle, anchored to the content's top-right (left of where the MODE
+	   control floats in the overlay). It scales/pans WITH the slide — fine, since
+	   layout authoring happens in FITTED. Being a content child, blocks placed over
+	   it render on top of it (the point of moving it here). */
+	.layout-ctrl {
+		position: absolute;
+		top: 12px;
+		right: 150px;
+		font-size: var(--base-font);
+		/* Above the slide surface, but no z-index so later siblings (the slot's
+		   blocks) still paint over it. */
 	}
 	.content.fill {
 		/* Exact-fit: the box IS the full canvas (padding folded in via border-box),
