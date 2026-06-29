@@ -35,7 +35,9 @@ Read the `README.md` first for the user-facing overview. This file is the *opera
 - **Components** (`src/lib/components/`): `Box`, `Note`, `Hint`, `Label`, `YouTube`, `WideDiv`,
   `Code`, `JavaCode`, `CodeBox`, `JavaCodeBox`, `QuickCode` (small dark monospace box for short
   hand-written snippets; not Monaco), `ViewSource` (corner `</> Source` button that shows a page's
-  own `?raw` source in a `CodeBox`), plus framework-internal `Copyright`, `CtrlBtn`,
+  own `?raw` source in a `CodeBox`), `Block` / `ImageBlock` (absolutely-positioned
+  wrappers you place at exact canvas pixels — drag/resize them in **LAYOUT mode**,
+  see that playbook), plus framework-internal `Copyright`, `CtrlBtn`,
   `NavigationBar`, `TableOfContent`, `SizeMode`, `Seo` (renders SEO/social metadata
   into `<svelte:head>` — see the SEO note under *Gotchas*).
 - Package manager is **pnpm** (`pnpm dev` / `build` / `deploy`). Dev server: `http://localhost:5173`.
@@ -206,6 +208,50 @@ build steps, emphasis):
 If they truly want cross-slide transitions, that's a larger change (switch nav to SvelteKit
 client-side `goto` + a shared transition layer) — scope it explicitly first.
 
+### "Place an element visually (LAYOUT mode)"
+
+When a slide positions things at exact canvas pixels, you don't have to guess the
+numbers. Wrap the element in a **`Block`** (or **`ImageBlock`** for a picture) and
+turn on **LAYOUT mode** to drag/resize it in the browser, then copy the resulting
+tag — with its final `x`/`y`/`width`/`height` — back into the source by hand.
+
+**LAYOUT mode is an authoring aid, not a viewer feature, and it saves nothing** — it
+only helps you *find* coordinates to paste yourself. It is on by default in
+`pnpm dev`. On a built/deployed site it is OFF, with a deliberate escape hatch:
+append **`?layout`** to any slide URL to enable the control there; **`?layout=off`**
+disables it again. (Both are sticky per browser origin — see the Gotcha.)
+
+1. In the slide's `+page.svelte`, wrap the element:
+   ```svelte
+   <script>
+     import Block from '$lib/components/Block.svelte';
+   </script>
+   <Block name="logo" x={760} y={420} width={400} height={240}>
+     <!-- your content -->
+   </Block>
+   ```
+   For an image, use `ImageBlock` instead (the image fills the panel and reshapes
+   with the box; aspect is locked by default, Alt to break it):
+   ```svelte
+   <ImageBlock src={photo} alt="…" x={760} y={560} width={320} height={320} />
+   ```
+2. Run `pnpm dev` and open the slide. The **SizeMode** control (top-right) now shows
+   a LAYOUT toggle — turn it on. A dashed outline appears around each `Block`.
+3. **Drag** the body to move, **drag the bottom-right grip** to resize. Snap to a
+   grid with the `grid` prop; hold **Alt** to break an aspect lock; **Esc** cancels
+   the in-progress gesture. **Ctrl/Cmd+Z** undoes, **Ctrl/Cmd+Shift+Z** / **Ctrl+Y**
+   redoes — globally across every `Block` on the page.
+4. Click **Copy** on the block to put its current tag (with the live coordinates) on
+   the clipboard, then **paste it over the original tag in the source**. `ImageBlock`
+   emits a `src={…}` placeholder — keep your real `import`ed `src`.
+5. Turn LAYOUT off (or just leave dev) and verify the slide looks right.
+
+> Key props (full list in the component headers): `x`/`y`/`width`/`height` (canvas
+> px), `name` (label + snippet comment), `grid` (snap step), `aspect`
+> (`true`/number/`false`), `bounds` (`'canvas'` clamps inside, `'none'` lets it
+> bleed off-stage), `minSize`. Match `canvasWidth`/`canvasHeight` to the deck if it
+> isn't the 1920×1080 default.
+
 ### "Host this alongside my existing blog / GitHub Pages site"
 
 This needs facts before code — **ask first**:
@@ -275,6 +321,13 @@ componentization style. If it wraps Monaco (`Code`/`JavaCode`), remember Monaco 
   `src/lib/seo/routes.ts`.
 - **`name` ending in `.html` is intentional.** Route folders are literally `title.html/`, so the URL is
   `/slides/title.html`. Don't "fix" it.
+- **LAYOUT mode's `?layout` opt-in is sticky and global, not per-deck.** Once `?layout`
+  is seen on a built site, it's saved to `localStorage` and the LAYOUT control then
+  shows on **every deck on that origin** until `?layout=off`; the on/off toggle state
+  is one global flag too. So "I enabled it on one slide and now it's everywhere" is
+  expected, not a bug. The flag isn't stripped from the URL, so a shared `?layout`
+  link also enables it for the recipient (harmless — nothing is ever saved). In
+  `pnpm dev` it's always available regardless. See `src/lib/stores/layoutMode.ts`.
 - **No `pnpm install` purge in CI sandboxes.** If `pnpm install` wants to wipe `node_modules`, prefer
   `pnpm install --lockfile-only` to just sync the lockfile.
 - **Static only.** If a user asks for anything server-side (auth, a database, form handling), explain

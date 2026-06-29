@@ -45,3 +45,5 @@ dist.zip
 # includes the _unused/ retirement folder). Plan/config/scripts stay tracked.
 # See narration/PLAN.md §6, §14.
 narration/**/voice_clips/
+
+.booth/.tmp/
