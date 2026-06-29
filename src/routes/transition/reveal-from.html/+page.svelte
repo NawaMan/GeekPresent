@@ -1,6 +1,7 @@
 <script>
 	import TransitionFrom from '../TransitionFrom.svelte';
 	import SourceView     from '../SourceView.svelte';
+	import EffectDemo     from '../EffectDemo.svelte';
 	import source         from './+page.svelte?raw';
 
 	const css = `@view-transition { navigation: auto; }
@@ -31,5 +32,7 @@
 >
 	On the way back the circle runs the other way, so the leaving slide closes over.
 </TransitionFrom>
+
+<EffectDemo kind="reveal" />
 
 <SourceView {source} />

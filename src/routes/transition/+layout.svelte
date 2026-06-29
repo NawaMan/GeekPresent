@@ -8,7 +8,8 @@
   the role tokens (hence the themes.css + roles.css imports below).
 -->
 <script lang="ts">
-	import SlideDeck    from '$lib/components/SlideDeck.svelte';
+	import SlideDeck     from '$lib/components/SlideDeck.svelte';
+	import AnimationBar  from '$lib/components/AnimationBar.svelte';
 	import { pages }    from './pages';
 	import { setPages, setViewTransitions } from '$lib/presentation';
 
@@ -46,4 +47,10 @@
 	deckClass="gp-deck theme-green"
 >
 	<slot />
+	<!-- One AnimationBar for the whole deck (it re-detects per navigation). It only
+	     shows itself on slides that carry an in-page animation — the "(from)" slides
+	     with an <EffectDemo/> — and stays invisible on every other slide. startExpanded
+	     skips the ANIMATION button so the controls are there the moment a "(from)"
+	     slide appears. -->
+	<AnimationBar startExpanded />
 </SlideDeck>

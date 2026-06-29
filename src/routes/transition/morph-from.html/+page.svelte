@@ -7,6 +7,7 @@
 	import ContentPage from '$lib/templates/ContentPage.svelte';
 	import CssSnippet  from '$lib/components/CssSnippet.svelte';
 	import SourceView  from '../SourceView.svelte';
+	import EffectDemo  from '../EffectDemo.svelte';
 	import source      from './+page.svelte?raw';
 
 	const css = `/* one name per card — four shared elements */
@@ -40,6 +41,8 @@
 		<div class="card card-4 m4">4</div>
 	</div>
 </ContentPage>
+
+<EffectDemo kind="morph" />
 
 <SourceView {source} />
 

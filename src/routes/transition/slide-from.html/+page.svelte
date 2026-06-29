@@ -1,6 +1,7 @@
 <script>
 	import TransitionFrom from '../TransitionFrom.svelte';
 	import SourceView     from '../SourceView.svelte';
+	import EffectDemo     from '../EffectDemo.svelte';
 	import source         from './+page.svelte?raw';
 
 	const css = `@view-transition { navigation: auto; }
@@ -30,5 +31,7 @@
 >
 	The deck pages like a filmstrip — and the direction follows the key you press.
 </TransitionFrom>
+
+<EffectDemo kind="slide" />
 
 <SourceView {source} />

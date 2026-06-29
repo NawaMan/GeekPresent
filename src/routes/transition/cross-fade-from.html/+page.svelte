@@ -1,6 +1,7 @@
 <script>
 	import TransitionFrom from '../TransitionFrom.svelte';
 	import SourceView     from '../SourceView.svelte';
+	import EffectDemo     from '../EffectDemo.svelte';
 	import source         from './+page.svelte?raw';
 
 	const css = `@view-transition {
@@ -28,5 +29,9 @@
 >
 	With <code>navigation: auto</code> the browser does the dissolve for free.
 </TransitionFrom>
+
+<!-- In-page re-creation of THIS slide's effect, controllable by the deck's
+     AnimationBar. Scrub the cross-fade by hand, then press → for the real one. -->
+<EffectDemo kind="fade" />
 
 <SourceView {source} />

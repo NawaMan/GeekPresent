@@ -30,12 +30,15 @@
 	export let language: string = 'html';
 	/** Button label. */
 	export let text: string = '</> Source';
+	/** Recede into the frame like the other chrome controls (MODE / nav). Default
+	    on; pass `chrome={false}` for the prominent accent-blue look. */
+	export let chrome: boolean = true;
 
 	let expanded = false;
 </script>
 
 <div class="view-source">
-	<CtrlBtn {text} hoverText="View source" isSelected={expanded} on:click={() => (expanded = true)} />
+	<CtrlBtn {chrome} {text} hoverText="View source" isSelected={expanded} on:click={() => (expanded = true)} />
 </div>
 
 <CodeBox code={source} {language} title={path} bind:expanded />
