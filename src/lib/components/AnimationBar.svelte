@@ -37,8 +37,16 @@
 
 	/* Selector for the element whose subtree is searched for animations. Defaults
 	   to the slide canvas `.content`; an author can narrow it (e.g. ".page") to a
-	   sub-region when one slide hosts several independent animated areas. */
+	   sub-region when one slide hosts several independent animated areas. Resolved
+	   relative to the bar's own position (nearest enclosing match), so several bars
+	   on one page — e.g. one <AnimationScene> each — each govern their own region.
+	   <AnimationScene> uses this to point the embedded bar at the scene wrapper. */
 	export let scope = '.content';
+	/* Explicit scope element, highest precedence over `scope`. For the rare case an
+	   author already holds the container element (their own bind:this) and wants a
+	   standalone bar to govern exactly its subtree. Usually unnecessary — the scope
+	   selector resolved from the bar's position covers the <AnimationScene> case. */
+	export let host: HTMLElement | null = null;
 	/* Emphasise the collapsed ANIMATION button with the prominent (accent) look
 	   instead of the muted chrome, when controlling the animation is meant to read
 	   as part of the slide rather than incidental chrome. */
@@ -52,6 +60,11 @@
 	   The bar shows the rail as a live read-out; the play/restart buttons are
 	   hidden because re-attaching to the clock would fight the external driver. */
 	export let driven = false;
+	/* Start the animation HELD at its first frame with the bar already open,
+	   instead of letting it auto-play on load. The viewer presses Play to begin.
+	   Implies "shown" (like startExpanded) but also pauses + seeks to 0, so the
+	   slide opens on the animation's initial state rather than running it. */
+	export let startPaused = false;
 
 	/* Seek the whole group to a 0..1 fraction of its envelope. The public hook for
 	   scroll-/pointer-driven scrubbing from a parent — pair it with `driven`. */
@@ -66,8 +79,9 @@
 	   rail's time-scale tracks the new duration. */
 	export function rescan() { collect(); }
 
-	let root:  HTMLElement;          // this component's wrapper (used to self-exclude)
-	let track: HTMLElement;          // the progress rail (its geometry maps x -> time)
+	let root:   HTMLElement;         // this component's wrapper (used to self-exclude)
+	let anchor: HTMLElement;         // always-present DOM marker for scope resolution
+	let track:  HTMLElement;         // the progress rail (its geometry maps x -> time)
 
 	let anims: Animation[] = [];     // the finite CSS animations we govern
 	let duration = 0;                // envelope length in ms (max end time of all)
@@ -91,9 +105,13 @@
 	// controls and CSS *transitions* (Box/WideDiv) and infinite loops.
 	function collect() {
 		if (!browser) return;
-		const host = (root?.closest(scope) ?? document.querySelector(scope) ?? document) as
-			Document | Element;
-		const all = host.getAnimations({ subtree: true });
+		// Resolve the scope from the bar's own position. `anchor` is always in the DOM
+		// (unlike `root`, which only exists once hasAnim renders the bar), so closest()
+		// finds THIS bar's enclosing scope even on first paint — letting several scenes
+		// on one page each resolve to their own region. `host` (explicit element) wins.
+		const scopeRoot = (host ?? anchor?.closest(scope) ?? root?.closest(scope)
+			?? document.querySelector(scope) ?? document) as Document | Element;
+		const all = scopeRoot.getAnimations({ subtree: true });
 		anims = all.filter((a) => {
 			// Skip the controls' own animations, if any.
 			const target = (a.effect as KeyframeEffect | null)?.target as Element | null;
@@ -200,12 +218,14 @@
 	// sampling loop here — it starts only when the bar is expanded.)
 	function refresh() {
 		if (!browser) return;
-		// Driven bars are always open (rail-as-read-out); otherwise honour startExpanded.
-		expanded = driven || startExpanded;
+		// Driven bars are always open (rail-as-read-out); a startPaused bar opens too
+		// (so its Play button is visible); otherwise honour startExpanded.
+		expanded = driven || startPaused || startExpanded;
 		stopLoop();
 		const begin = () => {
 			if (!hasAnim) return;
 			if (driven) { pause(); seek(0); }            // external source owns the playhead
+			else if (startPaused) { pause(); seek(0); }  // hold on frame 0 until the viewer plays
 			else if (expanded && playing) startLoop();   // already-open: sample the live clock
 		};
 		collect();
@@ -217,6 +237,10 @@
 	afterNavigate(refresh);
 	onDestroy(stopLoop);
 </script>
+
+<!-- Zero-footprint marker that is ALWAYS in the DOM at the bar's position, so the
+     scope can be resolved (anchor.closest) before any controls render. -->
+<span class="anim-anchor" bind:this={anchor} aria-hidden="true"></span>
 
 {#if hasAnim}
 <div class="anim-bar no-print" class:expanded bind:this={root}>
@@ -268,6 +292,7 @@
 {/if}
 
 <style>
+	.anim-anchor { display: none; }   /* DOM-present, layout-absent (used for closest) */
 	.anim-bar {
 		position: absolute;
 		left: 50%;

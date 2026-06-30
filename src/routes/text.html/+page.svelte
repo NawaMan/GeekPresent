@@ -8,6 +8,7 @@
 -->
 <script lang="ts">
 	import Label from '$lib/components/Label.svelte';
+	import AnimationScene from '$lib/components/AnimationScene.svelte';
 	import diagram from './presentation-vs-text.svg';
 </script>
 
@@ -43,6 +44,25 @@
 	be adapted for flowing documents one at a time; for now, prose, headings,
 	lists, links, images and inline components work as you would expect.
 </p>
+
+<h2>Even an animated scene works inline</h2>
+
+<p>
+	An <code>&lt;AnimationScene&gt;</code> is one of those slide-born components that now
+	travels to a Text unchanged. It anchors its controls to its own box rather than to a
+	slide canvas, so it drops straight into the flowing column. The square and circle
+	below run two different animations on one shared playhead &mdash; press
+	<b>Play</b> and scrub them together:
+</p>
+
+<div class="scene-frame">
+	<AnimationScene startPaused>
+		<div class="scene-stage">
+			<span class="scene-square"></span>
+			<span class="scene-circle"></span>
+		</div>
+	</AnimationScene>
+</div>
 
 <h2>Anatomy of a Text artifact</h2>
 
@@ -139,5 +159,48 @@
 		/* Size knob: caps the diagram so it sits in proportion with the text. */
 		max-width: 900px;
 		margin: 1.5em 0;
+	}
+
+	/* AnimationScene demo: a centred, bordered panel (matching the code blocks on
+	   this page) that flows in the column. The stage leaves a strip at its bottom
+	   for the scene's own absolutely-anchored control bar. */
+	.scene-frame {
+		max-width: 460px;
+		margin: 1.5em auto;
+		padding: 18px 22px;
+		border: 1.5px solid #2a3a40;
+		border-radius: 12px;
+		background: #0e1112;
+	}
+	.scene-stage {
+		position: relative;
+		width: 100%;
+		height: 230px;
+	}
+	.scene-square, .scene-circle {
+		position: absolute;
+		left: 0;
+		width: 48px;
+		height: 48px;
+	}
+	.scene-square {
+		top: 24px;
+		border-radius: 8px;
+		background: #2980B9;
+		animation: scene-glide 2.5s ease-in-out both;
+	}
+	.scene-circle {
+		top: 84px;
+		border-radius: 50%;
+		background: #F0A33E;
+		animation: scene-drift 3.5s ease both;
+	}
+	@keyframes scene-glide {
+		from { transform: translateX(0); }
+		to   { transform: translateX(300px); }
+	}
+	@keyframes scene-drift {
+		from { transform: translateX(300px) scale(0.4); opacity: 0.25; }
+		to   { transform: translateX(0)     scale(1);   opacity: 1; }
 	}
 </style>
