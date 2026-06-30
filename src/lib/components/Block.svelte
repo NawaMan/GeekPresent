@@ -13,10 +13,11 @@
 
   When LAYOUT mode is ON, the wrapper grows a drag body + a bottom-right
   resize handle + a small toolbar. Dragging updates x/y/width/height live; the
-  COPY button writes an updated <Block .../> snippet to the clipboard so you can
-  paste the new geometry back into the page source. (Snippet-emit, not live source
-  rewrite: what you copy is the element's own current props — robust and decoupled
-  from how the page text is laid out.)
+  COPY button writes the updated OPENING tag — just `<Block … x={…} y={…} …>` —
+  to the clipboard, so you paste that one line over your element's existing open
+  tag (its children and closing tag stay put). A self-closing wrapper (ImageBlock)
+  copies as `<Tag … />`. (Snippet-emit, not live source rewrite: what you copy is
+  the element's own current props — robust and decoupled from the page text.)
 
   The drag math divides screen-pixel pointer deltas by the element's LIVE rendered
   scale (getBoundingClientRect().width / offsetWidth), so a drag tracks the cursor
@@ -176,7 +177,10 @@
 	$: openTag =
 		`<${tag}${name ? ` name="${name}"` : ''}${attrs} x={${Math.round(x)}} y={${Math.round(y)}}` +
 		` width={${Math.round(width)}} height={${Math.round(height)}}${aspectAttr}`;
-	$: snippet = selfClose ? `${openTag} />` : `${openTag}>\n  <!-- ... -->\n</${tag}>`;
+	// COPY emits only the OPENING tag with the live geometry — that's the single
+	// line you paste over your element's existing open tag to update its position.
+	// (A self-closing wrapper like ImageBlock has no children, so it stays `<Tag … />`.)
+	$: snippet = selfClose ? `${openTag} />` : `${openTag}>`;
 
 	async function copy() {
 		try {
