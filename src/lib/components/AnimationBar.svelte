@@ -359,6 +359,21 @@
 		cursor: pointer;
 		touch-action: none;        /* let us own horizontal drag for scrubbing */
 	}
+	/* Invisible grab strip: the visible rail is only 0.28em tall but the knob is
+	   ~0.62em, so a press on the knob's top/bottom edge would miss the thin rail and
+	   land on the bar behind it (dead zone). This pseudo-element extends the track's
+	   pointer target vertically past the whole knob — without thickening the rail —
+	   so the white knob is grabbable from its first frame, not only along its waist. */
+	.track::before {
+		content: '';
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: 50%;
+		height: 1.2em;             /* taller than the knob (0.62em) for a comfortable grab */
+		transform: translateY(-50%);
+		/* transparent — purely a hit area (a no-background element is still hit-tested) */
+	}
 	.track:focus-visible {
 		outline: 2px solid var(--ctrl-hover-bg, #2980B9);
 		outline-offset: 3px;
