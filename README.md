@@ -294,7 +294,7 @@ then feed them to the `YouTube` component (which shows the thumbnail with a QR o
 
 ### Other components
 
-The presentation under `src/routes/slides/` is itself a working reference — open any slide and read its source. Beyond the above you'll find **Note** (speaker notes), **Hint** (bottom-of-slide cue), **Label** (hoverable inline highlight), **WideDiv** (wheel-scrollable wide container), **QuickCode** (small dark monospace box for short hand-written snippets — use `Code`/`CodeBox` for real syntax-highlighted code), and **Copyright** (auto-added corner notice).
+The presentation under `src/routes/slides/` is itself a working reference — open any slide and read its source. Beyond the above you'll find **Note** (speaker notes), **Hint** (bottom-of-slide cue), **Label** (hoverable inline highlight), **ScrollDiv** (wheel-pannable container — `axis` x/y/both, with an optional draggable scrollbar; **WideDiv** is its `axis="x"` alias), **QuickCode** (small dark monospace box for short hand-written snippets — use `Code`/`CodeBox` for real syntax-highlighted code), and **Copyright** (auto-added corner notice).
 
 ---
 

@@ -20,7 +20,8 @@
 			<li><b>Hint</b> &mdash; hint text at the bottom of a slide</li>
 			<li><b>Label</b> &mdash; hoverable highlighted text</li>
 			<li><b>YouTube</b> &mdash; YouTube thumbnail with QR code link</li>
-			<li><b>WideDiv</b> &mdash; horizontally scrollable container</li>
+			<li><b>ScrollDiv</b> &mdash; wheel-pannable container (axis: x / y / both)</li>
+			<li><b>WideDiv</b> &mdash; horizontally scrollable container (ScrollDiv axis="x")</li>
 			<li><b>Code</b> &mdash; Monaco editor for any language (read-only)</li>
 			<li><b>JavaCode</b> &mdash; Monaco editor specialised for Java</li>
 			<li><b>CodeBox</b> &mdash; Code inside an expandable Box</li>
