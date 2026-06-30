@@ -60,6 +60,12 @@
 		seek(Math.max(0, Math.min(1, f)) * duration);
 	}
 
+	/* Re-read the slide's animations and recompute the envelope WITHOUT resetting
+	   the bar's UI (unlike refresh(), which collapses it). Call after an external
+	   change to the animation — e.g. an authoring tool that retimes it — so the
+	   rail's time-scale tracks the new duration. */
+	export function rescan() { collect(); }
+
 	let root:  HTMLElement;          // this component's wrapper (used to self-exclude)
 	let track: HTMLElement;          // the progress rail (its geometry maps x -> time)
 
