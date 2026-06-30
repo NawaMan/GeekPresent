@@ -13,6 +13,7 @@ export const pages = [
     { path: "hint-component.html",    title: "Hint" },
     { path: "label-component.html",   title: "Label" },
     { path: "scrolldiv-component.html", title: "ScrollDiv" },
+    { path: "scroll-anim.html",       title: "Scroll-driven Animation" },
     { path: "code-component.html",    title: "Code" },
     { path: "javacode-component.html", title: "JavaCode" },
     { path: "codebox-component.html", title: "CodeBox" },

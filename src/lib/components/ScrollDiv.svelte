@@ -40,8 +40,14 @@
 	export let minY: number | undefined = undefined;
 	export let maxY: number | undefined = undefined;
 
-	export let onScroll: (target: EventTarget | null, position: { x: number; y: number }) => void
-		= () => {};
+	// Fired on every wheel/drag with the raw pixel offset AND the normalized
+	// 0..1 progress along each axis (progX/progY) — the latter is what you wire to
+	// a scroll-driven animation (e.g. AnimationBar's seekFraction), since it is
+	// already mapped onto the pan bounds and independent of the content size.
+	export let onScroll: (
+		target: EventTarget | null,
+		position: { x: number; y: number; progX: number; progY: number },
+	) => void = () => {};
 
 	// Show a draggable scrollbar on each scrolling axis that overflows. Purely
 	// visual/affordance — the wheel still works. (We draw our own because the
@@ -81,8 +87,13 @@
 	// visible/content ratio; thumb offset is how far through the pan range we are.
 	$: thumbFracX = clamp01(parseInt(outerWidth)  / parseInt(innerW));
 	$: thumbFracY = clamp01(parseInt(outerHeight) / parseInt(innerH));
-	$: progX = bX.max > bX.min ? clamp01((scrollX - bX.min) / (bX.max - bX.min)) : 0;
-	$: progY = bY.max > bY.min ? clamp01((scrollY - bY.min) / (bY.max - bY.min)) : 0;
+	// 0..1 progress along each axis. Computed via plain functions (not only the
+	// reactive `progX`/`progY`) so an event handler can read the up-to-date value
+	// right after mutating scrollX/scrollY, before Svelte flushes reactivity.
+	const progressX = (x: number) => (bX.max > bX.min ? clamp01((x - bX.min) / (bX.max - bX.min)) : 0);
+	const progressY = (y: number) => (bY.max > bY.min ? clamp01((y - bY.min) / (bY.max - bY.min)) : 0);
+	$: progX = progressX(scrollX);
+	$: progY = progressY(scrollY);
 	$: showX = scrollbar && scrollsX && thumbFracX < 1;
 	$: showY = scrollbar && scrollsY && thumbFracY < 1;
 
@@ -108,7 +119,7 @@
 			scrollY = Math.min(bY.max, Math.max(bY.min, scrollY + event.deltaY / 2));
 		}
 
-		onScroll(event.target, { x: scrollX, y: scrollY });
+		onScroll(event.target, { x: scrollX, y: scrollY, progX: progressX(scrollX), progY: progressY(scrollY) });
 	}
 
 	// Drag a scrollbar thumb. We map screen-pixel pointer movement onto the pan
@@ -132,7 +143,7 @@
 			const next = from + (travelPx > 0 ? (d / travelPx) * span : 0);
 			if (isX) scrollX = Math.min(bX.max, Math.max(bX.min, next));
 			else     scrollY = Math.min(bY.max, Math.max(bY.min, next));
-			onScroll(ev.target, { x: scrollX, y: scrollY });
+			onScroll(ev.target, { x: scrollX, y: scrollY, progX: progressX(scrollX), progY: progressY(scrollY) });
 		};
 		const up = () => {
 			thumb.releasePointerCapture(e.pointerId);
@@ -144,15 +155,27 @@
 	}
 </script>
 
+<!--
+  The scroll state is published as CSS custom properties on `.outer` (which is NOT
+  transform-panned): `--scroll-x`/`--scroll-y` (pixels) and `--prog-x`/`--prog-y`
+  (0..1). `.inner` inherits and consumes the pixel vars for its pan transform; a
+  `foreground` slot — overlaid and pinned, so it does NOT pan with the content —
+  can read the same vars to move at a ratio of the scroll in pure CSS, e.g.
+      <div slot="foreground" style="left: calc(var(--prog-x) * 100%)"> … </div>
+-->
 <div class="outer"
      on:wheel={handleScroll}
-     style="width: {outerWidth}px; height: {outerHeight}px; {extraStyle}"
+     style="width: {outerWidth}px; height: {outerHeight}px; --scroll-x: {scrollX}; --scroll-y: {scrollY}; --prog-x: {progX}; --prog-y: {progY}; {extraStyle}"
      {...rest}>
 	<div
 		class="inner"
-		style="width: {innerW}px; height: {innerH}px; --scroll-x: {scrollX}; --scroll-y: {scrollY};">
+		style="width: {innerW}px; height: {innerH}px;">
 		<slot></slot>
 	</div>
+
+	{#if $$slots.foreground}
+	<div class="foreground"><slot name="foreground"></slot></div>
+	{/if}
 
 	{#if showX}
 	<div class="scrollbar sb-x" class:inset={showY} bind:this={trackXEl}>
@@ -186,6 +209,17 @@
 
 		transform:  translate(calc(var(--scroll-x) * -1px), calc(var(--scroll-y) * -1px));
 		transition: transform 0.1s ease-out;
+	}
+
+	/* Overlay layer pinned to the viewport — sits above the panned content but
+	   below the scrollbars, and is transparent to the wheel/drag (pointer-events:
+	   none) so scrolling still works through it. */
+	.foreground {
+		position: absolute;
+		inset: 0;
+		overflow: hidden;
+		pointer-events: none;
+		z-index: 1;
 	}
 
 	.scrollbar {

@@ -46,6 +46,19 @@
 	/* Skip the ANIMATION button and show the controls straight away. With the
 	   reveal being one-way anyway, this just means "always open". */
 	export let startExpanded = false;
+	/* "Driven" mode: an EXTERNAL source owns the playhead (e.g. a ScrollDiv wired
+	   `onScroll={(t, p) => bar.seekFraction(p.progY)}`). We detach the animations
+	   from the wall-clock on load and seek to 0, then let seekFraction() move them.
+	   The bar shows the rail as a live read-out; the play/restart buttons are
+	   hidden because re-attaching to the clock would fight the external driver. */
+	export let driven = false;
+
+	/* Seek the whole group to a 0..1 fraction of its envelope. The public hook for
+	   scroll-/pointer-driven scrubbing from a parent — pair it with `driven`. */
+	export function seekFraction(f: number) {
+		if (!hasAnim || duration <= 0) return;
+		seek(Math.max(0, Math.min(1, f)) * duration);
+	}
 
 	let root:  HTMLElement;          // this component's wrapper (used to self-exclude)
 	let track: HTMLElement;          // the progress rail (its geometry maps x -> time)
@@ -181,11 +194,14 @@
 	// sampling loop here — it starts only when the bar is expanded.)
 	function refresh() {
 		if (!browser) return;
-		expanded = startExpanded;
+		// Driven bars are always open (rail-as-read-out); otherwise honour startExpanded.
+		expanded = driven || startExpanded;
 		stopLoop();
-		// When we start already-expanded, the rail is visible immediately, so drive
-		// the sampling loop right away (the ANIMATION-button path starts it on click).
-		const begin = () => { if (hasAnim && expanded && playing) startLoop(); };
+		const begin = () => {
+			if (!hasAnim) return;
+			if (driven) { pause(); seek(0); }            // external source owns the playhead
+			else if (expanded && playing) startLoop();   // already-open: sample the live clock
+		};
 		collect();
 		if (hasAnim) begin();
 		else requestAnimationFrame(() => { collect(); begin(); });
@@ -205,6 +221,7 @@
 		<CtrlBtn chrome={!highlight} text="ANIMATION" on:click={expand} />
 	</span>
 	{:else}
+	{#if !driven}
 	<button class="icon-btn" aria-label={playing ? 'Pause' : 'Play'} on:click={toggle}>
 		{#if playing}
 			<!-- pause -->
@@ -214,6 +231,7 @@
 			<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
 		{/if}
 	</button>
+	{/if}
 
 	<div
 		class="track"
@@ -233,10 +251,12 @@
 		<div class="knob" style="left:{fraction * 100}%"></div>
 	</div>
 
+	{#if !driven}
 	<button class="icon-btn" aria-label="Restart" on:click={restart}>
 		<!-- replay -->
 		<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" /></svg>
 	</button>
+	{/if}
 	{/if}
 </div>
 {/if}
