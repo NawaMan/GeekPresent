@@ -108,6 +108,16 @@
 		transform: translate(-50%, -50%);
 	}
 
+	/* When open, the modal (and its full-canvas dimming backdrop — the 9999px
+	   box-shadow on .img-box below) must sit ABOVE every page component, including
+	   in-slide chrome that carries its own z-index (e.g. the KeyframeStudio panel and
+	   ghost labels at z-index:50). A slide author can't reach inside here to fix the
+	   stacking, so the open Box owns it. Only when expanded, so a collapsed 0×0 Box
+	   never needlessly raises itself. */
+	.parent.expanded {
+		z-index: 1000;
+	}
+
     .parent .link a {
         text-decoration: none;
     }
