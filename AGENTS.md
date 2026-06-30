@@ -32,7 +32,9 @@ Read the `README.md` first for the user-facing overview. This file is the *opera
   fixed **1920×1080** canvas; FITTED mode transforms it to fit the window, SCALED shows it at an exact
   factor (1:1 and beyond, centered and pannable, with a minimap) and reveals speaker notes below the
   slide when zoomed out. Display mode lives in the `displayMode` store. Text color is `#C0F1FF` on `#181818`.
-- **Components** (`src/lib/components/`): `Box`, `Note`, `Hint`, `Label`, `YouTube`, `WideDiv`,
+- **Components** (`src/lib/components/`): `Box`, `Note`, `Hint`, `Label`, `YouTube`,
+  `ScrollDiv` (wheel-pannable container, `axis` x/y/both, optional draggable `scrollbar`;
+  `WideDiv` is its `axis="x"` alias),
   `Code`, `JavaCode`, `CodeBox`, `JavaCodeBox`, `QuickCode` (small dark monospace box for short
   hand-written snippets; not Monaco), `ViewSource` (corner `</> Source` button that shows a page's
   own `?raw` source in a `CodeBox`), `Block` / `ImageBlock` (absolutely-positioned

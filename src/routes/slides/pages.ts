@@ -12,7 +12,7 @@ export const pages = [
     { path: "youtube-showcase.html",  title: "YouTube" },
     { path: "hint-component.html",    title: "Hint" },
     { path: "label-component.html",   title: "Label" },
-    { path: "widediv-component.html", title: "WideDiv" },
+    { path: "scrolldiv-component.html", title: "ScrollDiv" },
     { path: "code-component.html",    title: "Code" },
     { path: "javacode-component.html", title: "JavaCode" },
     { path: "codebox-component.html", title: "CodeBox" },
