@@ -8,6 +8,7 @@ export const pages = [
     { path: "components.html",        title: "Components" },
     { path: "box-component.html",     title: "Box Component" },
     { path: "block-component.html",   title: "Block Component" },
+    { path: "highlight-component.html", title: "Highlight Component" },
     { path: "youtube-showcase.html",  title: "YouTube" },
     { path: "hint-component.html",    title: "Hint" },
     { path: "label-component.html",   title: "Label" },
