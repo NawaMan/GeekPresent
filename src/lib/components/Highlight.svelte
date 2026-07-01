@@ -73,6 +73,29 @@
 	    the slot is ignored — the glow lands on the real element and the arrow
 	    floats over it. Leave null to use WRAP mode (slot). */
 	export let target: string | Element | null = null;
+	/** Click handler for the ARROW. Setting it makes only the arrow glyph a hit
+	    target (cursor + keyboard-activatable); leave null for a passive cue. */
+	export let onClick: ((event: MouseEvent | KeyboardEvent) => void) | null = null;
+	/** Accessible label announced for the arrow when it is clickable. */
+	export let label = 'Highlight';
+
+	// Imperative show/hide for a parent holding `bind:this`. `show` is also a
+	// bindable prop, so `bind:show` works too — these just save a round-trip.
+	/** Flip the cue on/off. */
+	export function toggle() { show = !show; }
+	/** Force the cue on. */
+	export function reveal() { show = true; }
+	/** Force the cue off. */
+	export function hide() { show = false; }
+
+	function fireClick(event: MouseEvent | KeyboardEvent) {
+		if (!onClick) return;
+		if (event instanceof KeyboardEvent) {
+			if (event.key !== 'Enter' && event.key !== ' ') return;
+			event.preventDefault(); // stop Space from scrolling
+		}
+		onClick(event);
+	}
 
 	const REMEASURE_EVENTS = ['resize', 'scroll', 'wheel', 'keydown'] as const;
 
@@ -196,7 +219,19 @@
 			>
 				<span class="arrow" style="{geom.anchor} transform: translate({geom.tx}, {geom.ty});">
 					<span class="arrow-rot" style="transform: rotate({geom.rot}deg);">
-						<svg class="arrow-svg" class:pulse viewBox="0 0 120 120" aria-hidden="true">
+						<!-- svelte-ignore a11y-no-static-element-interactions a11y-click-events-have-key-events a11y-no-noninteractive-tabindex -->
+						<svg
+							class="arrow-svg"
+							class:pulse
+							class:clickable={onClick}
+							viewBox="0 0 120 120"
+							role={onClick ? 'button' : undefined}
+							tabindex={onClick ? 0 : undefined}
+							aria-label={onClick ? label : undefined}
+							aria-hidden={onClick ? undefined : true}
+							on:click={fireClick}
+							on:keydown={fireClick}
+						>
 							<path d="M10 52 H44 V42 L60 60 L44 78 V68 H10 Z" fill="var(--hl-color)" />
 						</svg>
 					</span>
@@ -217,7 +252,19 @@
 		{#if show && arrow}
 			<span class="arrow" style="{geom.anchor} transform: translate({geom.tx}, {geom.ty});">
 				<span class="arrow-rot" style="transform: rotate({geom.rot}deg);">
-					<svg class="arrow-svg" class:pulse viewBox="0 0 120 120" aria-hidden="true">
+					<!-- svelte-ignore a11y-no-static-element-interactions a11y-click-events-have-key-events a11y-no-noninteractive-tabindex -->
+					<svg
+						class="arrow-svg"
+						class:pulse
+						class:clickable={onClick}
+						viewBox="0 0 120 120"
+						role={onClick ? 'button' : undefined}
+						tabindex={onClick ? 0 : undefined}
+						aria-label={onClick ? label : undefined}
+						aria-hidden={onClick ? undefined : true}
+						on:click={fireClick}
+						on:keydown={fireClick}
+					>
 						<path d="M10 52 H44 V42 L60 60 L44 78 V68 H10 Z" fill="var(--hl-color)" />
 					</svg>
 				</span>
@@ -281,6 +328,18 @@
 		overflow: visible;
 		/* a hair of shadow so the arrow reads over busy backgrounds */
 		filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.4));
+	}
+	/* When clickable, re-enable hit-testing on the painted glyph ONLY (pointer-events
+	   is inherited, so .arrow's `none` reaches here; the path opts back in, and SVG
+	   visiblePainted means the transparent half of the box stays click-through).
+	   The click lands on the path and bubbles to the svg's on:click. */
+	.arrow-svg.clickable path {
+		pointer-events: auto;
+		cursor: pointer;
+	}
+	.arrow-svg.clickable:focus-visible {
+		outline: 2.5px solid var(--hl-color);
+		outline-offset: 3px;
 	}
 
 	/* Keyframes are -global- so the global .gp-hl-glow rule can reference them too

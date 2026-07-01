@@ -22,6 +22,15 @@
 		'left',        null,     'right',
 		'bottom-left', 'bottom', 'bottom-right',
 	];
+
+	// Interactive bits: imperative toggle() via bind:this, and a clickable arrow.
+	let wordHl;                    // the inline-word Highlight, driven by the button
+	let remoteFrom = 'bottom';     // clicking the remote arrow flips its side
+	let remoteClicks = 0;
+	function flipRemote() {
+		remoteFrom = remoteFrom === 'bottom' ? 'top' : 'bottom';
+		remoteClicks += 1;
+	}
 </script>
 
 <ContentPage title="Highlight" subtitle="Red glow on a target + an arrow pointing in from the side you choose">
@@ -31,7 +40,6 @@
 		<b>retrospectively</b>: give an element an id and aim at it with
 		<code>target="#id"</code>. A gentle pulse is on by default.
 	</p>
-	<br/>
 	<br/>
 	<div class="ring">
 		{#each ring as dir}
@@ -59,19 +67,23 @@
 		{/each}
 	</div>
 	<br/>
-	<br/>
 	<p style="margin: 0.3em 0 0; opacity: 0.85;">
 		Wrap mode points at an
-		<Highlight from="top" arrowSize={92}><span class="word">inline word</span></Highlight>
+		<Highlight bind:this={wordHl} from="top" arrowSize={92}><span class="word">inline word</span></Highlight>
 		&nbsp;&mdash;&nbsp; while remote mode reaches an existing chip
 		<span id="remote-chip" class="chip">#remote-chip</span> from afar.
 		Props: <code>from</code>, <code>target</code>, <code>color</code>, <code>glow</code>,
 		<code>opacity</code>, <code>gap</code>, <code>arrowSize</code>, <code>arrow</code>,
-		<code>pulse</code>, <code>show</code>.
+		<code>pulse</code>, <code>show</code>, <code>onClick</code>.
 	</p>
 
-	<!-- REMOTE: self-closing, no slot — finds #remote-chip and floats a glow + arrow over it. -->
-	<Highlight target="#remote-chip" from="bottom" color="#19b6ff" arrowSize={104} />
+	<p class="controls">
+		<button class="btn" on:click={() => wordHl.toggle()}>toggle() the inline cue</button>
+		<span class="hint">— or <b>click the blue arrow</b> on the chip ({remoteClicks} {remoteClicks === 1 ? 'click' : 'clicks'}) to flip its <code>from</code>.</span>
+	</p>
+
+	<!-- REMOTE + clickable: self-closing, finds #remote-chip; clicking the arrow flips its side. -->
+	<Highlight target="#remote-chip" from={remoteFrom} color="#19b6ff" arrowSize={104} onClick={flipRemote} label="Flip arrow side" />
 </ContentPage>
 
 <ViewSource {source} {path} />
@@ -80,7 +92,7 @@
 	.ring {
 		display: grid;
 		grid-template-columns: repeat(3, 308px);
-		gap: 60px 150px;
+		gap: 45px 150px;
 		justify-content: center;
 		align-content: center;
 		width: max-content;
@@ -93,8 +105,8 @@
 	}
 
 	.card {
-		width: 297px;
-		height: 92px;
+		width: 330px;
+		height: 60px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -134,6 +146,29 @@
 		border: 1.5px solid #1f4d5e;
 		color: #aee8ff;
 		font-family: ui-monospace, monospace;
+		font-size: 0.9em;
+	}
+	.controls {
+		margin: 0.5em 0 0;
+		display: flex;
+		align-items: baseline;
+		gap: 0.6em;
+	}
+	.btn {
+		font-size: 0.85em;
+		padding: 0.35em 0.8em;
+		border-radius: 7px;
+		border: 1.5px solid #3a5a2f;
+		background: #223018;
+		color: #d7f0c4;
+		cursor: pointer;
+		font-family: ui-monospace, monospace;
+	}
+	.btn:hover {
+		background: #2c3f1f;
+	}
+	.controls .hint {
+		opacity: 0.8;
 		font-size: 0.9em;
 	}
 </style>
