@@ -11,6 +11,15 @@
 
     export let pages: Array<{path: string, title: string}> = [];
 
+	/** Show the extra link above the slide list. Off by default — only decks that
+	    want it (e.g. a text.html article view, or a "back to home" link) enable it. */
+	export let article = false;
+	/** Label for that link. */
+	export let articleText = 'View as article';
+	/** Href for that link. Relative to the current slide URL (e.g. `../text.html`
+	    for the deck's article view, or `../` for the site root). */
+	export let articleHref = '../text.html';
+
 	let tocRef: HTMLElement;
 	let isContentVisible = writable(false);
 
@@ -52,7 +61,9 @@
 
 	{#if $isContentVisible}
 	<div class="content">
-		<div id="article"><a href="../text.html">View as article</a></div>
+		{#if article}
+		<div id="article"><a href={articleHref}>{articleText}</a></div>
+		{/if}
         <ol>
             {#each pages as { path, title }}
                 <li><a href={`./${path}`}>{title}</a></li>
@@ -66,7 +77,7 @@
 	.toc {
 		/* functional */
 		position: absolute;
-		top: 0px;
+		top: var(--ctrl-top, 12px);
 		left:0px;
 		margin:0px;
 		padding: 0px;

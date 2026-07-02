@@ -302,7 +302,7 @@
      the invalidated root. -->
 {#if editing}
 {#each stops as stop, i (stop.id)}
-<Block name={`${stop.pct}%`} bind:x={stops[i].x} bind:y={stops[i].y} bind:width={stops[i].w} bind:height={stops[i].h}>
+<Block name={`${stop.pct}%`} bounds="none" bind:x={stops[i].x} bind:y={stops[i].y} bind:width={stops[i].w} bind:height={stops[i].h}>
 	<!-- Tilt only the inner preview (same `origin` as the target), NOT the Block
 	     wrapper — rotating the wrapper would inflate its bbox and break Block's
 	     getBoundingClientRect/offsetWidth drag-scale. The upright outline stays the

@@ -132,6 +132,12 @@
 		top: var(--ctrl-top, 12px);
 		right: var(--ctrl-right, 16px);
 		margin-right: 0;
+		/* The overlay is screen-fixed and NOT scaled by the slide's fit transform, so
+		   scale this control's font by the current view scale (set on the overlay by
+		   SlideDeck). That makes DISPLAY read the same on-screen size as the in-content
+		   NAV / ANIMATION chrome, which the transform already shrinks by the same factor.
+		   1em here is the inherited --base-font; the anchor position is unaffected. */
+		font-size: calc(1em * var(--view-scale, 1));
 	}
 
 	.menu {

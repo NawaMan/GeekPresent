@@ -34,6 +34,9 @@
 	width={1920}
 	height={1080}
 	fill
+	article
+	articleText="← Back to home"
+	articleHref="../"
 >
 	<slot />
 </SlideDeck>
