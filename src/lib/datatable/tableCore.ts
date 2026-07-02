@@ -99,11 +99,18 @@ export function inferColumnType<T>(
 	return 'string';
 }
 
-/** The text a cell displays (and what global search matches against):
- *  the format() result when present, else the raw value stringified. */
-export function cellText<T>(row: T, column: ColumnDef<T>): string {
+/** The raw value a cell holds (row[column.key]) — what cell snippets receive
+ *  and what sorting compares (absent a sortValue accessor). */
+export function cellValue<T>(row: T, column: ColumnDef<T>): unknown {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const raw = (row as any)?.[column.key];
+	return (row as any)?.[column.key];
+}
+
+/** The text a cell displays (and what global search matches against, even
+ *  when a snippet renders the cell): the format() result when present, else
+ *  the raw value stringified. */
+export function cellText<T>(row: T, column: ColumnDef<T>): string {
+	const raw = cellValue(row, column);
 	if (column.format) return column.format(raw, row);
 	return isBlank(raw) ? '' : String(raw);
 }

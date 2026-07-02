@@ -1,6 +1,8 @@
 // Public types for the DataTable component family.
 // See specs/DATATABLE-1.md for the full design; this is the target API surface —
-// Phase 1 uses the subset it needs (filterable/visible land in Phase 3).
+// filterable/visible land in Phase 3.
+
+import type { Snippet } from 'svelte';
 
 export type SortDirection = 'asc' | 'desc' | null;
 
@@ -37,8 +39,31 @@ export interface ColumnDef<T = any> {
 	align?: 'left' | 'center' | 'right';
 }
 
-/** All processing state in one bindable object — the seam for controlled
- *  mode and server-side data (Phase 2). */
+/** A custom cell renderer, receiving (row, value, rowIndex) — value is the
+ *  raw row[column.key] (format() is NOT applied first), rowIndex is 0-based
+ *  within the current page. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type CellSnippet<T = any> = Snippet<[T, any, number]>;
+
+/** Per-column custom cell snippets, keyed by column key. Passed as the
+ *  `snippets` prop — an explicit map, deliberately NOT dynamically-named
+ *  `cell_*` snippets (dynamic snippet names aren't resolvable in Svelte).
+ *  Rendering precedence per cell: snippet > column.format > raw value.
+ *  Sorting and searching are untouched by snippets: rows still sort by the
+ *  raw value (or sortValue) and search still matches the format()/raw text. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type CellSnippets<T = any> = Record<string, CellSnippet<T>>;
+
+/** Per-column custom header content, keyed by column key; each snippet
+ *  receives the ColumnDef. For sortable columns it renders INSIDE the header
+ *  button (replacing the label text), so click-to-sort, keyboard
+ *  operability, and the sort indicator are preserved. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type HeaderSnippets<T = any> = Record<string, Snippet<[ColumnDef<T>]>>;
+
+/** All processing state in one object, exposed as the `bind:state` prop —
+ *  bind it for controlled mode (internal changes write back; external
+ *  changes drive the table) and for server-side data. */
 export interface TableState {
 	sort: SortDescriptor | null;
 	search: string;
@@ -49,5 +74,6 @@ export interface TableState {
 
 /** 'client': the component filters/sorts/paginates rows itself (default).
  *  'server': rows are rendered as-is and the component only emits state
- *  changes (Phase 2). */
+ *  changes (onstatechange / bind:state) — the parent fetches each page and
+ *  supplies `totalCount`. */
 export type TableMode = 'client' | 'server';
