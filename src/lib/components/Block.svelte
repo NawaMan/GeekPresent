@@ -26,6 +26,10 @@
 <script lang="ts">
 	import { layoutMode, canLayout } from '$lib/stores/layoutMode';
 	import { record } from '$lib/stores/layoutHistory';
+	import { nextChangeId, reportChange, withdrawChange } from '$lib/stores/layoutChanges';
+	import { trackPointer } from '$lib/utils/drag';
+	import { browser } from '$app/environment';
+	import { onDestroy } from 'svelte';
 
 	// Editing affordances only when the LAYOUT control is BOTH available (dev or an
 	// opted-in `?layout` session) and switched on. canLayout keeps the published
@@ -62,6 +66,16 @@
 	export let tag = 'Block';
 	export let attrs = '';
 	export let selfClose = false;
+	/** Report this wrapper's opening tag to the page-wide changed-tags
+	    registry, so a Draw's "Copy changed" patch includes moved Blocks too.
+	    Scaffolding wrappers opt out with false: KeyframeStudio's ghost stops
+	    (their tags are meaningless as source) and Draw's own hosted
+	    Rect/Ellipse blocks (Draw already reports those itself). */
+	export let track = true;
+	/** Optional draw-on reveal editor (a Draw Rect/Ellipse passes this via
+	    <Draw>): when set, the toolbar grows time/delay fields for the wrapped
+	    shape's self-draw. Plain Blocks leave it null. */
+	export let drawEdit: import('$lib/draw/types').DrawOnEditor | null = null;
 
 	let el: HTMLElement;
 	let copied = false;
@@ -80,11 +94,6 @@
 		event.stopPropagation();
 		dragging = mode;
 
-		// Live scale: how many screen px equal one canvas px right now. Works in any
-		// display mode because it measures the element as actually painted.
-		const scale = el.getBoundingClientRect().width / el.offsetWidth || 1;
-		const startPX = event.clientX;
-		const startPY = event.clientY;
 		const startX = x;
 		const startY = y;
 		const startW = width;
@@ -94,72 +103,58 @@
 		const ratio = typeof aspect === 'number' ? aspect : aspect === true ? startW / startH : null;
 
 		const free = bounds === 'none';
-		const onMove = (e: PointerEvent) => {
-			const dx = (e.clientX - startPX) / scale;
-			const dy = (e.clientY - startPY) / scale;
-			if (mode === 'move') {
-				x = snap(free ? startX + dx : clamp(startX + dx, 0, canvasWidth - width));
-				y = snap(free ? startY + dy : clamp(startY + dy, 0, canvasHeight - height));
-			} else if (ratio && !e.altKey) {
-				// Aspect-locked: drive from the axis the pointer moved most, derive the
-				// other from `ratio`, then clamp to canvas + minSize without skewing —
-				// whichever bound binds first wins and the partner follows the ratio.
-				// Hold Alt to break the lock and resize freeform (see the else below).
-				let w, h;
-				if (Math.abs(dx) >= Math.abs(dy)) {
-					w = startW + dx;
-					h = w / ratio;
+		// The shared helper measures the live rendered scale from `el`, captures
+		// the pointer, and streams canvas-px deltas until pointerup / Esc.
+		trackPointer(event, {
+			scaleFrom: el,
+			onMove: (dx, dy, e) => {
+				if (mode === 'move') {
+					x = snap(free ? startX + dx : clamp(startX + dx, 0, canvasWidth - width));
+					y = snap(free ? startY + dy : clamp(startY + dy, 0, canvasHeight - height));
+				} else if (ratio && !e.altKey) {
+					// Aspect-locked: drive from the axis the pointer moved most, derive the
+					// other from `ratio`, then clamp to canvas + minSize without skewing —
+					// whichever bound binds first wins and the partner follows the ratio.
+					// Hold Alt to break the lock and resize freeform (see the else below).
+					let w, h;
+					if (Math.abs(dx) >= Math.abs(dy)) {
+						w = startW + dx;
+						h = w / ratio;
+					} else {
+						h = startH + dy;
+						w = h * ratio;
+					}
+					if (w < minSize) { w = minSize; h = w / ratio; }
+					if (h < minSize) { h = minSize; w = h * ratio; }
+					if (!free && x + w > canvasWidth)  { w = canvasWidth  - x; h = w / ratio; }
+					if (!free && y + h > canvasHeight) { h = canvasHeight - y; w = h * ratio; }
+					width  = snap(w);
+					height = snap(h);
 				} else {
-					h = startH + dy;
-					w = h * ratio;
+					width = clamp(snap(startW + dx), minSize, free ? Infinity : canvasWidth - x);
+					height = clamp(snap(startH + dy), minSize, free ? Infinity : canvasHeight - y);
 				}
-				if (w < minSize) { w = minSize; h = w / ratio; }
-				if (h < minSize) { h = minSize; w = h * ratio; }
-				if (!free && x + w > canvasWidth)  { w = canvasWidth  - x; h = w / ratio; }
-				if (!free && y + h > canvasHeight) { h = canvasHeight - y; w = h * ratio; }
-				width  = snap(w);
-				height = snap(h);
-			} else {
-				width = clamp(snap(startW + dx), minSize, free ? Infinity : canvasWidth - x);
-				height = clamp(snap(startH + dy), minSize, free ? Infinity : canvasHeight - y);
+			},
+			// On commit, record the net change (before → after) for global undo/redo —
+			// but only if the gesture actually moved something, so a stray click that
+			// doesn't drag never clutters the history.
+			onEnd: () => {
+				dragging = null;
+				const before = { x: startX, y: startY, w: startW, h: startH };
+				const after = { x, y, w: width, h: height };
+				if (before.x === after.x && before.y === after.y && before.w === after.w && before.h === after.h) return;
+				record({
+					undo: () => { x = before.x; y = before.y; width = before.w; height = before.h; },
+					redo: () => { x = after.x;  y = after.y;  width = after.w;  height = after.h; },
+				});
+			},
+			// Esc cancels the in-progress gesture: snap every value back to where it
+			// was when the drag began.
+			onCancel: () => {
+				dragging = null;
+				x = startX; y = startY; width = startW; height = startH;
 			}
-		};
-		const target = event.target as Element;
-		const pid = event.pointerId;
-		function end() {
-			dragging = null;
-			window.removeEventListener('pointermove', onMove);
-			window.removeEventListener('pointerup', onUp);
-			window.removeEventListener('keydown', onKey, true);
-			target?.releasePointerCapture?.(pid);
-		}
-		// On commit, record the net change (before → after) for global undo/redo —
-		// but only if the gesture actually moved something, so a stray click that
-		// doesn't drag never clutters the history.
-		const onUp = () => {
-			end();
-			const before = { x: startX, y: startY, w: startW, h: startH };
-			const after = { x, y, w: width, h: height };
-			if (before.x === after.x && before.y === after.y && before.w === after.w && before.h === after.h) return;
-			record({
-				undo: () => { x = before.x; y = before.y; width = before.w; height = before.h; },
-				redo: () => { x = after.x;  y = after.y;  width = after.w;  height = after.h; },
-			});
-		};
-		// Esc cancels the in-progress gesture: snap every value back to where it was
-		// when the drag began. Captured (useCapture) + stopped so it doesn't also
-		// trip an ancestor's Escape handler (e.g. a Box close).
-		const onKey = (e: KeyboardEvent) => {
-			if (e.key !== 'Escape') return;
-			e.preventDefault();
-			e.stopPropagation();
-			x = startX; y = startY; width = startW; height = startH;
-			end();
-		};
-		target.setPointerCapture?.(pid);
-		window.addEventListener('pointermove', onMove);
-		window.addEventListener('pointerup', onUp);
-		window.addEventListener('keydown', onKey, true);
+		});
 	}
 
 	// When NOT editing, a bounds="none" element that bleeds past the canvas should
@@ -181,6 +176,27 @@
 	// line you paste over your element's existing open tag to update its position.
 	// (A self-closing wrapper like ImageBlock has no children, so it stays `<Tag … />`.)
 	$: snippet = selfClose ? `${openTag} />` : `${openTag}>`;
+
+	// The mount-time tag is the SOURCE form; live-vs-initial drives this
+	// wrapper's entry in the page-wide changed-tags registry (Draw's
+	// "Copy changed" OLD/NEW patch). Browser-only: SSR must not touch the
+	// module-level registry.
+	const changeId = nextChangeId();
+	const initial = { x, y, width, height };
+	$: initialOpenTag =
+		`<${tag}${name ? ` name="${name}"` : ''}${attrs} x={${Math.round(initial.x)}} y={${Math.round(initial.y)}}` +
+		` width={${Math.round(initial.width)}} height={${Math.round(initial.height)}}${aspectAttr}`;
+	$: initialSnippet = selfClose ? `${initialOpenTag} />` : `${initialOpenTag}>`;
+	$: if (browser && track)
+		reportChange({
+			id: changeId,
+			kind: tag,
+			name,
+			dirty: snippet !== initialSnippet,
+			oldTag: initialSnippet,
+			newTag: snippet,
+		});
+	onDestroy(() => withdrawChange(changeId));
 
 	async function copy() {
 		try {
@@ -213,6 +229,27 @@
 		<button class="copy" type="button" on:pointerdown|stopPropagation on:click|stopPropagation={copy}>
 			{copied ? 'Copied!' : 'Copy'}
 		</button>
+		{#if drawEdit}
+			<!-- Draw-on reveal editor for a wrapped Draw shape (Rect/Ellipse):
+			     retime the self-draw + its delay. stopPropagation so editing the
+			     fields doesn't start a Block drag. -->
+			<!-- svelte-ignore a11y-no-static-element-interactions -->
+			<div class="drawon" on:pointerdown|stopPropagation>
+				<span>draw</span>
+				<input
+					type="number" min="0" step="0.1"
+					value={drawEdit.seconds}
+					aria-label="draw-on seconds"
+					on:change={(e) => drawEdit.setSeconds(+e.currentTarget.value)}
+				/><span>s +</span>
+				<input
+					type="number" min="0" step="0.1"
+					value={drawEdit.delay}
+					aria-label="draw-on delay seconds"
+					on:change={(e) => drawEdit.setDelay(+e.currentTarget.value)}
+				/><span>s</span>
+			</div>
+		{/if}
 		<!-- svelte-ignore a11y-no-static-element-interactions -->
 		<div class="handle" on:pointerdown={(e) => startDrag('size', e)}></div>
 	{/if}
@@ -249,6 +286,37 @@
 		color: var(--on-accent, #ffffff);
 		border-radius: 3px;
 		pointer-events: none;
+	}
+
+	/* Draw-on reveal editor (only present for wrapped Draw Rect/Ellipse):
+	   a compact row hanging under the box. */
+	.movable .drawon {
+		position: absolute;
+		left: 0;
+		top: 100%;
+		margin-top: 4px;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25em;
+		font-size: 0.55em;
+		font-family: 'Fira Code', monospace;
+		white-space: nowrap;
+		padding: 0.15em 0.4em;
+		background: rgba(18, 18, 18, 0.92);
+		border: 1px solid var(--ctrl-strong-bg, #2980b9);
+		border-radius: 4px;
+		color: #9aa7b0;
+		touch-action: none;
+	}
+	.movable .drawon input {
+		width: 3.4em;
+		font-family: 'Fira Code', monospace;
+		font-size: 1em;
+		color: #cfe3f2;
+		background: var(--ctrl-bg, #181818);
+		border: 1px solid var(--ctrl-strong-bg, #2980b9);
+		border-radius: 4px;
+		padding: 0.1em 0.3em;
 	}
 
 	.movable .copy {

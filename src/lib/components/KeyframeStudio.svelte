@@ -49,6 +49,7 @@
 	import AnimationBar from '$lib/components/AnimationBar.svelte';
 	import { layoutMode, canLayout } from '$lib/stores/layoutMode';
 	import { record } from '$lib/stores/layoutHistory';
+	import { trackPointer } from '$lib/utils/drag';
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
 
@@ -207,24 +208,22 @@
 		const before = safeRot(stops[i].rot);
 		const angle = (cx: number, cy: number) => (Math.atan2(cy - py, cx - px) * 180) / Math.PI;
 		const a0 = angle(event.clientX, event.clientY);
-		grip.setPointerCapture?.(event.pointerId);
-		const onMove = (e: PointerEvent) => {
-			let next = before + (angle(e.clientX, e.clientY) - a0);
-			if (e.shiftKey) next = Math.round(next / 15) * 15;   // coarse 15° detents
-			stops[i].rot = Math.round(next);
-			stops = stops;
-		};
-		const onUp = () => {
-			window.removeEventListener('pointermove', onMove);
-			window.removeEventListener('pointerup', onUp);
-			grip.releasePointerCapture?.(event.pointerId);
-			const after = safeRot(stops[i].rot);
-			if (after === before) return;
-			const set = (v: number) => { const s = stops.find((s) => s.id === id); if (s) { s.rot = v; stops = stops; } };
-			record({ undo: () => set(before), redo: () => set(after) });
-		};
-		window.addEventListener('pointermove', onMove);
-		window.addEventListener('pointerup', onUp);
+		// Rotation works on the raw pointer position (angle about the pivot), so
+		// no scaleFrom — the helper's deltas are unused; the event carries clientX/Y.
+		trackPointer(event, {
+			onMove: (_dx, _dy, e) => {
+				let next = before + (angle(e.clientX, e.clientY) - a0);
+				if (e.shiftKey) next = Math.round(next / 15) * 15;   // coarse 15° detents
+				stops[i].rot = Math.round(next);
+				stops = stops;
+			},
+			onEnd: () => {
+				const after = safeRot(stops[i].rot);
+				if (after === before) return;
+				const set = (v: number) => { const s = stops.find((s) => s.id === id); if (s) { s.rot = v; stops = stops; } };
+				record({ undo: () => set(before), redo: () => set(after) });
+			}
+		});
 	}
 	function commitDur()  { durationSec = clamp(Number(durationSec) || 0.1, 0.1, 60); }
 
@@ -279,19 +278,14 @@
 
 	function startPanelDrag(event: PointerEvent) {
 		event.preventDefault();
-		const scale = panelEl.getBoundingClientRect().width / panelEl.offsetWidth || 1;
-		const startPX = event.clientX, startPY = event.clientY;
 		const baseDX = panelDX, baseDY = panelDY;
-		const onMove = (e: PointerEvent) => {
-			panelDX = baseDX + (e.clientX - startPX) / scale;
-			panelDY = baseDY + (e.clientY - startPY) / scale;
-		};
-		const onUp = () => {
-			window.removeEventListener('pointermove', onMove);
-			window.removeEventListener('pointerup', onUp);
-		};
-		window.addEventListener('pointermove', onMove);
-		window.addEventListener('pointerup', onUp);
+		trackPointer(event, {
+			scaleFrom: panelEl,
+			onMove: (dx, dy) => {
+				panelDX = baseDX + dx;
+				panelDY = baseDY + dy;
+			}
+		});
 	}
 </script>
 
@@ -302,7 +296,7 @@
      the invalidated root. -->
 {#if editing}
 {#each stops as stop, i (stop.id)}
-<Block name={`${stop.pct}%`} bounds="none" bind:x={stops[i].x} bind:y={stops[i].y} bind:width={stops[i].w} bind:height={stops[i].h}>
+<Block name={`${stop.pct}%`} bounds="none" track={false} bind:x={stops[i].x} bind:y={stops[i].y} bind:width={stops[i].w} bind:height={stops[i].h}>
 	<!-- Tilt only the inner preview (same `origin` as the target), NOT the Block
 	     wrapper — rotating the wrapper would inflate its bbox and break Block's
 	     getBoundingClientRect/offsetWidth drag-scale. The upright outline stays the
