@@ -530,6 +530,40 @@ describe('geometry keyframes (stops + animate)', () => {
 		expect(style).toContain('100% { stroke-dashoffset: 0; }');
 	});
 
+	it('per-stop ease emits animation-timing-function inside that keyframe', () => {
+		const { container } = render(Curve, {
+			from: [0, 0] as [number, number],
+			to: [100, 0] as [number, number],
+			c1: [50, 50] as [number, number],
+			stops: [
+				{ pct: 0, c1: [50, 50] as [number, number], drawn: 0, ease: 'ease-in' },
+				{ pct: 100, c1: [50, -50] as [number, number], drawn: 1, ease: 'linear' }
+			],
+			animate: 4
+		});
+		const style = container.querySelector('g style')!.textContent!;
+		// the timing function rides both the geometry (d) and reveal frames
+		expect(style).toContain('0% { d: path("M 0 0 Q 50 50 100 0"); animation-timing-function: ease-in; }');
+		expect(style).toContain('0% { stroke-dashoffset: 1; animation-timing-function: ease-in; }');
+		expect(style).toContain('animation-timing-function: linear;'); // the 100% stop
+	});
+
+	it('a malicious ease is sanitized away (no CSS injection)', () => {
+		const { container } = render(Curve, {
+			from: [0, 0] as [number, number],
+			to: [100, 0] as [number, number],
+			c1: [50, 50] as [number, number],
+			stops: [
+				{ pct: 0, c1: [50, 50] as [number, number], ease: 'ease-in} body{display:none}' },
+				{ pct: 100, c1: [50, -50] as [number, number] }
+			],
+			animate: 4
+		});
+		const style = container.querySelector('g style')!.textContent!;
+		expect(style).not.toContain('body{display:none}');
+		expect(style).not.toContain('animation-timing-function: ease-in}');
+	});
+
 	it('Curve reveal keyframes stroke-dashoffset (non-linear draw progress)', () => {
 		const { container } = render(Curve, {
 			from: [300, 800] as [number, number],

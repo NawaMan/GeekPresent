@@ -357,6 +357,33 @@
 									/>
 									<span class="tb-pctsign">%</span>
 								{/if}
+								{#if selected.anim.setEase}
+									<!-- Easing for the segment starting at this keyframe. -->
+									<select
+										class="tb-ease"
+										value={st.ease ?? ''}
+										aria-label="keyframe easing"
+										title="Easing of the segment starting here"
+										onchange={(e) => selected?.anim?.setEase?.(st.id, e.currentTarget.value || null)}
+									>
+										<option value="">ease</option>
+										<option value="linear">linear</option>
+										<option value="ease-in">in</option>
+										<option value="ease-out">out</option>
+										<option value="ease-in-out">in-out</option>
+									</select>
+								{/if}
+								{#if selected.anim.setPose}
+									<!-- Numeric box pose on the SAME row: L/T/W/H in canvas px, R in
+									     degrees. Drag on-canvas OR type here — same setter, live. -->
+									<span class="tb-pose">
+										<label class="tb-poselabel">L<input class="tb-posef" type="number" step="1" value={st.x ?? 0} aria-label="left, px" onchange={(e) => selected?.anim?.setPose?.(st.id, 'x', +e.currentTarget.value)} /></label>
+										<label class="tb-poselabel">T<input class="tb-posef" type="number" step="1" value={st.y ?? 0} aria-label="top, px" onchange={(e) => selected?.anim?.setPose?.(st.id, 'y', +e.currentTarget.value)} /></label>
+										<label class="tb-poselabel">W<input class="tb-posef" type="number" step="1" value={st.w ?? 0} aria-label="width, px" onchange={(e) => selected?.anim?.setPose?.(st.id, 'w', +e.currentTarget.value)} /></label>
+										<label class="tb-poselabel">H<input class="tb-posef" type="number" step="1" value={st.h ?? 0} aria-label="height, px" onchange={(e) => selected?.anim?.setPose?.(st.id, 'h', +e.currentTarget.value)} /></label>
+										<label class="tb-poselabel">R<input class="tb-posef" type="number" step="15" value={st.rot ?? 0} aria-label="rotation, deg" onchange={(e) => selected?.anim?.setPose?.(st.id, 'rot', +e.currentTarget.value)} />°</label>
+									</span>
+								{/if}
 								<button
 									class="tb-del"
 									type="button"
@@ -571,6 +598,32 @@
 		font-size: 15px;
 		color: #9aa7b0;
 	}
+	/* Numeric box-pose fields (Sprite): compact L/T/W/H/R group inline on the
+	   stop's % row. */
+	.tb-pose {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4em;
+		margin-left: 0.4em;
+	}
+	.tb-poselabel {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.12em;
+		font-family: 'Fira Code', monospace;
+		font-size: 13px;
+		color: #9aa7b0;
+	}
+	.tb-posef {
+		width: 3.2em;
+		font-family: 'Fira Code', monospace;
+		font-size: 14px;
+		color: #cfe3f2;
+		background: var(--ctrl-bg, #181818);
+		border: 1px solid var(--ctrl-strong-bg, #2980b9);
+		border-radius: 4px;
+		padding: 0.1em 0.25em;
+	}
 	.tb-flabel {
 		display: inline-block;
 		width: 3.2em;
@@ -581,6 +634,16 @@
 	.tb-drawnlabel {
 		width: auto;
 		margin-left: 0.5em;
+	}
+	.tb-ease {
+		font-family: 'Fira Code', monospace;
+		font-size: 13px;
+		color: #cfe3f2;
+		background: var(--ctrl-bg, #181818);
+		border: 1px solid var(--ctrl-strong-bg, #2980b9);
+		border-radius: 4px;
+		padding: 0.1em 0.2em;
+		margin-left: 0.4em;
 	}
 	.tb-del {
 		font-family: 'Fira Code', monospace;
