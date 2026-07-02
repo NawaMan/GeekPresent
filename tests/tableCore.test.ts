@@ -3,6 +3,7 @@ import {
 	cellText,
 	clampPage,
 	compareValues,
+	exportCsv,
 	filterRows,
 	inferColumnType,
 	isBlank,
@@ -228,6 +229,35 @@ describe('filterRows / cellText', () => {
 		expect(cellText(rows[2], columns[0])).toBe('');
 		expect(cellText(rows[3], columns[1])).toBe('—');
 	});
+
+	it('applies per-column filters as case-insensitive contains matches', () => {
+		expect(ids(filterRows(rows, '', columns, { name: 'ITEM' }))).toEqual([1, 2]);
+		expect(ids(filterRows(rows, '', columns, { name: 'item1' }))).toEqual([1]);
+	});
+
+	it('ANDs column filters with each other and with the global search', () => {
+		// name contains "item" AND when contains "2024" → only id 1
+		expect(ids(filterRows(rows, '', columns, { name: 'item', when: '2024' }))).toEqual([1]);
+		// global "apple" AND when "2024" → id 4 (id 5's when is garbage)
+		expect(ids(filterRows(rows, 'apple', columns, { when: '2024' }))).toEqual([4]);
+		// intersection can be empty even when each filter matches alone
+		expect(ids(filterRows(rows, 'apple', columns, { name: 'item' }))).toEqual([]);
+	});
+
+	it('matches column filters against the formatted value', () => {
+		expect(ids(filterRows(rows, '', columns, { amount: '$10' }))).toEqual([1, 3]);
+	});
+
+	it('ignores blank filters and filters on unknown or hidden columns', () => {
+		expect(ids(filterRows(rows, '', columns, { name: '  ' }))).toEqual([1, 2, 3, 4, 5]);
+		expect(ids(filterRows(rows, '', columns, { nope: 'x' }))).toEqual([1, 2, 3, 4, 5]);
+		const hidden: ColumnDef<Row>[] = [
+			{ key: 'name', label: 'Name', visible: false },
+			{ key: 'when', label: 'When' }
+		];
+		// name is hidden → its filter is suspended (no invisible criteria)
+		expect(ids(filterRows(rows, '', hidden, { name: 'item' }))).toEqual([1, 2, 3, 4, 5]);
+	});
 });
 
 describe('pagination', () => {
@@ -275,5 +305,50 @@ describe('pagination', () => {
 		expect(pageWindow(1, 10, 45)).toEqual({ start: 1, end: 10 });
 		expect(pageWindow(5, 10, 45)).toEqual({ start: 41, end: 45 });
 		expect(pageWindow(9, 10, 25)).toEqual({ start: 21, end: 25 }); // stale page clamped
+	});
+});
+
+describe('exportCsv', () => {
+	type Product = { name: string; price: number | null; note: string | null };
+	const products: Product[] = [
+		{ name: 'Widget, large', price: 19.5, note: 'says "best"' },
+		{ name: 'Plain', price: null, note: null },
+		{ name: 'Multi\nline', price: 3, note: 'ok' }
+	];
+	const productColumns: ColumnDef<Product>[] = [
+		{ key: 'name', label: 'Name' },
+		{ key: 'price', label: 'Price ($)', format: (v) => (v == null ? '—' : `$${v.toFixed(2)}`) },
+		{ key: 'note', label: 'Note' }
+	];
+
+	it('quotes commas, escapes quotes, and quotes line breaks (RFC 4180)', () => {
+		const lines = exportCsv(products, productColumns).split('\r\n');
+		expect(lines[1]).toBe('"Widget, large",$19.50,"says ""best"""');
+		expect(lines[2]).toBe('Plain,—,'); // nulls export as blank/format output
+		// the embedded newline stays inside one quoted field
+		expect(exportCsv([products[2]], productColumns)).toContain('"Multi\nline",$3.00,ok');
+	});
+
+	it('starts with the header labels and ends rows with CRLF', () => {
+		const csv = exportCsv(products, productColumns);
+		expect(csv.startsWith('Name,Price ($),Note\r\n')).toBe(true);
+		expect(csv.endsWith('\r\n')).toBe(true);
+	});
+
+	it('applies format and skips hidden columns', () => {
+		const visibleOnly = exportCsv(products.slice(0, 1), [
+			{ key: 'name', label: 'Name' },
+			{ key: 'price', label: 'Price', visible: false }
+		] as ColumnDef<Product>[]);
+		expect(visibleOnly).toBe('Name\r\n"Widget, large"\r\n');
+	});
+
+	it('exports whatever set it is given — the caller passes filtered+sorted, not a page', () => {
+		// simulate the intended wiring: filter → sort → export (all matches,
+		// even if the table would paginate to 1 row per page)
+		const filtered = filterRows(rows, 'item', [{ key: 'name', label: 'Name' }]);
+		const sorted = sortRows(filtered, { key: 'name', direction: 'asc' }, 'string');
+		const csv = exportCsv(sorted, [{ key: 'name', label: 'Name' }]);
+		expect(csv).toBe('Name\r\nitem2\r\nitem10\r\n');
 	});
 });

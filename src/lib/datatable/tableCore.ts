@@ -4,7 +4,7 @@
 // The pipeline (each stage its own $derived in DataTable.svelte — never merged):
 //   rows → filterRows → sortRows → paginateRows → visible rows
 
-import type { ColumnDef, ResolvedColumnType, SortDescriptor } from './types';
+import type { ColumnDef, ResolvedColumnType, RowKey, SortDescriptor } from './types';
 
 /** Values that always sort last and never match a search: null/undefined/''. */
 export function isBlank(value: unknown): boolean {
@@ -99,6 +99,13 @@ export function inferColumnType<T>(
 	return 'string';
 }
 
+/** A row's identity under a RowKey (field name or accessor) — what selection
+ *  is keyed by, so it survives sorting, filtering, and paging. */
+export function rowKeyOf<T>(row: T, rowKey: RowKey<T>): unknown {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	return typeof rowKey === 'function' ? rowKey(row) : (row as any)?.[rowKey];
+}
+
 /** The raw value a cell holds (row[column.key]) — what cell snippets receive
  *  and what sorting compares (absent a sortValue accessor). */
 export function cellValue<T>(row: T, column: ColumnDef<T>): unknown {
@@ -116,20 +123,34 @@ export function cellText<T>(row: T, column: ColumnDef<T>): string {
 }
 
 /**
- * Global search: case-insensitive substring match across all visible columns,
- * against the formatted value when a format fn exists. Empty/whitespace-only
- * search returns all rows.
+ * Filter stage: global search AND per-column filters, both case-insensitive
+ * substring matches against the displayed (formatted) text. The global
+ * search matches if ANY visible column contains it; each non-blank column
+ * filter must ALSO match its own column (AND composition). Filters keyed to
+ * unknown or hidden columns are ignored — hiding a column suspends its
+ * filter (WYSIWYG: no invisible criteria). Empty search + no active filters
+ * returns all rows.
  */
 export function filterRows<T>(
 	rows: readonly T[],
 	search: string,
-	columns: readonly ColumnDef<T>[]
+	columns: readonly ColumnDef<T>[],
+	columnFilters: Record<string, string> = {}
 ): T[] {
 	const needle = search.trim().toLowerCase();
-	if (needle === '') return rows.slice();
 	const searched = columns.filter((c) => c.visible !== false);
-	return rows.filter((row) =>
-		searched.some((column) => cellText(row, column).toLowerCase().includes(needle))
+	const active = Object.entries(columnFilters)
+		.map(([key, text]) => ({
+			column: searched.find((c) => c.key === key),
+			needle: text.trim().toLowerCase()
+		}))
+		.filter((f) => f.column !== undefined && f.needle !== '');
+	if (needle === '' && active.length === 0) return rows.slice();
+	return rows.filter(
+		(row) =>
+			(needle === '' ||
+				searched.some((column) => cellText(row, column).toLowerCase().includes(needle))) &&
+			active.every((f) => cellText(row, f.column!).toLowerCase().includes(f.needle))
 	);
 }
 
@@ -169,6 +190,25 @@ export function sortRows<T>(
 			return c !== 0 ? c : a.index - b.index;
 		})
 		.map((tagged) => tagged.row);
+}
+
+/**
+ * CSV for the given rows over the visible columns: a header row of column
+ * labels, then one line per row using the displayed text (format applied via
+ * cellText). Pass the FILTERED+SORTED set — what the user sees across all
+ * pages — not just the current page. RFC 4180 quoting: fields containing
+ * commas, quotes, or line breaks are wrapped in quotes with inner quotes
+ * doubled; CRLF row endings so Excel opens it cleanly.
+ */
+export function exportCsv<T>(rows: readonly T[], columns: readonly ColumnDef<T>[]): string {
+	const exported = columns.filter((c) => c.visible !== false);
+	const escape = (text: string): string =>
+		/[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+	const lines = [
+		exported.map((column) => escape(column.label)).join(','),
+		...rows.map((row) => exported.map((column) => escape(cellText(row, column))).join(','))
+	];
+	return lines.join('\r\n') + '\r\n';
 }
 
 /** Total pages for a result set — never less than 1, so an empty set still

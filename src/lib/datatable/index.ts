@@ -8,6 +8,7 @@
 // (`empty`) stay regular named snippets. Cell precedence: snippet >
 // column.format > raw value; sorting always compares the raw/sortValue
 // value and global search always matches the format()/raw text.
+export { default as ColumnToggle } from './ColumnToggle.svelte';
 export { default as DataTable } from './DataTable.svelte';
 export { default as Pagination } from './Pagination.svelte';
 export { default as SearchBox } from './SearchBox.svelte';

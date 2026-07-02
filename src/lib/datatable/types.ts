@@ -54,6 +54,12 @@ export type CellSnippet<T = any> = Snippet<[T, any, number]>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type CellSnippets<T = any> = Record<string, CellSnippet<T>>;
 
+/** Row identity for selection: a key field name, or an accessor function
+ *  for composite/derived keys. Required when `selectable` — array index is
+ *  deliberately NOT an option, since it changes under sort/filter/page. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type RowKey<T = any> = string | ((row: T) => unknown);
+
 /** Per-column custom header content, keyed by column key; each snippet
  *  receives the ColumnDef. For sortable columns it renders INSIDE the header
  *  button (replacing the label text), so click-to-sort, keyboard

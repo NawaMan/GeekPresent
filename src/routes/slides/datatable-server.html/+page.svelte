@@ -9,8 +9,9 @@
   answers each emission with one page of rows plus totalCount for the
   readout and page math; a real backend would answer an HTTP query built
   from the same TableState. bind:state keeps the UI and the fetches on one
-  shared state object. Styled as the DARK counterpart of the static slide's
-  light panel — same component, only the --dt-* custom properties differ.
+  shared state object. Styled with a colorful "candy" --dt-* palette — the
+  finale of the deck's light (static) → dark (tools) → colorful (server)
+  theming range; same component, only the custom-property values differ.
 -->
 <script lang="ts">
 	import ContentPage from '$lib/templates/ContentPage.svelte';
@@ -89,7 +90,7 @@
 				: column.type && column.type !== 'auto'
 					? column.type
 					: inferColumnType(servers, column.key, column.sortValue);
-			const filtered = filterRows(servers, state.search, columns);
+			const filtered = filterRows(servers, state.search, columns, state.columnFilters);
 			const sorted = sortRows(filtered, state.sort, type, column?.sortValue);
 			serverTotal = sorted.length;
 			serverRows = paginateRows(sorted, state.page, state.pageSize);
@@ -137,9 +138,9 @@
 		Server-mode props: <code>mode="server"</code>, <code>totalCount</code> (readout + page math),
 		<code>onstatechange</code> (refetch signal), <code>bind:state</code> (full
 		<code>TableState</code>: <code>sort</code>, <code>search</code>, <code>page</code>,
-		<code>pageSize</code>), <code>loading</code>. Client mode on the previous slide needs none of
-		these — switching is a props-only change. The dark look is just different
-		<code>--dt-*</code> values (the previous slide sets a light panel).
+		<code>pageSize</code>), <code>loading</code>. Client mode on the previous slides needs none of
+		these — switching is a props-only change. The candy look is just different
+		<code>--dt-*</code> values (light → dark → colorful across the three slides).
 	</p>
 </ContentPage>
 
@@ -148,20 +149,22 @@
 <style>
 	.demo {
 		--dt-font-size: 0.72em;
-		/* dark theme — the counterpart to the light "inverted panel" on the
-		   static-data slide; same component, only --dt-* values differ */
-		--dt-bg: #101821;
-		--dt-color: #d7e2ec;
-		--dt-border: #35485c;
-		--dt-header-bg: rgba(120, 170, 220, 0.12);
-		--dt-stripe-bg: rgba(120, 170, 220, 0.05);
-		--dt-row-hover: rgba(120, 170, 220, 0.14);
-		--dt-accent: #f0a840;
+		/* colorful "candy" theme — purple header, pink accent, sky stripes;
+		   the finale of the deck's light → dark → colorful theming range.
+		   Same component, only --dt-* values differ. */
+		--dt-bg: #fff9f2;
+		--dt-color: #3a2b4d;
+		--dt-border: #c77dff;
+		--dt-header-bg: rgba(155, 93, 229, 0.28);
+		--dt-stripe-bg: rgba(0, 187, 249, 0.1);
+		--dt-row-hover: rgba(0, 245, 212, 0.22);
+		--dt-accent: #f15bb5;
 		margin: 0.3em auto 0;
 		max-width: 1600px;
 		line-height: 1.35;
 		text-align: initial;
 	}
+	/* candy-saturated badges to match the theme */
 	.badge {
 		display: inline-block;
 		padding: 0.1em 0.6em;
@@ -170,18 +173,17 @@
 		font-weight: 700;
 		line-height: 1.5;
 	}
-	/* dark-surface badges: translucent fills, bright text */
 	.badge-healthy {
-		background: rgba(80, 200, 110, 0.18);
-		color: #7ce29a;
+		background: rgba(0, 245, 212, 0.35);
+		color: #00705c;
 	}
 	.badge-degraded {
-		background: rgba(240, 170, 60, 0.18);
-		color: #f5c069;
+		background: rgba(254, 228, 64, 0.6);
+		color: #6e5600;
 	}
 	.badge-offline {
-		background: rgba(235, 100, 100, 0.18);
-		color: #f49a9a;
+		background: rgba(241, 91, 181, 0.28);
+		color: #a81b69;
 	}
 	.hint {
 		margin: 0.6em 0 0;

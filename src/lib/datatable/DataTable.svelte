@@ -9,6 +9,8 @@
   Uncontrolled by default: pass raw `rows` + `columns` and the component
   filters/sorts/paginates internally. A column can sort by something other
   than what it displays via `sortValue: (row) => value` — see types.ts.
+  Columns with `filterable: true` get a debounced contains-filter input in
+  a second header row; column filters AND the global search compose.
   All processing state lives in one TableState object exposed as
   `bind:state` — bind it and internal changes write back to the parent;
   change it externally and the table follows (controlled mode).
@@ -17,6 +19,12 @@
   pipeline) and emits onstatechange(state) after every sort/search/page
   interaction — refetch there and hand back the new page of rows plus
   `totalCount` for the readout and page math.
+
+  Row selection: `selectable` adds a checkbox column with page-scoped
+  select-all (indeterminate when partial); `bind:selected` exposes the
+  selected rows, keyed by the required `rowKey` (field name or accessor —
+  never the array index), so selection survives paging/sorting/filtering.
+  Tint selected rows via --dt-selected-bg.
 
   Custom cells: pass `snippets={{ columnKey: mySnippet }}` — an explicit
   map, NOT dynamically-named `cell_*` snippets (those aren't resolvable in
@@ -45,6 +53,7 @@
 		pageCount,
 		pageWindow,
 		paginateRows,
+		rowKeyOf,
 		sortRows
 	} from './tableCore';
 	import type {
@@ -52,6 +61,7 @@
 		ColumnDef,
 		HeaderSnippets,
 		ResolvedColumnType,
+		RowKey,
 		SortDirection,
 		TableMode,
 		TableState
@@ -77,6 +87,9 @@
 		mode = 'client',
 		totalCount,
 		onstatechange,
+		selectable = false,
+		rowKey,
+		selected = $bindable([]),
 		searchable = true,
 		loading = false,
 		striped = false,
@@ -108,6 +121,14 @@
 		 *  search, paging) with the new TableState. In server mode this is the
 		 *  refetch signal; external bind:state changes don't echo. */
 		onstatechange?: (state: TableState) => void;
+		/** Opt-in checkbox column for row selection. Requires `rowKey`. */
+		selectable?: boolean;
+		/** Row identity for selection: key field name or accessor fn — never
+		 *  the array index, which changes under sort/filter/page. */
+		rowKey?: RowKey<T>;
+		/** The selected rows (`bind:selected`). Selection is keyed by rowKey,
+		 *  so it survives page changes, re-sorting, and filtering. */
+		selected?: T[];
 		searchable?: boolean;
 		loading?: boolean;
 		/** Custom cell renderers, keyed by column key — an explicit map by
@@ -136,6 +157,12 @@
 		height?: string;
 	} = $props();
 
+	// Rendering respects ColumnDef.visible reactively (ColumnToggle mutates a
+	// bound columns array). The full `columns` list still feeds the pipeline:
+	// filterRows skips hidden columns itself, and a sort on a now-hidden
+	// column keeps applying until the user sorts elsewhere.
+	const visibleColumns = $derived(columns.filter((column) => column.visible !== false));
+
 	// Resolve 'auto' column types once per (rows, columns) — never per
 	// comparison. Inference samples the sortValue accessor when one exists,
 	// since those are the values that get compared.
@@ -155,7 +182,9 @@
 	// verbatim — the parent did the processing — and `total` comes from
 	// totalCount; the pure functions stay the single source of truth for
 	// client mode.
-	const filtered = $derived(mode === 'client' ? filterRows(rows, table.search, columns) : rows);
+	const filtered = $derived(
+		mode === 'client' ? filterRows(rows, table.search, columns, table.columnFilters) : rows
+	);
 	const sortColumn = $derived(
 		table.sort ? columns.find((column) => column.key === table.sort?.key) : undefined
 	);
@@ -177,6 +206,68 @@
 	);
 	const totalPages = $derived(pageCount(total, table.pageSize));
 	const readout = $derived(pageWindow(currentPage, table.pageSize, total));
+
+	// --- selection: identity by rowKey, never by index, so the same rows
+	// stay selected across paging, sorting, and filtering. `selected` holds
+	// the rows themselves (bindable); the key set is derived for lookups.
+	function keyOf(row: T): unknown {
+		if (rowKey == null) throw new Error('DataTable: `rowKey` is required when `selectable`');
+		return rowKeyOf(row, rowKey);
+	}
+
+	const selectedKeys = $derived(selectable ? new Set(selected.map((row) => keyOf(row))) : new Set());
+	const allPageSelected = $derived(
+		selectable && visibleRows.length > 0 && visibleRows.every((row) => selectedKeys.has(keyOf(row)))
+	);
+	const somePageSelected = $derived(
+		selectable && visibleRows.some((row) => selectedKeys.has(keyOf(row)))
+	);
+
+	function toggleRow(row: T) {
+		const key = keyOf(row);
+		selected = selectedKeys.has(key)
+			? selected.filter((candidate) => keyOf(candidate) !== key)
+			: [...selected, row];
+	}
+
+	// Select-all is page-scoped: it (de)selects the current page's rows and
+	// leaves selections on other pages untouched.
+	function toggleAllOnPage() {
+		if (allPageSelected) {
+			const pageKeys = new Set(visibleRows.map((row) => keyOf(row)));
+			selected = selected.filter((candidate) => !pageKeys.has(keyOf(candidate)));
+		} else {
+			const fresh = visibleRows.filter((row) => !selectedKeys.has(keyOf(row)));
+			selected = [...selected, ...fresh];
+		}
+	}
+
+	// --- per-column filters: debounced like the global search. Drafts hold
+	// the in-flight text so a re-render mid-debounce can't wipe the input;
+	// a draft is dropped once its value is committed to state.
+	const hasFilterRow = $derived(visibleColumns.some((column) => column.filterable));
+	const filterDrafts = $state<Record<string, string>>({});
+	const filterTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+
+	$effect(() => () => Object.values(filterTimers).forEach(clearTimeout));
+
+	function filterTextOf(column: ColumnDef<T>): string {
+		return filterDrafts[column.key] ?? table.columnFilters[column.key] ?? '';
+	}
+
+	function handleFilterInput(column: ColumnDef<T>, event: Event) {
+		const text = (event.currentTarget as HTMLInputElement).value;
+		filterDrafts[column.key] = text;
+		clearTimeout(filterTimers[column.key]);
+		filterTimers[column.key] = setTimeout(() => {
+			delete filterDrafts[column.key];
+			commit({
+				...table,
+				columnFilters: { ...table.columnFilters, [column.key]: text },
+				page: 1 // a new filter invalidates the old page
+			});
+		}, 250);
+	}
 
 	function sortDirectionOf(column: ColumnDef<T>): SortDirection {
 		return table.sort?.key === column.key ? table.sort.direction : null;
@@ -234,7 +325,18 @@
 			<table>
 				<thead>
 					<tr>
-						{#each columns as column (column.key)}
+						{#if selectable}
+							<th scope="col" class="select-col">
+								<input
+									type="checkbox"
+									checked={allPageSelected}
+									indeterminate={somePageSelected && !allPageSelected}
+									onchange={toggleAllOnPage}
+									aria-label="Select all rows on this page"
+								/>
+							</th>
+						{/if}
+						{#each visibleColumns as column (column.key)}
 							{@const header = headerSnippets?.[column.key]}
 							<th
 								scope="col"
@@ -263,6 +365,26 @@
 							</th>
 						{/each}
 					</tr>
+					{#if hasFilterRow}
+						<!-- per-column filters; sticks below the label row when scrolling -->
+						<tr class="filter-row">
+							{#if selectable}<td class="select-col"></td>{/if}
+							{#each visibleColumns as column (column.key)}
+								<td>
+									{#if column.filterable}
+										<input
+											type="search"
+											class="column-filter"
+											placeholder="Filter…"
+											aria-label="Filter {column.label}"
+											value={filterTextOf(column)}
+											oninput={(event) => handleFilterInput(column, event)}
+										/>
+									{/if}
+								</td>
+							{/each}
+						</tr>
+					{/if}
 				</thead>
 				<tbody>
 					{#if visibleRows.length === 0}
@@ -270,19 +392,32 @@
 						     no-hit search also means empty rows) picks the right message -->
 						{#if table.search.trim() !== ''}
 							<tr class="empty">
-								<td colspan={columns.length}>
+								<td colspan={visibleColumns.length + (selectable ? 1 : 0)}>
 									{#if empty}{@render empty()}{:else}No results found{/if}
 								</td>
 							</tr>
 						{:else}
 							<tr class="empty">
-								<td colspan={columns.length}>No data</td>
+								<td colspan={visibleColumns.length + (selectable ? 1 : 0)}>No data</td>
 							</tr>
 						{/if}
 					{:else}
 						{#each visibleRows as row, rowIndex}
-							<tr class:stripe={striped && rowIndex % 2 === 1}>
-								{#each columns as column (column.key)}
+							<tr
+								class:stripe={striped && rowIndex % 2 === 1}
+								class:selected={selectable && selectedKeys.has(keyOf(row))}
+							>
+								{#if selectable}
+									<td class="select-col">
+										<input
+											type="checkbox"
+											checked={selectedKeys.has(keyOf(row))}
+											onchange={() => toggleRow(row)}
+											aria-label="Select row {keyOf(row)}"
+										/>
+									</td>
+								{/if}
+								{#each visibleColumns as column (column.key)}
 									{@const cell = snippets?.[column.key]}
 									<td style:text-align={column.align}>
 										{#if cell}
@@ -351,6 +486,11 @@
 		position: sticky;
 		top: 0;
 		z-index: 1;
+		/* Fixed height (not min-height) so the filter row below knows exactly
+		   where to stick; labels are nowrap single-line so nothing clips.
+		   Override with --dt-header-height if a header snippet runs taller. */
+		height: var(--dt-header-height, 2.6em);
+		box-sizing: border-box;
 		/* header tint layered over an opaque base so scrolled rows can't show
 		   through the sticky header; theme the base with --dt-bg */
 		background: linear-gradient(
@@ -396,6 +536,48 @@
 	}
 	tr.stripe td {
 		background: var(--dt-stripe-bg, rgba(128, 128, 128, 0.07));
+	}
+	.filter-row td {
+		/* sticks right below the label row (whose height is fixed above), so
+		   the filter inputs never scroll away under the sticky header */
+		position: sticky;
+		top: var(--dt-header-height, 2.6em);
+		z-index: 1;
+		padding: 0.25em 0.45em 0.45em;
+		border-bottom: 2px solid var(--dt-border, rgba(128, 128, 128, 0.35));
+		/* opaque base so scrolled rows can't show through */
+		background: var(--dt-bg, Canvas);
+	}
+	.column-filter {
+		width: 100%;
+		box-sizing: border-box;
+		font: inherit;
+		font-size: 0.9em;
+		color: inherit;
+		background: var(--dt-header-bg, rgba(128, 128, 128, 0.14));
+		border: 1px solid var(--dt-border, rgba(128, 128, 128, 0.35));
+		border-radius: 5px;
+		padding: 0.2em 0.45em;
+	}
+	.column-filter:focus-visible {
+		outline: 2px solid var(--dt-accent, #4a9eda);
+		outline-offset: 1px;
+	}
+	.select-col {
+		width: 2.2em;
+		text-align: center;
+	}
+	.select-col input {
+		accent-color: var(--dt-accent, #4a9eda);
+		cursor: pointer;
+	}
+	.select-col input:focus-visible {
+		outline: 2px solid var(--dt-accent, #4a9eda);
+		outline-offset: 1px;
+	}
+	/* selection tint wins over stripe (later rule, same specificity) */
+	tr.selected td {
+		background: var(--dt-selected-bg, rgba(74, 158, 218, 0.16));
 	}
 	tbody tr:hover td {
 		background: var(--dt-row-hover, rgba(128, 128, 128, 0.09));

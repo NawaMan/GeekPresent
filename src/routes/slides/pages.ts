@@ -11,6 +11,7 @@ export const pages = [
     { path: "highlight-component.html", title: "Highlight Component" },
     { path: "carousel-component.html", title: "Carousel Component" },
     { path: "datatable-component.html", title: "DataTable — Static Data" },
+    { path: "datatable-tools.html",   title: "DataTable — Table Tools" },
     { path: "datatable-server.html",  title: "DataTable — Server-Side Data" },
     { path: "youtube-showcase.html",  title: "YouTube" },
     { path: "hint-component.html",    title: "Hint" },
