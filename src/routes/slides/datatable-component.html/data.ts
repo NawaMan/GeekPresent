@@ -11,9 +11,14 @@ export interface ServerRow {
 	requests: number | string | null;
 	cpu: number | null;
 	deployed: string | null;
+	/** Derived from cpu below — feeds the badge-snippet demo (Phase 2). */
+	status: 'healthy' | 'degraded' | 'offline';
+	/** Monthly cost in dollars, derived from requests — feeds the currency
+	 *  format() demo (null when requests is null/'N/A'). */
+	cost: number | null;
 }
 
-export const servers: ServerRow[] = [
+const base: Omit<ServerRow, 'status' | 'cost'>[] = [
 	{ id: 1, name: 'node-29', region: 'ap-south', team: 'Mobile', requests: 1876482, cpu: 59.7, deployed: '2025-03-02' },
 	{ id: 2, name: 'node-89', region: 'us-west', team: 'Mobile', requests: 1098817, cpu: 64.9, deployed: '2025-06-18' },
 	{ id: 3, name: 'node-45', region: 'sa-east', team: 'Mobile', requests: 39234, cpu: 85.2, deployed: '2023-02-22' },
@@ -215,3 +220,9 @@ export const servers: ServerRow[] = [
 	{ id: 199, name: 'node-43', region: 'us-east', team: 'Infra', requests: 1758434, cpu: 15.5, deployed: '2023-03-28' },
 	{ id: 200, name: 'node-137', region: 'sa-east', team: null, requests: 1439462, cpu: null, deployed: '2025-10-08' }
 ];
+
+export const servers: ServerRow[] = base.map((row) => ({
+	...row,
+	status: row.cpu === null ? 'offline' : row.cpu >= 85 ? 'degraded' : 'healthy',
+	cost: typeof row.requests === 'number' ? Math.round(row.requests * 0.04) / 100 : null
+}));

@@ -1,7 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
+import { createRawSnippet } from 'svelte';
 import { describe, expect, it } from 'vitest';
+import BindStateHost from './BindStateHost.svelte';
 import DataTable from '../src/lib/datatable/DataTable.svelte';
-import type { ColumnDef } from '../src/lib/datatable/types';
+import type { ColumnDef, TableState } from '../src/lib/datatable/types';
 
 type Person = { name: string; score: number | null; joined: string | null };
 
@@ -209,5 +211,264 @@ describe('DataTable', () => {
 		const { container } = render(DataTable, { rows: people, columns, loading: true });
 		expect(container.querySelector('[role="status"]')?.textContent).toContain('Loading');
 		expect(rowsOf(container)).toHaveLength(10); // rows still rendered underneath
+	});
+});
+
+describe('DataTable cell snippets', () => {
+	type Service = { name: string; status: string; cost: number };
+	const services: Service[] = [
+		{ name: 'api', status: 'up', cost: 20 },
+		{ name: 'db', status: 'down', cost: 3 },
+		{ name: 'web', status: 'up', cost: 100 }
+	];
+	const serviceColumns: ColumnDef[] = [
+		{ key: 'name', label: 'Name' },
+		// format present too — the snippet must win (precedence snippet > format > raw)
+		{ key: 'status', label: 'Status', format: () => 'format-loses' },
+		{ key: 'cost', label: 'Cost', format: (v) => `$${v}.00` }
+	];
+	// createRawSnippet params arrive as getters: (row, value, rowIndex).
+	// row is `() => unknown` because render() can't infer the component generic.
+	const badge = createRawSnippet(
+		(_row: () => unknown, value: () => unknown, rowIndex: () => number) => ({
+			render: () =>
+				`<span class="badge badge-${value()}" data-row-index="${rowIndex()}">${value()}</span>`
+		})
+	);
+
+	it('renders cells via the snippets map with (row, value, rowIndex), beating format', () => {
+		const { container } = render(DataTable, {
+			rows: services,
+			columns: serviceColumns,
+			snippets: { status: badge }
+		});
+
+		const badges = Array.from(container.querySelectorAll('tbody .badge'));
+		expect(badges.map((b) => b.textContent)).toEqual(['up', 'down', 'up']); // raw value, not format()
+		expect(badges.map((b) => b.className)).toEqual(['badge badge-up', 'badge badge-down', 'badge badge-up']);
+		expect(badges.map((b) => b.getAttribute('data-row-index'))).toEqual(['0', '1', '2']);
+		expect(container.textContent).not.toContain('format-loses');
+	});
+
+	it('sorts snippet and format columns by the raw value, not the displayed text', async () => {
+		const { container } = render(DataTable, {
+			rows: services,
+			columns: serviceColumns,
+			snippets: { status: badge }
+		});
+		const names = () => rowsOf(container).map((tr) => tr.cells[0].textContent);
+		const buttonFor = (label: string) =>
+			Array.from(container.querySelectorAll('th button')).find((b) =>
+				b.textContent?.includes(label)
+			)!;
+
+		// cost displays "$20.00" etc. but sorts numerically: 3 < 20 < 100
+		await fireEvent.click(buttonFor('Cost'));
+		expect(names()).toEqual(['db', 'api', 'web']);
+		expect(rowsOf(container).map((tr) => tr.cells[2].textContent?.trim())).toEqual([
+			'$3.00',
+			'$20.00',
+			'$100.00'
+		]);
+
+		// snippet column sorts by its raw value too
+		await fireEvent.click(buttonFor('Status'));
+		expect(names()).toEqual(['db', 'api', 'web']); // down < up (asc), ties keep order
+	});
+
+	it('matches global search against the formatted text, even for snippet cells', async () => {
+		const { container } = render(DataTable, {
+			rows: services,
+			columns: serviceColumns,
+			snippets: { status: badge }
+		});
+		const input = screen.getByLabelText('Search') as HTMLInputElement;
+
+		await fireEvent.input(input, { target: { value: '$100' } }); // format() output
+		await new Promise((resolve) => setTimeout(resolve, 350));
+		expect(rowsOf(container).map((tr) => tr.cells[0].textContent)).toEqual(['web']);
+	});
+
+	it('renders the empty snippet instead of "No results found"', async () => {
+		const emptySnippet = createRawSnippet(() => ({
+			render: () => `<em class="custom-empty">Nothing matched, sorry!</em>`
+		}));
+		const { container } = render(DataTable, {
+			rows: services,
+			columns: serviceColumns,
+			empty: emptySnippet
+		});
+
+		await fireEvent.input(screen.getByLabelText('Search'), { target: { value: 'zzz-no-hit' } });
+		await new Promise((resolve) => setTimeout(resolve, 350));
+		expect(container.querySelector('tbody .custom-empty')?.textContent).toBe(
+			'Nothing matched, sorry!'
+		);
+		expect(container.textContent).not.toContain('No results found');
+	});
+});
+
+describe('DataTable bind:state (controlled mode)', () => {
+	const hostProps = { rows: people, columns };
+	const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+	it('follows external state changes: page, search, sort', async () => {
+		const { container, component } = render(BindStateHost, hostProps);
+		const readout = () => container.querySelector('.readout')?.textContent;
+		const names = () => rowsOf(container).map((tr) => tr.cells[0].textContent);
+
+		expect(readout()).toBe('Showing 1–5 of 15 entries'); // host pageSize 5
+
+		component.setState({ page: 3 });
+		await flush();
+		expect(readout()).toBe('Showing 11–15 of 15 entries');
+
+		// external search needs no debounce — it drives the table directly
+		component.setState({ search: 'Person 12', page: 1 });
+		await flush();
+		expect(names()).toEqual(['Person 12']);
+
+		component.setState({ search: '', sort: { key: 'name', direction: 'desc' } });
+		await flush();
+		expect(names()[0]).toBe('Person 15'); // natural desc: 15 > 14 > … (numeric, not lexicographic)
+		const nameTh = container.querySelector('th[aria-sort]');
+		expect(nameTh?.getAttribute('aria-sort')).toBe('descending'); // UI reflects external sort
+	});
+
+	it('writes internal changes back to the bound parent state', async () => {
+		const { container, component } = render(BindStateHost, hostProps);
+
+		const nameButton = Array.from(container.querySelectorAll('th button')).find((b) =>
+			b.textContent?.includes('Name')
+		)!;
+		await fireEvent.click(nameButton);
+		expect(component.getState().sort).toEqual({ key: 'name', direction: 'asc' });
+
+		await fireEvent.click(screen.getByLabelText('Next page'));
+		expect(component.getState().page).toBe(2);
+
+		const select = screen.getByLabelText('Rows per page') as HTMLSelectElement;
+		await fireEvent.change(select, { target: { value: '10' } });
+		expect(component.getState().pageSize).toBe(10);
+	});
+
+	it('accepts an initial state prop without binding', () => {
+		const initial: TableState = {
+			sort: null,
+			search: '',
+			columnFilters: {},
+			page: 2,
+			pageSize: 5
+		};
+		const { container } = render(DataTable, { rows: people, columns, state: initial });
+		expect(container.querySelector('.readout')?.textContent).toBe('Showing 6–10 of 15 entries');
+	});
+});
+
+describe('DataTable server mode', () => {
+	const serverState: TableState = {
+		sort: { key: 'name', direction: 'desc' },
+		search: 'Person',
+		columnFilters: {},
+		page: 2,
+		pageSize: 5
+	};
+
+	it('renders rows verbatim — no filtering, sorting, or paging applied', () => {
+		// state says: sort desc, search "Person", pageSize 5 — none of it may
+		// touch the rows; the server already applied it.
+		const { container } = render(DataTable, {
+			rows: people.slice(0, 8), // "the server's page": 8 rows, unsorted
+			columns,
+			mode: 'server',
+			totalCount: 95,
+			state: serverState
+		});
+
+		const names = rowsOf(container).map((tr) => tr.cells[0].textContent);
+		expect(names).toEqual(people.slice(0, 8).map((p) => p.name)); // original order, all 8
+	});
+
+	it('honors totalCount for the readout and page math', () => {
+		const { container } = render(DataTable, {
+			rows: people.slice(0, 5),
+			columns,
+			mode: 'server',
+			totalCount: 95,
+			state: serverState
+		});
+
+		expect(container.querySelector('.readout')?.textContent).toBe('Showing 6–10 of 95 entries');
+		expect(container.textContent).toContain('Page 2 of 19');
+	});
+
+	it('emits onstatechange for sort, search, and paging interactions', async () => {
+		const emitted: TableState[] = [];
+		const { container } = render(DataTable, {
+			rows: people.slice(0, 5),
+			columns,
+			mode: 'server',
+			totalCount: 95,
+			state: serverState,
+			onstatechange: (s: TableState) => emitted.push(s)
+		});
+
+		await fireEvent.click(screen.getByLabelText('Next page'));
+		expect(emitted.at(-1)?.page).toBe(3);
+
+		const nameButton = Array.from(container.querySelectorAll('th button')).find((b) =>
+			b.textContent?.includes('Name')
+		)!;
+		await fireEvent.click(nameButton); // desc → none (cycle), back to page 1
+		expect(emitted.at(-1)?.sort).toBeNull();
+		expect(emitted.at(-1)?.page).toBe(1);
+
+		await fireEvent.input(screen.getByLabelText('Search'), { target: { value: 'node' } });
+		await new Promise((resolve) => setTimeout(resolve, 350)); // debounce
+		expect(emitted.at(-1)?.search).toBe('node');
+	});
+
+	it('shows "No results found" when a server search comes back empty', () => {
+		const { container } = render(DataTable, {
+			rows: [],
+			columns,
+			mode: 'server',
+			totalCount: 0,
+			state: { ...serverState, search: 'zzz-no-hit', page: 1 }
+		});
+		expect(container.querySelector('tbody')?.textContent).toContain('No results found');
+	});
+});
+
+describe('DataTable header snippets', () => {
+	const fancy = createRawSnippet((column: () => ColumnDef) => ({
+		render: () => `<span class="fancy-th">★ ${column().label}</span>`
+	}));
+
+	it('renders custom header content inside the sort button; sorting still works', async () => {
+		const { container } = render(DataTable, {
+			rows: people,
+			columns,
+			headerSnippets: { score: fancy }
+		});
+
+		const fancyTh = container.querySelector('th .fancy-th');
+		expect(fancyTh?.textContent).toBe('★ Score'); // receives the ColumnDef
+		expect(fancyTh?.closest('button')).not.toBeNull(); // inside the sort button
+
+		await fireEvent.click(fancyTh!.closest('button')!);
+		expect(fancyTh?.closest('th')?.getAttribute('aria-sort')).toBe('ascending');
+	});
+
+	it('renders bare header content for non-sortable columns', () => {
+		const { container } = render(DataTable, {
+			rows: people,
+			columns: [{ key: 'name', label: 'Name', sortable: false }] as ColumnDef[],
+			headerSnippets: { name: fancy }
+		});
+
+		const fancyTh = container.querySelector('th .fancy-th');
+		expect(fancyTh?.textContent).toBe('★ Name');
+		expect(fancyTh?.closest('button')).toBeNull(); // no button when unsortable
 	});
 });
