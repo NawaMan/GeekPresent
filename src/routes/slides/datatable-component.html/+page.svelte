@@ -4,12 +4,12 @@
 
   A dependency-free jQuery-DataTables replacement over a hardcoded array:
   the component filters, sorts, and paginates the 200 mixed-type rows
-  itself. Type-aware sorting (2 < 10 < 100, natural names, dates; 'N/A'
-  and blanks sink), custom cells — the Status column renders a colored
-  badge via the `snippets` prop map, Cost renders via `format`, and both
-  still sort by the raw value / search by the formatted text — plus a 🚀
-  header snippet. See the next slide for the same table fed by a (fake)
-  server. Theme via the --dt-* CSS custom properties.
+  itself. Core surface on show: type-aware sorting (2 < 10 < 100, natural
+  names, dates; 'N/A' and blanks sink), the Status badge via the `snippets`
+  prop map, Cost via `format` (both still sort by the raw value / search by
+  the formatted text), and a 🚀 header snippet. The next slides demo the
+  table tools (selection, filters, toggle, CSV) and server mode. Theme via
+  the --dt-* CSS custom properties.
 -->
 <script lang="ts">
 	import ContentPage from '$lib/templates/ContentPage.svelte';
@@ -88,11 +88,9 @@
 	<p class="props">
 		Props: <code>rows</code>, <code>columns</code> (<code>key</code>, <code>label</code>,
 		<code>type</code>, <code>format</code>, <code>sortValue</code>, <code>sortable</code>,
-		<code>width</code>, <code>align</code>), <code>snippets</code> (key → snippet, gets
-		<code>row, value, rowIndex</code>), <code>headerSnippets</code> (gets the
-		<code>ColumnDef</code> — see 🚀), <code>empty</code> snippet, <code>pageSize</code>,
-		<code>searchable</code>, <code>loading</code>, <code>striped</code>,
-		<code>height</code>/<code>maxHeight</code>. Pure core in
+		<code>width</code>, <code>align</code>), <code>snippets</code>, <code>headerSnippets</code>,
+		<code>empty</code>, <code>pageSize</code>, <code>searchable</code>, <code>loading</code>,
+		<code>striped</code>, <code>height</code>/<code>maxHeight</code>. Pure core in
 		<code>$lib/datatable/tableCore.ts</code>; theme via the <code>--dt-*</code> custom properties.
 	</p>
 </ContentPage>

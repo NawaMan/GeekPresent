@@ -2,6 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
 import { describe, expect, it } from 'vitest';
 import BindStateHost from './BindStateHost.svelte';
+import SelectHost from './SelectHost.svelte';
+import ToggleHost from './ToggleHost.svelte';
 import DataTable from '../src/lib/datatable/DataTable.svelte';
 import type { ColumnDef, TableState } from '../src/lib/datatable/types';
 
@@ -437,6 +439,203 @@ describe('DataTable server mode', () => {
 			state: { ...serverState, search: 'zzz-no-hit', page: 1 }
 		});
 		expect(container.querySelector('tbody')?.textContent).toContain('No results found');
+	});
+});
+
+describe('DataTable per-column filters', () => {
+	const staff = [
+		{ name: 'Alice Smith', region: 'east' },
+		{ name: 'Bob Smith', region: 'west' },
+		{ name: 'Cara Jones', region: 'east' },
+		{ name: 'Dan Smith', region: 'east' }
+	];
+	const staffColumns: ColumnDef[] = [
+		{ key: 'name', label: 'Name' },
+		{ key: 'region', label: 'Region', filterable: true }
+	];
+	const names = (container: HTMLElement) =>
+		rowsOf(container).map((tr) => tr.cells[0].textContent);
+
+	it('column filter + global search return the intersection', async () => {
+		const { container } = render(DataTable, { rows: staff, columns: staffColumns });
+
+		await fireEvent.input(screen.getByLabelText('Filter Region'), { target: { value: 'east' } });
+		await new Promise((resolve) => setTimeout(resolve, 350)); // debounced
+		expect(names(container)).toEqual(['Alice Smith', 'Cara Jones', 'Dan Smith']);
+
+		await fireEvent.input(screen.getByLabelText('Search'), { target: { value: 'smith' } });
+		await new Promise((resolve) => setTimeout(resolve, 350));
+		expect(names(container)).toEqual(['Alice Smith', 'Dan Smith']); // east ∩ smith
+
+		await fireEvent.input(screen.getByLabelText('Filter Region'), { target: { value: '' } });
+		await new Promise((resolve) => setTimeout(resolve, 350));
+		expect(names(container)).toEqual(['Alice Smith', 'Bob Smith', 'Dan Smith']);
+	});
+
+	it('renders filter inputs only for filterable columns, and no row without any', () => {
+		const withFilter = render(DataTable, { rows: staff, columns: staffColumns });
+		expect(withFilter.container.querySelectorAll('.column-filter')).toHaveLength(1);
+		expect(screen.getByLabelText('Filter Region')).toBeTruthy();
+		withFilter.unmount();
+
+		const { container } = render(DataTable, { rows: staff, columns: staffColumns.map((c) => ({ ...c, filterable: false })) });
+		expect(container.querySelector('.filter-row')).toBeNull();
+	});
+
+	it('snaps back to page 1 when a column filter changes', async () => {
+		const { container } = render(DataTable, {
+			rows: people,
+			columns: [
+				{ key: 'name', label: 'Name', filterable: true },
+				{ key: 'score', label: 'Score' }
+			] as ColumnDef[],
+			pageSize: 3
+		});
+		const readout = () => container.querySelector('.readout')?.textContent;
+
+		await fireEvent.click(screen.getByLabelText('Next page'));
+		expect(readout()).toBe('Showing 4–6 of 15 entries');
+
+		await fireEvent.input(screen.getByLabelText('Filter Name'), { target: { value: 'Person 1' } });
+		await new Promise((resolve) => setTimeout(resolve, 350));
+		expect(readout()).toBe('Showing 1–3 of 7 entries'); // Person 1, 10–15
+	});
+});
+
+describe('DataTable row selection', () => {
+	const hostProps = { rows: people, columns, pageSize: 5 }; // rowKey 'name' (host default)
+	const selectAll = () =>
+		screen.getByLabelText('Select all rows on this page') as HTMLInputElement;
+	const rowCheckboxes = (container: HTMLElement) =>
+		Array.from(container.querySelectorAll('tbody input[type="checkbox"]')) as HTMLInputElement[];
+
+	it('select-all selects only the current page and survives page changes', async () => {
+		const { container, component } = render(SelectHost, hostProps);
+
+		await fireEvent.click(selectAll());
+		expect(component.getSelected().map((r: { name: string }) => r.name)).toEqual(
+			people.slice(0, 5).map((p) => p.name) // page 1 only, not all 15
+		);
+		expect(selectAll().checked).toBe(true);
+		expect(selectAll().indeterminate).toBe(false);
+
+		await fireEvent.click(screen.getByLabelText('Next page'));
+		// page 2: nothing selected here — header unchecked, rows unchecked
+		expect(selectAll().checked).toBe(false);
+		expect(rowCheckboxes(container).every((cb) => !cb.checked)).toBe(true);
+
+		await fireEvent.click(screen.getByLabelText('Previous page'));
+		// selection survived the round trip
+		expect(selectAll().checked).toBe(true);
+		expect(rowCheckboxes(container).every((cb) => cb.checked)).toBe(true);
+		expect(component.getSelected()).toHaveLength(5);
+	});
+
+	it('is indeterminate when only some page rows are selected', async () => {
+		const { container } = render(SelectHost, hostProps);
+
+		await fireEvent.click(rowCheckboxes(container)[1]);
+		expect(selectAll().checked).toBe(false);
+		expect(selectAll().indeterminate).toBe(true);
+
+		await fireEvent.click(rowCheckboxes(container)[1]); // deselect again
+		expect(selectAll().indeterminate).toBe(false);
+	});
+
+	it('keeps identity by rowKey across re-sorting, not by index', async () => {
+		const { container, component } = render(SelectHost, hostProps);
+
+		// select the first visible row: Person 1
+		await fireEvent.click(screen.getByLabelText('Select row Person 1'));
+		expect(component.getSelected().map((r: { name: string }) => r.name)).toEqual(['Person 1']);
+
+		// sort by name desc — natural sort puts Person 15..11 on page 1
+		const nameButton = Array.from(container.querySelectorAll('th button')).find((b) =>
+			b.textContent?.includes('Name')
+		)!;
+		await fireEvent.click(nameButton);
+		await fireEvent.click(nameButton);
+
+		// index 0 now holds a different row and must NOT be selected
+		expect(rowCheckboxes(container)[0].checked).toBe(false);
+		expect(component.getSelected().map((r: { name: string }) => r.name)).toEqual(['Person 1']);
+
+		// Person 1 is on the last page now; its checkbox is still checked
+		while (!screen.queryByLabelText('Select row Person 1')) {
+			await fireEvent.click(screen.getByLabelText('Next page'));
+		}
+		expect((screen.getByLabelText('Select row Person 1') as HTMLInputElement).checked).toBe(true);
+	});
+
+	it('deselecting via select-all removes only this page from the selection', async () => {
+		const { component } = render(SelectHost, hostProps);
+
+		await fireEvent.click(selectAll()); // page 1 selected (5 rows)
+		await fireEvent.click(screen.getByLabelText('Next page'));
+		await fireEvent.click(selectAll()); // page 2 selected too (10 total)
+		expect(component.getSelected()).toHaveLength(10);
+
+		await fireEvent.click(selectAll()); // deselect page 2 only
+		expect(component.getSelected()).toHaveLength(5);
+		expect(
+			component.getSelected().map((r: { name: string }) => r.name)
+		).toEqual(people.slice(0, 5).map((p) => p.name));
+	});
+
+	it('renders no checkbox column unless selectable', () => {
+		const { container } = render(DataTable, { rows: people, columns });
+		expect(container.querySelector('input[type="checkbox"]')).toBeNull();
+	});
+});
+
+describe('DataTable column visibility', () => {
+	const headerLabels = (container: HTMLElement) =>
+		Array.from(container.querySelectorAll('thead tr:first-child th')).map((th) =>
+			th.textContent?.trim()
+		);
+
+	it('respects visible: false on a ColumnDef', () => {
+		const { container } = render(DataTable, {
+			rows: people,
+			columns: columns.map((c) => (c.key === 'score' ? { ...c, visible: false } : c))
+		});
+		expect(headerLabels(container)).toEqual(['Name', 'Joined']);
+		expect(rowsOf(container)[0].cells).toHaveLength(2);
+	});
+
+	it('ColumnToggle hides and shows a column through the bound columns array', async () => {
+		const { container } = render(ToggleHost, { rows: people, columns });
+		const toggleFor = (label: string) =>
+			Array.from(container.querySelectorAll('.column-toggle .option')).find((option) =>
+				option.textContent?.includes(label)
+			)!.querySelector('input') as HTMLInputElement;
+
+		expect(headerLabels(container)).toEqual(['Name', 'Score', 'Joined']);
+		expect(toggleFor('Score').checked).toBe(true);
+
+		await fireEvent.click(toggleFor('Score'));
+		expect(headerLabels(container)).toEqual(['Name', 'Joined']);
+		expect(rowsOf(container)[0].cells).toHaveLength(2);
+		expect(toggleFor('Score').checked).toBe(false);
+
+		await fireEvent.click(toggleFor('Score')); // show it again
+		expect(headerLabels(container)).toEqual(['Name', 'Score', 'Joined']);
+		expect(rowsOf(container)[0].cells).toHaveLength(3);
+	});
+
+	it('hides a filterable column together with its filter input', async () => {
+		const { container } = render(ToggleHost, {
+			rows: people,
+			columns: columns.map((c) => (c.key === 'name' ? { ...c, filterable: true } : c))
+		});
+		expect(screen.getByLabelText('Filter Name')).toBeTruthy();
+
+		const nameToggle = Array.from(container.querySelectorAll('.column-toggle .option'))
+			.find((option) => option.textContent?.includes('Name'))!
+			.querySelector('input') as HTMLInputElement;
+		await fireEvent.click(nameToggle);
+		expect(screen.queryByLabelText('Filter Name')).toBeNull();
+		expect(container.querySelector('.filter-row')).toBeNull(); // no other filterable column
 	});
 });
 
