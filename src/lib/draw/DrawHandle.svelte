@@ -25,6 +25,19 @@
 		/** Snap step in canvas px while dragging (1 = freeform). */
 		grid?: number;
 		kind?: 'point' | 'control' | 'bend';
+		/** Whether the owning shape is selected. Unselected shapes show smaller,
+		 *  quieter connectors so the selected shape's handles stand out (and the
+		 *  surface reads less cluttered when several shapes are editable at once).
+		 *  Defaults true, so callers that only render handles once selected keep
+		 *  full-size knobs. */
+		selected?: boolean;
+		/** For a keyframe-stop connector: this stop's percent on the timeline, and
+		 *  the live playhead percent. When both are given the knob reads the
+		 *  timeline: stops BEFORE the playhead (exclusive) are dashed, the stop AT
+		 *  or AFTER it solid, and the ring thickens the closer the stop sits to the
+		 *  playhead. Omitted for plain (non-animated) endpoint handles. */
+		pct?: number | null;
+		playhead?: number | null;
 		/** Tooltip (SVG <title>). */
 		title?: string;
 		/** Applied to the already-grid-snapped point while Shift is held. */
@@ -45,11 +58,32 @@
 		shiftSnap,
 		onmove,
 		oncommit,
-		onselect
+		onselect,
+		selected = true,
+		pct = null,
+		playhead = null
 	}: Props = $props();
 
 	const ctx = getContext<DrawContext | undefined>(DRAW_CONTEXT_KEY);
 	let el = $state<SVGCircleElement>();
+
+	// Full knob when the shape is selected; HALF size when it isn't, so an
+	// unselected shape's connectors stay visible/grabbable without shouting.
+	const r = $derived((kind === 'control' ? 8 : 10) * (selected ? 1 : 0.5));
+
+	// Timeline-aware styling for keyframe-stop handles (pct + live playhead).
+	const timeline = $derived(typeof pct === 'number' && typeof playhead === 'number');
+	// BEFORE the playhead (exclusive) = already passed = dashed; AT/AFTER = solid.
+	const before = $derived(timeline && (pct as number) < (playhead as number));
+	// Bolder the closer this stop sits to the playhead: 1px when ≥50% away, then
+	// +1px per 10% closer (capped at 6px right on the playhead).
+	const dist = $derived(timeline ? Math.abs((pct as number) - (playhead as number)) : 0);
+	const tlWidth = $derived(Math.max(1, Math.min(6, 6 - Math.floor(dist / 10))));
+	// Inline style wins over the class rules, so timeline handles override both
+	// the default and the `.quiet` stroke width / dash.
+	const tlStyle = $derived(
+		timeline ? `stroke-width:${tlWidth}px; stroke-dasharray:${before ? '3 3' : 'none'};` : ''
+	);
 
 	const snap = (n: number) => (grid > 1 ? Math.round(n / grid) * grid : Math.round(n));
 
@@ -84,9 +118,11 @@
 <circle
 	bind:this={el}
 	class="draw-handle {kind}"
+	class:quiet={!selected}
 	cx={point[0]}
 	cy={point[1]}
-	r={kind === 'control' ? 8 : 10}
+	{r}
+	style={tlStyle}
 	onpointerdown={start}
 >
 	{#if title}<title>{title}</title>{/if}
@@ -105,6 +141,12 @@
 	}
 	.draw-handle:active {
 		cursor: grabbing;
+	}
+	/* Unselected shape: a thinner ring to match the smaller radius, and a touch
+	   of transparency so the connectors recede until you select the shape. */
+	.draw-handle.quiet {
+		stroke-width: 1.75;
+		opacity: 0.7;
 	}
 	/* Bézier control points: hollow, so they read as satellites of the
 	   endpoints they steer. */

@@ -211,6 +211,11 @@
 		guide to building decks with this framework.
 	</li>
 	<li>
+		<a href="animation/title.html">Animation</a> &mdash; a deck of in-slide motion
+		demos: the AnimationBar/Scene playback primitives, the SpriteStudio authoring
+		wrapper, the animated Draw family, and scroll-driven animation.
+	</li>
+	<li>
 		<a href="transition/title.html">Page Transitions</a> &mdash; a green-themed deck
 		on animating slide-to-slide with the View Transitions API; each effect is
 		performed live by paging through its own &ldquo;from &rarr; to&rdquo; pair.
@@ -240,6 +245,19 @@
 	<li>
 		<a href="text.html">Text view</a> &mdash; a sample Text artifact: one long
 		page, authored by hand, that scrolls.
+	</li>
+</ul>
+
+<h3>Design notes</h3>
+<ul>
+	<li>
+		<a href="animation-check/title.html">Draw &amp; Block, step by step</a> &mdash; a
+		short deck that builds one idea up a slide at a time: first make an object
+		<i>editable</i> (a Block, a Shape, then both under one LAYOUT gate), then reach
+		for motion &mdash; where a plain Block hits a wall, a Shape animates, and both
+		move together once the Block&rsquo;s content rides in a Sprite &mdash; and finally
+		how the older <b>KeyframeStudio</b> folded into that one Sprite path (and was
+		retired). Each step is a live demo.
 	</li>
 </ul>
 

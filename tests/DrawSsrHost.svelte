@@ -10,6 +10,7 @@
 	import Line from '../src/lib/draw/Line.svelte';
 	import Polyline from '../src/lib/draw/Polyline.svelte';
 	import Rect from '../src/lib/draw/Rect.svelte';
+	import Sprite from '../src/lib/draw/Sprite.svelte';
 </script>
 
 <Draw title="Request flow">
@@ -20,5 +21,9 @@
 	<Polyline points={[[100, 900], [400, 700], [700, 950], [1100, 600]]} smooth draw={1.5} />
 	<Rect x={1395} y={675} width={370} height={190} rounded={16} />
 	<Ellipse x={860} y={940} width={200} height={90} />
+	<Sprite name="rocket" animate={2.5} fontScale={0.84} stops={[
+		{ pct: 0, x: 100, y: 800, w: 56, h: 55, rot: 20, ease: 'ease-in' },
+		{ pct: 100, x: 1500, y: 430, w: 228, h: 219, rot: -45 }
+	]}>ROCKET</Sprite>
 	<circle cx="960" cy="770" r="10" fill="currentColor" />
 </Draw>

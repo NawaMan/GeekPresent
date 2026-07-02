@@ -23,6 +23,7 @@
 -->
 <script lang="ts">
 	import { getContext, onDestroy, untrack } from 'svelte';
+	import { browser } from '$app/environment';
 	import { record } from '$lib/stores/layoutHistory';
 	import DrawHandle from './DrawHandle.svelte';
 	import {
@@ -32,6 +33,7 @@
 		neighborsAt,
 		newEditorId,
 		playheadPercent,
+		sanitizeEase,
 		sharedAttrs,
 		widestGapMid
 	} from './editing';
@@ -167,7 +169,11 @@
 	const geomStops = $derived.by(() => {
 		if (!geomAnim || !S) return null;
 		return S.filter(hasGeom)
-			.map((s) => ({ pct: Math.max(0, Math.min(100, finite(s.pct))), shape: stopShape(s) }))
+			.map((s) => ({
+				pct: Math.max(0, Math.min(100, finite(s.pct))),
+				shape: stopShape(s),
+				ease: sanitizeEase(s.ease)
+			}))
 			.sort((a, b) => a.pct - b.pct);
 	});
 
@@ -214,13 +220,17 @@
 		return s;
 	}
 
+	// A per-stop CSS timing function set INSIDE its keyframe governs the
+	// segment starting at that stop; '' inherits the default ease-in-out.
+	const tf = (e: string) => (e ? ` animation-timing-function: ${e};` : '');
+
 	const keyframesCss = $derived.by(() => {
 		if (!animSecs) return '';
 		const frame = (pct: number, body: string) => `${pct}% { ${body} }`;
 		let css = '';
 		if (geomStops) {
 			const shaftFrames = geomStops
-				.map((g) => frame(g.pct, `d: path("${samplePath(shaftShapeOf(g.shape))}");`))
+				.map((g) => frame(g.pct, `d: path("${samplePath(shaftShapeOf(g.shape))}");${tf(g.ease)}`))
 				.join(' ');
 			css += `@keyframes ${animName} { ${shaftFrames} }`;
 			if (atEnd) {
@@ -228,7 +238,7 @@
 					.map((g) =>
 						frame(
 							g.pct,
-							`transform: translate(${round(g.shape.to[0])}px, ${round(g.shape.to[1])}px) rotate(${deg(angleAt(g.shape, 1))}deg);`
+							`transform: translate(${round(g.shape.to[0])}px, ${round(g.shape.to[1])}px) rotate(${deg(angleAt(g.shape, 1))}deg);${tf(g.ease)}`
 						)
 					)
 					.join(' ');
@@ -239,7 +249,7 @@
 					.map((g) =>
 						frame(
 							g.pct,
-							`transform: translate(${round(g.shape.from[0])}px, ${round(g.shape.from[1])}px) rotate(${deg(angleAt(g.shape, 0) + Math.PI)}deg);`
+							`transform: translate(${round(g.shape.from[0])}px, ${round(g.shape.from[1])}px) rotate(${deg(angleAt(g.shape, 0) + Math.PI)}deg);${tf(g.ease)}`
 						)
 					)
 					.join(' ');
@@ -249,7 +259,7 @@
 				const frames = geomStops
 					.map((g) => {
 						const p = labelPos(g.shape, labelAt, labelOffset);
-						return frame(g.pct, `transform: translate(${p[0]}px, ${p[1]}px);`);
+						return frame(g.pct, `transform: translate(${p[0]}px, ${p[1]}px);${tf(g.ease)}`);
 					})
 					.join(' ');
 				css += ` @keyframes ${animName}-label { ${frames} }`;
@@ -259,10 +269,11 @@
 			const frames = S.filter(hasDrawn)
 				.map((s) => ({
 					pct: Math.max(0, Math.min(100, finite(s.pct))),
-					off: round(1 - Math.max(0, Math.min(1, finite(s.drawn as number))))
+					off: round(1 - Math.max(0, Math.min(1, finite(s.drawn as number)))),
+					ease: sanitizeEase(s.ease)
 				}))
 				.sort((a, b) => a.pct - b.pct)
-				.map((r) => frame(r.pct, `stroke-dashoffset: ${r.off};`))
+				.map((r) => frame(r.pct, `stroke-dashoffset: ${r.off};${tf(r.ease)}`))
 				.join(' ');
 			css += ` @keyframes ${animName}-reveal { ${frames} }`;
 		}
@@ -294,7 +305,7 @@
 			? ` stops={[${list
 					.map(
 						(s) =>
-							`{ pct: ${finite(s.pct)}${s.from ? `, from: ${fmtPoint(s.from)}` : ''}${s.to ? `, to: ${fmtPoint(s.to)}` : ''}${s.bend != null ? `, bend: ${fmtBend(s.bend)}` : ''}${s.drawn != null ? `, drawn: ${fmtNum(s.drawn)}` : ''} }`
+							`{ pct: ${finite(s.pct)}${s.from ? `, from: ${fmtPoint(s.from)}` : ''}${s.to ? `, to: ${fmtPoint(s.to)}` : ''}${s.bend != null ? `, bend: ${fmtBend(s.bend)}` : ''}${s.drawn != null ? `, drawn: ${fmtNum(s.drawn)}` : ''}${s.ease ? `, ease: "${sanitizeEase(s.ease)}"` : ''} }`
 					)
 					.join(', ')}]}${animate ? ` animate={${finite(animate)}}` : ''}`
 			: '';
@@ -382,6 +393,23 @@
 	// Ref to the shaft path, so "+ keyframe" can read the live playhead time.
 	let shaftEl = $state<SVGPathElement>();
 
+	// Live playhead % for timeline-aware stop connectors (dashed before, bold
+	// near). Polled each frame while editing an animated arc; null otherwise.
+	let playhead = $state<number | null>(null);
+	$effect(() => {
+		if (!browser || !editing || !geomAnim) {
+			playhead = null;
+			return;
+		}
+		let raf = 0;
+		const loop = () => {
+			playhead = playheadPercent(shaftEl, animName, animSecs);
+			raf = requestAnimationFrame(loop);
+		};
+		loop();
+		return () => cancelAnimationFrame(raf);
+	});
+
 	const drawApi: DrawOnEditor = {
 		get seconds() {
 			return finite(drawVal ?? 0);
@@ -404,7 +432,8 @@
 				.map((s) => ({
 					id: s.id,
 					pct: Math.round(finite(s.pct)),
-					drawn: s.drawn != null ? Math.round(finite(s.drawn) * 100) : null
+					drawn: s.drawn != null ? Math.round(finite(s.drawn) * 100) : null,
+					ease: s.ease ?? null
 				}))
 				.sort((a, b) => a.pct - b.pct);
 		},
@@ -424,6 +453,7 @@
 				const bv = b.drawn ?? 1;
 				ns.drawn = Math.round((av + (bv - av) * frac) * 1000) / 1000;
 			}
+			if (a.ease) ns.ease = a.ease; // inherit the split segment's easing
 			liveStops = [...list, ns];
 		},
 		removeStop(id: number) {
@@ -443,6 +473,16 @@
 					return rest as IdStop;
 				}
 				return { ...s, drawn: Math.max(0, Math.min(1, finite(drawnPct) / 100)) };
+			});
+		},
+		setEase(id: number, ease: string | null) {
+			liveStops = materializeStops().map((s) => {
+				if (s.id !== id) return s;
+				if (!ease) {
+					const { ease: _drop, ...rest } = s;
+					return rest as IdStop;
+				}
+				return { ...s, ease: sanitizeEase(ease) };
 			});
 		},
 		preview() {
@@ -515,7 +555,7 @@
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<path class="draw-hit" d={baseD} onpointerdown={select} />
 		{#if !(geomAnim && S?.some((s) => s.from))}
-			<DrawHandle
+			<DrawHandle selected={isSelected}
 				point={F}
 				{grid}
 				title="from · Shift = H/V/45°"
@@ -526,7 +566,7 @@
 			/>
 		{/if}
 		{#if !(geomAnim && S?.some((s) => s.to))}
-			<DrawHandle
+			<DrawHandle selected={isSelected}
 				point={T}
 				{grid}
 				title="to · Shift = H/V/45°"
@@ -537,7 +577,7 @@
 			/>
 		{/if}
 		{#if !(geomAnim && S?.some((s) => s.bend != null))}
-			<DrawHandle
+			<DrawHandle selected={isSelected}
 				point={apex}
 				kind="bend"
 				title="bend · drag across the chord to flip"
@@ -555,10 +595,12 @@
 			     handle per stop that animates bend. -->
 			{#each S as s, i (i)}
 				{#if s.from}
-					<DrawHandle
+					<DrawHandle selected={isSelected}
 						point={s.from}
 						{grid}
 						kind={i === lowestStopFor('from') ? 'point' : 'control'}
+						pct={finite(s.pct)}
+						{playhead}
 						title={`from · ${finite(s.pct)}%`}
 						onselect={select}
 						onmove={(p) => setStopPoint(i, 'from', p, i === lowestStopFor('from'))}
@@ -566,10 +608,12 @@
 					/>
 				{/if}
 				{#if s.to}
-					<DrawHandle
+					<DrawHandle selected={isSelected}
 						point={s.to}
 						{grid}
 						kind={i === lowestStopFor('to') ? 'point' : 'control'}
+						pct={finite(s.pct)}
+						{playhead}
 						title={`to · ${finite(s.pct)}%`}
 						onselect={select}
 						onmove={(p) => setStopPoint(i, 'to', p, i === lowestStopFor('to'))}
@@ -579,9 +623,11 @@
 				{#if s.bend != null}
 					{@const sf = s.from ?? F}
 					{@const st = s.to ?? T}
-					<DrawHandle
+					<DrawHandle selected={isSelected}
 						point={pointAt({ kind: 'arc', from: sf, to: st, bend: s.bend }, 0.5)}
 						kind="bend"
+						pct={finite(s.pct)}
+						{playhead}
 						title={`bend · ${finite(s.pct)}%`}
 						onselect={select}
 						onmove={(p) => setStopBend(i, bendFromApex(sf, st, p), false)}

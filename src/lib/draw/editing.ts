@@ -26,6 +26,16 @@ export function fmtPoint(p: Point): string {
 
 const num = (n: number) => (Number.isFinite(n) ? n : 0);
 
+/** A per-stop easing value safe to emit into a generated <style>. Keeps only
+ *  the characters a CSS timing function needs (keywords, cubic-bezier/steps
+ *  numbers), so a stop's `ease` can never break out of the keyframe block.
+ *  Returns '' for anything suspicious. */
+export function sanitizeEase(ease: string | undefined | null): string {
+	if (!ease) return '';
+	const e = String(ease).trim();
+	return /^[a-z0-9.,()%\- ]+$/i.test(e) ? e : '';
+}
+
 /** The two keyframe stops bracketing a target percent, plus the local 0..1
  *  fraction between them. `sorted` must be ascending by pct. */
 export function neighborsAt<T extends { pct: number }>(

@@ -27,6 +27,10 @@ describe('Draw (SSR)', () => {
 		expect(body).toContain('>round trip</text>'); // the visible Arc label
 		expect(body).toContain('pathLength="1"'); // draw-on plumbing, CSS-only
 		expect(body).toContain('animation-duration:1.5s'); // …with its duration inline
+		expect(body).toContain('<foreignObject'); // the Sprite's moving HTML element
+		expect(body).toContain('@keyframes draw-sprite-'); // …driven by generated CSS
+		expect(body).toContain('transform:rotate(20deg);'); // …the 0% pose, server-side
+		expect(body).toContain('>ROCKET<'); // …with its slot content
 		expect(body).not.toContain('NaN');
 	});
 });

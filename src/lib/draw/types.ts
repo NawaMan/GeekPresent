@@ -46,6 +46,10 @@ export interface LineStop {
 	from?: Point;
 	to?: Point;
 	drawn?: number;
+	/** CSS animation-timing-function for the segment STARTING at this stop
+	 *  (e.g. 'ease-in', 'ease-out', 'linear'); default inherits the
+	 *  animation's ease-in-out. Applies to both tracks this stop is in. */
+	ease?: string;
 }
 
 /** One keyframe for an animated Curve: a percent plus any of the endpoints /
@@ -63,6 +67,8 @@ export interface CurveStop {
 	c1?: Point;
 	c2?: Point;
 	drawn?: number;
+	/** CSS timing function for the segment starting here — see LineStop. */
+	ease?: string;
 }
 
 /** One keyframe for an animated Arc: a percent plus any of the endpoints
@@ -77,6 +83,28 @@ export interface ArcStop {
 	to?: Point;
 	bend?: number;
 	drawn?: number;
+	/** CSS timing function for the segment starting here — see LineStop. */
+	ease?: string;
+}
+
+/** One keyframe for an animated Sprite — a positioned, rotatable HTML box
+ *  (the KeyframeStudio "flying element", folded into the Draw family). A
+ *  percent (0–100) plus the box geometry at that moment: top-left x/y, size
+ *  w/h (canvas px), and an optional rotation `rot` (degrees). Unlike the path
+ *  shapes, every Sprite stop carries FULL geometry (there's no base pose to
+ *  fall back to) — the geometry is edited by dragging the per-stop ghost, and
+ *  the moving element tweens between stops as pure CSS (left/top/width/height/
+ *  transform keyframes), so it prerenders and AnimationBar scrubs it. */
+export interface SpriteStop {
+	pct: number;
+	x: number;
+	y: number;
+	w: number;
+	h: number;
+	/** Rotation in degrees at this stop (transform: rotate); default 0. */
+	rot?: number;
+	/** CSS timing function for the segment starting here — see LineStop. */
+	ease?: string;
 }
 
 /** Visible-label props shared by the path shapes (Line/Curve/Arc). The
@@ -114,6 +142,17 @@ export interface AnimStopRow {
 	 *  the stop has no reveal keyframe. Present only for shapes with a reveal
 	 *  track (Curve). */
 	drawn?: number | null;
+	/** CSS timing function for the segment starting at this stop, or null for
+	 *  the default. */
+	ease?: string | null;
+	/** Box pose at this stop — left/top/width/height in canvas px and rotate in
+	 *  degrees. Present only for box-pose shapes (Sprite); the panel shows
+	 *  numeric l/t/w/h/r fields per row when they are. */
+	x?: number;
+	y?: number;
+	w?: number;
+	h?: number;
+	rot?: number;
 }
 
 /** The keyframe editor a shape exposes when it is animating (stops +
@@ -130,6 +169,13 @@ export interface AnimEditor {
 	 *  remove the reveal keyframe). Present only when the shape supports a
 	 *  reveal track; the panel shows a "drawn %" field per row when it is. */
 	setDrawn?(id: number, drawnPct: number | null): void;
+	/** Set/clear a stop's segment easing (a CSS timing function, or null for
+	 *  the default). The panel shows an easing picker per row. */
+	setEase?(id: number, ease: string | null): void;
+	/** Set one field of a stop's box pose (Sprite): 'x'|'y'|'w'|'h' in canvas
+	 *  px, 'rot' in degrees. Present only for box-pose shapes; the panel shows
+	 *  numeric l/t/w/h/r fields per row when it is — drag on-canvas OR type. */
+	setPose?(id: number, key: 'x' | 'y' | 'w' | 'h' | 'rot', value: number): void;
 	/** A LIVE preview at the AnimationBar playhead, for scrubbing: the
 	 *  timeline `pct` (0–100) and, when the shape has an active reveal track,
 	 *  the interpolated `drawn` percent (read off the animated

@@ -11,5 +11,6 @@ export { default as Line } from './Line.svelte';
 export { default as Polyline } from './Polyline.svelte';
 export { default as Rect } from './Rect.svelte';
 export { default as Ellipse } from './Ellipse.svelte';
+export { default as Sprite } from './Sprite.svelte';
 export * from './drawCore';
 export * from './types';

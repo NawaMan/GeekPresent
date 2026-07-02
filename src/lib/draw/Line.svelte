@@ -28,6 +28,7 @@
 -->
 <script lang="ts">
 	import { getContext, onDestroy, untrack } from 'svelte';
+	import { browser } from '$app/environment';
 	import { record } from '$lib/stores/layoutHistory';
 	import DrawHandle from './DrawHandle.svelte';
 	import {
@@ -37,6 +38,7 @@
 		neighborsAt,
 		newEditorId,
 		playheadPercent,
+		sanitizeEase,
 		sharedAttrs,
 		widestGapMid
 	} from './editing';
@@ -195,10 +197,15 @@
 			.map((s) => ({
 				pct: Math.max(0, Math.min(100, finite(s.pct))),
 				from: s.from ?? F,
-				to: s.to ?? T
+				to: s.to ?? T,
+				ease: sanitizeEase(s.ease)
 			}))
 			.sort((a, b) => a.pct - b.pct);
 	});
+
+	// A per-stop CSS timing function set INSIDE its keyframe governs the
+	// segment starting at that stop; '' inherits the default ease-in-out.
+	const tf = (e: string) => (e ? ` animation-timing-function: ${e};` : '');
 
 	const keyframesCss = $derived.by(() => {
 		if (!animSecs) return '';
@@ -209,7 +216,7 @@
 				.map((s) => {
 					const sf = atStart ? shorten(s.to, s.from, size) : s.from;
 					const st = atEnd ? shorten(s.from, s.to, size) : s.to;
-					return frame(s.pct, `d: path("${linePath(sf, st)}");`);
+					return frame(s.pct, `d: path("${linePath(sf, st)}");${tf(s.ease)}`);
 				})
 				.join(' ');
 			css += `@keyframes ${animName} { ${shaft} }`;
@@ -218,7 +225,7 @@
 					.map((s) =>
 						frame(
 							s.pct,
-							`transform: translate(${round(s.to[0])}px, ${round(s.to[1])}px) rotate(${deg(segmentAngle(s.from, s.to))}deg);`
+							`transform: translate(${round(s.to[0])}px, ${round(s.to[1])}px) rotate(${deg(segmentAngle(s.from, s.to))}deg);${tf(s.ease)}`
 						)
 					)
 					.join(' ');
@@ -229,7 +236,7 @@
 					.map((s) =>
 						frame(
 							s.pct,
-							`transform: translate(${round(s.from[0])}px, ${round(s.from[1])}px) rotate(${deg(segmentAngle(s.to, s.from))}deg);`
+							`transform: translate(${round(s.from[0])}px, ${round(s.from[1])}px) rotate(${deg(segmentAngle(s.to, s.from))}deg);${tf(s.ease)}`
 						)
 					)
 					.join(' ');
@@ -239,7 +246,7 @@
 				const frames = geomStops
 					.map((s) => {
 						const p = labelPos({ kind: 'line', from: s.from, to: s.to }, labelAt, labelOffset);
-						return frame(s.pct, `transform: translate(${p[0]}px, ${p[1]}px);`);
+						return frame(s.pct, `transform: translate(${p[0]}px, ${p[1]}px);${tf(s.ease)}`);
 					})
 					.join(' ');
 				css += ` @keyframes ${animName}-label { ${frames} }`;
@@ -249,10 +256,11 @@
 			const frames = S.filter(hasDrawn)
 				.map((s) => ({
 					pct: Math.max(0, Math.min(100, finite(s.pct))),
-					off: round(1 - Math.max(0, Math.min(1, finite(s.drawn as number))))
+					off: round(1 - Math.max(0, Math.min(1, finite(s.drawn as number)))),
+					ease: sanitizeEase(s.ease)
 				}))
 				.sort((a, b) => a.pct - b.pct)
-				.map((r) => frame(r.pct, `stroke-dashoffset: ${r.off};`))
+				.map((r) => frame(r.pct, `stroke-dashoffset: ${r.off};${tf(r.ease)}`))
 				.join(' ');
 			css += ` @keyframes ${animName}-reveal { ${frames} }`;
 		}
@@ -282,7 +290,7 @@
 			? ` stops={[${list
 					.map(
 						(s) =>
-							`{ pct: ${finite(s.pct)}${s.from ? `, from: ${fmtPoint(s.from)}` : ''}${s.to ? `, to: ${fmtPoint(s.to)}` : ''}${s.drawn != null ? `, drawn: ${fmtNum(s.drawn)}` : ''} }`
+							`{ pct: ${finite(s.pct)}${s.from ? `, from: ${fmtPoint(s.from)}` : ''}${s.to ? `, to: ${fmtPoint(s.to)}` : ''}${s.drawn != null ? `, drawn: ${fmtNum(s.drawn)}` : ''}${s.ease ? `, ease: "${sanitizeEase(s.ease)}"` : ''} }`
 					)
 					.join(', ')}]}${animate ? ` animate={${finite(animate)}}` : ''}`
 			: '';
@@ -376,6 +384,23 @@
 	// Ref to the shaft path, so "+ keyframe" can read the live playhead time.
 	let shaftEl = $state<SVGPathElement>();
 
+	// Live playhead % for timeline-aware stop connectors (dashed before, bold
+	// near). Polled each frame while editing an animated line; null otherwise.
+	let playhead = $state<number | null>(null);
+	$effect(() => {
+		if (!browser || !editing || !geomAnim) {
+			playhead = null;
+			return;
+		}
+		let raf = 0;
+		const loop = () => {
+			playhead = playheadPercent(shaftEl, animName, animSecs);
+			raf = requestAnimationFrame(loop);
+		};
+		loop();
+		return () => cancelAnimationFrame(raf);
+	});
+
 	const drawApi: DrawOnEditor = {
 		get seconds() {
 			return finite(drawVal ?? 0);
@@ -399,7 +424,8 @@
 				.map((s) => ({
 					id: s.id,
 					pct: Math.round(finite(s.pct)),
-					drawn: s.drawn != null ? Math.round(finite(s.drawn) * 100) : null
+					drawn: s.drawn != null ? Math.round(finite(s.drawn) * 100) : null,
+					ease: s.ease ?? null
 				}))
 				.sort((a, b) => a.pct - b.pct);
 		},
@@ -420,6 +446,7 @@
 				const bv = b.drawn ?? 1;
 				ns.drawn = Math.round((av + (bv - av) * frac) * 1000) / 1000;
 			}
+			if (a.ease) ns.ease = a.ease; // inherit the split segment's easing
 			liveStops = [...list, ns];
 		},
 		removeStop(id: number) {
@@ -439,6 +466,16 @@
 					return rest as IdStop;
 				}
 				return { ...s, drawn: Math.max(0, Math.min(1, finite(drawnPct) / 100)) };
+			});
+		},
+		setEase(id: number, ease: string | null) {
+			liveStops = materializeStops().map((s) => {
+				if (s.id !== id) return s;
+				if (!ease) {
+					const { ease: _drop, ...rest } = s;
+					return rest as IdStop;
+				}
+				return { ...s, ease: sanitizeEase(ease) };
 			});
 		},
 		preview() {
@@ -513,7 +550,7 @@
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<path class="draw-hit" d={linePath(F, T)} onpointerdown={select} />
 		{#if !fromAnimated}
-			<DrawHandle
+			<DrawHandle selected={isSelected}
 				point={F}
 				{grid}
 				title="from · Shift = H/V/45°"
@@ -524,7 +561,7 @@
 			/>
 		{/if}
 		{#if !toAnimated}
-			<DrawHandle
+			<DrawHandle selected={isSelected}
 				point={T}
 				{grid}
 				title="to · Shift = H/V/45°"
@@ -540,10 +577,12 @@
 			     are hollow. -->
 			{#each S as s, i (i)}
 				{#if s.from}
-					<DrawHandle
+					<DrawHandle selected={isSelected}
 						point={s.from}
 						{grid}
 						kind={i === lowestStopFor('from') ? 'point' : 'control'}
+						pct={finite(s.pct)}
+						{playhead}
 						title={`from · ${finite(s.pct)}%`}
 						shiftSnap={(p) => snapToAngles(p, s.to ?? T)}
 						onselect={select}
@@ -552,10 +591,12 @@
 					/>
 				{/if}
 				{#if s.to}
-					<DrawHandle
+					<DrawHandle selected={isSelected}
 						point={s.to}
 						{grid}
 						kind={i === lowestStopFor('to') ? 'point' : 'control'}
+						pct={finite(s.pct)}
+						{playhead}
 						title={`to · ${finite(s.pct)}%`}
 						shiftSnap={(p) => snapToAngles(p, s.from ?? F)}
 						onselect={select}

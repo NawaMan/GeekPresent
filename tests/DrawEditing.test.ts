@@ -487,6 +487,29 @@ describe('keyframe panel — per-stop drawn %', () => {
 		expect(writeText.mock.calls[0][0]).toContain('{ pct: 0, c1: [300, 800], drawn: 0.25 }');
 	});
 
+	it('per-stop easing picker sets the segment timing function, live + copyable', async () => {
+		const writeText = vi.fn().mockResolvedValue(undefined);
+		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+		const { container } = render(DrawEditHost);
+		const g = await selectProgress(container);
+		const easeSelects = () =>
+			Array.from(container.querySelectorAll('select[aria-label="keyframe easing"]')) as HTMLSelectElement[];
+		expect(easeSelects().length).toBe(2); // one per keyframe
+		expect(easeSelects()[0].value).toBe(''); // default
+
+		// pick ease-out on the 0% stop → it rides its geometry keyframe
+		const sel = easeSelects()[0];
+		sel.value = 'ease-out';
+		sel.dispatchEvent(new Event('change', { bubbles: true }));
+		await tick();
+		expect(g.querySelector('style')!.textContent).toContain('animation-timing-function: ease-out;');
+
+		// Copy carries the ease
+		(container.querySelector('.draw-toolbar .tb-copy') as HTMLButtonElement).click();
+		await tick();
+		expect(writeText.mock.calls[0][0]).toContain('ease: "ease-out"');
+	});
+
 	it('previews the timeline % and interpolated drawn % live while scrubbing', async () => {
 		// jsdom runs no CSS animation, so stub what the preview reads: the
 		// shaft's live playhead (getAnimations currentTime) and its animated
