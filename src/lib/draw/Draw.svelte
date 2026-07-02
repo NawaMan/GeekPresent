@@ -1,0 +1,630 @@
+<!--
+  Draw — the canvas-coordinate SVG surface for the drawing components.
+
+  Renders one absolutely-positioned <svg> spanning the whole canvas with
+  viewBox="0 0 1920 1080" (both overridable for portrait/custom decks), so
+  SVG user units equal canvas pixels equal Block x/y — place <Draw> as a
+  direct child of the slide, exactly like a bare <Block>, and the numbers
+  match with no math:
+
+      <Draw title="Request flow">
+        <Line from={[300, 540]} to={[900, 540]} arrow="end" />
+        <Rect x={860} y={480} width={400} height={120} rounded={12} />
+        <circle cx="960" cy="540" r="8" fill="currentColor" />  (raw SVG passes through)
+      </Draw>
+
+  The surface never eats input: pointer-events none, so a full-canvas Draw
+  never blocks clicks, drags, or text selection on content beneath it.
+  (Phase 3 re-enables pointer events only on editing chrome, only in LAYOUT.)
+
+  Accessibility: role="img" with a required `title` (→ <title>) and optional
+  `description` (→ <desc>); purely decorative surfaces opt out with
+  `decorative` → aria-hidden="true" (then `title` is not required).
+
+  Theme via --draw-* custom properties (--draw-stroke, --draw-thickness,
+  --draw-fill, --draw-font-size), mirroring --chart-*/--dt-*; defaults
+  inherit currentColor so shapes sit on light or dark slides unchanged.
+-->
+<script lang="ts">
+	import type { Snippet } from 'svelte';
+	import { setContext } from 'svelte';
+	import { browser } from '$app/environment';
+	import Block from '$lib/components/Block.svelte';
+	import { layoutChanges } from '$lib/stores/layoutChanges';
+	import { canLayout, layoutMode } from '$lib/stores/layoutMode';
+	import { trackPointer } from '$lib/utils/drag';
+	import {
+		DRAW_CONTEXT_KEY,
+		type BlockShapeRegistration,
+		type DrawContext,
+		type ShapeEditor
+	} from './types';
+
+	interface Props {
+		/** The coordinate space, in canvas px (override for portrait decks). */
+		width?: number;
+		height?: number;
+		/** Accessible name (SVG <title>). Required unless `decorative`. */
+		title?: string;
+		/** Optional longer description (SVG <desc>). */
+		description?: string;
+		/** Purely decorative surface: aria-hidden, no title required. */
+		decorative?: boolean;
+		/** Editing-toolbar title + localStorage key for its position (mirrors
+		 *  KeyframeStudio's `name`), so two Draws on a page don't collide. */
+		name?: string;
+		children?: Snippet;
+	}
+
+	let {
+		width = 1920,
+		height = 1080,
+		title,
+		description,
+		decorative = false,
+		name = '',
+		children
+	}: Props = $props();
+
+	// LAYOUT-mode editing (Phase 3): shapes read this gate + selection surface
+	// from context. canLayout keeps the published deck inert even if a stale
+	// layoutMode=true lingers in localStorage — same rule as Block.
+	const editing = $derived($canLayout && $layoutMode);
+	// $state.raw: shapes check `ctx.selected === editor` by identity, so the
+	// stored editor must not be wrapped in a reactive proxy.
+	let selected = $state.raw<ShapeEditor | null>(null);
+	// Path shapes register on mount (raw for the same identity reason).
+	let editors = $state.raw<ShapeEditor[]>([]);
+	// Box-geometry shapes (Rect/Ellipse) — Draw hosts one editing <Block> per
+	// registration as an HTML sibling of the svg (HTML can't live inside it).
+	let blocks = $state<BlockShapeRegistration[]>([]);
+
+	setContext<DrawContext>(DRAW_CONTEXT_KEY, {
+		get width() {
+			return width;
+		},
+		get height() {
+			return height;
+		},
+		get editing() {
+			return editing;
+		},
+		get selected() {
+			return selected;
+		},
+		select(editor) {
+			selected = editor;
+		},
+		registerShape(editor) {
+			editors = [...editors, editor];
+			return () => {
+				editors = editors.filter((e) => e.id !== editor.id);
+				if (selected === editor) selected = null;
+			};
+		},
+		registerBlock(shape) {
+			blocks = [...blocks, shape];
+			return () => {
+				blocks = blocks.filter((b) => b.id !== shape.id);
+			};
+		}
+	});
+
+	// --- Floating Copy toolbar for the selected shape (the KeyframeStudio
+	// panel pattern): draggable by its header, offset persisted in canvas px
+	// per `name`. Nothing else is saved — the editor is a coordinate finder.
+	const PANEL_KEY = `drawPanel:${name}`;
+	function loadPanel(): { dx: number; dy: number } {
+		if (!browser) return { dx: 0, dy: 0 };
+		try {
+			const s = JSON.parse(localStorage.getItem(PANEL_KEY) || 'null');
+			if (s) return { dx: Number(s.dx) || 0, dy: Number(s.dy) || 0 };
+		} catch {
+			/* corrupt storage — fall through to the default */
+		}
+		return { dx: 0, dy: 0 };
+	}
+	const savedPanel = loadPanel();
+
+	let panelEl = $state<HTMLElement>();
+	let panelDX = $state(savedPanel.dx);
+	let panelDY = $state(savedPanel.dy);
+	$effect(() => {
+		if (browser) localStorage.setItem(PANEL_KEY, JSON.stringify({ dx: panelDX, dy: panelDY }));
+	});
+
+	function startPanelDrag(event: PointerEvent) {
+		event.preventDefault();
+		const baseDX = panelDX;
+		const baseDY = panelDY;
+		trackPointer(event, {
+			scaleFrom: panelEl,
+			onMove: (dx, dy) => {
+				panelDX = baseDX + dx;
+				panelDY = baseDY + dy;
+			}
+		});
+	}
+
+	// Single selection, everywhere: grabbing anything that isn't this Draw's
+	// editing chrome (another Block, slide content, empty canvas) deselects.
+	// Handle drags stopPropagation and never get here; hit-stroke clicks land
+	// inside the svg and are exempt, so shape→shape selection still swaps.
+	let svgEl = $state<SVGSVGElement>();
+	$effect(() => {
+		if (!editing || !selected) return;
+		const onDown = (e: PointerEvent) => {
+			const t = e.target as Node | null;
+			if (t && (svgEl?.contains(t) || panelEl?.contains(t))) return;
+			// Keep the selection (and this toolbar) up while the author works the
+			// AnimationBar — playing/scrubbing is exactly when the live draw
+			// preview matters.
+			if (t instanceof Element && t.closest('.anim-bar')) return;
+			selected = null;
+		};
+		// Capture phase: Block's drag handler stopPropagation()s, so a bubbling
+		// listener would never see a grab on a Block.
+		window.addEventListener('pointerdown', onDown, true);
+		return () => window.removeEventListener('pointerdown', onDown, true);
+	});
+
+	let copied = $state(false);
+	async function copySnippet() {
+		if (!selected) return;
+		const snippet = selected.snippet;
+		try {
+			await navigator.clipboard.writeText(snippet);
+			copied = true;
+			setTimeout(() => (copied = false), 1200);
+		} catch {
+			// Clipboard blocked (insecure context / permission) — fall back to a
+			// prompt so the author can still grab the text by hand.
+			window.prompt('Copy this snippet:', snippet);
+		}
+	}
+
+	// --- "Copy changed": everything whose live geometry differs from its
+	// source form, as an OLD/NEW patch — this Draw's shapes (in markup order;
+	// ids are handed out in mount order) plus every moved slide-level Block
+	// from the page-wide registry (Blocks are siblings of the surface, so
+	// context can't reach them). The OLD tag locates the source line without
+	// assuming the tags sit together — hand the whole thing to an AI
+	// assistant (or apply it by hand/sed) instead of pasting tag by tag.
+	const dirtyShapes = $derived(
+		[
+			...editors.map((e) => ({ id: e.id, kind: e.kind, name: e.name, dirty: e.dirty, oldTag: e.sourceSnippet, newTag: e.snippet })),
+			...blocks.map((b) => ({ id: b.id, kind: b.tag, name: b.name, dirty: b.dirty, oldTag: b.sourceSnippet, newTag: b.snippet }))
+		]
+			.filter((s) => s.dirty)
+			.sort((a, b) => a.id - b.id)
+	);
+	const dirtyBlocks = $derived([...$layoutChanges.values()].filter((e) => e.dirty));
+	const dirtyAll = $derived([...dirtyShapes, ...dirtyBlocks]);
+
+	const patchText = $derived(
+		[
+			`Slide shape updates (${dirtyAll.length} changed) — apply to the slide's Svelte source.\n` +
+				`For each entry, find the line with the OLD opening tag (match by component +\n` +
+				`name, or by its old geometry) and replace that ONE line with the NEW tag,\n` +
+				`exactly as given. Leave children, comments, and every other line untouched.`,
+			...dirtyAll.map(
+				(s, i) =>
+					`${i + 1}) ${s.kind}${s.name ? ` "${s.name}"` : ''}\n` +
+					`OLD: ${s.oldTag}\n` +
+					`NEW: ${s.newTag}`
+			)
+		].join('\n\n')
+	);
+
+	let copiedPatch = $state(false);
+	async function copyPatch() {
+		const text = patchText;
+		try {
+			await navigator.clipboard.writeText(text);
+			copiedPatch = true;
+			setTimeout(() => (copiedPatch = false), 1200);
+		} catch {
+			window.prompt('Copy this patch:', text);
+		}
+	}
+
+	// Live scrub preview: while an animated shape is selected, poll its
+	// playhead % and interpolated draw-progress each frame so the panel
+	// previews progress as the AnimationBar scrubs.
+	let livePreview = $state<{ pct: number; drawn: number | null } | null>(null);
+	$effect(() => {
+		const read = selected?.anim?.preview;
+		if (!browser || !editing || !read) {
+			livePreview = null;
+			return;
+		}
+		let raf = 0;
+		const loop = () => {
+			livePreview = read();
+			raf = requestAnimationFrame(loop);
+		};
+		loop();
+		return () => cancelAnimationFrame(raf);
+	});
+</script>
+
+<svg
+	bind:this={svgEl}
+	class="draw"
+	class:raised={editing}
+	viewBox="0 0 {width} {height}"
+	style="width:{width}px; height:{height}px; pointer-events:none;"
+	role={decorative ? undefined : 'img'}
+	aria-hidden={decorative ? 'true' : undefined}
+>
+	{#if !decorative && title}<title>{title}</title>{/if}
+	{#if !decorative && description}<desc>{description}</desc>{/if}
+	{@render children?.()}
+</svg>
+
+{#if editing}
+	<!-- LAYOUT-mode editing Blocks for the box-geometry shapes: rendered as
+	     HTML siblings of the svg (same canvas coordinates — Draw must be a
+	     direct child of the slide, like a bare Block), two-way bound so the
+	     svg shape follows every drag. Block supplies move/resize/aspect/grid/
+	     undo and a Copy that emits the shape's OWN tag. -->
+	{#each blocks as b (b.id)}
+		<Block
+			tag={b.tag}
+			selfClose
+			attrs={b.attrs}
+			name={b.name}
+			grid={b.grid}
+			aspect={b.aspect}
+			bounds={b.bounds}
+			canvasWidth={width}
+			canvasHeight={height}
+			track={false}
+			drawEdit={b.drawEdit}
+			bind:x={b.x}
+			bind:y={b.y}
+			bind:width={b.width}
+			bind:height={b.height}
+		/>
+	{/each}
+
+	{#if selected || dirtyAll.length}
+		<!-- Copy toolbar: the selected path shape's tag (Rect/Ellipse use their
+		     Block's own chrome), plus a "Copy changed" patch of every dragged
+		     shape. HTML, per-Draw, floating — never in SVG. -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="draw-toolbar no-print"
+			bind:this={panelEl}
+			style="transform: translate({panelDX}px, {panelDY}px);"
+		>
+			<div class="tb-head" onpointerdown={startPanelDrag}>
+				<span class="tb-title">Draw{name ? ` · ${name}` : ''}</span>
+				{#if selected}
+					<span class="tb-shape">{selected.name || selected.kind}</span>
+					<button
+						class="tb-close"
+						type="button"
+						aria-label="Deselect"
+						onpointerdown={(e) => e.stopPropagation()}
+						onclick={() => (selected = null)}>✕</button
+					>
+				{/if}
+			</div>
+			{#if selected}
+				<div class="tb-readout">{selected.readout}</div>
+				{#if selected.anim}
+					<!-- Keyframe editor for the selected animated shape: one row per
+					     stop (its % of the timeline), add into the widest gap, remove
+					     (min 2). Retiming/adding is finder state — Copy to persist. -->
+					<div class="tb-keyframes">
+						<div class="tb-kftitle">
+							keyframes{#if livePreview}<span class="tb-livedrawn"
+									>▸ {livePreview.pct}%{#if livePreview.drawn != null} · {livePreview.drawn}% drawn{/if}</span
+								>{/if}
+						</div>
+						{#each selected.anim.stops as st (st.id)}
+							<div class="tb-kfrow">
+								<input
+									class="tb-pct"
+									type="number"
+									min="0"
+									max="100"
+									step="1"
+									value={st.pct}
+									aria-label="keyframe percent"
+									onchange={(e) => selected?.anim?.setPct(st.id, +e.currentTarget.value)}
+								/>
+								<span class="tb-pctsign">%</span>
+								{#if selected.anim.setDrawn}
+									<!-- Reveal draw-progress at this keyframe (blank = no reveal
+									     keyframe here; type a % to add one, clear to remove). -->
+									<span class="tb-flabel tb-drawnlabel">drawn</span>
+									<input
+										class="tb-pct"
+										type="number"
+										min="0"
+										max="100"
+										step="1"
+										placeholder="—"
+										value={st.drawn ?? ''}
+										aria-label="keyframe drawn percent"
+										onchange={(e) =>
+											selected?.anim?.setDrawn?.(
+												st.id,
+												e.currentTarget.value === '' ? null : +e.currentTarget.value
+											)}
+									/>
+									<span class="tb-pctsign">%</span>
+								{/if}
+								<button
+									class="tb-del"
+									type="button"
+									title="Remove this keyframe"
+									disabled={selected.anim.stops.length <= 2}
+									onclick={() => selected?.anim?.removeStop(st.id)}>✕</button
+								>
+							</div>
+						{/each}
+						<button class="tb-add" type="button" onclick={() => selected?.anim?.addStop()}
+							>+ keyframe</button
+						>
+					</div>
+				{/if}
+				{#if selected.drawEdit}
+					<!-- Draw-on reveal editor: retime the self-draw and its start
+					     delay. Live + copyable, so the reveal is animatable/editable
+					     just like geometry keyframes. -->
+					<div class="tb-keyframes">
+						<div class="tb-kftitle">draw-on</div>
+						<div class="tb-kfrow">
+							<span class="tb-flabel">time</span>
+							<input
+								class="tb-pct"
+								type="number"
+								min="0"
+								step="0.1"
+								value={selected.drawEdit.seconds}
+								aria-label="draw-on seconds"
+								onchange={(e) => selected?.drawEdit?.setSeconds(+e.currentTarget.value)}
+							/>
+							<span class="tb-pctsign">s</span>
+						</div>
+						<div class="tb-kfrow">
+							<span class="tb-flabel">delay</span>
+							<input
+								class="tb-pct"
+								type="number"
+								min="0"
+								step="0.1"
+								value={selected.drawEdit.delay}
+								aria-label="draw-on delay seconds"
+								onchange={(e) => selected?.drawEdit?.setDelay(+e.currentTarget.value)}
+							/>
+							<span class="tb-pctsign">s</span>
+						</div>
+					</div>
+				{/if}
+				<button class="tb-copy" type="button" onclick={copySnippet}>
+					{copied ? 'Copied!' : 'Copy'}
+				</button>
+			{/if}
+			{#if dirtyAll.length}
+				<div class="tb-changed">
+					<span class="tb-count">{dirtyAll.length} changed</span>
+					<button
+						class="tb-copy tb-patch"
+						type="button"
+						title="Copies an OLD/NEW patch of every moved shape and Block — paste it to your AI assistant (or apply by hand) to update the source"
+						onclick={copyPatch}
+					>
+						{copiedPatch ? 'Copied!' : `Copy changed (${dirtyAll.length})`}
+					</button>
+				</div>
+			{/if}
+		</div>
+	{/if}
+{/if}
+
+<style>
+	.draw {
+		position: absolute;
+		left: 0;
+		top: 0;
+		/* pointer-events:none is inline on the element — the never-eats-input
+		   guarantee must hold even before/without this stylesheet. */
+		display: block;
+		fill: none;
+		/* Theming contract: shapes read --draw-stroke / --draw-thickness /
+		   --draw-fill (set them on the deck, a slide, or any ancestor — they
+		   cascade into the svg); --draw-font-size feeds Phase 2 labels. */
+		font-size: var(--draw-font-size, 32px);
+	}
+	/* In LAYOUT mode the whole surface lifts above the HTML editing chrome
+	   (Blocks/ghosts have no z-index) so handles and hit strokes always win
+	   the pointer — otherwise a Block or a KeyframeStudio ghost sitting on a
+	   shape (e.g. a ghost stop centered on a curve endpoint) makes the
+	   handle unreachable, and you could never select the shape to begin
+	   with. The surface itself remains pointer-events:none, so everything
+	   that isn't a handle or hit stroke still clicks through to the
+	   Blocks/ghosts beneath. */
+	.draw.raised {
+		z-index: 60;
+	}
+
+	/* Floating Copy toolbar (LAYOUT mode, selected shape only) — the
+	   KeyframeStudio panel look. */
+	.draw-toolbar {
+		position: absolute;
+		left: 40px;
+		bottom: 56px;
+		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 0.5em;
+		padding: 0.6em 0.7em 0.7em;
+		background: rgba(18, 18, 18, 0.92);
+		border: 1px solid var(--ctrl-strong-bg, #2980b9);
+		border-radius: 8px;
+		/* Above the raised surface (60), so the toolbar stays usable even
+		   where a stroke crosses it. */
+		z-index: 70;
+	}
+	.tb-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1.2em;
+		cursor: move;
+		user-select: none;
+		touch-action: none;
+	}
+	.tb-title {
+		font-family: 'Fira Code', monospace;
+		font-size: 18px;
+		color: #9aa7b0;
+	}
+	.tb-shape {
+		font-family: 'Fira Code', monospace;
+		font-size: 18px;
+		font-weight: bold;
+		color: #cfe3f2;
+	}
+	.tb-close {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.6em;
+		height: 1.6em;
+		font-family: 'Fira Code', monospace;
+		font-size: 15px;
+		line-height: 1;
+		cursor: pointer;
+		border: 0;
+		border-radius: 5px;
+		background: var(--ctrl-bg, #181818);
+		color: #cfe3f2;
+	}
+	.tb-close:hover {
+		background: #b3402e;
+		color: #fff;
+	}
+	.tb-readout {
+		font-family: 'Fira Code', monospace;
+		font-size: 15px;
+		color: #9aa7b0;
+		white-space: nowrap;
+	}
+	.tb-changed {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1em;
+	}
+	.tb-count {
+		font-family: 'Fira Code', monospace;
+		font-size: 15px;
+		color: #9aa7b0;
+	}
+
+	/* Keyframe editor: a stacked list of stop rows + an add button. */
+	.tb-keyframes {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.3em;
+		padding: 0.3em 0;
+		border-top: 1px solid rgba(255, 255, 255, 0.12);
+	}
+	.tb-kftitle {
+		font-family: 'Fira Code', monospace;
+		font-size: 13px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: #6f7d86;
+	}
+	/* Live draw-progress readout — updates each frame as the bar scrubs. */
+	.tb-livedrawn {
+		margin-left: 0.6em;
+		letter-spacing: 0;
+		text-transform: none;
+		color: var(--ctrl-selected-bg, #00b356);
+		font-weight: bold;
+	}
+	.tb-kfrow {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3em;
+	}
+	.tb-pct {
+		width: 3.4em;
+		font-family: 'Fira Code', monospace;
+		font-size: 15px;
+		color: #cfe3f2;
+		background: var(--ctrl-bg, #181818);
+		border: 1px solid var(--ctrl-strong-bg, #2980b9);
+		border-radius: 5px;
+		padding: 0.12em 0.3em;
+	}
+	.tb-pctsign {
+		font-family: 'Fira Code', monospace;
+		font-size: 15px;
+		color: #9aa7b0;
+	}
+	.tb-flabel {
+		display: inline-block;
+		width: 3.2em;
+		font-family: 'Fira Code', monospace;
+		font-size: 15px;
+		color: #9aa7b0;
+	}
+	.tb-drawnlabel {
+		width: auto;
+		margin-left: 0.5em;
+	}
+	.tb-del {
+		font-family: 'Fira Code', monospace;
+		font-size: 14px;
+		line-height: 1;
+		cursor: pointer;
+		border: 0;
+		border-radius: 4px;
+		padding: 0.15em 0.4em;
+		background: var(--ctrl-bg, #181818);
+		color: #cfe3f2;
+	}
+	.tb-del:hover:not(:disabled) {
+		background: #b3402e;
+		color: #fff;
+	}
+	.tb-del:disabled {
+		opacity: 0.35;
+		cursor: default;
+	}
+	.tb-add {
+		font-family: 'Fira Code', monospace;
+		font-size: 14px;
+		font-weight: bold;
+		cursor: pointer;
+		border: 0;
+		border-radius: 5px;
+		padding: 0.2em 0.6em;
+		background: var(--ctrl-strong-bg, #2980b9);
+		color: var(--on-accent, #ffffff);
+	}
+	.tb-copy {
+		align-self: flex-start;
+		font-family: 'Fira Code', monospace;
+		font-weight: bold;
+		font-size: 18px;
+		cursor: pointer;
+		border: 0;
+		border-radius: 5px;
+		padding: 0.3em 0.9em;
+		background: var(--ctrl-selected-bg, #00b356);
+		color: var(--on-accent, #ffffff);
+	}
+	.tb-copy.tb-patch {
+		background: var(--ctrl-strong-bg, #2980b9);
+	}
+</style>

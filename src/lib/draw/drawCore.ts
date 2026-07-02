@@ -1,0 +1,486 @@
+// Pure geometry for the Draw component family. No component imports, no DOM —
+// everything here is independently unit-testable (tests/drawCore.test.ts),
+// exactly as tableCore.ts is for DataTable. Components contain only $derived
+// wiring and SVG markup; this module owns paths, arrowheads, and segment math
+// (Phase 2 adds curves/arcs/evaluators feeding the same arrowHead()).
+//
+// Everything is NaN-safe: a mid-edit half-typed prop must never emit NaNpx
+// into the SVG (the same discipline as KeyframeStudio's r()). All numbers
+// pass through finite()/round() before reaching an attribute string.
+
+import type { PathShape, Point } from './types';
+
+/** Coerce a possibly non-finite number to a safe finite one. */
+export function finite(value: number, fallback = 0): number {
+	return Number.isFinite(value) ? value : fallback;
+}
+
+/** A Point with both coordinates coerced finite. */
+export function finitePoint(p: Point): Point {
+	return [finite(p[0]), finite(p[1])];
+}
+
+/** Round to 2 decimals for clean, diffable SVG attributes (never NaN,
+ *  never -0). */
+export function round(value: number): number {
+	return Math.round(finite(value) * 100) / 100 + 0;
+}
+
+/** End tangent of the straight segment from → to, in radians.
+ *  Zero-length segments return 0 (pointing right), never NaN. */
+export function segmentAngle(from: Point, to: Point): number {
+	const [fx, fy] = finitePoint(from);
+	const [tx, ty] = finitePoint(to);
+	if (fx === tx && fy === ty) return 0;
+	return Math.atan2(ty - fy, tx - fx);
+}
+
+/** The point `by` px back from `to` along the segment from → to.
+ *  Degenerate zero-length segments return `to` unchanged (never NaN);
+ *  `by` longer than the segment clamps at `from` (the shaft collapses,
+ *  it never flips past its own start). Negative `by` extends past `to`. */
+export function shorten(from: Point, to: Point, by: number): Point {
+	const [fx, fy] = finitePoint(from);
+	const [tx, ty] = finitePoint(to);
+	const dx = tx - fx;
+	const dy = ty - fy;
+	const len = Math.hypot(dx, dy);
+	if (len === 0) return [tx, ty];
+	const t = Math.min(finite(by) / len, 1);
+	return [round(tx - dx * t), round(ty - dy * t)];
+}
+
+/** The three polygon points of an arrowhead of `size` at `tip`, pointing
+ *  along `angle` (radians): the tip itself plus the two base corners, `size`
+ *  back from the tip and half a `size` out to each side (a 2:1 head). */
+export function arrowHead(tip: Point, angle: number, size: number): Point[] {
+	const [x, y] = finitePoint(tip);
+	const a = finite(angle);
+	const s = finite(size);
+	const bx = x - Math.cos(a) * s;
+	const by = y - Math.sin(a) * s;
+	const wx = -Math.sin(a) * (s / 2);
+	const wy = Math.cos(a) * (s / 2);
+	return [
+		[round(x), round(y)],
+		[round(bx + wx), round(by + wy)],
+		[round(bx - wx), round(by - wy)]
+	];
+}
+
+/** Default arrowhead size for a given stroke thickness (canvas px). */
+export function defaultArrowSize(thickness: number): number {
+	return Math.max(12, finite(thickness, 4) * 4);
+}
+
+/** The `d` string for a straight segment. */
+export function linePath(from: Point, to: Point): string {
+	const [fx, fy] = finitePoint(from);
+	const [tx, ty] = finitePoint(to);
+	return `M ${round(fx)} ${round(fy)} L ${round(tx)} ${round(ty)}`;
+}
+
+/** The `d` string for a Bézier curve: quadratic with one control point,
+ *  cubic with two. */
+export function curvePath(from: Point, to: Point, c1: Point, c2?: Point): string {
+	const [fx, fy] = finitePoint(from);
+	const [tx, ty] = finitePoint(to);
+	const [ax, ay] = finitePoint(c1);
+	if (c2) {
+		const [bx, by] = finitePoint(c2);
+		return `M ${round(fx)} ${round(fy)} C ${round(ax)} ${round(ay)} ${round(bx)} ${round(by)} ${round(tx)} ${round(ty)}`;
+	}
+	return `M ${round(fx)} ${round(fy)} Q ${round(ax)} ${round(ay)} ${round(tx)} ${round(ty)}`;
+}
+
+/** The `d` string for a circular arc through from/to with a signed `bend`
+ *  (sagitta / chord length, clamped to [-1, 1] — see clampBend; positive
+ *  bulges toward (dy, -dx), screen-up for a left-to-right chord). The
+ *  radius / large-arc / sweep math stays in here — raw SVG arc parameters
+ *  never appear in the public API. bend 0 and zero-length chords degenerate
+ *  to the straight line. */
+export function arcPath(from: Point, to: Point, bend: number): string {
+	const g = arcGeometry(from, to, bend);
+	if (!g) return linePath(from, to);
+	const [fx, fy] = finitePoint(from);
+	const [tx, ty] = finitePoint(to);
+	const largeArc = Math.abs(g.delta) > Math.PI ? 1 : 0;
+	const sweep = g.delta > 0 ? 1 : 0;
+	const r = round(g.r);
+	return `M ${round(fx)} ${round(fy)} A ${r} ${r} 0 ${largeArc} ${sweep} ${round(tx)} ${round(ty)}`;
+}
+
+/** The `d` string for straight segments through `points`, optionally closed.
+ *  Fewer than 2 points render nothing (empty string). */
+export function polylinePath(points: Point[], close = false): string {
+	if (points.length < 2) return '';
+	const [first, ...rest] = points.map(finitePoint);
+	const d =
+		`M ${round(first[0])} ${round(first[1])} ` +
+		rest.map(([x, y]) => `L ${round(x)} ${round(y)}`).join(' ');
+	return close ? `${d} Z` : d;
+}
+
+/** Catmull-Rom through `points`, converted to cubic Bézier segments — the
+ *  curve passes exactly THROUGH every input point (no overshoot-prone
+ *  fitting), collinear points yield collinear control points, and 2 points
+ *  degenerate to a straight line segment. `close` wraps the neighbors so the
+ *  loop is smooth through the first/last point too. Returned as PathShapes
+ *  so pointAt/angleAt work per segment (segment i runs points[i] →
+ *  points[i+1]). */
+export function smoothSegments(points: Point[], close = false): PathShape[] {
+	const pts = points.map(finitePoint);
+	const n = pts.length;
+	if (n < 2) return [];
+	if (n === 2) return [{ kind: 'line', from: pts[0], to: pts[1] }];
+	const count = close ? n : n - 1;
+	const at = (i: number): Point =>
+		close ? pts[((i % n) + n) % n] : pts[Math.max(0, Math.min(n - 1, i))];
+	const segments: PathShape[] = [];
+	for (let i = 0; i < count; i++) {
+		const p0 = at(i - 1);
+		const p1 = at(i);
+		const p2 = at(i + 1);
+		const p3 = at(i + 2);
+		segments.push({
+			kind: 'cubic',
+			from: p1,
+			c1: [round(p1[0] + (p2[0] - p0[0]) / 6), round(p1[1] + (p2[1] - p0[1]) / 6)],
+			c2: [round(p2[0] - (p3[0] - p1[0]) / 6), round(p2[1] - (p3[1] - p1[1]) / 6)],
+			to: p2
+		});
+	}
+	return segments;
+}
+
+/** The `d` string for a smooth (Catmull-Rom) path through `points`. */
+export function smoothPath(points: Point[], close = false): string {
+	const segments = smoothSegments(points, close);
+	if (segments.length === 0) return '';
+	const first = finitePoint(segments[0].from);
+	const parts = [`M ${round(first[0])} ${round(first[1])}`];
+	for (const seg of segments) {
+		if (seg.kind === 'cubic') {
+			parts.push(
+				`C ${round(seg.c1[0])} ${round(seg.c1[1])} ${round(seg.c2[0])} ${round(seg.c2[1])} ${round(seg.to[0])} ${round(seg.to[1])}`
+			);
+		} else {
+			parts.push(`L ${round(seg.to[0])} ${round(seg.to[1])}`);
+		}
+	}
+	if (close) parts.push('Z');
+	return parts.join(' ');
+}
+
+/** The pure inverse of arcPath's bend → apex math: given a dragged apex
+ *  point, the signed `bend` that puts the arc's apex at its projection onto
+ *  the chord's perpendicular bisector. bend = ((apex − mid) · n) / L with
+ *  n = (dy, −dx)/L — so dragging across the chord flips the sign, exactly
+ *  mirroring pointAt(arc, 0.5). Rounded to 3 decimals for clean copied
+ *  tags, clamped to [-1, 1]; a degenerate (zero-length) chord returns 0. */
+export function bendFromApex(from: Point, to: Point, apex: Point): number {
+	const [fx, fy] = finitePoint(from);
+	const [tx, ty] = finitePoint(to);
+	const dx = tx - fx;
+	const dy = ty - fy;
+	const len2 = dx * dx + dy * dy;
+	if (len2 === 0) return 0;
+	const [ax, ay] = finitePoint(apex);
+	const mx = (fx + tx) / 2;
+	const my = (fy + ty) / 2;
+	const bend = ((ax - mx) * dy - (ay - my) * dx) / len2;
+	return clampBend(Math.round(bend * 1000) / 1000 + 0);
+}
+
+/** Snap a dragged point to the nearest angular detent (default 45°: gives
+ *  horizontal / vertical / diagonals) relative to `ref`, by PROJECTING onto
+ *  the snapped ray — a horizontal snap keeps the dragged x and pins y to
+ *  ref's, the drawing-tool behavior. Coincident points return unchanged. */
+export function snapToAngles(p: Point, ref: Point, stepDeg = 45): Point {
+	const [px, py] = finitePoint(p);
+	const [rx, ry] = finitePoint(ref);
+	const dx = px - rx;
+	const dy = py - ry;
+	if (dx === 0 && dy === 0) return [px, py];
+	const step = ((finite(stepDeg, 45) || 45) * Math.PI) / 180;
+	const a = Math.round(Math.atan2(dy, dx) / step) * step;
+	const ux = Math.cos(a);
+	const uy = Math.sin(a);
+	const t = dx * ux + dy * uy;
+	return [round(rx + ux * t), round(ry + uy * t)];
+}
+
+/** Anchor point for a shape's visible label: the point at parameter `at`,
+ *  offset `offset` px perpendicular to the local tangent. Positive offset is
+ *  to the LEFT of the direction of travel — screen-up on a left-to-right
+ *  shape, outside the bulge on a positively-bent arc. */
+export function labelPos(shape: PathShape, at = 0.5, offset = 20): Point {
+	const [x, y] = pointAt(shape, at);
+	const a = angleAt(shape, at);
+	const o = finite(offset);
+	return [round(x + Math.sin(a) * o), round(y - Math.cos(a) * o)];
+}
+
+/** Format a point list for an SVG <polygon points> attribute. */
+export function polygonPoints(points: Point[]): string {
+	return points.map(([x, y]) => `${round(x)},${round(y)}`).join(' ');
+}
+
+/** A shape sampled into a fixed-count polyline `d` (M + `segments` L's).
+ *  Used for animating arcs: SVG arc-command flags (large-arc/sweep) don't
+ *  interpolate, so a bend sign-flip or threshold cross would jump between
+ *  two `A` keyframes — a same-count polyline morphs smoothly instead. The
+ *  count is constant across stops (that's the point), so `d: path()`
+ *  interpolates. */
+export function samplePath(shape: PathShape, segments = 64): string {
+	const n = Math.max(1, Math.floor(finite(segments, 64)));
+	const p0 = pointAt(shape, 0);
+	let d = `M ${round(p0[0])} ${round(p0[1])}`;
+	for (let k = 1; k <= n; k++) {
+		const p = pointAt(shape, k / n);
+		d += ` L ${round(p[0])} ${round(p[1])}`;
+	}
+	return d;
+}
+
+// ─── Shape evaluators (Phase 2) ─────────────────────────────────────────────
+// pointAt/angleAt over the PathShape union power label placement and curved
+// arrow tangents now, and Phase 3's bend handle later. All t are clamped to
+// [0, 1]; all inputs are coerced finite.
+
+const TWO_PI = Math.PI * 2;
+
+function clamp01(t: number): number {
+	const v = finite(t);
+	return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
+function lerpPoint(a: Point, b: Point, t: number): Point {
+	return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+}
+
+/** `bend` (the sagitta as a signed fraction of the chord — see Arc) is
+ *  clamped to [-1, 1]: at |bend| = 1 the bulge already equals the whole
+ *  chord length, and beyond that arcs degenerate into near-loops. */
+export function clampBend(bend: number): number {
+	return Math.max(-1, Math.min(1, finite(bend)));
+}
+
+/** The circle behind an arc shape: center, radius, start angle, and the
+ *  signed angular span (positive = SVG sweep 1). Positive bend bulges toward
+ *  the side of unit normal (dy, -dx)/|chord| — screen-up for a left-to-right
+ *  chord. Returns null when the arc degenerates to a straight line
+ *  (bend 0 or a zero-length chord). */
+function arcGeometry(
+	from: Point,
+	to: Point,
+	bend: number
+): { cx: number; cy: number; r: number; a0: number; delta: number } | null {
+	const b = clampBend(bend);
+	const [fx, fy] = finitePoint(from);
+	const [tx, ty] = finitePoint(to);
+	const dx = tx - fx;
+	const dy = ty - fy;
+	const len = Math.hypot(dx, dy);
+	if (len === 0 || b === 0) return null;
+	const s = Math.abs(b) * len; // sagitta
+	const r = (len * len) / (8 * s) + s / 2;
+	const side = Math.sign(b);
+	const bulgeX = (dy / len) * side; // unit vector from chord toward the bulge
+	const bulgeY = (-dx / len) * side;
+	const cx = (fx + tx) / 2 - bulgeX * (r - s);
+	const cy = (fy + ty) / 2 - bulgeY * (r - s);
+	const a0 = Math.atan2(fy - cy, fx - cx);
+	const a1 = Math.atan2(ty - cy, tx - cx);
+	// Positive bend traverses in increasing-angle direction (sweep 1), so its
+	// span is in (0, 2π); negative bend mirrors to (-2π, 0).
+	let delta = a1 - a0;
+	if (b > 0 && delta <= 0) delta += TWO_PI;
+	if (b < 0 && delta >= 0) delta -= TWO_PI;
+	return { cx, cy, r, a0, delta };
+}
+
+/** The point at parameter t ∈ [0, 1] along a shape. */
+export function pointAt(shape: PathShape, t: number): Point {
+	const u = clamp01(t);
+	const from = finitePoint(shape.from);
+	const to = finitePoint(shape.to);
+	switch (shape.kind) {
+		case 'line': {
+			const [x, y] = lerpPoint(from, to, u);
+			return [round(x), round(y)];
+		}
+		case 'quadratic': {
+			const c = finitePoint(shape.c1);
+			const v = 1 - u;
+			return [
+				round(v * v * from[0] + 2 * v * u * c[0] + u * u * to[0]),
+				round(v * v * from[1] + 2 * v * u * c[1] + u * u * to[1])
+			];
+		}
+		case 'cubic': {
+			const c1 = finitePoint(shape.c1);
+			const c2 = finitePoint(shape.c2);
+			const v = 1 - u;
+			return [
+				round(v * v * v * from[0] + 3 * v * v * u * c1[0] + 3 * v * u * u * c2[0] + u * u * u * to[0]),
+				round(v * v * v * from[1] + 3 * v * v * u * c1[1] + 3 * v * u * u * c2[1] + u * u * u * to[1])
+			];
+		}
+		case 'arc': {
+			const g = arcGeometry(from, to, shape.bend);
+			if (!g) {
+				const [x, y] = lerpPoint(from, to, u);
+				return [round(x), round(y)];
+			}
+			const a = g.a0 + g.delta * u;
+			return [round(g.cx + Math.cos(a) * g.r), round(g.cy + Math.sin(a) * g.r)];
+		}
+	}
+}
+
+/** The raw (unrounded) tangent vector at t, before degeneracy fallbacks. */
+function tangentAt(shape: PathShape, u: number): [number, number] {
+	const from = finitePoint(shape.from);
+	const to = finitePoint(shape.to);
+	switch (shape.kind) {
+		case 'line':
+			return [to[0] - from[0], to[1] - from[1]];
+		case 'quadratic': {
+			const c = finitePoint(shape.c1);
+			const v = 1 - u;
+			return [
+				2 * v * (c[0] - from[0]) + 2 * u * (to[0] - c[0]),
+				2 * v * (c[1] - from[1]) + 2 * u * (to[1] - c[1])
+			];
+		}
+		case 'cubic': {
+			const c1 = finitePoint(shape.c1);
+			const c2 = finitePoint(shape.c2);
+			const v = 1 - u;
+			return [
+				3 * v * v * (c1[0] - from[0]) + 6 * v * u * (c2[0] - c1[0]) + 3 * u * u * (to[0] - c2[0]),
+				3 * v * v * (c1[1] - from[1]) + 6 * v * u * (c2[1] - c1[1]) + 3 * u * u * (to[1] - c2[1])
+			];
+		}
+		case 'arc':
+			return [0, 0]; // handled directly in angleAt (exact from the circle)
+	}
+}
+
+/** The tangent angle (radians) at parameter t ∈ [0, 1] along a shape.
+ *  Degenerate tangents (a control point sitting on an endpoint, zero-length
+ *  shapes) fall back to a finite-difference sample, then to the chord angle
+ *  — never NaN. */
+export function angleAt(shape: PathShape, t: number): number {
+	const u = clamp01(t);
+	if (shape.kind === 'arc') {
+		const g = arcGeometry(shape.from, shape.to, shape.bend);
+		if (g) {
+			const a = g.a0 + g.delta * u;
+			// Tangent is perpendicular to the radius, in the direction of travel.
+			return a + (g.delta > 0 ? Math.PI / 2 : -Math.PI / 2);
+		}
+		return segmentAngle(shape.from, shape.to);
+	}
+	const [dx, dy] = tangentAt(shape, u);
+	if (Math.hypot(dx, dy) > 1e-9) return Math.atan2(dy, dx);
+	// Degenerate derivative: sample a small step around t.
+	const before = pointAt(shape, Math.max(0, u - 0.01));
+	const after = pointAt(shape, Math.min(1, u + 0.01));
+	if (Math.hypot(after[0] - before[0], after[1] - before[1]) > 1e-9) {
+		return Math.atan2(after[1] - before[1], after[0] - before[0]);
+	}
+	return segmentAngle(shape.from, shape.to);
+}
+
+/** The same shape traversed the other way (from ↔ to). Used to shorten a
+ *  shape at its START: reverse, shorten the tail, reverse back. */
+export function reverseShape(shape: PathShape): PathShape {
+	switch (shape.kind) {
+		case 'line':
+			return { kind: 'line', from: shape.to, to: shape.from };
+		case 'quadratic':
+			return { kind: 'quadratic', from: shape.to, to: shape.from, c1: shape.c1 };
+		case 'cubic':
+			return { kind: 'cubic', from: shape.to, to: shape.from, c1: shape.c2, c2: shape.c1 };
+		case 'arc':
+			// Same physical arc, opposite travel direction: the bulge sits on the
+			// other side RELATIVE to the new direction, so the sign flips.
+			return { kind: 'arc', from: shape.to, to: shape.from, bend: -shape.bend };
+	}
+}
+
+/** Trim ~`by` px off the TAIL of a shape, returning a shape of the same kind
+ *  that follows the original geometry (exact de Casteljau subdivision for
+ *  curves, exact angular trim for arcs; the px→parameter conversion uses the
+ *  end-tangent speed, a first-order approximation that is plenty for
+ *  arrowhead-sized trims). `by` ≤ 0 returns the shape unchanged; `by` beyond
+ *  the whole shape collapses it to its start. */
+export function shortenShape(shape: PathShape, by: number): PathShape {
+	const amount = finite(by);
+	if (amount <= 0) return shape;
+	switch (shape.kind) {
+		case 'line':
+			return { kind: 'line', from: shape.from, to: shorten(shape.from, shape.to, amount) };
+		case 'quadratic': {
+			const t = trimParameter(shape, amount);
+			const from = finitePoint(shape.from);
+			const c = finitePoint(shape.c1);
+			return {
+				kind: 'quadratic',
+				from: shape.from,
+				c1: roundPoint(lerpPoint(from, c, t)),
+				to: pointAt(shape, t)
+			};
+		}
+		case 'cubic': {
+			const t = trimParameter(shape, amount);
+			const from = finitePoint(shape.from);
+			const c1 = finitePoint(shape.c1);
+			const c2 = finitePoint(shape.c2);
+			const a = lerpPoint(from, c1, t);
+			const b = lerpPoint(c1, c2, t);
+			const d = lerpPoint(a, b, t);
+			return {
+				kind: 'cubic',
+				from: shape.from,
+				c1: roundPoint(a),
+				c2: roundPoint(d),
+				to: pointAt(shape, t)
+			};
+		}
+		case 'arc': {
+			const g = arcGeometry(shape.from, shape.to, shape.bend);
+			if (!g) {
+				return { kind: 'arc', from: shape.from, to: shorten(shape.from, shape.to, amount), bend: 0 };
+			}
+			const arcLength = g.r * Math.abs(g.delta);
+			const t = arcLength === 0 ? 0 : Math.max(0, 1 - amount / arcLength);
+			const span = Math.abs(g.delta) * t;
+			const chord = 2 * g.r * Math.sin(span / 2);
+			const sagitta = g.r * (1 - Math.cos(span / 2));
+			const bend = chord === 0 ? 0 : clampBend(Math.sign(shape.bend) * (sagitta / chord));
+			return { kind: 'arc', from: shape.from, to: pointAt(shape, t), bend };
+		}
+	}
+}
+
+function roundPoint(p: Point): Point {
+	return [round(p[0]), round(p[1])];
+}
+
+/** The parameter that sits ~`by` px back from the end of a curve, using the
+ *  end-tangent speed as the local px-per-parameter rate. */
+function trimParameter(shape: PathShape, by: number): number {
+	const [dx, dy] = tangentAt(shape, 1);
+	let speed = Math.hypot(dx, dy);
+	if (speed < 1e-9) {
+		// Degenerate end tangent: fall back to the chord as a length estimate.
+		const from = finitePoint(shape.from);
+		const to = finitePoint(shape.to);
+		speed = Math.hypot(to[0] - from[0], to[1] - from[1]);
+	}
+	if (speed < 1e-9) return 0;
+	return clamp01(1 - by / speed);
+}

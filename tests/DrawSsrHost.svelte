@@ -1,0 +1,24 @@
+<!-- SSR host for the prerender test: a full Draw surface with every shape
+     (Phases 1 + 2) plus the raw-SVG escape hatch, rendered via svelte/server
+     with no DOM — proves each shape emits its complete SVG from props alone,
+     including labels and the CSS-only draw-on animation plumbing. -->
+<script lang="ts">
+	import Arc from '../src/lib/draw/Arc.svelte';
+	import Curve from '../src/lib/draw/Curve.svelte';
+	import Draw from '../src/lib/draw/Draw.svelte';
+	import Ellipse from '../src/lib/draw/Ellipse.svelte';
+	import Line from '../src/lib/draw/Line.svelte';
+	import Polyline from '../src/lib/draw/Polyline.svelte';
+	import Rect from '../src/lib/draw/Rect.svelte';
+</script>
+
+<Draw title="Request flow">
+	<Line from={[510, 770]} to={[1410, 770]} arrow="end" thickness={6} />
+	<Line from={[1410, 810]} to={[510, 810]} dash />
+	<Curve from={[200, 200]} to={[900, 700]} c1={[500, 100]} c2={[700, 800]} arrow="end" />
+	<Arc from={[400, 540]} to={[1500, 540]} bend={0.3} labelText="round trip" />
+	<Polyline points={[[100, 900], [400, 700], [700, 950], [1100, 600]]} smooth draw={1.5} />
+	<Rect x={1395} y={675} width={370} height={190} rounded={16} />
+	<Ellipse x={860} y={940} width={200} height={90} />
+	<circle cx="960" cy="770" r="10" fill="currentColor" />
+</Draw>
