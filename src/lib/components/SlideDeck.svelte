@@ -88,6 +88,13 @@
 	export let contentBackground: string | undefined = undefined;
 	export let contentFont: string | undefined = undefined;
 
+	/* Show the TOC's extra link (article view, "back to home", …). Off by default —
+	   only decks that want it should enable it. `articleText`/`articleHref` customise
+	   the label and target (href is relative to the current slide URL). */
+	export let article = false;
+	export let articleText = 'View as article';
+	export let articleHref = '../text.html';
+
 	let viewport:  HTMLElement;
 	let container: HTMLElement;
 	let content:   HTMLElement;
@@ -95,6 +102,11 @@
 	let mode: DisplayMode = $displayMode;
 	let factor = clampFactor($displayFactor);
 	let initialized = false;
+	// On-screen scale of the slide content set by adjustSize() (the FITTED fit factor,
+	// or the SCALED zoom factor). The screen-fixed overlay chrome (DISPLAY control)
+	// multiplies its font by this so it renders the same size as the in-content NAV /
+	// ANIMATION buttons, which the content transform already scales by the same amount.
+	let viewScale = 1;
 	$: isFitted = mode === 'FITTED';
 	$: aspectRatio = width / height;
 
@@ -184,6 +196,7 @@
 			container.style.height = `${Math.round(height * factor)}px`;
 			content.style.transform = `scale(${factor})`;
 			content.style.transformOrigin = 'top left';
+			viewScale = factor;
 			if (recenter) centerScroll();
 			updateOverlay();
 			return;
@@ -213,6 +226,7 @@
 		const scale = Math.min(container.clientWidth / boxW, container.clientHeight / boxH);
 		content.style.transform = `scale(${scale})`;
 		content.style.transformOrigin = 'center center';
+		viewScale = scale;
 		updateOverlay();
 	}
 
@@ -287,7 +301,7 @@
 			</div>
 			{/if}
 			<slot />
-			<TableOfContent {pages} />
+			<TableOfContent {pages} {article} {articleText} {articleHref} />
 			<Copyright />
 			{/if}
 		</div>
@@ -298,7 +312,7 @@
      display-mode control and the minimap. Kept OUT of .content (which is scaled
      and panned) so they never drift off-screen. Hidden by ?clean. -->
 {#if initialized && !clean}
-<div class="overlay" style="--base-font:{baseFontSize}; --ctrl-top:{ctrlTop}; --ctrl-right:{ctrlRight};">
+<div class="overlay" style="--base-font:{baseFontSize}; --ctrl-top:{ctrlTop}; --ctrl-right:{ctrlRight}; --view-scale:{viewScale};">
 	<SizeMode {width} {height} />
 	{#if mapVisible}
 	<SlideMap {width} {height} rect={mapRect} />
@@ -381,7 +395,9 @@
 		position: absolute;
 		top: 12px;
 		right: 150px;
-		font-size: var(--base-font);
+		/* No font-size here: inherit .content's --base-font (already applied one level
+		   up) so this chrome button matches the NAV / ANIMATION buttons. Re-declaring
+		   --base-font here would apply the 1.5em lever twice and render ~1.5x larger. */
 		/* Above the slide surface, but no z-index so later siblings (the slot's
 		   blocks) still paint over it. */
 	}

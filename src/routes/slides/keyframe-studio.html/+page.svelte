@@ -1,6 +1,6 @@
 <!--
   Example: Authoring @keyframes WITH LAYOUT mode, via the reusable KeyframeStudio.
-  File: src/routes/slides/layout-keyframe.html/+page.svelte
+  File: src/routes/slides/keyframe-studio.html/+page.svelte
 
   All the machinery — ghost <Block>s per stop, the live preview, the draggable
   stop-editor panel, the <AnimationBar/> and the Copy button — now lives in
@@ -26,7 +26,7 @@
 	import ViewSource      from '$lib/components/ViewSource.svelte';
 	import source         from './+page.svelte?raw';
 
-	const path = 'src/routes/slides/layout-keyframe.html/+page.svelte';
+	const path = 'src/routes/slides/keyframe-studio.html/+page.svelte';
 
 	// Start poses for the rocket — KeyframeStudio clones these and owns the rest. Five
 	// stops with a rotation flourish: it climbs nose-up (20→26°), then banks hard the
