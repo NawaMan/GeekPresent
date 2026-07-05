@@ -34,7 +34,8 @@
   only the LAYOUT handles re-enable the pointer, and only in LAYOUT mode.
 -->
 <script lang="ts">
-	import { getContext, onDestroy, untrack, type Snippet } from 'svelte';
+	import { getContext, onDestroy, setContext, untrack, type Snippet } from 'svelte';
+	import { browser } from '$app/environment';
 	import { record } from '$lib/stores/layoutHistory';
 	import DrawHandle from './DrawHandle.svelte';
 	import {
@@ -48,10 +49,12 @@
 	import { finite, round } from './drawCore';
 	import {
 		DRAW_CONTEXT_KEY,
+		SPRITE_ISOLATION_KEY,
 		type AnimEditor,
 		type DrawContext,
 		type Point,
 		type ShapeEditor,
+		type SpriteIsolation,
 		type SpriteStop
 	} from './types';
 
@@ -71,6 +74,11 @@
 		name?: string;
 		/** Snap step (canvas px) while dragging handles. 1 = freeform. */
 		grid?: number;
+		/** Treat this sprite as a GROUP of editable shapes (children are a nested
+		 *  <Draw>): in LAYOUT, double-click to enter isolation — freeze + straighten
+		 *  — and edit the nested shapes; Esc / click-outside exits. Off by default,
+		 *  so a plain glyph sprite keeps its simple select-and-fly behavior. */
+		group?: boolean;
 		children?: Snippet;
 	}
 
@@ -81,6 +89,7 @@
 		origin = '50% 50%',
 		name = '',
 		grid = 1,
+		group = false,
 		children
 	}: Props = $props();
 
@@ -178,6 +187,7 @@
 		`${animate ? ` animate={${fmtNum(animate)}}` : ''}` +
 		`${fontScale != null ? ` fontScale={${fmtNum(fontScale)}}` : ''}` +
 		`${origin !== '50% 50%' ? ` origin="${origin}"` : ''}` +
+		`${group ? ' group' : ''}` +
 		` stops={[${list.map(stopLiteral).join(', ')}]}>`;
 
 	// Source (prop) stops resolved the same way, for the "Copy changed" OLD side.
@@ -292,6 +302,87 @@
 	// playhead time off its CSS animation.
 	let spriteEl = $state<HTMLElement>();
 
+	// --- Isolation ("enter group") editing -----------------------------------
+	// Double-click the sprite to FREEZE it at its current on-screen pose,
+	// STRAIGHTEN it to rot 0, and make its content pointer-live — so the nested
+	// shapes edit with the ordinary Draw machinery. Rotation is the ONLY thing
+	// that broke DrawHandle's drag scale (getBoundingClientRect on a turned box
+	// inflates the bbox); at rot 0 the nested svg is upright at plain deck scale,
+	// identical to a standalone Draw, so its editing is known-good. Esc (or
+	// toggling LAYOUT off) exits and restores the flight. Reachable only in
+	// LAYOUT, so published builds stay byte-inert and never eat input.
+	let entered = $state(false);
+	let editPose = $state<{ x: number; y: number; w: number; h: number } | null>(null);
+
+	// Tell any nested <Draw> (a group's contents) that it may edit ONLY while
+	// this sprite is isolated — so its handles/toolbar never linger on, or ride
+	// along with, the flying box. A standalone Draw has no such provider.
+	setContext<SpriteIsolation>(SPRITE_ISOLATION_KEY, {
+		get entered() {
+			return entered;
+		}
+	});
+
+	function enterIsolation() {
+		if (!group || !editing || !browser || !spriteEl) return;
+		// Freeze at the CURRENT animated pose, read straight off the running CSS
+		// animation, so the box straightens where it is rather than jumping.
+		const cs = getComputedStyle(spriteEl);
+		editPose = {
+			x: parseFloat(cs.left) || base.x,
+			y: parseFloat(cs.top) || base.y,
+			w: parseFloat(cs.width) || base.w,
+			h: parseFloat(cs.height) || base.h
+		};
+		entered = true;
+		// Hand editing to the nested Draw: drop the outer selection so the
+		// sprite's own keyframe toolbar steps aside for the inner shape's.
+		ctx?.select(null);
+	}
+	function exitIsolation() {
+		entered = false;
+		editPose = null;
+	}
+	// Esc exits; so does turning LAYOUT off underneath an entered sprite.
+	$effect(() => {
+		if (!entered || !browser) return;
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') exitIsolation();
+		};
+		window.addEventListener('keydown', onKey);
+		return () => window.removeEventListener('keydown', onKey);
+	});
+	// Click OUTSIDE the isolated group leaves isolation (Illustrator-style), which
+	// also tears down the nested Draw's editing chrome (its `editing` gates on our
+	// `entered`) — so deselecting by clicking away closes the inner dialog too.
+	// Clicks on the sprite content (shapes, handles, the nested toolbar) or the
+	// AnimationBar are exempt.
+	$effect(() => {
+		if (!entered || !browser) return;
+		const onDown = (e: PointerEvent) => {
+			const t = e.target as Node | null;
+			if (t && spriteEl?.contains(t)) return;
+			if (t instanceof Element && t.closest('.anim-bar')) return;
+			exitIsolation();
+		};
+		window.addEventListener('pointerdown', onDown, true);
+		return () => window.removeEventListener('pointerdown', onDown, true);
+	});
+	$effect(() => {
+		if (!editing && entered) exitIsolation();
+	});
+
+	// The frozen, straightened edit pose — no animation, rot 0 — swapped in for
+	// baseStyle on .sprite-el while entered.
+	const editStyle = $derived(
+		editPose
+			? `left:${round(editPose.x)}px; top:${round(editPose.y)}px; ` +
+					`width:${round(editPose.w)}px; height:${round(editPose.h)}px; ` +
+					`transform-origin:${origin}; transform:rotate(0deg);` +
+					`${fontFor(editPose.h) != null ? ` font-size:${fontFor(editPose.h)}px;` : ''}`
+			: baseStyle
+	);
+
 	const animApi: AnimEditor = {
 		get stops() {
 			const list = liveStops ?? (stops ?? []).map((s, i) => ({ ...s, id: -1 - i }) as IdStop);
@@ -372,23 +463,35 @@
 	<!-- The moving element lives in HTML space, spanning the canvas so a stop's
 	     x/y/w/h are its left/top/width/height with no math. pointer-events:none
 	     keeps the surface's never-eats-input guarantee. -->
-	<foreignObject x="0" y="0" width={cw} height={ch} style="overflow:visible; pointer-events:none;">
+	<foreignObject
+		x="0"
+		y="0"
+		width={cw}
+		height={ch}
+		style="overflow:visible; pointer-events:{entered ? 'auto' : 'none'};"
+	>
 		<div
 			xmlns="http://www.w3.org/1999/xhtml"
 			class="sprite-layer"
-			style="position:absolute; inset:0; pointer-events:none; overflow:visible;"
+			style="position:absolute; inset:0; pointer-events:{entered ? 'auto' : 'none'}; overflow:visible;"
 		>
-			<div bind:this={spriteEl} class="sprite-el" style={baseStyle}>
+			<div
+				bind:this={spriteEl}
+				class="sprite-el"
+				class:entered
+				style={entered && editPose ? editStyle : baseStyle}
+			>
 				{@render children?.()}
 			</div>
 		</div>
 	</foreignObject>
 
-	{#if editing}
+	{#if editing && !entered}
 		<!-- One ghost per stop: an axis-aligned dashed box (the grab/geometry
 		     box) with the stop's percent, plus a short tick showing its rotation.
-		     Clicking a box selects the sprite; when selected, each box grows
-		     move / resize / rotate handles. -->
+		     Clicking a box selects the sprite; DOUBLE-clicking enters isolation
+		     (freeze + straighten) to edit the nested shapes; when selected, each
+		     box grows move / resize / rotate handles. -->
 		{#each RS as s, i (i)}
 			{@const cxy = center(s)}
 			<g class="sprite-ghost" class:selected={isSelected}>
@@ -400,6 +503,7 @@
 					width={s.w}
 					height={s.h}
 					onpointerdown={select}
+					ondblclick={enterIsolation}
 				/>
 				<rect class="sprite-box" x={s.x} y={s.y} width={s.w} height={s.h} />
 				<!-- Orientation tick: from center outwards along `rot` (0 = up). -->
@@ -441,6 +545,20 @@
 			</g>
 		{/each}
 	{/if}
+
+	{#if entered && editPose}
+		<!-- Isolation affordance: an upright frame + hint in the OUTER svg (not
+		     pointer-inert), marking that the group is frozen/straightened and its
+		     nested shapes are now directly editable. Esc exits. -->
+		<rect
+			class="iso-frame"
+			x={editPose.x}
+			y={editPose.y}
+			width={editPose.w}
+			height={editPose.h}
+		/>
+		<text class="iso-hint" x={editPose.x} y={editPose.y - 12}>▸ group isolated · Esc to exit</text>
+	{/if}
 </g>
 
 <style>
@@ -453,6 +571,11 @@
 		/* Redundant with the inline pointer-events:none, but keep it even if the
 		   inline style is ever trimmed — the surface must never eat input. */
 		pointer-events: none;
+	}
+	/* Isolation mode (LAYOUT + double-click only): the frozen, straightened box
+	   becomes pointer-live so the nested Draw's own handles/hit-strokes work. */
+	.sprite-el.entered {
+		pointer-events: auto;
 	}
 
 	/* Editing chrome (LAYOUT mode only). */
@@ -480,6 +603,21 @@
 	}
 	.sprite-pct {
 		fill: rgba(255, 255, 255, 0.55);
+		font-family: 'Fira Code', monospace;
+		font-size: 20px;
+		pointer-events: none;
+		user-select: none;
+	}
+	/* Isolation affordances. */
+	.iso-frame {
+		fill: none;
+		stroke: var(--ctrl-selected-bg, #00b356);
+		stroke-width: 2;
+		stroke-dasharray: 10 6;
+		pointer-events: none;
+	}
+	.iso-hint {
+		fill: var(--ctrl-selected-bg, #00b356);
 		font-family: 'Fira Code', monospace;
 		font-size: 20px;
 		pointer-events: none;

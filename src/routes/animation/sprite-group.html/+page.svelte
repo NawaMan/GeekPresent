@@ -41,16 +41,31 @@
 			cluster as a rigid unit on <b>one</b> AnimationBar. The <Label>Rect</Label>
 			rides along too — its editing chrome now lives <i>inside</i> the transformed
 			div, which is exactly why the div-as-group idea works where an SVG
-			<code>&lt;g&gt;</code> could not. And the inner arrow <b>draws itself in</b>
-			(<code>draw=&#123;2&#125; drawDelay=&#123;2&#125;</code>) over the flight's
-			second half — a shape <i>inside</i> the flying group animating on the very
-			same timeline, because <code>getAnimations(&#123;subtree:true&#125;)</code>
-			reaches it through the foreignObject and the nested svg.
+			<code>&lt;g&gt;</code> could not. And the inner arrow carries its
+			<b>own keyframes on the same progress</b> as the flight
+			(<code>animate=&#123;4&#125;</code>, stop percents lined up with the
+			Sprite's) — so as the badge flies 0→50→100%, the arrow <b>extends in
+			lockstep</b> on <b>one</b> AnimationBar, because
+			<code>getAnimations(&#123;subtree:true&#125;)</code> scrubs both finite
+			animations through the foreignObject and the nested svg together.
+		</p>
+		<p style="margin-top: 0.5em;">
+			<b>Editing the shapes inside</b> — the Sprite makes its content
+			pointer-inert, and a rotated box breaks the drag math. So in <b>LAYOUT</b>,
+			<b>double-click</b> the badge: it <b>freezes in place and straightens</b>
+			to rot&nbsp;0 (isolation mode), and its nested shapes become directly
+			selectable with the ordinary Draw handles + toolbar — because upright at
+			deck scale the nested svg is identical to a standalone Draw. Tune the
+			connector, <b>Copy</b>, then <b>Esc</b> — or <b>click outside the
+			group</b> — to leave isolation and resume the flight (which also closes
+			the inner dialog). The nested Draw only shows its chrome while isolated,
+			so nothing lingers on the flying badge.
 		</p>
 		<QuickCode style="margin-top: 0.4em;">
 			&lt;Sprite name="badge" animate=&#123;4&#125; stops=&#123;[…]&#125;&gt; &lt;Draw
-			width=&#123;600&#125; height=&#123;360&#125; decorative&gt; &lt;Rect …/&gt; &lt;Line
-			arrow="end" …/&gt; &lt;Ellipse …/&gt; &lt;/Draw&gt; &lt;/Sprite&gt;
+			width=&#123;600&#125; height=&#123;360&#125; decorative&gt; &lt;Line arrow="end"
+			animate=&#123;4&#125; stops=&#123;[…same %s as the flight…]&#125; …/&gt; …
+			&lt;/Draw&gt; &lt;/Sprite&gt;
 		</QuickCode>
 	</div>
 </ContentPage>
@@ -65,6 +80,7 @@
 	     (see the notes re: scaling). -->
 	<Sprite
 		name="badge"
+		group
 		animate={4}
 		origin="50% 50%"
 		stops={[
@@ -77,21 +93,26 @@
 		     (the outer Draw describes the whole thing). -->
 		<Draw width={600} height={360} decorative>
 			<Rect x={8} y={8} width={584} height={344} rounded={28} thickness={5} color="#2980b9" />
-			<!-- Inner animation on the SAME AnimationBar: the arrow draws itself in
-			     over the flight's second half (draw=2s, after a 2s delay). Proof
-			     that a shape INSIDE the flying group animates on the one timeline —
-			     getAnimations({subtree:true}) reaches it through the foreignObject
-			     and the nested svg. -->
+			<!-- Inner keyframes on the SAME progress as the flight: animate={4}
+			     matches the Sprite's animate={4}, and the stop percents line up
+			     with the flight's stops — so as the badge flies 0→50→100%, the
+			     arrow extends in lockstep on the one AnimationBar. Both are finite
+			     4s CSS animations; getAnimations({subtree:true}) scrubs them
+			     together. In isolation you can drag each of these stops. -->
 			<Line
 				name="flow"
 				from={[70, 165]}
-				to={[350, 165]}
+				to={[130, 165]}
 				arrow="end"
 				thickness={7}
 				color="#f39c12"
 				labelText="req"
-				draw={2}
-				drawDelay={2}
+				stops={[
+					{ pct: 0, to: [130, 165] },
+					{ pct: 50, to: [240, 165] },
+					{ pct: 100, to: [350, 165] }
+				]}
+				animate={4}
 			/>
 			<Ellipse x={400} y={110} width={110} height={110} thickness={5} color="#00b356" />
 			<!-- raw SVG escape hatch: a dot at the node's centre -->
