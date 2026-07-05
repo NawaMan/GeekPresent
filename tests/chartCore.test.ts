@@ -4,9 +4,15 @@ import {
 	isBlank,
 	linePath,
 	linearScale,
+	nearestIndex,
 	niceTicks,
 	numericExtent,
+	seriesColor,
+	stackExtent,
+	stackSeries,
+	timeTicks,
 	toNumber,
+	toTime,
 	valueOf
 } from '../src/lib/chart/chartCore';
 
@@ -220,6 +226,205 @@ describe('bandScale', () => {
 		const tight = bandScale(['a', 'b', 'c'], [0, 300], { paddingInner: 0, paddingOuter: 0 });
 		expect(tight.bandwidth).toBe(tight.step);
 		expect(tight.map('a')).toBe(0);
+	});
+});
+
+describe('stackSeries', () => {
+	const series = [
+		{ key: 'a', value: 'a' },
+		{ key: 'b', value: 'b' },
+		{ key: 'c', value: 'c' }
+	];
+
+	it('accumulates positive segments into running [y0, y1] totals', () => {
+		const [row] = stackSeries([{ a: 10, b: 20, c: 5 }], series);
+		expect(row).toEqual([
+			{ key: 'a', y0: 0, y1: 10, value: 10 },
+			{ key: 'b', y0: 10, y1: 30, value: 20 },
+			{ key: 'c', y0: 30, y1: 35, value: 5 }
+		]);
+	});
+
+	it('treats a blank as 0 thickness — the stack above it is undisturbed', () => {
+		const [row] = stackSeries([{ a: 10, b: null, c: 5 }], series);
+		expect(row[1]).toEqual({ key: 'b', y0: 10, y1: 10, value: 0 }); // zero-thick
+		expect(row[2]).toEqual({ key: 'c', y0: 10, y1: 15, value: 5 }); // keeps stacking
+	});
+
+	it('stacks negatives on a baseline independent of the positives', () => {
+		const [row] = stackSeries([{ a: 10, b: -4, c: -6 }], series);
+		expect(row[0]).toEqual({ key: 'a', y0: 0, y1: 10, value: 10 });
+		expect(row[1]).toEqual({ key: 'b', y0: 0, y1: -4, value: -4 });
+		expect(row[2]).toEqual({ key: 'c', y0: -4, y1: -10, value: -6 });
+	});
+
+	it('degenerates to plain [0, value] bars for a single series', () => {
+		const stacks = stackSeries([{ a: 7 }, { a: -3 }], [{ key: 'a', value: 'a' }]);
+		expect(stacks).toEqual([
+			[{ key: 'a', y0: 0, y1: 7, value: 7 }],
+			[{ key: 'a', y0: 0, y1: -3, value: -3 }]
+		]);
+	});
+
+	it('yields one aligned segment array per row', () => {
+		const stacks = stackSeries([{ a: 1, b: 2, c: 3 }, { a: 4, b: 5, c: 6 }], series);
+		expect(stacks).toHaveLength(2);
+		expect(stacks[0]).toHaveLength(3);
+	});
+});
+
+describe('stackExtent', () => {
+	it('spans the tallest stack and always includes 0', () => {
+		const stacks = stackSeries([{ a: 10, b: 20, c: 5 }], [
+			{ key: 'a', value: 'a' },
+			{ key: 'b', value: 'b' },
+			{ key: 'c', value: 'c' }
+		]);
+		expect(stackExtent(stacks)).toEqual([0, 35]);
+	});
+
+	it('reaches below zero for a negative stack', () => {
+		const stacks = stackSeries([{ a: -4, b: -6 }], [
+			{ key: 'a', value: 'a' },
+			{ key: 'b', value: 'b' }
+		]);
+		expect(stackExtent(stacks)).toEqual([-10, 0]);
+	});
+
+	it('returns [0, 0] for empty input (still a valid baseline)', () => {
+		expect(stackExtent([])).toEqual([0, 0]);
+	});
+});
+
+describe('nearestIndex', () => {
+	const xs = [0, 10, 20, 30, 40];
+
+	it('finds an exact hit', () => {
+		expect(nearestIndex(xs, 20)).toBe(2);
+	});
+
+	it('snaps to the closer neighbour between ticks', () => {
+		expect(nearestIndex(xs, 12)).toBe(1); // closer to 10
+		expect(nearestIndex(xs, 17)).toBe(2); // closer to 20
+	});
+
+	it('breaks an exact midpoint tie toward the lower index', () => {
+		expect(nearestIndex(xs, 15)).toBe(1); // 10 vs 20, tie → 10
+	});
+
+	it('clamps out-of-range queries to the ends', () => {
+		expect(nearestIndex(xs, -100)).toBe(0);
+		expect(nearestIndex(xs, 999)).toBe(4);
+	});
+
+	it('handles a single element and an empty array', () => {
+		expect(nearestIndex([7], 3)).toBe(0);
+		expect(nearestIndex([], 3)).toBe(-1);
+	});
+
+	it('agrees with a linear scan on random-ish queries', () => {
+		const scan = (arr: number[], p: number) => {
+			let best = 0;
+			for (let i = 1; i < arr.length; i++) {
+				if (Math.abs(arr[i] - p) < Math.abs(arr[best] - p)) best = i;
+			}
+			return best;
+		};
+		const arr = [2, 5, 9, 14, 22, 31, 50];
+		for (const p of [0, 3, 4, 7, 12, 18, 27, 40, 60]) {
+			expect(nearestIndex(arr, p)).toBe(scan(arr, p));
+		}
+	});
+});
+
+describe('seriesColor', () => {
+	it('prefers an explicit SeriesDef.color', () => {
+		expect(seriesColor('#abc', 3)).toBe('#abc');
+	});
+
+	it('falls back to --chart-series-{i+1} with a palette default', () => {
+		expect(seriesColor(undefined, 0)).toBe('var(--chart-series-1, #4c78a8)');
+		expect(seriesColor(undefined, 1)).toBe('var(--chart-series-2, #f58518)');
+	});
+
+	it('wraps the palette default past eight series (var index keeps counting)', () => {
+		expect(seriesColor(undefined, 8)).toBe('var(--chart-series-9, #4c78a8)');
+	});
+});
+
+describe('toTime', () => {
+	it('reads a Date, passes a number through, parses an ISO string', () => {
+		const d = new Date(2024, 0, 15);
+		expect(toTime(d)).toBe(d.getTime());
+		expect(toTime(1700000000000)).toBe(1700000000000);
+		expect(toTime('2024-01-01')).toBe(new Date('2024-01-01').getTime());
+	});
+
+	it('returns NaN for blanks and invalid dates', () => {
+		expect(toTime(null)).toBeNaN();
+		expect(toTime('')).toBeNaN();
+		expect(toTime('not a date')).toBeNaN();
+	});
+});
+
+describe('timeTicks', () => {
+	// Local Date(y, m, d) constructors keep these robust across timezones — the
+	// floor/step logic works in local calendar fields.
+	const labels = (min: Date, max: Date, count?: number) => {
+		const t = timeTicks(min.getTime(), max.getTime(), count);
+		return { ticks: t.ticks, labels: t.ticks.map((v) => t.format(v)) };
+	};
+
+	it('a ~3-year span yields year ticks (no numeric spam)', () => {
+		const { ticks, labels: ls } = labels(new Date(2021, 0, 1), new Date(2024, 0, 1));
+		expect(ls.every((l) => /^\d{4}$/.test(l))).toBe(true);
+		expect(ticks.length).toBeLessThanOrEqual(7);
+		expect(ls).toContain('2022');
+	});
+
+	it('a ~6-month span yields month ticks', () => {
+		const { labels: ls } = labels(new Date(2024, 0, 1), new Date(2024, 6, 1));
+		expect(ls).toContain('Feb 2024');
+		expect(ls.every((l) => /^[A-Z][a-z]{2} \d{4}$/.test(l))).toBe(true);
+	});
+
+	it('a ~2-week span yields day ticks — no overlapping spam', () => {
+		const { ticks, labels: ls } = labels(new Date(2024, 0, 1), new Date(2024, 0, 15));
+		expect(ticks.length).toBeLessThanOrEqual(8);
+		expect(ls.every((l) => /^[A-Z][a-z]{2} \d{1,2}$/.test(l))).toBe(true);
+		expect(ls[0]).toBe('Jan 1');
+	});
+
+	it('lands every tick on a local calendar boundary across a DST change', () => {
+		// March 2024 contains the US spring-forward; calendar stepping (not fixed
+		// ms) must keep each tick at local midnight regardless.
+		const { ticks } = labels(new Date(2024, 2, 1), new Date(2024, 2, 31));
+		expect(ticks.length).toBeGreaterThan(1);
+		for (const t of ticks) {
+			const d = new Date(t);
+			expect(d.getHours()).toBe(0);
+			expect(d.getMinutes()).toBe(0);
+		}
+	});
+
+	it('keeps ticks ascending and inside [min, max]', () => {
+		const min = new Date(2024, 0, 1).getTime();
+		const max = new Date(2024, 5, 1).getTime();
+		const { ticks } = timeTicks(min, max);
+		for (let i = 1; i < ticks.length; i++) expect(ticks[i]).toBeGreaterThan(ticks[i - 1]);
+		expect(ticks[0]).toBeGreaterThanOrEqual(min);
+		expect(ticks[ticks.length - 1]).toBeLessThanOrEqual(max);
+	});
+
+	it('degenerates to a single tick when min === max', () => {
+		const t = new Date(2024, 3, 10).getTime();
+		expect(timeTicks(t, t).ticks).toEqual([t]);
+	});
+
+	it('normalises reversed input', () => {
+		const a = new Date(2024, 0, 1).getTime();
+		const b = new Date(2024, 6, 1).getTime();
+		expect(timeTicks(b, a).ticks).toEqual(timeTicks(a, b).ticks);
 	});
 });
 

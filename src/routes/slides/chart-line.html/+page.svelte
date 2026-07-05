@@ -1,13 +1,14 @@
 <!--
-  Example: LineChart beside its data (Phase 1)
+  Example: dual-axis 2-series LineChart on a TIME axis (Phase 2)
   File: src/routes/slides/chart-line.html/+page.svelte
 
-  The SAME plain array drives a DataTable and a LineChart, side by side. The
-  line cases on show: UNEVEN x spacing on a linear axis (months 1, 2, 4, 5,
-  6, 9, 10) and a NULL at month 5 that breaks the line into a GAP rather than
-  dipping to 0 — the table shows that null as "—" in the very row the line
-  skips. Chart geometry is pure in $lib/chart/chartCore.ts; theme via
-  --chart-* and --dt-*.
+  The SAME plain array drives a DataTable and a LineChart. Phase-2 features on
+  show here: TWO series of very different magnitudes on INDEPENDENT axes —
+  requests (~millions) on the left, cost (~dollars) on the right — via `dualAxis`,
+  each axis tinted to match its line so both read legibly; a calendar-aware TIME
+  x-axis (year/quarter ticks over ~3 years); a clickable LEGEND; a hover TOOLTIP
+  with a custom snippet; and a NULL cost that breaks that line into a gap. Chart
+  geometry is pure in $lib/chart/chartCore.ts.
 -->
 <script lang="ts">
 	import ContentPage from '$lib/templates/ContentPage.svelte';
@@ -18,62 +19,71 @@
 
 	const path = 'src/routes/slides/chart-line.html/+page.svelte';
 
-	// One array — rendered as a table AND charted.
-	type Sample = { month: number; latency: number | null };
-	const samples: Sample[] = [
-		{ month: 1, latency: 120 },
-		{ month: 2, latency: 132 },
-		{ month: 4, latency: 128 }, // uneven x (no month 3)
-		{ month: 5, latency: null }, // blank → gap in the line
-		{ month: 6, latency: 145 },
-		{ month: 9, latency: 138 }, // uneven x (no 7, 8)
-		{ month: 10, latency: 150 }
+	// One array — rendered as a table AND charted. Deploy dates span ~3 years.
+	type Deploy = { deployed: Date; requests: number; cost: number | null };
+	const deploys: Deploy[] = [
+		{ deployed: new Date(2021, 1, 3), requests: 412_000, cost: 118.4 },
+		{ deployed: new Date(2021, 7, 19), requests: 690_000, cost: 173.9 },
+		{ deployed: new Date(2022, 2, 8), requests: 905_000, cost: null }, // blank → gap
+		{ deployed: new Date(2022, 9, 27), requests: 1_142_000, cost: 289.1 },
+		{ deployed: new Date(2023, 4, 14), requests: 1_398_000, cost: 366.7 },
+		{ deployed: new Date(2023, 11, 2), requests: 1_620_000, cost: 441.2 },
+		{ deployed: new Date(2024, 5, 21), requests: 1_930_000, cost: 501.26 }
 	];
 
-	const msFmt = (v: number | null) => (v == null ? '—' : `${v} ms`);
+	const dateFmt = (d: Date | null) =>
+		d == null ? '—' : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+	const reqFmt = (v: number) => v.toLocaleString('en-US');
+	const costFmt = (v: number | null) => (v == null ? '—' : `$${v.toFixed(2)}`);
 
-	// Table view of the data.
-	const columns: ColumnDef<Sample>[] = [
-		{ key: 'month', label: 'Month', type: 'number', align: 'right', format: (v) => `M${v}` },
-		{ key: 'latency', label: 'Latency', type: 'number', align: 'right', format: (v) => msFmt(v) }
+	// Table view of the same data.
+	const columns: ColumnDef<Deploy>[] = [
+		{ key: 'deployed', label: 'Deployed', type: 'date', format: (v) => dateFmt(v as Date) },
+		{ key: 'requests', label: 'Requests', type: 'number', align: 'right', format: (v) => reqFmt(v) },
+		{ key: 'cost', label: 'Cost', type: 'number', align: 'right', format: (v) => costFmt(v) }
 	];
 
-	// Chart view of the same data.
-	const monthX: AxisDef<Sample> = {
-		value: 'month',
-		type: 'linear',
-		label: 'Month',
-		format: (v) => `M${v}`
-	};
-	const latencySeries: SeriesDef<Sample> = {
-		key: 'latency',
-		label: 'Latency (ms)',
-		value: 'latency',
-		format: (v) => msFmt(v)
-	};
+	// Chart view: a time x-axis, two series of different magnitudes on their own axes.
+	const deployX: AxisDef<Deploy> = { value: 'deployed', type: 'time', label: 'Deploy date' };
+	const series: SeriesDef<Deploy>[] = [
+		{ key: 'requests', label: 'Requests', value: 'requests', format: reqFmt },
+		{ key: 'cost', label: 'Cost', value: 'cost', format: (v) => costFmt(v) }
+	];
 </script>
 
 <ContentPage
-	title="Chart — Line"
-	subtitle="One array, two views: a DataTable and a LineChart side by side"
+	title="Chart — Dual-Axis Line + Time Axis"
+	subtitle="Two magnitudes on their own left/right axes, a calendar axis, a legend, and a tooltip"
 >
 	<div class="demo">
 		<div class="data">
-			<DataTable rows={samples} {columns} searchable={false} striped />
+			<DataTable rows={deploys} {columns} searchable={false} striped />
 		</div>
 
 		<figure class="viz">
 			<LineChart
-				data={samples}
-				x={monthX}
-				series={latencySeries}
+				data={deploys}
+				x={deployX}
+				{series}
 				points
-				title="Latency over time"
-				description="A line over uneven month values; the null at month 5 breaks the line into a gap rather than dipping to zero. The table beside this chart is the accessible representation of the same data."
-			/>
+				legend
+				dualAxis
+				title="Requests and cost over time"
+				description="Two series — requests (millions, left axis) and cost (dollars, right axis) — over a ~3-year time axis, each on its own scale. The null cost in early 2022 breaks that line into a gap. The table beside this chart is the accessible representation of the same data."
+			>
+				{#snippet tooltip(x, points)}
+					<strong>{dateFmt(x as Date)}</strong>
+					{#each points as p (p.key)}
+						<div class="tip-row">
+							<span class="tip-swatch" style:background={p.color}></span>
+							{p.label}: <b>{p.formatted}</b>
+						</div>
+					{/each}
+				{/snippet}
+			</LineChart>
 			<figcaption>
-				Linear x — uneven months space unevenly, and the <code>null</code> at month 5 becomes a
-				<b>gap</b>, not a dive to 0.
+				Dual axes — <code>Requests</code> (left) and <code>Cost</code> (right) on their own scales ·
+				time x-axis (year/quarter ticks) · hover for the tooltip · the <code>null</code> cost is a gap.
 			</figcaption>
 		</figure>
 	</div>
@@ -86,9 +96,12 @@
 		/* light "inverted panel" on the dark deck, shared by chart + table */
 		--chart-fg: #1a2530;
 		--chart-series-1: #2f6db0;
+		--chart-series-2: #b25f00;
 		--chart-grid: rgba(30, 60, 90, 0.14);
 		--chart-axis: rgba(30, 60, 90, 0.5);
 		--chart-font-size: 13px;
+		--chart-tooltip-bg: #1a2530;
+		--chart-tooltip-fg: #f4f7fa;
 
 		--dt-font-size: 0.7em;
 		--dt-bg: #eef2f5;
@@ -128,8 +141,18 @@
 	}
 	.data {
 		flex: 1 1 300px;
-		max-width: 420px;
+		max-width: 440px;
 		line-height: 1.35;
+	}
+	.tip-row {
+		display: flex;
+		align-items: center;
+		gap: 0.4em;
+	}
+	.tip-swatch {
+		width: 0.7em;
+		height: 0.7em;
+		border-radius: 2px;
 	}
 	code {
 		font-family: ui-monospace, monospace;

@@ -1,6 +1,7 @@
-import { render } from '@testing-library/svelte';
+import { fireEvent, render } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
 import BarChart from '../src/lib/chart/BarChart.svelte';
+import ComboChart from '../src/lib/chart/ComboChart.svelte';
 import LineChart from '../src/lib/chart/LineChart.svelte';
 import type { AxisDef, SeriesDef } from '../src/lib/chart/types';
 
@@ -86,6 +87,66 @@ describe('BarChart', () => {
 	});
 });
 
+describe('BarChart — multi-series', () => {
+	type Row = { region: string; a: number | null; b: number };
+	const rows: Row[] = [
+		{ region: 'us', a: 10, b: 20 },
+		{ region: 'eu', a: null, b: 15 } // blank in series a
+	];
+	const two: SeriesDef[] = [
+		{ key: 'a', label: 'Alpha', value: 'a' },
+		{ key: 'b', label: 'Beta', value: 'b' }
+	];
+
+	it('grouped: draws one rect per (series × non-blank value)', () => {
+		const { container } = render(BarChart, {
+			props: { data: rows, x: regionX, series: two, title: 'Grouped' }
+		});
+		// us: a + b = 2 rects; eu: a is blank so only b = 1 rect → 3 total
+		expect(container.querySelectorAll('.bars rect')).toHaveLength(3);
+	});
+
+	it('grouped: distinct series colors and disambiguated aria-labels', () => {
+		const { container } = render(BarChart, {
+			props: { data: rows, x: regionX, series: two, title: 'Grouped' }
+		});
+		const labels = Array.from(container.querySelectorAll('.bars rect')).map((r) =>
+			r.getAttribute('aria-label')
+		);
+		expect(labels).toContain('us — Alpha: 10');
+		expect(labels).toContain('us — Beta: 20');
+		const fills = new Set(
+			Array.from(container.querySelectorAll('.bars rect')).map((r) => r.getAttribute('fill'))
+		);
+		expect(fills.size).toBeGreaterThan(1); // series don't share one color
+	});
+
+	it('stacked: full-width bars whose segment tops equal the running totals', () => {
+		const { container } = render(BarChart, {
+			props: { data: rows, x: regionX, series: two, stacked: true, title: 'Stacked' }
+		});
+		const rects = Array.from(container.querySelectorAll('.bars rect'));
+		// us: a(10)+b(15 is eu)… us has a=10,b=20 → 2 segments; eu: a blank(0, no rect)+b=15 → 1 → 3
+		expect(rects).toHaveLength(3);
+		// the two us segments share the same x and width (one stacked column)
+		const us = rects.filter((r) => r.getAttribute('aria-label')?.startsWith('us'));
+		expect(us).toHaveLength(2);
+		expect(us[0].getAttribute('x')).toBe(us[1].getAttribute('x'));
+		expect(us[0].getAttribute('width')).toBe(us[1].getAttribute('width'));
+	});
+
+	it('stacked: a blank contributes no rect and does not corrupt the stack', () => {
+		const { container } = render(BarChart, {
+			props: { data: rows, x: regionX, series: two, stacked: true, title: 'Stacked' }
+		});
+		const labels = Array.from(container.querySelectorAll('.bars rect')).map((r) =>
+			r.getAttribute('aria-label')
+		);
+		expect(labels).not.toContain('eu — Alpha: 0'); // blank drew nothing
+		expect(labels).toContain('eu — Beta: 15');
+	});
+});
+
 describe('LineChart', () => {
 	it('breaks the line into two sub-paths across a blank (a gap, not a dip to 0)', () => {
 		const { container } = render(LineChart, {
@@ -110,5 +171,347 @@ describe('LineChart', () => {
 		});
 		const labels = Array.from(container.querySelectorAll('.axis-label')).map((t) => t.textContent);
 		expect(labels).toContain('Month');
+	});
+
+	it('draws one <path> per series with distinct colors and aria-labels', () => {
+		type Row = { month: number; req: number; cost: number };
+		const rows: Row[] = [
+			{ month: 1, req: 100, cost: 4 },
+			{ month: 2, req: 200, cost: 9 }
+		];
+		const two: SeriesDef[] = [
+			{ key: 'req', label: 'Requests', value: 'req' },
+			{ key: 'cost', label: 'Cost', value: 'cost' }
+		];
+		const { container } = render(LineChart, {
+			props: { data: rows, x: monthX, series: two, title: 'Two series' }
+		});
+		const paths = Array.from(container.querySelectorAll('path.line'));
+		expect(paths).toHaveLength(2);
+		const labels = paths.map((p) => p.getAttribute('aria-label'));
+		expect(labels).toEqual(['Requests', 'Cost']);
+		const strokes = new Set(paths.map((p) => p.getAttribute('stroke')));
+		expect(strokes.size).toBe(2);
+	});
+});
+
+describe('ChartLegend / visibility', () => {
+	type Row = { month: number; big: number; small: number };
+	const rows: Row[] = [
+		{ month: 1, big: 1000, small: 10 },
+		{ month: 2, big: 2000, small: 20 }
+	];
+	const two: SeriesDef[] = [
+		{ key: 'big', label: 'Big', value: 'big' },
+		{ key: 'small', label: 'Small', value: 'small' }
+	];
+	const monthX: AxisDef = { value: 'month', type: 'linear' };
+
+	it('renders a button per series, aria-pressed=true while shown', () => {
+		const { container } = render(LineChart, {
+			props: { data: rows, x: monthX, series: two, legend: true, title: 'Legend' }
+		});
+		const buttons = Array.from(container.querySelectorAll('.legend button'));
+		expect(buttons.map((b) => b.textContent?.trim())).toEqual(['Big', 'Small']);
+		expect(buttons.every((b) => b.getAttribute('aria-pressed') === 'true')).toBe(true);
+	});
+
+	it('clicking a legend button hides that series and toggles aria-pressed', async () => {
+		const { container } = render(LineChart, {
+			props: { data: rows, x: monthX, series: two, legend: true, title: 'Legend' }
+		});
+		expect(container.querySelectorAll('path.line')).toHaveLength(2);
+		const bigBtn = Array.from(container.querySelectorAll('.legend button')).find(
+			(b) => b.textContent?.trim() === 'Big'
+		)!;
+		await fireEvent.click(bigBtn);
+		expect(container.querySelectorAll('path.line')).toHaveLength(1); // Big line gone
+		expect(bigBtn.getAttribute('aria-pressed')).toBe('false');
+	});
+
+	it('hiding the larger series re-fits the y axis to the smaller (acceptance)', async () => {
+		const { container } = render(LineChart, {
+			props: { data: rows, x: monthX, series: two, legend: true, title: 'Legend' }
+		});
+		const yTicks = () =>
+			Array.from(container.querySelectorAll('.ticks .tick-label')).map((t) => t.textContent);
+		expect(yTicks()).toContain('2,000'); // domain reaches the big series
+		const bigBtn = Array.from(container.querySelectorAll('.legend button')).find(
+			(b) => b.textContent?.trim() === 'Big'
+		)!;
+		await fireEvent.click(bigBtn);
+		const after = yTicks();
+		expect(after).not.toContain('2,000'); // re-scaled down…
+		expect(after).toContain('20'); // …to fit the small series
+	});
+
+	it('BarChart: hiding a grouped series drops its rects', async () => {
+		const { container } = render(BarChart, {
+			props: {
+				data: [{ region: 'us', big: 1000, small: 10 }],
+				x: { value: 'region', type: 'band' } as AxisDef,
+				series: two,
+				legend: true,
+				title: 'Legend'
+			}
+		});
+		expect(container.querySelectorAll('.bars rect')).toHaveLength(2);
+		const smallBtn = Array.from(container.querySelectorAll('.legend button')).find(
+			(b) => b.textContent?.trim() === 'Small'
+		)!;
+		await fireEvent.click(smallBtn);
+		expect(container.querySelectorAll('.bars rect')).toHaveLength(1);
+	});
+});
+
+describe('ComboChart', () => {
+	type Row = { region: string; vol: number | null; rate: number };
+	const rows: Row[] = [
+		{ region: 'us', vol: 320, rate: 4.1 },
+		{ region: 'eu', vol: 260, rate: 3.2 },
+		{ region: 'ap', vol: null, rate: 2.8 } // blank bar, line continues
+	];
+	const regionX: AxisDef = { value: 'region', type: 'band', label: 'Region' };
+	const twoDefault: SeriesDef[] = [
+		{ key: 'vol', label: 'Volume', value: 'vol' },
+		{ key: 'rate', label: 'Rate', value: 'rate' }
+	];
+
+	it('defaults the first series to bars/left and the rest to a line/right', () => {
+		const { container } = render(ComboChart, {
+			props: { data: rows, x: regionX, series: twoDefault, title: 'Combo' }
+		});
+		// bars: one rect per non-blank vol row (ap is blank → 2 rects)
+		expect(container.querySelectorAll('.bars rect')).toHaveLength(2);
+		// line: exactly one path for the rate series
+		expect(container.querySelectorAll('path.line')).toHaveLength(1);
+		// both a left (Volume) and right (Rate) axis label
+		const axisLabels = Array.from(container.querySelectorAll('.axis-label')).map((t) => t.textContent);
+		expect(axisLabels).toContain('Volume');
+		expect(axisLabels).toContain('Rate');
+	});
+
+	it('honors explicit per-series mark / axis', () => {
+		const explicit: SeriesDef[] = [
+			{ key: 'vol', label: 'Volume', value: 'vol', mark: 'line', axis: 'left' },
+			{ key: 'rate', label: 'Rate', value: 'rate', mark: 'bar', axis: 'right' }
+		];
+		const { container } = render(ComboChart, {
+			props: { data: rows, x: regionX, series: explicit, title: 'Combo' }
+		});
+		// vol is now the line (3 finite points), rate the bars (3 rects)
+		expect(container.querySelectorAll('path.line')).toHaveLength(1);
+		expect(container.querySelectorAll('.bars rect')).toHaveLength(3);
+	});
+
+	it('gives the line series a shape-based legend chip (not just color)', () => {
+		const { container } = render(ComboChart, {
+			props: { data: rows, x: regionX, series: twoDefault, legend: true, title: 'Combo' }
+		});
+		// the line series gets a .line chip; the bar series a plain square swatch
+		expect(container.querySelector('.legend .swatch.line')).not.toBeNull();
+		expect(container.querySelector('.legend .swatch:not(.line)')).not.toBeNull();
+	});
+
+	it('stacks two bar series on one axis when stacked', () => {
+		type S = { region: string; a: number; b: number };
+		const sr: S[] = [{ region: 'us', a: 10, b: 20 }];
+		const barsTwo: SeriesDef[] = [
+			{ key: 'a', label: 'A', value: 'a', mark: 'bar', axis: 'left' },
+			{ key: 'b', label: 'B', value: 'b', mark: 'bar', axis: 'left' }
+		];
+		const { container } = render(ComboChart, {
+			props: { data: sr, x: regionX, series: barsTwo, stacked: true, title: 'Stacked combo' }
+		});
+		const rects = Array.from(container.querySelectorAll('.bars rect'));
+		expect(rects).toHaveLength(2);
+		// stacked → both segments share the same x and width (one column)
+		expect(rects[0].getAttribute('x')).toBe(rects[1].getAttribute('x'));
+		expect(rects[0].getAttribute('width')).toBe(rects[1].getAttribute('width'));
+	});
+
+	it('drops a hidden series from its marks', async () => {
+		const { container } = render(ComboChart, {
+			props: {
+				data: rows,
+				x: regionX,
+				series: twoDefault,
+				legend: true,
+				title: 'Combo',
+				hidden: new Set(['rate'])
+			}
+		});
+		expect(container.querySelectorAll('path.line')).toHaveLength(0); // rate line hidden
+		expect(container.querySelectorAll('.bars rect')).toHaveLength(2); // vol bars remain
+	});
+});
+
+describe('Dual-axis LineChart', () => {
+	type Row = { month: number; requests: number; cost: number };
+	const rows: Row[] = [
+		{ month: 1, requests: 412000, cost: 118 },
+		{ month: 2, requests: 1930000, cost: 501 }
+	];
+	const two: SeriesDef[] = [
+		{ key: 'requests', label: 'Requests', value: 'requests', format: (v) => v.toLocaleString('en-US') },
+		{ key: 'cost', label: 'Cost', value: 'cost', format: (v) => `$${v}` }
+	];
+	const monthX: AxisDef = { value: 'month', type: 'linear' };
+
+	it('renders three axes — bottom, left, and right — when dualAxis is set', () => {
+		const { container } = render(LineChart, {
+			props: { data: rows, x: monthX, series: two, dualAxis: true, title: 'Dual' }
+		});
+		// Two vertical axes means two sets of vertical axis labels (left + right).
+		const axisLabels = Array.from(container.querySelectorAll('.axis-label')).map(
+			(t) => t.textContent
+		);
+		expect(axisLabels).toContain('Requests'); // left
+		expect(axisLabels).toContain('Cost'); // right
+	});
+
+	it('scales each series to its own axis, so the small line is not pinned flat', () => {
+		const { container } = render(LineChart, {
+			props: { data: rows, x: monthX, series: two, dualAxis: true, title: 'Dual' }
+		});
+		// Each line spans a real vertical range on its own axis: the cost line's two
+		// points differ in y just as much as requests', instead of both hugging 0.
+		const [reqPath, costPath] = Array.from(container.querySelectorAll('path.line')).map(
+			(p) => p.getAttribute('d') ?? ''
+		);
+		const ys = (d: string) =>
+			[...d.matchAll(/[ML] [\d.]+ ([\d.]+)/g)].map((m) => parseFloat(m[1]));
+		const span = (d: string) => Math.max(...ys(d)) - Math.min(...ys(d));
+		expect(span(reqPath)).toBeGreaterThan(50);
+		expect(span(costPath)).toBeGreaterThan(50); // would be ~0 on a shared axis
+	});
+
+	it('tints each y-axis to match its series color', () => {
+		const { container } = render(LineChart, {
+			props: { data: rows, x: monthX, series: two, dualAxis: true, title: 'Dual' }
+		});
+		expect(container.querySelectorAll('.axis.tinted').length).toBe(2);
+	});
+
+	it('ignores dualAxis unless there are exactly two series', () => {
+		const { container } = render(LineChart, {
+			props: {
+				data: [{ month: 1, requests: 1, cost: 2 }],
+				x: monthX,
+				series: [two[0]], // one series
+				dualAxis: true,
+				title: 'Solo'
+			}
+		});
+		expect(container.querySelectorAll('.axis.tinted').length).toBe(0); // no dual tint
+	});
+});
+
+describe('Time x-axis', () => {
+	it('labels a multi-year time axis with years, no NaN coordinates', () => {
+		type Row = { at: Date; v: number };
+		const rows: Row[] = [
+			{ at: new Date(2021, 0, 1), v: 10 },
+			{ at: new Date(2022, 6, 1), v: 30 },
+			{ at: new Date(2024, 0, 1), v: 20 }
+		];
+		const timeX: AxisDef = { value: 'at', type: 'time', label: 'Date' };
+		const s: SeriesDef = { key: 'v', label: 'V', value: 'v' };
+		const { container } = render(LineChart, {
+			props: { data: rows, x: timeX, series: s, title: 'Over time' }
+		});
+		const tickTexts = Array.from(container.querySelectorAll('.ticks .tick-label')).map(
+			(t) => t.textContent ?? ''
+		);
+		// year labels present on the x axis…
+		expect(tickTexts.some((t) => /^\d{4}$/.test(t))).toBe(true);
+		// …and the line path carries no NaN from date coercion.
+		const d = container.querySelector('path.line')!.getAttribute('d')!;
+		expect(d).not.toContain('NaN');
+		expect(d).toContain('M');
+	});
+
+	it('honors AxisDef.format (given a Date) over the default time labels', () => {
+		type Row = { at: Date; v: number };
+		const rows: Row[] = [
+			{ at: new Date(2024, 0, 1), v: 10 },
+			{ at: new Date(2024, 6, 1), v: 20 }
+		];
+		const timeX: AxisDef = {
+			value: 'at',
+			type: 'time',
+			format: (v) => `Y${(v as Date).getFullYear()}`
+		};
+		const s: SeriesDef = { key: 'v', label: 'V', value: 'v' };
+		const { container } = render(LineChart, {
+			props: { data: rows, x: timeX, series: s, title: 'Custom fmt' }
+		});
+		const tickTexts = Array.from(container.querySelectorAll('.ticks .tick-label')).map(
+			(t) => t.textContent ?? ''
+		);
+		expect(tickTexts.some((t) => t.startsWith('Y2024'))).toBe(true);
+	});
+});
+
+describe('Hover tooltip', () => {
+	// jsdom's getBoundingClientRect is all-zero, so stub it to the logical box to
+	// make the pointer→logical mapping (and thus which x is nearest) deterministic.
+	const stubRect = (svg: Element) => {
+		(svg as SVGSVGElement).getBoundingClientRect = () =>
+			({ left: 0, top: 0, width: 640, height: 400, right: 640, bottom: 400, x: 0, y: 0 }) as DOMRect;
+	};
+
+	type Row = { month: number; req: number; cost: number };
+	const rows: Row[] = [
+		{ month: 1, req: 1253153, cost: 501.26 },
+		{ month: 2, req: 900000, cost: 300 }
+	];
+	const two: SeriesDef[] = [
+		{ key: 'req', label: 'Requests', value: 'req', format: (v) => v.toLocaleString('en-US') },
+		{ key: 'cost', label: 'Cost', value: 'cost', format: (v) => `$${v.toFixed(2)}` }
+	];
+	const monthX: AxisDef = { value: 'month', type: 'linear' };
+
+	it('renders nothing until a pointer moves, then one formatted entry per series', async () => {
+		const { container } = render(LineChart, {
+			props: { data: rows, x: monthX, series: two, title: 'Tip' }
+		});
+		expect(container.querySelector('.tooltip')).toBeNull(); // no hover yet
+		expect(container.querySelector('.guide')).toBeNull();
+
+		const svg = container.querySelector('svg')!;
+		stubRect(svg);
+		// clientX near the left edge → nearest to month 1.
+		await fireEvent.pointerMove(svg, { clientX: 55, clientY: 100 });
+
+		const tip = container.querySelector('.tooltip')!;
+		expect(tip).not.toBeNull();
+		expect(tip.textContent).toContain('1,253,153'); // Requests, formatted
+		expect(tip.textContent).toContain('$501.26'); // Cost, formatted
+		expect(container.querySelector('.guide')).not.toBeNull(); // vertical guide shown
+	});
+
+	it('hides again on pointer leave', async () => {
+		const { container } = render(LineChart, {
+			props: { data: rows, x: monthX, series: two, title: 'Tip' }
+		});
+		const svg = container.querySelector('svg')!;
+		stubRect(svg);
+		await fireEvent.pointerMove(svg, { clientX: 55, clientY: 100 });
+		expect(container.querySelector('.tooltip')).not.toBeNull();
+		await fireEvent.pointerLeave(svg);
+		expect(container.querySelector('.tooltip')).toBeNull();
+	});
+
+	it('omits a hidden series from the tooltip entries', async () => {
+		const { container } = render(LineChart, {
+			props: { data: rows, x: monthX, series: two, title: 'Tip', hidden: new Set(['cost']) }
+		});
+		const svg = container.querySelector('svg')!;
+		stubRect(svg);
+		await fireEvent.pointerMove(svg, { clientX: 55, clientY: 100 });
+		const tip = container.querySelector('.tooltip')!;
+		expect(tip.textContent).toContain('Requests');
+		expect(tip.textContent).not.toContain('Cost'); // hidden series excluded
 	});
 });

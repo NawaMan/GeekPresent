@@ -4,6 +4,7 @@
      guarantee a prerendered slide needs, mirroring DrawSsrHost. -->
 <script lang="ts">
 	import BarChart from '../src/lib/chart/BarChart.svelte';
+	import ComboChart from '../src/lib/chart/ComboChart.svelte';
 	import LineChart from '../src/lib/chart/LineChart.svelte';
 
 	const regions = [
@@ -17,6 +18,11 @@
 		{ month: 4, latency: 128 },
 		{ month: 5, latency: null }, // blank → gap
 		{ month: 6, latency: 145 }
+	];
+	const combo = [
+		{ month: 'Jan', sessions: 4200, rate: 2.4 },
+		{ month: 'Feb', sessions: 4600, rate: 2.9 },
+		{ month: 'Mar', sessions: 5100, rate: 3.3 }
 	];
 </script>
 
@@ -34,4 +40,14 @@
 	points
 	title="Latency over time"
 	description="a gapped line"
+/>
+<ComboChart
+	data={combo}
+	x={{ value: 'month', type: 'band', label: 'Month' }}
+	series={[
+		{ key: 'sessions', label: 'Sessions', value: 'sessions', mark: 'bar', axis: 'left' },
+		{ key: 'rate', label: 'Rate', value: 'rate', mark: 'line', axis: 'right' }
+	]}
+	title="Sessions and rate"
+	description="bars plus a line on two axes"
 />

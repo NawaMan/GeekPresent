@@ -7,6 +7,9 @@
 // (BarChart, LineChart, Axis) land alongside these exports as they arrive.
 export { default as Axis } from './Axis.svelte';
 export { default as BarChart } from './BarChart.svelte';
+export { default as ChartLegend } from './ChartLegend.svelte';
+export { default as ChartTooltip } from './ChartTooltip.svelte';
+export { default as ComboChart } from './ComboChart.svelte';
 export { default as LineChart } from './LineChart.svelte';
 export * from './chartCore';
 export type * from './types';

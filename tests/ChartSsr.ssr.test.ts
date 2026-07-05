@@ -19,8 +19,10 @@ describe('Chart (SSR)', () => {
 		expect(body).toContain('role="img"');
 		expect(body).toContain('<title>Net change by region</title>');
 		expect(body).toContain('<desc>bars with a zero baseline</desc>');
-		// three bars: us-east, us-west, sa-east — eu-west is blank, no rect
-		expect(body.match(/<rect[^>]*aria-label=/g)).toHaveLength(3);
+		// three region bars: us-east, us-west, sa-east — eu-west is blank, no rect
+		// (single-series labels are "cat: value"; the ComboChart below uses "cat — series: value")
+		const regionBars = body.match(/aria-label="[^"—]*: -?[\d,]+"/g) ?? [];
+		expect(regionBars).toHaveLength(3);
 		expect(body).toContain('aria-label="us-east: 320"');
 		expect(body).toContain('aria-label="us-west: -140"'); // negative bar
 		expect(body).not.toContain('eu-west:'); // blank drew no bar
@@ -36,7 +38,22 @@ describe('Chart (SSR)', () => {
 		expect(body).toContain('<circle'); // point dots
 	});
 
+	it('renders the ComboChart bars and line server-side on two axes', () => {
+		expect(body).toContain('<title>Sessions and rate</title>');
+		// bar rects for the sessions series…
+		expect(body).toContain('aria-label="Jan — Sessions: 4,200"');
+		// …and a line path for the rate series
+		expect(body).toMatch(/class="line[^"]*"[^>]*d="M /);
+	});
+
 	it('never emits NaN in any coordinate', () => {
 		expect(body).not.toContain('NaN');
+	});
+
+	it('never prerenders the pointer-only layers (tooltip / hover guide)', () => {
+		// The interactive layer mounts client-side; the static SVG must be complete
+		// on its own, with no tooltip panel or hover guide in the server output.
+		expect(body).not.toContain('class="tooltip"');
+		expect(body).not.toContain('class="guide"');
 	});
 });
