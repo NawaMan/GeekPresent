@@ -1,0 +1,42 @@
+// @vitest-environment node
+//
+// True server-side render of the charts (svelte/server, no DOM): the node
+// environment gets vitest's SSR transform, so the components compile in server
+// mode — proving each chart emits its complete SVG markup from props alone,
+// which is what prerendering a slide does. (The slides deck itself gates slide
+// content behind onMount in SlideDeck, so the deck's built HTML can't
+// demonstrate this — this test is the prerender guarantee, mirroring
+// DrawSsr.ssr.test.ts.)
+import { render } from 'svelte/server';
+import { describe, expect, it } from 'vitest';
+import ChartSsrHost from './ChartSsrHost.svelte';
+
+describe('Chart (SSR)', () => {
+	const { body } = render(ChartSsrHost, { props: {} });
+
+	it('renders the full BarChart SVG server-side from props alone', () => {
+		expect(body).toContain('viewBox="0 0 640 400"');
+		expect(body).toContain('role="img"');
+		expect(body).toContain('<title>Net change by region</title>');
+		expect(body).toContain('<desc>bars with a zero baseline</desc>');
+		// three bars: us-east, us-west, sa-east — eu-west is blank, no rect
+		expect(body.match(/<rect[^>]*aria-label=/g)).toHaveLength(3);
+		expect(body).toContain('aria-label="us-east: 320"');
+		expect(body).toContain('aria-label="us-west: -140"'); // negative bar
+		expect(body).not.toContain('eu-west:'); // blank drew no bar
+		expect(body).toContain('zero-line'); // visible zero baseline (scoped class)
+	});
+
+	it('renders the LineChart line as a gapped path (blank → two sub-paths)', () => {
+		expect(body).toContain('<title>Latency over time</title>');
+		const line = body.match(/class="line[^"]*"[^>]*d="([^"]*)"/)?.[1] ?? '';
+		expect(line).not.toBe('');
+		// the null at month 5 breaks the line: exactly two M sub-paths, a gap
+		expect(line.match(/M/g)).toHaveLength(2);
+		expect(body).toContain('<circle'); // point dots
+	});
+
+	it('never emits NaN in any coordinate', () => {
+		expect(body).not.toContain('NaN');
+	});
+});

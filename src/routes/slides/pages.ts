@@ -14,6 +14,8 @@ export const pages = [
     { path: "datatable-tools.html",   title: "DataTable — Table Tools" },
     { path: "datatable-server.html",  title: "DataTable — Server-Side Data" },
     { path: "draw-component.html",    title: "Draw — Shapes & Arrows" },
+    { path: "chart-bar.html",         title: "Chart — Bar" },
+    { path: "chart-line.html",        title: "Chart — Line" },
     { path: "youtube-showcase.html",  title: "YouTube" },
     { path: "hint-component.html",    title: "Hint" },
     { path: "label-component.html",   title: "Label" },
