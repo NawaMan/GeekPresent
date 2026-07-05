@@ -17,6 +17,12 @@ export interface SeriesDef<T = any> {
 	value: Accessor<T>; // the y value (or slice size)
 	color?: string; // overrides --chart-series-N
 	format?: (value: number) => string; // tooltip/axis-adjacent label text
+	/** ComboChart only: draw this series as bars or a line. Defaults to 'bar' for
+	 *  the first series and 'line' for the rest. Ignored by BarChart/LineChart. */
+	mark?: 'bar' | 'line';
+	/** ComboChart only: which y-axis this series is scaled against. Defaults to
+	 *  'left' for bars and 'right' for lines. */
+	axis?: 'left' | 'right';
 }
 
 /** The x dimension: which value, how to scale it, how to label its ticks. */
@@ -34,6 +40,17 @@ export interface AxisDef<T = any> {
 export interface Point {
 	x: number;
 	y: number;
+}
+
+/** One series' entry in a hover tooltip: its label, raw value, `format`-ed
+ *  text, and swatch color. A blank at the hovered x has `value: null` and a
+ *  dash for `formatted`. Passed (with the x value) to a `tooltip` snippet. */
+export interface TooltipPoint {
+	key: string;
+	label: string;
+	value: number | null;
+	formatted: string;
+	color: string;
 }
 
 /** Options for linearScale. `zero: true` forces the domain to include 0 (bars

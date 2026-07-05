@@ -12,8 +12,8 @@
 	import type { BandScale, LinearScale } from './types';
 
 	interface Props {
-		/** 'bottom' = horizontal x axis; 'left' = vertical y axis. */
-		orientation: 'bottom' | 'left';
+		/** 'bottom' = horizontal x axis; 'left'/'right' = vertical y axis. */
+		orientation: 'bottom' | 'left' | 'right';
 		scale: LinearScale | BandScale;
 		/** Plot-area rectangle in logical px (the axis frames this box). */
 		left: number;
@@ -23,13 +23,29 @@
 		format?: (value: unknown) => string;
 		gridlines?: boolean;
 		label?: string;
+		/** Tint the axis line, ticks and labels (e.g. to match a series on a
+		 *  dual-axis chart). Falls back to the neutral --chart-axis/--chart-fg. */
+		color?: string;
 	}
 
-	let { orientation, scale, left, right, top, bottom, format, gridlines = false, label }: Props =
-		$props();
+	let {
+		orientation,
+		scale,
+		left,
+		right,
+		top,
+		bottom,
+		format,
+		gridlines = false,
+		label,
+		color
+	}: Props = $props();
 
 	const isBand = $derived('bandwidth' in scale);
 	const isBottom = $derived(orientation === 'bottom');
+	const isRight = $derived(orientation === 'right');
+	// The x pixel of a vertical axis: the plot's right edge for 'right', else left.
+	const vx = $derived(isRight ? right : left);
 
 	interface Tick {
 		value: unknown;
@@ -51,7 +67,7 @@
 		format ? format(value) : value === null || value === undefined ? '' : String(value);
 </script>
 
-<g class="axis" aria-hidden="true">
+<g class="axis" class:tinted={color} style:--axis-color={color} aria-hidden="true">
 	{#if gridlines}
 		<g class="grid">
 			{#each ticks as t (t.pos)}
@@ -68,7 +84,7 @@
 	{#if isBottom}
 		<line class="axis-line" x1={left} y1={bottom} x2={right} y2={bottom} />
 	{:else}
-		<line class="axis-line" x1={left} y1={top} x2={left} y2={bottom} />
+		<line class="axis-line" x1={vx} y1={top} x2={vx} y2={bottom} />
 	{/if}
 
 	<g class="ticks">
@@ -78,9 +94,14 @@
 				<text class="tick-label" x={t.pos} y={bottom + 9} text-anchor="middle" dominant-baseline="hanging">
 					{text(t.value)}
 				</text>
+			{:else if isRight}
+				<line class="tick" x1={vx} y1={t.pos} x2={vx + 6} y2={t.pos} />
+				<text class="tick-label" x={vx + 9} y={t.pos} text-anchor="start" dominant-baseline="middle">
+					{text(t.value)}
+				</text>
 			{:else}
-				<line class="tick" x1={left - 6} y1={t.pos} x2={left} y2={t.pos} />
-				<text class="tick-label" x={left - 9} y={t.pos} text-anchor="end" dominant-baseline="middle">
+				<line class="tick" x1={vx - 6} y1={t.pos} x2={vx} y2={t.pos} />
+				<text class="tick-label" x={vx - 9} y={t.pos} text-anchor="end" dominant-baseline="middle">
 					{text(t.value)}
 				</text>
 			{/if}
@@ -92,14 +113,25 @@
 			<text class="axis-label" x={(left + right) / 2} y={bottom + 34} text-anchor="middle" dominant-baseline="hanging">
 				{label}
 			</text>
+		{:else if isRight}
+			<text
+				class="axis-label"
+				x={vx + 44}
+				y={(top + bottom) / 2}
+				text-anchor="middle"
+				dominant-baseline="text-before-edge"
+				transform="rotate(90 {vx + 44} {(top + bottom) / 2})"
+			>
+				{label}
+			</text>
 		{:else}
 			<text
 				class="axis-label"
-				x={left - 42}
+				x={vx - 42}
 				y={(top + bottom) / 2}
 				text-anchor="middle"
 				dominant-baseline="text-after-edge"
-				transform="rotate(-90 {left - 42} {(top + bottom) / 2})"
+				transform="rotate(-90 {vx - 42} {(top + bottom) / 2})"
 			>
 				{label}
 			</text>
@@ -126,5 +158,15 @@
 	.axis-label {
 		font-size: 1.05em;
 		opacity: 0.85;
+	}
+	/* Dual-axis tint: colour the line, ticks and labels to match the series.
+	   Gridlines above deliberately keep --chart-grid, staying neutral. */
+	.tinted .axis-line,
+	.tinted .tick {
+		stroke: var(--axis-color);
+	}
+	.tinted .tick-label,
+	.tinted .axis-label {
+		fill: var(--axis-color);
 	}
 </style>
