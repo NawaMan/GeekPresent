@@ -68,6 +68,35 @@ export interface BandScaleOptions {
 	paddingOuter?: number; // default 0.1
 }
 
+/** A reducer over one group's rows → a single number (Phase 3 aggregation).
+ *  Built by the `sumOf` / `avgOf` / `countOf` factories; blanks are skipped
+ *  (never counted as 0) so a missing value doesn't drag a sum or average down. */
+export type Reducer<T = any> = (rows: readonly T[]) => number; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+/** Options for `aggregate`: which reducer produces each group's value, and an
+ *  optional label echoed onto the SeriesDef by the caller. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface AggregateOptions<T = any> {
+	value: Reducer<T>; // the group → number reducer (sumOf/avgOf/countOf)
+	label?: string; // advisory: the caller reuses it as the SeriesDef label
+}
+
+/** One row of grouped rows, in first-seen order (the output of `groupRows`). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface RowGroup<T = any> {
+	group: unknown; // the distinct accessor value this bucket shares
+	rows: T[]; // its rows, in original order
+}
+
+/** One aggregated, chart-shaped row (the output of `aggregate`): the group key,
+ *  the reduced value, and how many rows fell in the group. Chart it with
+ *  `x={{ value: 'group' }}` and `series=[{ value: 'value', … }]`. */
+export interface AggregateRow {
+	group: unknown;
+	value: number;
+	count: number;
+}
+
 // chartCore.ts — pure factories return plain objects, no classes.
 export interface LinearScale {
 	map: (value: unknown) => number; // domain → range px (NaN-safe: blanks map to NaN)

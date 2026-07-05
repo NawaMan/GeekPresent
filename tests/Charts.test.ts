@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import BarChart from '../src/lib/chart/BarChart.svelte';
 import ComboChart from '../src/lib/chart/ComboChart.svelte';
 import LineChart from '../src/lib/chart/LineChart.svelte';
+import PieChart from '../src/lib/chart/PieChart.svelte';
 import type { AxisDef, SeriesDef } from '../src/lib/chart/types';
 
 // Structure-only smoke tests (no pixels): bar/rect counts, gap in the line
@@ -74,7 +75,10 @@ describe('BarChart', () => {
 	it('forces zero into the domain even when all values are positive', () => {
 		const { container } = render(BarChart, {
 			props: {
-				data: [{ region: 'a', net: 500 }, { region: 'b', net: 900 }],
+				data: [
+					{ region: 'a', net: 500 },
+					{ region: 'b', net: 900 }
+				],
 				x: regionX,
 				series: netSeries,
 				title: 'All positive'
@@ -286,7 +290,9 @@ describe('ComboChart', () => {
 		// line: exactly one path for the rate series
 		expect(container.querySelectorAll('path.line')).toHaveLength(1);
 		// both a left (Volume) and right (Rate) axis label
-		const axisLabels = Array.from(container.querySelectorAll('.axis-label')).map((t) => t.textContent);
+		const axisLabels = Array.from(container.querySelectorAll('.axis-label')).map(
+			(t) => t.textContent
+		);
 		expect(axisLabels).toContain('Volume');
 		expect(axisLabels).toContain('Rate');
 	});
@@ -353,7 +359,12 @@ describe('Dual-axis LineChart', () => {
 		{ month: 2, requests: 1930000, cost: 501 }
 	];
 	const two: SeriesDef[] = [
-		{ key: 'requests', label: 'Requests', value: 'requests', format: (v) => v.toLocaleString('en-US') },
+		{
+			key: 'requests',
+			label: 'Requests',
+			value: 'requests',
+			format: (v) => v.toLocaleString('en-US')
+		},
 		{ key: 'cost', label: 'Cost', value: 'cost', format: (v) => `$${v}` }
 	];
 	const monthX: AxisDef = { value: 'month', type: 'linear' };
@@ -379,8 +390,7 @@ describe('Dual-axis LineChart', () => {
 		const [reqPath, costPath] = Array.from(container.querySelectorAll('path.line')).map(
 			(p) => p.getAttribute('d') ?? ''
 		);
-		const ys = (d: string) =>
-			[...d.matchAll(/[ML] [\d.]+ ([\d.]+)/g)].map((m) => parseFloat(m[1]));
+		const ys = (d: string) => [...d.matchAll(/[ML] [\d.]+ ([\d.]+)/g)].map((m) => parseFloat(m[1]));
 		const span = (d: string) => Math.max(...ys(d)) - Math.min(...ys(d));
 		expect(span(reqPath)).toBeGreaterThan(50);
 		expect(span(costPath)).toBeGreaterThan(50); // would be ~0 on a shared axis
@@ -458,7 +468,16 @@ describe('Hover tooltip', () => {
 	// make the pointer→logical mapping (and thus which x is nearest) deterministic.
 	const stubRect = (svg: Element) => {
 		(svg as SVGSVGElement).getBoundingClientRect = () =>
-			({ left: 0, top: 0, width: 640, height: 400, right: 640, bottom: 400, x: 0, y: 0 }) as DOMRect;
+			({
+				left: 0,
+				top: 0,
+				width: 640,
+				height: 400,
+				right: 640,
+				bottom: 400,
+				x: 0,
+				y: 0
+			}) as DOMRect;
 	};
 
 	type Row = { month: number; req: number; cost: number };
@@ -513,5 +532,181 @@ describe('Hover tooltip', () => {
 		const tip = container.querySelector('.tooltip')!;
 		expect(tip.textContent).toContain('Requests');
 		expect(tip.textContent).not.toContain('Cost'); // hidden series excluded
+	});
+});
+
+describe('PieChart', () => {
+	type Region = { region: string; requests: number | null };
+	// shares: 40/30/20/8/2 = 100%. The 2% slice is below the 4% label threshold.
+	const regions: Region[] = [
+		{ region: 'us-east', requests: 40 },
+		{ region: 'us-west', requests: 30 },
+		{ region: 'eu', requests: 20 },
+		{ region: 'ap', requests: 8 },
+		{ region: 'sa', requests: 2 },
+		{ region: 'blank', requests: null }, // skipped — not a slice
+		{ region: 'zero', requests: 0 } // skipped — a pie shows positive parts
+	];
+	const regionX: AxisDef = { value: 'region' };
+	const reqSeries: SeriesDef = { key: 'requests', label: 'Requests', value: 'requests' };
+
+	it('draws one slice per finite positive row (blank / zero skipped)', () => {
+		const { container } = render(PieChart, {
+			props: { data: regions, x: regionX, series: reqSeries, title: 'Share' }
+		});
+		expect(container.querySelectorAll('.slices .slice')).toHaveLength(5);
+	});
+
+	it('per-slice aria-labels carry value and percentage, summing to ~100%', () => {
+		const { container } = render(PieChart, {
+			props: { data: regions, x: regionX, series: reqSeries, title: 'Share' }
+		});
+		const labels = Array.from(container.querySelectorAll('.slice')).map((s) =>
+			s.getAttribute('aria-label')
+		);
+		expect(labels).toContain('us-east: 40 (40%)');
+		expect(labels).toContain('sa: 2 (2%)');
+		const pctSum = labels.reduce((sum, l) => sum + Number(l!.match(/\((\d+)%\)/)![1]), 0);
+		expect(pctSum).toBeGreaterThanOrEqual(99);
+		expect(pctSum).toBeLessThanOrEqual(101);
+	});
+
+	it('omits the in-slice label on a slice under minSliceLabel (legend still lists it)', () => {
+		const { container } = render(PieChart, {
+			props: { data: regions, x: regionX, series: reqSeries, legend: true, title: 'Share' }
+		});
+		const inSlice = Array.from(container.querySelectorAll('.slice-label')).map(
+			(t) => t.textContent
+		);
+		expect(inSlice).toContain('ap'); // 8% ≥ threshold → labelled
+		expect(inSlice).not.toContain('sa'); // 2% < threshold → no in-slice label
+		// …but every drawable slice is in the legend
+		const legend = Array.from(container.querySelectorAll('.legend .label')).map(
+			(t) => t.textContent
+		);
+		expect(legend).toContain('sa');
+		expect(legend).toHaveLength(5); // blank/zero rows aren't legend entries either
+	});
+
+	it('cuts a donut hole when innerRadius is set (ring-segment paths, two arcs each)', () => {
+		const pie = render(PieChart, {
+			props: { data: regions, x: regionX, series: reqSeries, title: 'Pie' }
+		});
+		const donut = render(PieChart, {
+			props: { data: regions, x: regionX, series: reqSeries, innerRadius: 0.6, title: 'Donut' }
+		});
+		const arcs = (root: ParentNode) =>
+			(root.querySelector('.slice')!.getAttribute('d')!.match(/A /g) ?? []).length;
+		expect(arcs(pie.container)).toBe(1); // solid wedge: one arc
+		expect(arcs(donut.container)).toBe(2); // ring segment: outer + inner arc
+	});
+
+	it('hiding a slice via the legend re-normalises the rest (percentages grow)', async () => {
+		const { container } = render(PieChart, {
+			props: { data: regions, x: regionX, series: reqSeries, legend: true, title: 'Share' }
+		});
+		const pctOf = (region: string) =>
+			Number(
+				Array.from(container.querySelectorAll('.slice'))
+					.find((s) => s.getAttribute('aria-label')!.startsWith(`${region}:`))!
+					.getAttribute('aria-label')!
+					.match(/\((\d+)%\)/)![1]
+			);
+		expect(pctOf('us-east')).toBe(40);
+		const sa = Array.from(container.querySelectorAll('.legend button')).find(
+			(b) => b.textContent?.trim() === 'sa'
+		)!;
+		await fireEvent.click(sa); // hide the 2% slice
+		expect(pctOf('us-east')).toBeGreaterThan(40); // rest re-normalised to 100%
+	});
+});
+
+describe('Selection highlighting', () => {
+	type Row = { id: number; region: string; v: number };
+	const rows: Row[] = [
+		{ id: 1, region: 'a', v: 10 },
+		{ id: 2, region: 'b', v: 20 },
+		{ id: 3, region: 'c', v: 30 }
+	];
+	const regionX: AxisDef = { value: 'region', type: 'band' };
+	const vSeries: SeriesDef = { key: 'v', label: 'V', value: 'v' };
+
+	it('BarChart: highlighted bars get .hl, the rest .dim; keyed by rowKeyAccessor', () => {
+		const { container } = render(BarChart, {
+			props: {
+				data: rows,
+				x: regionX,
+				series: vSeries,
+				title: 'Bars',
+				rowKeyAccessor: 'id',
+				highlighted: [2]
+			}
+		});
+		const rects = Array.from(container.querySelectorAll('.bars rect'));
+		const hl = rects.filter((r) => r.classList.contains('hl'));
+		const dim = rects.filter((r) => r.classList.contains('dim'));
+		expect(hl).toHaveLength(1);
+		expect(hl[0].getAttribute('aria-label')).toBe('b: 20'); // id 2 → region b
+		expect(dim).toHaveLength(2); // the other two dim
+	});
+
+	it('BarChart: an empty highlight list dims nothing (clearing un-dims everything)', () => {
+		const { container } = render(BarChart, {
+			props: {
+				data: rows,
+				x: regionX,
+				series: vSeries,
+				title: 'Bars',
+				rowKeyAccessor: 'id',
+				highlighted: []
+			}
+		});
+		expect(container.querySelectorAll('.bars rect.dim')).toHaveLength(0);
+		expect(container.querySelectorAll('.bars rect.hl')).toHaveLength(0);
+	});
+
+	it('PieChart: the selected slice is emphasised and the rest dim', () => {
+		const { container } = render(PieChart, {
+			props: {
+				data: rows,
+				x: { value: 'region' } as AxisDef,
+				series: vSeries,
+				title: 'Pie',
+				rowKeyAccessor: 'id',
+				highlighted: [3]
+			}
+		});
+		const slices = Array.from(container.querySelectorAll('.slice'));
+		expect(slices.filter((s) => s.classList.contains('hl'))).toHaveLength(1);
+		expect(container.querySelector('.slice.hl')!.getAttribute('aria-label')!.startsWith('c:')).toBe(
+			true
+		);
+		expect(slices.filter((s) => s.classList.contains('dim'))).toHaveLength(2);
+	});
+
+	it('LineChart: reveals point markers and highlights the selected one', () => {
+		const { container } = render(LineChart, {
+			props: {
+				data: rows.map((r) => ({ ...r, x: r.id })),
+				x: { value: 'x', type: 'linear' } as AxisDef,
+				series: vSeries,
+				title: 'Line',
+				rowKeyAccessor: 'id',
+				highlighted: [2]
+				// note: points not set — highlighting alone reveals the dots
+			}
+		});
+		const dots = Array.from(container.querySelectorAll('.dots circle'));
+		expect(dots).toHaveLength(3); // markers shown despite points={false}
+		expect(dots.filter((d) => d.classList.contains('hl'))).toHaveLength(1);
+		expect(dots.filter((d) => d.classList.contains('dim'))).toHaveLength(2);
+	});
+
+	it('ignores highlighting when no rowKeyAccessor is given', () => {
+		const { container } = render(BarChart, {
+			props: { data: rows, x: regionX, series: vSeries, title: 'Bars', highlighted: [2] }
+		});
+		expect(container.querySelectorAll('.bars rect.dim')).toHaveLength(0);
+		expect(container.querySelectorAll('.bars rect.hl')).toHaveLength(0);
 	});
 });

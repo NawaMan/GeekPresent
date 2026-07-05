@@ -11,5 +11,6 @@ export { default as ChartLegend } from './ChartLegend.svelte';
 export { default as ChartTooltip } from './ChartTooltip.svelte';
 export { default as ComboChart } from './ComboChart.svelte';
 export { default as LineChart } from './LineChart.svelte';
+export { default as PieChart } from './PieChart.svelte';
 export * from './chartCore';
 export type * from './types';

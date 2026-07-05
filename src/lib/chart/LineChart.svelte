@@ -28,6 +28,7 @@
 	import ChartLegend from './ChartLegend.svelte';
 	import ChartTooltip from './ChartTooltip.svelte';
 	import {
+		keyString,
 		linePath,
 		linearScale,
 		nearestIndex,
@@ -38,7 +39,7 @@
 		toTime,
 		valueOf
 	} from './chartCore';
-	import type { AxisDef, Point, SeriesDef, TooltipPoint } from './types';
+	import type { Accessor, AxisDef, Point, SeriesDef, TooltipPoint } from './types';
 
 	interface Props {
 		data: T[];
@@ -56,6 +57,13 @@
 		description?: string;
 		/** Draw a dot at each (finite) data point. */
 		points?: boolean;
+		/** Row keys (from `rowKeyAccessor`) to emphasise; matching points are
+		 *  marked and the rest dim — the chart-side hook for a DataTable's
+		 *  `bind:selected`. Highlighting reveals the point markers even when
+		 *  `points` is off, so a selection is visible on the line. */
+		highlighted?: unknown[];
+		/** How to read a row's key, matched against `highlighted`. */
+		rowKeyAccessor?: Accessor<T>;
 		/** Two series of different magnitudes on independent axes: the first series
 		 *  on the left y-axis, the second on the right, each with its own scale.
 		 *  Requires exactly two series (ignored otherwise). */
@@ -76,8 +84,19 @@
 		description,
 		points = false,
 		dualAxis = false,
+		highlighted,
+		rowKeyAccessor,
 		tooltip
 	}: Props = $props();
+
+	// Selection highlighting: with a non-empty `highlighted` list + a
+	// `rowKeyAccessor`, matching point markers are emphasised and the rest dim
+	// (and the markers show even when `points` is off, so the selection reads).
+	const hlKeys = $derived(new Set((highlighted ?? []).map(keyString)));
+	const hlActive = $derived(!!rowKeyAccessor && hlKeys.size > 0);
+	const isHighlighted = (row: T): boolean =>
+		hlActive && hlKeys.has(keyString(valueOf(row, rowKeyAccessor!)));
+	const showDots = $derived(points || hlActive);
 
 	const seriesList = $derived(Array.isArray(series) ? series : [series]);
 	// Visible series drive the y extent — hiding one re-fits the axis.
@@ -118,7 +137,11 @@
 	const xPix = (row: T): number => xScale.map(xNum(row));
 
 	const xScale = $derived(
-		linearScale(numericExtent(data, (r: T) => xNum(r)), [plot.left, plot.right], { nice: !isTime })
+		linearScale(
+			numericExtent(data, (r: T) => xNum(r)),
+			[plot.left, plot.right],
+			{ nice: !isTime }
+		)
 	);
 
 	// Calendar ticks + default label formatter for a time axis; AxisDef.format
@@ -151,10 +174,14 @@
 	// Dual axis: an independent scale per side (each fitted to its own series);
 	// both fall back to the shared yScale when not dual.
 	const yA = $derived(
-		dual ? linearScale(numericExtent(data, sA.value), [plot.bottom, plot.top], { nice: true }) : yScale
+		dual
+			? linearScale(numericExtent(data, sA.value), [plot.bottom, plot.top], { nice: true })
+			: yScale
 	);
 	const yB = $derived(
-		dual ? linearScale(numericExtent(data, sB.value), [plot.bottom, plot.top], { nice: true }) : yScale
+		dual
+			? linearScale(numericExtent(data, sB.value), [plot.bottom, plot.top], { nice: true })
+			: yScale
 	);
 	const yFor = (key: string) => (dual ? (key === sA.key ? yA : yB) : yScale);
 
@@ -163,12 +190,15 @@
 		return s?.format ? s.format(n) : Number.isFinite(n) ? n.toLocaleString('en-US') : String(v);
 	};
 
+	interface Dot extends Point {
+		hl: boolean; // this point's row is in the highlighted set
+	}
 	interface Line {
 		key: string;
 		label: string;
 		color: string;
 		d: string;
-		dots: Point[];
+		dots: Dot[];
 	}
 
 	// One line per visible series; a blank y yields a non-finite point, which
@@ -178,9 +208,10 @@
 		shown.map((s) => {
 			const idx = seriesList.findIndex((o) => o.key === s.key);
 			const scale = yFor(s.key);
-			const pts: Point[] = data.map((row) => ({
+			const pts: Dot[] = data.map((row) => ({
 				x: xPix(row),
-				y: scale.map(valueOf(row, s.value))
+				y: scale.map(valueOf(row, s.value)),
+				hl: isHighlighted(row)
 			}));
 			return {
 				key: s.key,
@@ -277,85 +308,99 @@
 </script>
 
 <div class="chart-root">
-<div class="plot-wrap">
-<svg
-	class="chart"
-	viewBox="0 0 {width} {height}"
-	role="img"
-	aria-label={title}
-	preserveAspectRatio="xMidYMid meet"
-	bind:this={svgEl}
-	onpointermove={onMove}
-	onpointerleave={onLeave}
->
-	<title>{title}</title>
-	{#if description}<desc>{description}</desc>{/if}
+	<div class="plot-wrap">
+		<svg
+			class="chart"
+			viewBox="0 0 {width} {height}"
+			role="img"
+			aria-label={title}
+			preserveAspectRatio="xMidYMid meet"
+			bind:this={svgEl}
+			onpointermove={onMove}
+			onpointerleave={onLeave}
+		>
+			<title>{title}</title>
+			{#if description}<desc>{description}</desc>{/if}
 
-	<Axis
-		orientation="left"
-		scale={dual ? yA : yScale}
-		left={plot.left}
-		right={plot.right}
-		top={plot.top}
-		bottom={plot.bottom}
-		format={dual ? fmtAxis(sA) : yFormat}
-		color={dual ? colorA : undefined}
-		gridlines
-		label={leftLabel}
-	/>
-	{#if dual}
-		<Axis
-			orientation="right"
-			scale={yB}
-			left={plot.left}
-			right={plot.right}
-			top={plot.top}
-			bottom={plot.bottom}
-			format={fmtAxis(sB)}
-			color={colorB}
-			label={rightLabel}
-		/>
-	{/if}
-	<Axis
-		orientation="bottom"
-		scale={xAxisScale}
-		left={plot.left}
-		right={plot.right}
-		top={plot.top}
-		bottom={plot.bottom}
-		format={xTickText}
-		label={x.label}
-	/>
-
-	<g class="lines">
-		{#each lines as line (line.key)}
-			<path class="line" d={line.d} fill="none" stroke={line.color} aria-label={line.label} />
-			{#if points}
-				<g class="dots">
-					{#each line.dots as p, i (i)}
-						<circle cx={p.x} cy={p.y} r="3" fill={line.color} />
-					{/each}
-				</g>
+			<Axis
+				orientation="left"
+				scale={dual ? yA : yScale}
+				left={plot.left}
+				right={plot.right}
+				top={plot.top}
+				bottom={plot.bottom}
+				format={dual ? fmtAxis(sA) : yFormat}
+				color={dual ? colorA : undefined}
+				gridlines
+				label={leftLabel}
+			/>
+			{#if dual}
+				<Axis
+					orientation="right"
+					scale={yB}
+					left={plot.left}
+					right={plot.right}
+					top={plot.top}
+					bottom={plot.bottom}
+					format={fmtAxis(sB)}
+					color={colorB}
+					label={rightLabel}
+				/>
 			{/if}
-		{/each}
-	</g>
+			<Axis
+				orientation="bottom"
+				scale={xAxisScale}
+				left={plot.left}
+				right={plot.right}
+				top={plot.top}
+				bottom={plot.bottom}
+				format={xTickText}
+				label={x.label}
+			/>
 
-	{#if hover}
-		<line class="guide" x1={hover.px} y1={plot.top} x2={hover.px} y2={plot.bottom} />
-	{/if}
-</svg>
+			<g class="lines">
+				{#each lines as line (line.key)}
+					<path
+						class="line"
+						class:dim={hlActive}
+						d={line.d}
+						fill="none"
+						stroke={line.color}
+						aria-label={line.label}
+					/>
+					{#if showDots}
+						<g class="dots">
+							{#each line.dots as p, i (i)}
+								<circle
+									cx={p.x}
+									cy={p.y}
+									r={p.hl ? 4.5 : 3}
+									fill={line.color}
+									class:hl={p.hl}
+									class:dim={hlActive && !p.hl}
+								/>
+							{/each}
+						</g>
+					{/if}
+				{/each}
+			</g>
 
-	{#if hover}
-		<ChartTooltip
-			xLabel={hover.xLabel}
-			xValue={hover.xValue}
-			points={hover.points}
-			left={hover.leftPct}
-			top={hover.topPct}
-			{tooltip}
-		/>
-	{/if}
-</div>
+			{#if hover}
+				<line class="guide" x1={hover.px} y1={plot.top} x2={hover.px} y2={plot.bottom} />
+			{/if}
+		</svg>
+
+		{#if hover}
+			<ChartTooltip
+				xLabel={hover.xLabel}
+				xValue={hover.xValue}
+				points={hover.points}
+				left={hover.leftPct}
+				top={hover.topPct}
+				{tooltip}
+			/>
+		{/if}
+	</div>
 
 	{#if legend}
 		<ChartLegend series={seriesList} bind:hidden />
@@ -390,5 +435,22 @@
 		stroke-width: 2;
 		stroke-linejoin: round;
 		stroke-linecap: round;
+		transition: opacity 0.15s ease;
+	}
+	/* Selection highlighting: fade the line so the marked points read, emphasise
+	   the selected point markers and dim the rest. */
+	.line.dim {
+		opacity: 0.45;
+	}
+	.dots circle {
+		transition: opacity 0.15s ease;
+	}
+	.dots circle.dim {
+		opacity: 0.3;
+	}
+	.dots circle.hl {
+		stroke: var(--chart-highlight, color-mix(in srgb, currentColor 85%, transparent));
+		stroke-width: 2;
+		paint-order: stroke;
 	}
 </style>

@@ -46,6 +46,16 @@ describe('Chart (SSR)', () => {
 		expect(body).toMatch(/class="line[^"]*"[^>]*d="M /);
 	});
 
+	it('renders the PieChart (donut) slices server-side with value + percentage labels', () => {
+		expect(body).toContain('<title>Request share by region</title>');
+		// 60/30/10 shares → per-slice aria-labels with value and percentage
+		expect(body).toContain('aria-label="apac: 60 (60%)"');
+		expect(body).toContain('aria-label="latam: 10 (10%)"');
+		// donut (innerRadius set) → ring-segment paths carry an inner arc (two A cmds)
+		const slice = body.match(/class="slice[^"]*"[^>]*d="([^"]*)"/)?.[1] ?? '';
+		expect((slice.match(/A /g) ?? []).length).toBe(2);
+	});
+
 	it('never emits NaN in any coordinate', () => {
 		expect(body).not.toContain('NaN');
 	});
