@@ -15,6 +15,7 @@ export const pages = [
     { path: "draw-sprite.html",       title: "Draw — Flying Sprite" },
     { path: "sprite-multi.html",      title: "Draw — Sprites × Many" },
     { path: "draw-keyframe.html",     title: "Draw × Sprite" },
+    { path: "sprite-group.html",      title: "Draw — Sprite as Group" },
     // A different paradigm: scroll drives the playhead.
     { path: "scroll-anim.html",       title: "Scroll-driven Animation" },
 ];
