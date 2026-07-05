@@ -270,3 +270,15 @@ export interface DrawContext {
 
 /** setContext/getContext key used by <Draw> and its children. */
 export const DRAW_CONTEXT_KEY = Symbol('geekpresent-draw');
+
+/** Provided by <Sprite> to any <Draw> nested inside it (a "group"), so that
+ *  nested Draw only shows its editing chrome while the group is ISOLATED
+ *  (entered via double-click). A top-level Draw sees no provider and edits
+ *  normally in LAYOUT. This keeps a flying group's inner handles/toolbar from
+ *  lingering (or riding along with the moving box) when you aren't editing it. */
+export interface SpriteIsolation {
+	readonly entered: boolean;
+}
+
+/** setContext/getContext key for the Sprite→nested-Draw isolation gate. */
+export const SPRITE_ISOLATION_KEY = Symbol('geekpresent-sprite-isolation');

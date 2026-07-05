@@ -27,7 +27,7 @@
 -->
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { setContext } from 'svelte';
+	import { getContext, setContext } from 'svelte';
 	import { browser } from '$app/environment';
 	import Block from '$lib/components/Block.svelte';
 	import { layoutChanges } from '$lib/stores/layoutChanges';
@@ -35,9 +35,11 @@
 	import { trackPointer } from '$lib/utils/drag';
 	import {
 		DRAW_CONTEXT_KEY,
+		SPRITE_ISOLATION_KEY,
 		type BlockShapeRegistration,
 		type DrawContext,
-		type ShapeEditor
+		type ShapeEditor,
+		type SpriteIsolation
 	} from './types';
 
 	interface Props {
@@ -69,7 +71,11 @@
 	// LAYOUT-mode editing (Phase 3): shapes read this gate + selection surface
 	// from context. canLayout keeps the published deck inert even if a stale
 	// layoutMode=true lingers in localStorage — same rule as Block.
-	const editing = $derived($canLayout && $layoutMode);
+	// When nested inside a <Sprite> group, a Draw edits only while the group is
+	// ISOLATED (double-clicked), so its chrome never lingers on the flying box.
+	// A top-level Draw sees no isolation provider and edits normally.
+	const iso = getContext<SpriteIsolation | undefined>(SPRITE_ISOLATION_KEY);
+	const editing = $derived($canLayout && $layoutMode && (iso ? iso.entered : true));
 	// $state.raw: shapes check `ctx.selected === editor` by identity, so the
 	// stored editor must not be wrapped in a reactive proxy.
 	let selected = $state.raw<ShapeEditor | null>(null);
