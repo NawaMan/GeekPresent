@@ -12,11 +12,15 @@
 
 import type {
 	Accessor,
+	AggregateOptions,
+	AggregateRow,
 	BandScale,
 	BandScaleOptions,
 	LinearScale,
 	LinearScaleOptions,
-	Point
+	Point,
+	Reducer,
+	RowGroup
 } from './types';
 
 /** null / undefined / '' — the same blank set as the DataTable. */
@@ -29,6 +33,16 @@ export function isBlank(value: unknown): boolean {
 export function valueOf<T>(row: T, accessor: Accessor<T>): unknown {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	return typeof accessor === 'function' ? accessor(row) : (row as any)?.[accessor];
+}
+
+/** Canonical string for a key/category value so equal primitives, dates, and
+ *  objects collapse regardless of reference identity — the shared keying used
+ *  by band domains, grouping, pie slices, and selection highlighting. Lets a
+ *  `highlighted` list of row keys match a mark's key by value, not by ===. */
+export function keyString(value: unknown): string {
+	if (value instanceof Date) return 'd:' + value.getTime();
+	if (value !== null && typeof value === 'object') return 'o:' + JSON.stringify(value);
+	return 't:' + String(value);
 }
 
 /** Coerce to a number, returning NaN for anything that isn't a finite value —
@@ -56,6 +70,109 @@ export function numericExtent<T>(rows: readonly T[], accessor: Accessor<T>): [nu
 	}
 	if (min === Infinity) return [NaN, NaN];
 	return [min, max];
+}
+
+// ── Aggregation (Phase 3) ────────────────────────────────────────────────────
+// Turn *table-shaped* rows (one per server) into *chart-shaped* rows (one per
+// group) — the same pure pipeline the DataTable runs, reused outside it. A
+// chart sits downstream of groupRows/aggregate exactly as it sits downstream of
+// filterRows/sortRows: plain arrays in, plain arrays out.
+
+/** Stable string key so equal group values (and equal dates) collapse to one
+ *  bucket regardless of object identity — the same keying bandScale uses. */
+function groupKey(value: unknown): string {
+	if (value instanceof Date) return 'd:' + value.getTime();
+	if (value !== null && typeof value === 'object') return 'o:' + JSON.stringify(value);
+	return 't:' + String(value);
+}
+
+/**
+ * Bucket rows by an accessor value, in FIRST-SEEN order (the caller controls
+ * order by sorting rows first — same philosophy as the table's pipeline).
+ * Returns one RowGroup per distinct value, each carrying its rows in their
+ * original order. Blank group values are kept as their own bucket (a missing
+ * region is still a group); it's the *reducers* that skip blank measures.
+ */
+export function groupRows<T>(rows: readonly T[], by: Accessor<T>): RowGroup<T>[] {
+	const groups: RowGroup<T>[] = [];
+	const index = new Map<string, RowGroup<T>>();
+	for (const row of rows) {
+		const group = valueOf(row, by);
+		const key = groupKey(group);
+		let bucket = index.get(key);
+		if (!bucket) {
+			bucket = { group, rows: [] };
+			index.set(key, bucket);
+			groups.push(bucket);
+		}
+		bucket.rows.push(row);
+	}
+	return groups;
+}
+
+/**
+ * Group rows and reduce each group to a chart-shaped `{group, value, count}`
+ * row, in first-seen group order. `count` is the number of rows in the group;
+ * `value` is `options.value(groupRows)` — a reducer from sumOf/avgOf/countOf.
+ * Blank measures are skipped by those reducers (not zeroed), so a blank
+ * `requests` neither inflates a count nor drags an average down. Ready to chart
+ * with `x={{ value: 'group' }}` + `series=[{ value: 'value', … }]`.
+ */
+export function aggregate<T>(
+	rows: readonly T[],
+	by: Accessor<T>,
+	options: AggregateOptions<T>
+): AggregateRow[] {
+	return groupRows(rows, by).map((g) => ({
+		group: g.group,
+		value: options.value(g.rows),
+		count: g.rows.length
+	}));
+}
+
+/** Reducer: sum of the accessor's finite numeric values across a group, blanks
+ *  skipped. An all-blank group sums to 0 (nothing to add), not NaN. */
+export function sumOf<T>(accessor: Accessor<T>): Reducer<T> {
+	return (rows) => {
+		let sum = 0;
+		for (const row of rows) {
+			const n = toNumber(valueOf(row, accessor));
+			if (!Number.isNaN(n)) sum += n;
+		}
+		return sum;
+	};
+}
+
+/** Reducer: mean of the accessor's finite numeric values, blanks EXCLUDED from
+ *  both the sum and the divisor — a missing value doesn't pull the average
+ *  toward 0. An all-blank group (no comparable numbers) averages to 0. */
+export function avgOf<T>(accessor: Accessor<T>): Reducer<T> {
+	return (rows) => {
+		let sum = 0;
+		let n = 0;
+		for (const row of rows) {
+			const v = toNumber(valueOf(row, accessor));
+			if (!Number.isNaN(v)) {
+				sum += v;
+				n += 1;
+			}
+		}
+		return n === 0 ? 0 : sum / n;
+	};
+}
+
+/** Reducer: the number of rows in a group. With no accessor it counts every
+ *  row; with one it counts only rows whose value is non-blank (an "N of M have
+ *  a value" measure). */
+export function countOf<T>(accessor?: Accessor<T>): Reducer<T> {
+	return (rows) => {
+		if (!accessor) return rows.length;
+		let n = 0;
+		for (const row of rows) {
+			if (!Number.isNaN(toNumber(valueOf(row, accessor)))) n += 1;
+		}
+		return n;
+	};
 }
 
 /** Round a raw step up to the nearest 1/2/5×10ⁿ — the "nice number" the axis
@@ -495,4 +612,69 @@ export function linePath(points: readonly Point[]): string {
 		}
 	}
 	return d;
+}
+
+/** A point on a circle at angle `a` measured CLOCKWISE from 12 o'clock (the pie
+ *  convention): angle 0 is straight up, π/2 is 3 o'clock. */
+function polar(cx: number, cy: number, radius: number, a: number): [number, number] {
+	return [cx + radius * Math.sin(a), cy - radius * Math.cos(a)];
+}
+
+/**
+ * SVG path for a pie/donut slice from `startAngle` to `endAngle` (radians,
+ * clockwise from 12 o'clock). `innerR > 0` cuts a donut hole (the slice becomes
+ * a ring segment); `innerR === 0` draws a solid wedge to the centre. The
+ * FULL-CIRCLE case (a lone slice spanning ≥ 2π) can't be one `A` command — a
+ * start point equal to the end is a degenerate no-op arc — so it's drawn as TWO
+ * half-circle arcs (a ring, or a disc when solid). A non-positive or non-finite
+ * span returns '' (nothing to draw). Pure geometry: PieChart maps values →
+ * angles and feeds them here.
+ */
+export function arcPath(
+	cx: number,
+	cy: number,
+	r: number,
+	innerR: number,
+	startAngle: number,
+	endAngle: number
+): string {
+	const TAU = Math.PI * 2;
+	const span = endAngle - startAngle;
+	if (!Number.isFinite(span) || span <= 0 || !(r > 0)) return '';
+
+	const hole = innerR > 0;
+	const p = (radius: number, a: number): string => {
+		const [x, y] = polar(cx, cy, radius, a);
+		return `${coord(x)} ${coord(y)}`;
+	};
+
+	// Full circle: two semicircle arcs (one A can't close a 360° path).
+	if (span >= TAU - 1e-9) {
+		const mid = startAngle + Math.PI;
+		const outer = `M ${p(r, startAngle)} A ${coord(r)} ${coord(r)} 0 1 1 ${p(r, mid)} A ${coord(r)} ${coord(r)} 0 1 1 ${p(r, startAngle)} Z`;
+		if (!hole) return outer;
+		// Inner ring boundary wound the opposite way, so the hole subtracts.
+		const inner = `M ${p(innerR, startAngle)} A ${coord(innerR)} ${coord(innerR)} 0 1 0 ${p(innerR, mid)} A ${coord(innerR)} ${coord(innerR)} 0 1 0 ${p(innerR, startAngle)} Z`;
+		return `${outer} ${inner}`;
+	}
+
+	const large = span > Math.PI ? 1 : 0;
+	if (hole) {
+		// ring segment: out along the start radius edge, sweep the outer arc CW,
+		// in along the end radius edge, sweep the inner arc back CCW.
+		return (
+			`M ${p(r, startAngle)}` +
+			` A ${coord(r)} ${coord(r)} 0 ${large} 1 ${p(r, endAngle)}` +
+			` L ${p(innerR, endAngle)}` +
+			` A ${coord(innerR)} ${coord(innerR)} 0 ${large} 0 ${p(innerR, startAngle)}` +
+			` Z`
+		);
+	}
+	// solid wedge: centre → start edge → outer arc → back to centre.
+	return (
+		`M ${coord(cx)} ${coord(cy)}` +
+		` L ${p(r, startAngle)}` +
+		` A ${coord(r)} ${coord(r)} 0 ${large} 1 ${p(r, endAngle)}` +
+		` Z`
+	);
 }

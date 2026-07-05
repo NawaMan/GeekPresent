@@ -6,12 +6,18 @@
 	import BarChart from '../src/lib/chart/BarChart.svelte';
 	import ComboChart from '../src/lib/chart/ComboChart.svelte';
 	import LineChart from '../src/lib/chart/LineChart.svelte';
+	import PieChart from '../src/lib/chart/PieChart.svelte';
 
 	const regions = [
 		{ region: 'us-east', net: 320 },
 		{ region: 'us-west', net: -140 },
 		{ region: 'eu-west', net: null }, // blank → no bar
 		{ region: 'sa-east', net: 480 }
+	];
+	const share = [
+		{ region: 'apac', requests: 60 },
+		{ region: 'emea', requests: 30 },
+		{ region: 'latam', requests: 10 }
 	];
 	const samples = [
 		{ month: 1, latency: 120 },
@@ -50,4 +56,12 @@
 	]}
 	title="Sessions and rate"
 	description="bars plus a line on two axes"
+/>
+<PieChart
+	data={share}
+	x={{ value: 'region' }}
+	series={{ key: 'requests', label: 'Requests', value: 'requests' }}
+	innerRadius={0.55}
+	title="Request share by region"
+	description="the paired table is the accessible representation"
 />

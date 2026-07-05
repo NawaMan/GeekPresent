@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+	aggregate,
+	arcPath,
+	avgOf,
 	bandScale,
+	countOf,
+	groupRows,
 	isBlank,
 	linePath,
 	linearScale,
@@ -10,6 +15,7 @@ import {
 	seriesColor,
 	stackExtent,
 	stackSeries,
+	sumOf,
 	timeTicks,
 	toNumber,
 	toTime,
@@ -267,7 +273,13 @@ describe('stackSeries', () => {
 	});
 
 	it('yields one aligned segment array per row', () => {
-		const stacks = stackSeries([{ a: 1, b: 2, c: 3 }, { a: 4, b: 5, c: 6 }], series);
+		const stacks = stackSeries(
+			[
+				{ a: 1, b: 2, c: 3 },
+				{ a: 4, b: 5, c: 6 }
+			],
+			series
+		);
 		expect(stacks).toHaveLength(2);
 		expect(stacks[0]).toHaveLength(3);
 	});
@@ -275,19 +287,25 @@ describe('stackSeries', () => {
 
 describe('stackExtent', () => {
 	it('spans the tallest stack and always includes 0', () => {
-		const stacks = stackSeries([{ a: 10, b: 20, c: 5 }], [
-			{ key: 'a', value: 'a' },
-			{ key: 'b', value: 'b' },
-			{ key: 'c', value: 'c' }
-		]);
+		const stacks = stackSeries(
+			[{ a: 10, b: 20, c: 5 }],
+			[
+				{ key: 'a', value: 'a' },
+				{ key: 'b', value: 'b' },
+				{ key: 'c', value: 'c' }
+			]
+		);
 		expect(stackExtent(stacks)).toEqual([0, 35]);
 	});
 
 	it('reaches below zero for a negative stack', () => {
-		const stacks = stackSeries([{ a: -4, b: -6 }], [
-			{ key: 'a', value: 'a' },
-			{ key: 'b', value: 'b' }
-		]);
+		const stacks = stackSeries(
+			[{ a: -4, b: -6 }],
+			[
+				{ key: 'a', value: 'a' },
+				{ key: 'b', value: 'b' }
+			]
+		);
 		expect(stackExtent(stacks)).toEqual([-10, 0]);
 	});
 
@@ -476,5 +494,124 @@ describe('linePath', () => {
 	it('returns an empty string when there is nothing drawable', () => {
 		expect(linePath([])).toBe('');
 		expect(linePath([{ x: NaN, y: NaN }])).toBe('');
+	});
+});
+describe('aggregation — groupRows / aggregate / reducers', () => {
+	type Row = { region: string; requests: number | string | null };
+	const rows: Row[] = [
+		{ region: 'us-east', requests: 100 },
+		{ region: 'us-west', requests: 200 },
+		{ region: 'us-east', requests: 300 },
+		{ region: 'us-west', requests: 'N/A' }, // blank measure (uncoercible)
+		{ region: 'eu', requests: null } // blank measure
+	];
+
+	it('groupRows buckets by accessor in first-seen order, keeping row order', () => {
+		const groups = groupRows(rows, 'region');
+		expect(groups.map((g) => g.group)).toEqual(['us-east', 'us-west', 'eu']);
+		expect(groups[0].rows).toHaveLength(2);
+		expect(groups[0].rows.map((r) => r.requests)).toEqual([100, 300]); // original order
+		expect(groups[2].rows).toHaveLength(1); // eu, one blank row
+	});
+
+	it('groupRows accepts a function accessor and keeps a blank group as its own bucket', () => {
+		const withBlank: Row[] = [...rows, { region: '', requests: 5 }];
+		const groups = groupRows(withBlank, (r) => r.region);
+		expect(groups.map((g) => g.group)).toEqual(['us-east', 'us-west', 'eu', '']);
+	});
+
+	it('aggregate produces {group, value, count} rows in group order', () => {
+		const out = aggregate(rows, 'region', { value: sumOf('requests'), label: 'Requests' });
+		expect(out).toEqual([
+			{ group: 'us-east', value: 400, count: 2 },
+			{ group: 'us-west', value: 200, count: 2 }, // 200 + blank(skipped)
+			{ group: 'eu', value: 0, count: 1 } // all-blank group sums to 0
+		]);
+	});
+
+	it('sumOf skips blanks (never adds them as 0) and an all-blank group sums to 0', () => {
+		expect(sumOf('requests')(rows.filter((r) => r.region === 'us-west'))).toBe(200);
+		expect(sumOf('requests')([{ region: 'x', requests: null }])).toBe(0);
+	});
+
+	it('avgOf skips blanks in BOTH the sum and the divisor — a blank does not drag it toward 0', () => {
+		// us-west: 200 and one blank → mean of just [200] = 200, not 100.
+		const avg = avgOf('requests');
+		expect(avg(rows.filter((r) => r.region === 'us-west'))).toBe(200);
+		expect(
+			avg([
+				{ region: 'x', requests: 100 },
+				{ region: 'x', requests: 300 }
+			])
+		).toBe(200);
+		expect(avg([{ region: 'x', requests: null }])).toBe(0); // all-blank → 0, not NaN
+	});
+
+	it('countOf() counts every row; countOf(accessor) counts only non-blank measures', () => {
+		const groups = groupRows(rows, 'region');
+		const west = groups[1].rows; // 200 and a blank
+		expect(countOf()(west)).toBe(2); // both rows
+		expect(countOf('requests')(west)).toBe(1); // only the non-blank one
+		// aggregate's own `count` field is always the group's row count
+		const out = aggregate(rows, 'region', { value: countOf('requests') });
+		expect(out.map((r) => [r.group, r.value, r.count])).toEqual([
+			['us-east', 2, 2],
+			['us-west', 1, 2], // 1 non-blank value, 2 rows
+			['eu', 0, 1]
+		]);
+	});
+
+	it('aggregate over an empty set yields no rows', () => {
+		expect(aggregate([] as Row[], 'region', { value: sumOf('requests') })).toEqual([]);
+	});
+});
+
+describe('arcPath', () => {
+	// cx=100, cy=100, r=50: angle 0 = top (100,50), π/2 = right (150,100),
+	// π = bottom (100,150), 3π/2 = left (50,100).
+	const HALF = Math.PI;
+	const QUARTER = Math.PI / 2;
+	const TAU = Math.PI * 2;
+
+	it('draws a solid wedge from the centre across a quadrant', () => {
+		expect(arcPath(100, 100, 50, 0, 0, QUARTER)).toBe('M 100 100 L 100 50 A 50 50 0 0 1 150 100 Z');
+	});
+
+	it('keeps the large-arc flag 0 for a half turn and 1 past it', () => {
+		// exactly a semicircle (span === π): still the short-arc flag
+		expect(arcPath(100, 100, 50, 0, 0, HALF)).toContain('A 50 50 0 0 1 100 150');
+		// three quarters (span > π): large-arc flag flips to 1
+		expect(arcPath(100, 100, 50, 0, 0, 3 * QUARTER)).toContain('A 50 50 0 1 1 50 100');
+	});
+
+	it('cuts a ring segment (two radii, an L between the arcs) when innerR > 0', () => {
+		const d = arcPath(100, 100, 50, 25, 0, QUARTER);
+		expect(d).toBe('M 100 50 A 50 50 0 0 1 150 100 L 125 100 A 25 25 0 0 0 100 75 Z');
+		expect(d).not.toContain('M 100 100'); // a donut segment never touches the centre
+	});
+
+	it('draws a full circle as TWO half-circle arcs (not a degenerate single arc)', () => {
+		const disc = arcPath(100, 100, 50, 0, 0, TAU);
+		expect((disc.match(/A /g) ?? []).length).toBe(2); // two semicircles
+		expect(disc.startsWith('M 100 50')).toBe(true);
+		expect(disc).not.toContain('L'); // a full disc has no radial edge
+	});
+
+	it('draws a full donut ring as two outer + two inner arcs', () => {
+		const ring = arcPath(100, 100, 50, 25, 0, TAU);
+		expect((ring.match(/A 50 50/g) ?? []).length).toBe(2); // outer ring
+		expect((ring.match(/A 25 25/g) ?? []).length).toBe(2); // inner hole
+	});
+
+	it('returns "" for a zero-size or reversed slice, or a non-positive radius', () => {
+		expect(arcPath(100, 100, 50, 0, 1, 1)).toBe(''); // zero span
+		expect(arcPath(100, 100, 50, 0, 2, 1)).toBe(''); // reversed
+		expect(arcPath(100, 100, 0, 0, 0, QUARTER)).toBe(''); // no radius
+	});
+
+	it('never emits NaN, even at the quadrant boundaries', () => {
+		for (let k = 0; k <= 4; k++) {
+			expect(arcPath(100, 100, 50, 20, 0, (k * Math.PI) / 2 || 0.001)).not.toContain('NaN');
+		}
 	});
 });

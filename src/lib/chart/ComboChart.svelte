@@ -24,6 +24,7 @@
 	import ChartTooltip from './ChartTooltip.svelte';
 	import {
 		bandScale,
+		keyString,
 		linePath,
 		linearScale,
 		nearestIndex,
@@ -34,7 +35,7 @@
 		toNumber,
 		valueOf
 	} from './chartCore';
-	import type { AxisDef, Point, SeriesDef, TooltipPoint } from './types';
+	import type { Accessor, AxisDef, Point, SeriesDef, TooltipPoint } from './types';
 
 	interface Props {
 		data: T[];
@@ -47,6 +48,11 @@
 		legend?: boolean;
 		/** Hidden series keys — bindable so a parent can drive/observe visibility. */
 		hidden?: Set<string>;
+		/** Row keys (from `rowKeyAccessor`) to emphasise; every other mark dims —
+		 *  the chart-side hook for a DataTable's `bind:selected`. */
+		highlighted?: unknown[];
+		/** How to read a row's key, matched against `highlighted`. */
+		rowKeyAccessor?: Accessor<T>;
 		width?: number;
 		height?: number;
 		/** Accessible name (SVG <title>) — required. */
@@ -63,12 +69,21 @@
 		stacked = false,
 		legend = false,
 		hidden = $bindable(new Set<string>()),
+		highlighted,
+		rowKeyAccessor,
 		width = 640,
 		height = 400,
 		title,
 		description,
 		tooltip
 	}: Props = $props();
+
+	// Selection highlighting: with a non-empty `highlighted` list + a
+	// `rowKeyAccessor`, matching bars/points are emphasised and the rest dim.
+	const hlKeys = $derived(new Set((highlighted ?? []).map(keyString)));
+	const hlActive = $derived(!!rowKeyAccessor && hlKeys.size > 0);
+	const isHighlighted = (row: T): boolean =>
+		hlActive && hlKeys.has(keyString(valueOf(row, rowKeyAccessor!)));
 
 	interface Resolved extends SeriesDef<T> {
 		mark: 'bar' | 'line';
@@ -174,6 +189,7 @@
 		fill: string;
 		key: string;
 		label: string;
+		hl: boolean; // this bar's row is in the highlighted set
 	}
 
 	// Bars: stacked stacks the bar series per axis; grouped subdivides each band
@@ -190,6 +206,7 @@
 					const cat = valueOf(row, x.value);
 					const bx = xScale.map(cat);
 					if (Number.isNaN(bx)) return;
+					const hl = isHighlighted(row);
 					stacks[i]?.forEach((seg, si) => {
 						if (seg.value === 0) return; // blank / zero → no rect
 						const s = bs[si];
@@ -202,7 +219,8 @@
 							height: Math.abs(yTop - yBase),
 							fill: colorOf(s.key),
 							key: `${catLabel(cat)}|${s.key}`,
-							label: ariaLabel(cat, s, seg.value)
+							label: ariaLabel(cat, s, seg.value),
+							hl
 						});
 					});
 				});
@@ -219,6 +237,7 @@
 				paddingInner: barSeries.length > 1 ? 0.12 : 0,
 				paddingOuter: 0
 			});
+			const hl = isHighlighted(row);
 			for (const s of barSeries) {
 				const scale = yFor(s);
 				const v = toNumber(valueOf(row, s.value));
@@ -232,19 +251,23 @@
 					height: Math.abs(vy - z),
 					fill: colorOf(s.key),
 					key: `${catLabel(cat)}|${s.key}`,
-					label: ariaLabel(cat, s, v)
+					label: ariaLabel(cat, s, v),
+					hl
 				});
 			}
 		}
 		return out;
 	});
 
+	interface Dot extends Point {
+		hl: boolean; // this point's row is in the highlighted set
+	}
 	interface Line {
 		key: string;
 		label: string;
 		color: string;
 		d: string;
-		dots: Point[];
+		dots: Dot[];
 	}
 
 	// Lines draw through the band centers, each scaled against its own axis; a
@@ -252,11 +275,12 @@
 	const lines = $derived.by<Line[]>(() =>
 		lineSeries.map((s) => {
 			const scale = yFor(s);
-			const pts: Point[] = data.map((row) => {
+			const pts: Dot[] = data.map((row) => {
 				const bx = xScale.map(valueOf(row, x.value));
 				return {
 					x: Number.isNaN(bx) ? NaN : bx + xScale.bandwidth / 2,
-					y: scale.map(valueOf(row, s.value))
+					y: scale.map(valueOf(row, s.value)),
+					hl: isHighlighted(row)
 				};
 			});
 			return {
@@ -402,6 +426,8 @@
 						width={bar.width}
 						height={bar.height}
 						fill={bar.fill}
+						class:hl={bar.hl}
+						class:dim={hlActive && !bar.hl}
 						aria-label={bar.label}
 					/>
 				{/each}
@@ -424,10 +450,24 @@
 
 			<g class="lines">
 				{#each lines as line (line.key)}
-					<path class="line" d={line.d} fill="none" stroke={line.color} aria-label={line.label} />
+					<path
+						class="line"
+						class:dim={hlActive}
+						d={line.d}
+						fill="none"
+						stroke={line.color}
+						aria-label={line.label}
+					/>
 					<g class="dots">
 						{#each line.dots as p, i (i)}
-							<circle cx={p.x} cy={p.y} r="3" fill={line.color} />
+							<circle
+								cx={p.x}
+								cy={p.y}
+								r={p.hl ? 4.5 : 3}
+								fill={line.color}
+								class:hl={p.hl}
+								class:dim={hlActive && !p.hl}
+							/>
 						{/each}
 					</g>
 				{/each}
@@ -478,6 +518,21 @@
 	.bars rect {
 		transition: opacity 0.15s ease;
 	}
+	/* Selection highlighting: emphasise the chosen marks, dim the rest. */
+	.bars rect.dim,
+	.dots circle.dim,
+	.line.dim {
+		opacity: 0.34;
+	}
+	.bars rect.hl,
+	.dots circle.hl {
+		stroke: var(--chart-highlight, color-mix(in srgb, currentColor 85%, transparent));
+		stroke-width: 2;
+		paint-order: stroke;
+	}
+	.dots circle {
+		transition: opacity 0.15s ease;
+	}
 	.zero-line {
 		stroke: var(--chart-axis, color-mix(in srgb, currentColor 55%, transparent));
 		stroke-width: 1.25;
@@ -486,5 +541,6 @@
 		stroke-width: 2;
 		stroke-linejoin: round;
 		stroke-linecap: round;
+		transition: opacity 0.15s ease;
 	}
 </style>

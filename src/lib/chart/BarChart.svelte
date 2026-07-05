@@ -29,6 +29,7 @@
 	import ChartTooltip from './ChartTooltip.svelte';
 	import {
 		bandScale,
+		keyString,
 		linearScale,
 		nearestIndex,
 		numericExtent,
@@ -38,7 +39,7 @@
 		toNumber,
 		valueOf
 	} from './chartCore';
-	import type { AxisDef, SeriesDef, TooltipPoint } from './types';
+	import type { Accessor, AxisDef, SeriesDef, TooltipPoint } from './types';
 
 	interface Props {
 		data: T[];
@@ -51,6 +52,13 @@
 		legend?: boolean;
 		/** Hidden series keys — bindable so a parent can drive/observe visibility. */
 		hidden?: Set<string>;
+		/** Row keys (as produced by `rowKeyAccessor`) to emphasise; every other
+		 *  bar dims. The chart-side hook for a DataTable's `bind:selected` — the
+		 *  parent maps selected rows to keys. Empty/undefined → no highlighting. */
+		highlighted?: unknown[];
+		/** How to read a row's key, matched against `highlighted` (field name or
+		 *  function — the same identity the table selects by). */
+		rowKeyAccessor?: Accessor<T>;
 		width?: number;
 		height?: number;
 		/** Accessible name (SVG <title>) — required. */
@@ -67,12 +75,22 @@
 		stacked = false,
 		legend = false,
 		hidden = $bindable(new Set<string>()),
+		highlighted,
+		rowKeyAccessor,
 		width = 640,
 		height = 400,
 		title,
 		description,
 		tooltip
 	}: Props = $props();
+
+	// Selection highlighting: with a non-empty `highlighted` list + a
+	// `rowKeyAccessor`, bars whose row key is in the list are emphasised and the
+	// rest dim. No coupling to the DataTable — just row keys in, matched by value.
+	const hlKeys = $derived(new Set((highlighted ?? []).map(keyString)));
+	const hlActive = $derived(!!rowKeyAccessor && hlKeys.size > 0);
+	const isHighlighted = (row: T): boolean =>
+		hlActive && hlKeys.has(keyString(valueOf(row, rowKeyAccessor!)));
 
 	const seriesList = $derived(Array.isArray(series) ? series : [series]);
 	// Visible series drive every scale — hiding one re-fits the y axis.
@@ -122,7 +140,9 @@
 		}
 		return min === Infinity ? [NaN, NaN] : [min, max];
 	});
-	const yScale = $derived(linearScale(yExtent, [plot.bottom, plot.top], { zero: true, nice: true }));
+	const yScale = $derived(
+		linearScale(yExtent, [plot.bottom, plot.top], { zero: true, nice: true })
+	);
 	const zeroY = $derived(yScale.map(0));
 
 	const yFormat = (v: unknown): string => {
@@ -130,8 +150,7 @@
 		const fmt = !multi ? shown[0]?.format : undefined;
 		return fmt ? fmt(n) : Number.isFinite(n) ? n.toLocaleString('en-US') : String(v);
 	};
-	const catLabel = (cat: unknown): string =>
-		cat === null || cat === undefined ? '' : String(cat);
+	const catLabel = (cat: unknown): string => (cat === null || cat === undefined ? '' : String(cat));
 	const fmtSeries = (s: SeriesDef<T>, v: number): string =>
 		s.format ? s.format(v) : v.toLocaleString('en-US');
 	const ariaLabel = (cat: unknown, s: SeriesDef<T>, v: number): string =>
@@ -147,6 +166,7 @@
 		fill: string;
 		key: string;
 		label: string;
+		hl: boolean; // this bar's row is in the highlighted set
 	}
 
 	// The bars: grouped subdivides each band per series; stacked layers segments.
@@ -157,6 +177,7 @@
 				const cat = valueOf(row, x.value);
 				const bx = xScale.map(cat);
 				if (Number.isNaN(bx)) return;
+				const hl = isHighlighted(row);
 				stacks[i]?.forEach((seg, si) => {
 					if (seg.value === 0) return; // blank or zero → no rect
 					const s = shown[si];
@@ -169,7 +190,8 @@
 						height: Math.abs(yTop - yBase),
 						fill: colorOf(s.key),
 						key: `${catLabel(cat)}|${s.key}`,
-						label: ariaLabel(cat, s, seg.value)
+						label: ariaLabel(cat, s, seg.value),
+						hl
 					});
 				});
 			});
@@ -186,6 +208,7 @@
 				paddingInner: multi ? 0.12 : 0,
 				paddingOuter: 0
 			});
+			const hl = isHighlighted(row);
 			shown.forEach((s, si) => {
 				const v = toNumber(valueOf(row, s.value));
 				if (Number.isNaN(v)) return; // blank → no bar
@@ -198,7 +221,8 @@
 					height: Math.abs(vy - zeroY),
 					fill: colorOf(s.key),
 					key: `${catLabel(cat)}|${s.key}`,
-					label: ariaLabel(cat, s, v)
+					label: ariaLabel(cat, s, v),
+					hl
 				});
 			});
 		}
@@ -287,75 +311,77 @@
 </script>
 
 <div class="chart-root">
-<div class="plot-wrap">
-<svg
-	class="chart"
-	viewBox="0 0 {width} {height}"
-	role="img"
-	aria-label={title}
-	preserveAspectRatio="xMidYMid meet"
-	bind:this={svgEl}
-	onpointermove={onMove}
-	onpointerleave={onLeave}
->
-	<title>{title}</title>
-	{#if description}<desc>{description}</desc>{/if}
+	<div class="plot-wrap">
+		<svg
+			class="chart"
+			viewBox="0 0 {width} {height}"
+			role="img"
+			aria-label={title}
+			preserveAspectRatio="xMidYMid meet"
+			bind:this={svgEl}
+			onpointermove={onMove}
+			onpointerleave={onLeave}
+		>
+			<title>{title}</title>
+			{#if description}<desc>{description}</desc>{/if}
 
-	{#if hover}
-		<line class="guide" x1={hover.px} y1={plot.top} x2={hover.px} y2={plot.bottom} />
-	{/if}
+			{#if hover}
+				<line class="guide" x1={hover.px} y1={plot.top} x2={hover.px} y2={plot.bottom} />
+			{/if}
 
-	<Axis
-		orientation="left"
-		scale={yScale}
-		left={plot.left}
-		right={plot.right}
-		top={plot.top}
-		bottom={plot.bottom}
-		format={yFormat}
-		gridlines
-		label={yAxisLabel}
-	/>
-
-	<g class="bars">
-		{#each bars as bar (bar.key)}
-			<rect
-				x={bar.x}
-				y={bar.y}
-				width={bar.width}
-				height={bar.height}
-				fill={bar.fill}
-				aria-label={bar.label}
+			<Axis
+				orientation="left"
+				scale={yScale}
+				left={plot.left}
+				right={plot.right}
+				top={plot.top}
+				bottom={plot.bottom}
+				format={yFormat}
+				gridlines
+				label={yAxisLabel}
 			/>
-		{/each}
-	</g>
 
-	<!-- zero baseline: where bars originate; negatives hang below it -->
-	<line class="zero-line" x1={plot.left} y1={zeroY} x2={plot.right} y2={zeroY} />
+			<g class="bars">
+				{#each bars as bar (bar.key)}
+					<rect
+						x={bar.x}
+						y={bar.y}
+						width={bar.width}
+						height={bar.height}
+						fill={bar.fill}
+						class:hl={bar.hl}
+						class:dim={hlActive && !bar.hl}
+						aria-label={bar.label}
+					/>
+				{/each}
+			</g>
 
-	<Axis
-		orientation="bottom"
-		scale={xScale}
-		left={plot.left}
-		right={plot.right}
-		top={plot.top}
-		bottom={plot.bottom}
-		format={x.format}
-		label={x.label}
-	/>
-</svg>
+			<!-- zero baseline: where bars originate; negatives hang below it -->
+			<line class="zero-line" x1={plot.left} y1={zeroY} x2={plot.right} y2={zeroY} />
 
-	{#if hover}
-		<ChartTooltip
-			xLabel={hover.xLabel}
-			xValue={hover.xValue}
-			points={hover.points}
-			left={hover.leftPct}
-			top={hover.topPct}
-			{tooltip}
-		/>
-	{/if}
-</div>
+			<Axis
+				orientation="bottom"
+				scale={xScale}
+				left={plot.left}
+				right={plot.right}
+				top={plot.top}
+				bottom={plot.bottom}
+				format={x.format}
+				label={x.label}
+			/>
+		</svg>
+
+		{#if hover}
+			<ChartTooltip
+				xLabel={hover.xLabel}
+				xValue={hover.xValue}
+				points={hover.points}
+				left={hover.leftPct}
+				top={hover.topPct}
+				{tooltip}
+			/>
+		{/if}
+	</div>
 
 	{#if legend}
 		<ChartLegend series={seriesList} bind:hidden />
@@ -387,7 +413,18 @@
 		pointer-events: none;
 	}
 	.bars rect {
-		transition: opacity 0.15s ease;
+		transition:
+			opacity 0.15s ease,
+			stroke-width 0.15s ease;
+	}
+	/* Selection highlighting: emphasise the chosen bars, dim the rest. */
+	.bars rect.dim {
+		opacity: 0.32;
+	}
+	.bars rect.hl {
+		stroke: var(--chart-highlight, color-mix(in srgb, currentColor 85%, transparent));
+		stroke-width: 2;
+		paint-order: stroke;
 	}
 	.zero-line {
 		stroke: var(--chart-axis, color-mix(in srgb, currentColor 55%, transparent));
