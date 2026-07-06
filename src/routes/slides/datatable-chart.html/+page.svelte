@@ -25,7 +25,7 @@
 	import {
 		DataTable,
 		filterRows,
-		inferColumnType,
+		resolveColumnTypes,
 		sortRows,
 		type ColumnDef,
 		type TableState
@@ -37,20 +37,30 @@
 	const path = 'src/routes/slides/datatable-chart.html/+page.svelte';
 
 	const columns: ColumnDef<ServerRow>[] = [
-		{ key: 'id', label: 'ID', width: '4.5em' },
+		// ID is inferred as a number → same typed filter: 5, <=10, in(1,5,9)
+		{ key: 'id', label: 'ID', width: '5.5em', filterable: true },
 		{ key: 'name', label: 'Name', filterable: true },
 		{ key: 'region', label: 'Region', filterable: true },
-		{ key: 'status', label: 'Status' },
+		// Status filters like Name/Region — a substring of the badge's text
+		// (the filter matches the value, not the rendered snippet).
+		{ key: 'status', label: 'Status', filterable: true },
 		{
 			key: 'requests',
 			label: 'Requests',
 			type: 'number',
 			align: 'right',
+			// number filter understands >  >=  <  <=  !=  =  and in(…): e.g. >1000000
+			filterable: true,
 			format: (v) =>
 				v == null ? '—' : typeof v === 'number' ? v.toLocaleString('en-US') : String(v)
 		},
-		{ key: 'deployed', label: 'Last deploy', type: 'date' }
+		// date filter: same operators over the deploy day, e.g. >=2025-06-01
+		{ key: 'deployed', label: 'Last deploy', type: 'date', filterable: true }
 	];
+
+	// The table resolves these internally; the shared pipeline below reuses the
+	// same map so a >  <  in(…) filter reshapes the charts exactly like the table.
+	const columnTypes = resolveColumnTypes(servers, columns);
 
 	let tableState = $state<TableState>({
 		sort: null,
@@ -67,12 +77,8 @@
 	const visibleRows = $derived.by(() => {
 		const s = tableState;
 		const column = s.sort ? columns.find((c) => c.key === s.sort!.key) : undefined;
-		const type = !column
-			? 'string'
-			: column.type && column.type !== 'auto'
-				? column.type
-				: inferColumnType(servers, column.key, column.sortValue);
-		const filtered = filterRows(servers, s.search, columns, s.columnFilters);
+		const type = column ? columnTypes[column.key] : 'string';
+		const filtered = filterRows(servers, s.search, columns, s.columnFilters, columnTypes);
 		return sortRows(filtered, s.sort, type, column?.sortValue);
 	});
 

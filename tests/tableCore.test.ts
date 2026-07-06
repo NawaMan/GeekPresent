@@ -7,6 +7,8 @@ import {
 	filterRows,
 	inferColumnType,
 	isBlank,
+	matchColumnFilter,
+	resolveColumnTypes,
 	pageCount,
 	pageWindow,
 	paginateRows,
@@ -257,6 +259,69 @@ describe('filterRows / cellText', () => {
 		];
 		// name is hidden → its filter is suspended (no invisible criteria)
 		expect(ids(filterRows(rows, '', hidden, { name: 'item' }))).toEqual([1, 2, 3, 4, 5]);
+	});
+});
+
+describe('typed column filters (number / date)', () => {
+	// amount: 100, 2, 10, null, 'oops'  |  when: two 2024 dates, a 2023 date, null, 'garbage'
+	const columns: ColumnDef<Row>[] = [
+		{ key: 'name', label: 'Name' },
+		{ key: 'amount', label: 'Amount', type: 'number', format: (v) => (v === null ? '—' : `$${v}`) },
+		{ key: 'when', label: 'When', type: 'date' }
+	];
+	const types = resolveColumnTypes(rows, columns);
+	const byAmount = (expr: string) => ids(filterRows(rows, '', columns, { amount: expr }, types));
+	const byWhen = (expr: string) => ids(filterRows(rows, '', columns, { when: expr }, types));
+
+	it('resolveColumnTypes honours explicit types', () => {
+		expect(types).toEqual({ name: 'string', amount: 'number', when: 'date' });
+	});
+
+	it('number: bare value is an exact match', () => {
+		expect(byAmount('100')).toEqual([1]);
+		expect(byAmount('10')).toEqual([3]);
+		expect(byAmount('3')).toEqual([]); // exact, not substring
+	});
+
+	it('number: <, <=, >, >=, != comparisons (blank/NaN cells never match)', () => {
+		expect(byAmount('>10')).toEqual([1]);
+		expect(byAmount('>=10')).toEqual([1, 3]);
+		expect(byAmount('<10')).toEqual([2]);
+		expect(byAmount('<=10')).toEqual([2, 3]);
+		expect(byAmount('!=10')).toEqual([1, 2]); // null + 'oops' are uncomparable → excluded
+	});
+
+	it('number: in(…) set membership and thousands separators', () => {
+		expect(byAmount('in(2, 10)')).toEqual([2, 3]);
+		expect(byAmount('in(100, 2)')).toEqual([1, 2]);
+		expect(byAmount('>=1,00')).toEqual([1]); // separators stripped → >=100
+	});
+
+	it('number: an unparseable expression falls back to a substring of the formatted text', () => {
+		expect(byAmount('oops')).toEqual([5]); // matches "$oops"
+		expect(byAmount('$10')).toEqual([1, 3]); // "$100" and "$10"
+	});
+
+	it('date: comparisons over the day, bare value is a substring of the text', () => {
+		expect(byWhen('>=2024-01-01')).toEqual([1, 4]);
+		expect(byWhen('<2024-01-01')).toEqual([3]);
+		expect(byWhen('=2024-05-01')).toEqual([1, 4]);
+		expect(byWhen('in(2023-01-15, 2024-05-01)')).toEqual([1, 3, 4]);
+		expect(byWhen('2024')).toEqual([1, 4]); // bare → substring of "2024-05-01"
+	});
+
+	it('string columns and a missing type entry stay substring matches', () => {
+		expect(ids(filterRows(rows, '', columns, { name: '>item' }, types))).toEqual([]);
+		// no columnTypes at all → every column filters as a string (backward compatible)
+		expect(ids(filterRows(rows, '', columns, { amount: '>10' }))).toEqual([]); // ">10" substring of "$100"? no
+	});
+
+	it('matchColumnFilter is the reusable primitive', () => {
+		expect(matchColumnFilter(1876482, '1,876,482', '>1000000', 'number')).toBe(true);
+		expect(matchColumnFilter(500, '500', '>1000000', 'number')).toBe(false);
+		expect(matchColumnFilter(null, '—', '>0', 'number')).toBe(false);
+		expect(matchColumnFilter('2025-06-18', '2025-06-18', '>=2025-01-01', 'date')).toBe(true);
+		expect(matchColumnFilter('healthy', 'healthy', 'health', 'string')).toBe(true);
 	});
 });
 

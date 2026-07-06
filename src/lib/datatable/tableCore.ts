@@ -122,35 +122,154 @@ export function cellText<T>(row: T, column: ColumnDef<T>): string {
 	return isBlank(raw) ? '' : String(raw);
 }
 
+/** Resolve every column's effective type against the data in one map (keyed by
+ *  column.key): an explicit non-'auto' type is taken as-is, else inferred via
+ *  inferColumnType (sampling the sortValue accessor when present). This is the
+ *  same resolution DataTable does internally — call it once and hand the map to
+ *  filterRows so the shared pipeline (charts, CSV, fake server) filters numbers
+ *  and dates the same way the table does. */
+export function resolveColumnTypes<T>(
+	rows: readonly T[],
+	columns: readonly ColumnDef<T>[]
+): Record<string, ResolvedColumnType> {
+	const map: Record<string, ResolvedColumnType> = {};
+	for (const column of columns) {
+		map[column.key] =
+			!column.type || column.type === 'auto'
+				? inferColumnType(rows, column.key, column.sortValue)
+				: column.type;
+	}
+	return map;
+}
+
+type ComparisonOp = '=' | '!=' | '<' | '<=' | '>' | '>=' | 'in';
+
+/** Numeric operand: strip thousands separators (commas/underscores/spaces) so
+ *  "1,000,000" and "1_000_000" parse; blank → NaN (never Number('') === 0). */
+function numberOperand(text: string): number {
+	const cleaned = text.replace(/[,_\s]/g, '');
+	return cleaned === '' ? NaN : Number(cleaned);
+}
+
 /**
- * Filter stage: global search AND per-column filters, both case-insensitive
- * substring matches against the displayed (formatted) text. The global
- * search matches if ANY visible column contains it; each non-blank column
- * filter must ALSO match its own column (AND composition). Filters keyed to
- * unknown or hidden columns are ignored — hiding a column suspends its
- * filter (WYSIWYG: no invisible criteria). Empty search + no active filters
- * returns all rows.
+ * Parse a number/date column filter into an operator + comparable operand(s),
+ * or null when it isn't a typed expression (a bare date, a half-typed or
+ * non-numeric fragment) — the caller then falls back to a substring match.
+ * Grammar (whitespace-tolerant): `42` (bare → exact, numbers only),
+ * `<42 <=42 >42 >=42 !=42 <>42 =42`, and `in(1, 2, 3)`. Date operands are
+ * coerced to timestamps; number operands through numberOperand.
+ */
+function parseComparisonFilter(
+	text: string,
+	type: ResolvedColumnType
+): { op: ComparisonOp; values: number[] } | null {
+	const coerce = (s: string): number => (type === 'date' ? toTime(s.trim()) : numberOperand(s));
+
+	const inMatch = /^in\s*\(([^)]*)\)$/i.exec(text);
+	if (inMatch) {
+		const values = inMatch[1].split(',').map(coerce).filter((n) => !Number.isNaN(n));
+		return values.length ? { op: 'in', values } : null;
+	}
+	const opMatch = /^(<=|>=|!=|<>|<|>|=)\s*(.+)$/.exec(text);
+	if (opMatch) {
+		const op = (opMatch[1] === '<>' ? '!=' : opMatch[1]) as ComparisonOp;
+		const value = coerce(opMatch[2]);
+		return Number.isNaN(value) ? null : { op, values: [value] };
+	}
+	// A bare value is an exact match for numbers; on a date column it stays a
+	// substring match (bare "2025"/"2025-06" narrow naturally — use =date for
+	// an exact day), so return null and let the caller fall back.
+	if (type === 'date') return null;
+	const value = coerce(text);
+	return Number.isNaN(value) ? null : { op: '=', values: [value] };
+}
+
+/**
+ * Does a single cell satisfy one column filter? String columns: a
+ * case-insensitive substring of the displayed text (`displayed`). Number/date
+ * columns understand an operator grammar on the raw comparable value:
+ *   42            exact match (number columns)
+ *   <42 <=42 >42 >=42 !=42   inequality
+ *   in(1, 2, 3)   membership in the listed set
+ *   >2025-01-01, in(2025-01-01, 2025-06-18)   the same for date columns
+ * Anything a number/date column can't parse as such (a bare date, a half-typed
+ * or non-numeric fragment) falls back to the substring match, so typing never
+ * snaps the table empty mid-keystroke. A blank/uncomparable cell (null, 'N/A',
+ * invalid date) never satisfies a typed comparison.
+ */
+export function matchColumnFilter(
+	rawValue: unknown,
+	displayed: string,
+	filterText: string,
+	type: ResolvedColumnType
+): boolean {
+	const needle = filterText.trim();
+	if (needle === '') return true;
+	const substring = () => displayed.toLowerCase().includes(needle.toLowerCase());
+	if (type !== 'number' && type !== 'date') return substring();
+
+	const parsed = parseComparisonFilter(needle, type);
+	if (!parsed) return substring();
+	const x = type === 'date' ? toTime(rawValue) : toNumber(rawValue);
+	if (Number.isNaN(x)) return false;
+	switch (parsed.op) {
+		case '=':
+			return x === parsed.values[0];
+		case '!=':
+			return x !== parsed.values[0];
+		case '<':
+			return x < parsed.values[0];
+		case '<=':
+			return x <= parsed.values[0];
+		case '>':
+			return x > parsed.values[0];
+		case '>=':
+			return x >= parsed.values[0];
+		case 'in':
+			return parsed.values.includes(x);
+	}
+}
+
+/**
+ * Filter stage: global search AND per-column filters. The global search is
+ * always a case-insensitive substring match against the displayed (formatted)
+ * text of ANY visible column. Each non-blank column filter must ALSO match its
+ * own column (AND composition) — via matchColumnFilter, so number/date columns
+ * (per `columnTypes`, from resolveColumnTypes) accept operator expressions
+ * (`>1000`, `!=0`, `in(1,2,3)`) while string columns stay substring matches.
+ * Without a `columnTypes` entry a column filters as a string (backward
+ * compatible). Filters keyed to unknown or hidden columns are ignored — hiding
+ * a column suspends its filter (WYSIWYG: no invisible criteria). Empty search +
+ * no active filters returns all rows.
  */
 export function filterRows<T>(
 	rows: readonly T[],
 	search: string,
 	columns: readonly ColumnDef<T>[],
-	columnFilters: Record<string, string> = {}
+	columnFilters: Record<string, string> = {},
+	columnTypes: Record<string, ResolvedColumnType> = {}
 ): T[] {
 	const needle = search.trim().toLowerCase();
 	const searched = columns.filter((c) => c.visible !== false);
 	const active = Object.entries(columnFilters)
 		.map(([key, text]) => ({
 			column: searched.find((c) => c.key === key),
-			needle: text.trim().toLowerCase()
+			text
 		}))
-		.filter((f) => f.column !== undefined && f.needle !== '');
+		.filter((f) => f.column !== undefined && f.text.trim() !== '');
 	if (needle === '' && active.length === 0) return rows.slice();
 	return rows.filter(
 		(row) =>
 			(needle === '' ||
 				searched.some((column) => cellText(row, column).toLowerCase().includes(needle))) &&
-			active.every((f) => cellText(row, f.column!).toLowerCase().includes(f.needle))
+			active.every((f) =>
+				matchColumnFilter(
+					cellValue(row, f.column!),
+					cellText(row, f.column!),
+					f.text,
+					columnTypes[f.column!.key] ?? 'string'
+				)
+			)
 	);
 }
 
