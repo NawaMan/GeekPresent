@@ -12,6 +12,7 @@ import {
 	nearestIndex,
 	niceTicks,
 	numericExtent,
+	sampleFunction,
 	seriesColor,
 	stackExtent,
 	stackSeries,
@@ -494,6 +495,44 @@ describe('linePath', () => {
 	it('returns an empty string when there is nothing drawable', () => {
 		expect(linePath([])).toBe('');
 		expect(linePath([{ x: NaN, y: NaN }])).toBe('');
+	});
+});
+describe('sampleFunction', () => {
+	it('samples y = f(x) into `samples` points, hitting both endpoints exactly', () => {
+		const pts = sampleFunction((x) => 2 * x, [0, 10], 6);
+		expect(pts).toHaveLength(6);
+		expect(pts[0]).toEqual({ x: 0, y: 0 });
+		expect(pts[5]).toEqual({ x: 10, y: 20 }); // last point lands ON x1, no float drift
+		expect(pts[1]).toEqual({ x: 2, y: 4 });
+	});
+
+	it('keeps a non-finite result as a non-finite y so linePath gaps it', () => {
+		const pts = sampleFunction((x) => 1 / x, [-1, 1], 3); // middle sample at x = 0
+		expect(pts[1].x).toBe(0);
+		expect(Number.isFinite(pts[1].y)).toBe(false); // 1/0 → Infinity, kept as a gap
+		expect(linePath(pts)).not.toContain('Infinity');
+		expect((linePath(pts).match(/M /g) ?? []).length).toBe(2); // pen lifts → two sub-paths
+	});
+
+	it('turns a thrown domain error into a gap (NaN), never a crash', () => {
+		const pts = sampleFunction((x) => {
+			if (x < 0) throw new Error('domain');
+			return Math.sqrt(x);
+		}, [-1, 1], 3);
+		expect(Number.isNaN(pts[0].y)).toBe(true); // threw → NaN
+		expect(pts[2].y).toBeCloseTo(1);
+	});
+
+	it('coerces a non-number return (NaN, Infinity survive) and orders a reversed domain', () => {
+		const pts = sampleFunction(() => Math.sqrt(-1), [0, 1], 2); // NaN
+		expect(pts.every((p) => Number.isNaN(p.y))).toBe(true);
+		const rev = sampleFunction((x) => x, [10, 0], 3);
+		expect(rev.map((p) => p.x)).toEqual([0, 5, 10]); // sorted ascending
+	});
+
+	it('degenerates safely: non-finite domain → [], zero-width → one point', () => {
+		expect(sampleFunction((x) => x, [NaN, 1])).toEqual([]);
+		expect(sampleFunction((x) => x * x, [3, 3])).toEqual([{ x: 3, y: 9 }]);
 	});
 });
 describe('aggregation — groupRows / aggregate / reducers', () => {

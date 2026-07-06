@@ -585,6 +585,52 @@ export function timeTicks(min: number, max: number, count = 6): TimeTicks {
 	return { ticks, format: timeLabeler(chosen.unit) };
 }
 
+/**
+ * Sample a continuous function `y = f(x)` into evenly-spaced `{x, y}` points
+ * over `[x0, x1]` — the one missing seam between a math formula and the existing
+ * data-driven charts. Feed the result to LineChart as its `data` with
+ * `x={{ value: 'x', type: 'linear' }}` and a series reading `y`; every scale,
+ * tick, and path already works unchanged.
+ *
+ * `samples` is the number of POINTS (default 200), so there are `samples - 1`
+ * intervals and the endpoints x0/x1 are hit exactly. A non-finite result — an
+ * asymptote, a domain error, or a thrown exception (caught → NaN) — is kept as a
+ * non-finite `y`, so `linePath` BREAKS the curve into a gap there instead of
+ * plotting a spurious 0 or a vertical spike (e.g. tan x, 1/x). Callers wanting a
+ * clamped view (tan blowing up the y-scale) map |y| over a cutoff to NaN before
+ * charting. A non-finite domain yields []; a zero-width domain yields the single
+ * endpoint. Pure — no DOM, unit-tested alongside the rest of chartCore.
+ */
+export function sampleFunction(
+	fn: (x: number) => number,
+	domain: [number, number],
+	samples = 200
+): Point[] {
+	let [x0, x1] = domain;
+	if (!Number.isFinite(x0) || !Number.isFinite(x1)) return [];
+	if (x0 > x1) [x0, x1] = [x1, x0];
+
+	const at = (x: number): Point => {
+		let y: number;
+		try {
+			y = fn(x);
+		} catch {
+			y = NaN; // a thrown domain error is a gap, not a crash
+		}
+		return { x, y: typeof y === 'number' ? y : NaN };
+	};
+
+	if (x0 === x1) return [at(x0)];
+
+	const n = Math.max(2, Math.floor(samples)); // at least the two endpoints
+	const step = (x1 - x0) / (n - 1);
+	const points: Point[] = [];
+	for (let i = 0; i < n; i++) {
+		points.push(at(i === n - 1 ? x1 : x0 + i * step)); // land exactly on x1
+	}
+	return points;
+}
+
 /** Round a coordinate to 2dp so path strings stay short and stable. */
 function coord(n: number): number {
 	return Math.round(n * 100) / 100;
