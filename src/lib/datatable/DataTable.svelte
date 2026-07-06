@@ -9,8 +9,11 @@
   Uncontrolled by default: pass raw `rows` + `columns` and the component
   filters/sorts/paginates internally. A column can sort by something other
   than what it displays via `sortValue: (row) => value` — see types.ts.
-  Columns with `filterable: true` get a debounced contains-filter input in
-  a second header row; column filters AND the global search compose.
+  Columns with `filterable: true` get a debounced filter input in a second
+  header row; column filters AND the global search compose. String columns
+  filter by substring; number/date columns understand an operator grammar
+  (`42`, `<`, `<=`, `>`, `>=`, `!=`, `in(1,2,3)` — dates too, e.g.
+  `>=2025-06-01`), falling back to substring for anything unparseable.
   All processing state lives in one TableState object exposed as
   `bind:state` — bind it and internal changes write back to the parent;
   change it externally and the table follows (controlled mode).
@@ -49,8 +52,8 @@
 		cellValue,
 		clampPage,
 		filterRows,
-		inferColumnType,
 		pageCount,
+		resolveColumnTypes,
 		pageWindow,
 		paginateRows,
 		rowKeyOf,
@@ -165,17 +168,11 @@
 
 	// Resolve 'auto' column types once per (rows, columns) — never per
 	// comparison. Inference samples the sortValue accessor when one exists,
-	// since those are the values that get compared.
-	const columnTypes: Record<string, ResolvedColumnType> = $derived.by(() => {
-		const map: Record<string, ResolvedColumnType> = {};
-		for (const column of columns) {
-			map[column.key] =
-				!column.type || column.type === 'auto'
-					? inferColumnType(rows, column.key, column.sortValue)
-					: column.type;
-		}
-		return map;
-	});
+	// since those are the values that get compared. Drives both sort
+	// comparison and typed (number/date) column filtering.
+	const columnTypes: Record<string, ResolvedColumnType> = $derived(
+		resolveColumnTypes(rows, columns)
+	);
 
 	// The pipeline. Total for the readout comes from `sorted` (post-filter),
 	// not the raw rows. In server mode every stage passes rows through
@@ -183,7 +180,9 @@
 	// totalCount; the pure functions stay the single source of truth for
 	// client mode.
 	const filtered = $derived(
-		mode === 'client' ? filterRows(rows, table.search, columns, table.columnFilters) : rows
+		mode === 'client'
+			? filterRows(rows, table.search, columns, table.columnFilters, columnTypes)
+			: rows
 	);
 	const sortColumn = $derived(
 		table.sort ? columns.find((column) => column.key === table.sort?.key) : undefined
@@ -253,6 +252,13 @@
 
 	function filterTextOf(column: ColumnDef<T>): string {
 		return filterDrafts[column.key] ?? table.columnFilters[column.key] ?? '';
+	}
+
+	// Number/date columns accept an operator grammar (see matchColumnFilter), so
+	// hint it in the placeholder; string columns keep the plain contains-filter.
+	function filterPlaceholderOf(column: ColumnDef<T>): string {
+		const type = columnTypes[column.key];
+		return type === 'number' || type === 'date' ? '= < > in(…)' : 'Filter…';
 	}
 
 	function handleFilterInput(column: ColumnDef<T>, event: Event) {
@@ -375,7 +381,7 @@
 										<input
 											type="search"
 											class="column-filter"
-											placeholder="Filter…"
+											placeholder={filterPlaceholderOf(column)}
 											aria-label="Filter {column.label}"
 											value={filterTextOf(column)}
 											oninput={(event) => handleFilterInput(column, event)}

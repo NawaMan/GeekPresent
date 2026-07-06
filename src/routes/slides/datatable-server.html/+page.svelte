@@ -19,8 +19,8 @@
 	import {
 		DataTable,
 		filterRows,
-		inferColumnType,
 		paginateRows,
+		resolveColumnTypes,
 		sortRows,
 		type ColumnDef,
 		type TableState
@@ -62,6 +62,10 @@
 		}
 	];
 
+	// Resolve column types once; the fake server hands this to filterRows so
+	// number/date column filters use the same operator grammar the table does.
+	const columnTypes = resolveColumnTypes(servers, columns);
+
 	// One shared state object: the table writes into it on every interaction
 	// (and onstatechange hands it to the fake server), and honors it back.
 	let tableState = $state<TableState>({
@@ -85,12 +89,8 @@
 		clearTimeout(pending);
 		pending = setTimeout(() => {
 			const column = state.sort ? columns.find((c) => c.key === state.sort?.key) : undefined;
-			const type = !column
-				? 'string'
-				: column.type && column.type !== 'auto'
-					? column.type
-					: inferColumnType(servers, column.key, column.sortValue);
-			const filtered = filterRows(servers, state.search, columns, state.columnFilters);
+			const type = column ? columnTypes[column.key] : 'string';
+			const filtered = filterRows(servers, state.search, columns, state.columnFilters, columnTypes);
 			const sorted = sortRows(filtered, state.sort, type, column?.sortValue);
 			serverTotal = sorted.length;
 			serverRows = paginateRows(sorted, state.page, state.pageSize);

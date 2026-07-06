@@ -20,7 +20,7 @@
 		DataTable,
 		exportCsv,
 		filterRows,
-		inferColumnType,
+		resolveColumnTypes,
 		sortRows,
 		type ColumnDef,
 		type TableState
@@ -32,15 +32,16 @@
 
 	// $state (not const): ColumnToggle flips `visible` on this bound array
 	let columns = $state<ColumnDef<ServerRow>[]>([
-		{ key: 'id', label: 'ID', width: '4.5em' },
+		{ key: 'id', label: 'ID', width: '5.5em', filterable: true }, // inferred number → typed filter
 		{ key: 'name', label: 'Name', filterable: true },
 		{ key: 'region', label: 'Region', filterable: true },
-		{ key: 'status', label: 'Status' }, // rendered by the statusBadge snippet
+		{ key: 'status', label: 'Status', filterable: true }, // rendered by the statusBadge snippet
 		{
 			key: 'requests',
 			label: 'Requests',
 			type: 'number',
 			align: 'right',
+			filterable: true, // typed: >1000000  <=5000  !=0  in(1,2,3)
 			format: (v) =>
 				v == null ? '—' : typeof v === 'number' ? v.toLocaleString('en-US') : String(v)
 		},
@@ -49,12 +50,13 @@
 			label: 'Cost / mo',
 			type: 'number',
 			align: 'right',
+			filterable: true, // typed number filter, same operators
 			format: (v) =>
 				v == null
 					? '—'
 					: `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 		},
-		{ key: 'deployed', label: 'Last deploy', type: 'date' }
+		{ key: 'deployed', label: 'Last deploy', type: 'date', filterable: true } // e.g. >=2025-06-01
 	]);
 
 	let tableState = $state<TableState>({
@@ -71,13 +73,10 @@
 	// tableCore functions the table itself uses.
 	function downloadCsv() {
 		const state = $state.snapshot(tableState) as TableState;
+		const columnTypes = resolveColumnTypes(servers, columns);
 		const column = state.sort ? columns.find((c) => c.key === state.sort?.key) : undefined;
-		const type = !column
-			? 'string'
-			: column.type && column.type !== 'auto'
-				? column.type
-				: inferColumnType(servers, column.key, column.sortValue);
-		const filtered = filterRows(servers, state.search, columns, state.columnFilters);
+		const type = column ? columnTypes[column.key] : 'string';
+		const filtered = filterRows(servers, state.search, columns, state.columnFilters, columnTypes);
 		const sorted = sortRows(filtered, state.sort, type, column?.sortValue);
 		const blob = new Blob([exportCsv(sorted, columns)], { type: 'text/csv;charset=utf-8' });
 		const url = URL.createObjectURL(blob);
