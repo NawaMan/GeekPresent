@@ -1,5 +1,6 @@
 import { fireEvent, render } from '@testing-library/svelte';
 import { describe, expect, it } from 'vitest';
+import AreaChart from '../src/lib/chart/AreaChart.svelte';
 import BarChart from '../src/lib/chart/BarChart.svelte';
 import ComboChart from '../src/lib/chart/ComboChart.svelte';
 import LineChart from '../src/lib/chart/LineChart.svelte';
@@ -832,5 +833,60 @@ describe('ScatterChart', () => {
 		expect(tip).not.toBeNull();
 		expect(tip.textContent).toContain('Alpha'); // row.city — only reachable via the row arg
 		expect(tip.textContent).toContain('50'); // the series value, formatted
+	});
+});
+
+describe('AreaChart', () => {
+	it('draws a filled region with a crisp top edge over a zero baseline', () => {
+		const { container } = render(AreaChart, {
+			props: { data: samples, x: monthX, series: latencySeries, title: 'Latency area' }
+		});
+		expect(container.querySelector('path.area')?.getAttribute('d')).toMatch(/^M /);
+		expect(container.querySelector('path.edge')?.getAttribute('d')).toMatch(/^M /);
+		// area measures magnitude up from zero → a visible zero baseline
+		expect(container.querySelector('.zero-line')).not.toBeNull();
+	});
+
+	it('gaps the region across a blank (two closed sub-polygons, no dip to 0)', () => {
+		const { container } = render(AreaChart, {
+			props: { data: samples, x: monthX, series: latencySeries, title: 'Latency area' }
+		});
+		const d = container.querySelector('path.area')!.getAttribute('d')!;
+		expect(d.match(/M/g)).toHaveLength(2); // the null at month 5 splits the fill
+		expect(d.match(/Z/g)).toHaveLength(2);
+	});
+
+	it('stacks into one region per series (a blank pinches to zero thickness)', () => {
+		type Row = { day: number; a: number; b: number | null };
+		const rows: Row[] = [
+			{ day: 1, a: 10, b: 5 },
+			{ day: 2, a: 12, b: null }, // blank → contributes 0, no gap
+			{ day: 3, a: 9, b: 7 }
+		];
+		const two: SeriesDef[] = [
+			{ key: 'a', label: 'A', value: 'a' },
+			{ key: 'b', label: 'B', value: 'b' }
+		];
+		const { container } = render(AreaChart, {
+			props: {
+				data: rows,
+				x: { value: 'day', type: 'linear' } as AxisDef,
+				series: two,
+				stacked: true,
+				title: 'Stacked'
+			}
+		});
+		// one filled region per series; a stacked area never gaps (single sub-path each)
+		const areas = container.querySelectorAll('path.area');
+		expect(areas).toHaveLength(2);
+		for (const a of areas) expect(a.getAttribute('d')!.match(/M/g)).toHaveLength(1);
+	});
+
+	it('renders no reveal clip by default (animate off → static markup)', () => {
+		const { container } = render(AreaChart, {
+			props: { data: samples, x: monthX, series: latencySeries, title: 'Latency area' }
+		});
+		expect(container.querySelector('clipPath')).toBeNull();
+		expect(container.querySelector('.wipe')).toBeNull();
 	});
 });

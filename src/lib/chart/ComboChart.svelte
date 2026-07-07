@@ -58,8 +58,13 @@
 		/** Accessible name (SVG <title>) — required. */
 		title: string;
 		description?: string;
-		/** Override the hover tooltip body; receives (xValue, points). */
-		tooltip?: Snippet<[unknown, TooltipPoint[]]>;
+		/** Play a one-off left-to-right draw-in when the chart mounts (client-only,
+		 *  skipped under prefers-reduced-motion). Duration via --chart-animate-ms. */
+		animate?: boolean;
+		/** Override the hover tooltip body; receives (xValue, points, row) — a combo
+		 *  hover snaps to one source row, passed so the tooltip can show columns the
+		 *  chart itself never plots (e.g. `row.label`). */
+		tooltip?: Snippet<[unknown, TooltipPoint[], T]>;
 	}
 
 	let {
@@ -75,6 +80,7 @@
 		height = 400,
 		title,
 		description,
+		animate = false,
 		tooltip
 	}: Props = $props();
 
@@ -300,8 +306,24 @@
 	let svgEl: SVGSVGElement | undefined = $state();
 	let mounted = $state(false);
 	let hoverIdx = $state<number | null>(null);
+
+	// Draw-in reveal: a client-only left-to-right clip wipe on mount (skipped under
+	// prefers-reduced-motion). Never present in SSR markup — a pure enhancement.
+	let revealed = $state(false);
+	let animating = $state(false);
+	const clipId = `chart-combo-clip-${Math.random().toString(36).slice(2)}`;
+	const clipActive = $derived(animate && mounted && animating);
+	const PAD = 32; // clip padding so marks near the plot edge aren't cut once revealed
+
 	onMount(() => {
 		mounted = true;
+		const reduce =
+			typeof window !== 'undefined' &&
+			window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+		if (animate && !reduce) {
+			animating = true;
+			requestAnimationFrame(() => requestAnimationFrame(() => (revealed = true)));
+		}
 	});
 
 	const anchors = $derived(
@@ -335,6 +357,7 @@
 		xValue: unknown;
 		xLabel: string;
 		points: TooltipPoint[];
+		row: T; // the one source row under the pointer (forwarded to the tooltip snippet)
 	}
 	const hover = $derived.by<Hover | null>(() => {
 		if (!mounted || hoverIdx === null) return null;
@@ -368,7 +391,8 @@
 			topPct: (topY / height) * 100,
 			xValue: cat,
 			xLabel: x.format ? x.format(cat) : catLabel(cat),
-			points: pts
+			points: pts,
+			row
 		};
 	});
 </script>
@@ -387,6 +411,20 @@
 		>
 			<title>{title}</title>
 			{#if description}<desc>{description}</desc>{/if}
+
+			{#if clipActive}
+				<clipPath id={clipId}>
+					<rect
+						class="wipe"
+						class:run={revealed}
+						x={plot.left - PAD}
+						y={plot.top - PAD}
+						width={plot.right - plot.left + PAD * 2}
+						height={plot.bottom - plot.top + PAD * 2}
+						style:transform-origin="{plot.left - PAD}px {(plot.top + plot.bottom) / 2}px"
+					/>
+				</clipPath>
+			{/if}
 
 			{#if hover}
 				<line class="guide" x1={hover.px} y1={plot.top} x2={hover.px} y2={plot.bottom} />
@@ -418,7 +456,7 @@
 				/>
 			{/if}
 
-			<g class="bars">
+			<g class="bars" clip-path={clipActive ? `url(#${clipId})` : undefined}>
 				{#each bars as bar (bar.key)}
 					<rect
 						x={bar.x}
@@ -448,7 +486,7 @@
 				label={x.label}
 			/>
 
-			<g class="lines">
+			<g class="lines" clip-path={clipActive ? `url(#${clipId})` : undefined}>
 				{#each lines as line (line.key)}
 					<path
 						class="line"
@@ -481,6 +519,7 @@
 				points={hover.points}
 				left={hover.leftPct}
 				top={hover.topPct}
+				row={hover.row}
 				{tooltip}
 			/>
 		{/if}
@@ -542,5 +581,19 @@
 		stroke-linejoin: round;
 		stroke-linecap: round;
 		transition: opacity 0.15s ease;
+	}
+	/* Draw-in reveal: the clip rect scales from the left edge of the plot box. */
+	.wipe {
+		transform-box: view-box;
+		transform: scaleX(0);
+	}
+	.wipe.run {
+		transform: scaleX(1);
+		transition: transform var(--chart-animate-ms, 850ms) cubic-bezier(0.22, 1, 0.36, 1);
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.wipe {
+			transform: none;
+		}
 	}
 </style>

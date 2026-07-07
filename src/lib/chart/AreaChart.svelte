@@ -1,26 +1,31 @@
 <!--
-  LineChart — one line per series over a linear x-scale and a linear y-scale
-  (y does NOT force zero by default — a line reads relative change, not
-  magnitude-from-zero). A blank / uncoercible y BREAKS THAT LINE INTO A GAP
-  (linePath restarts with a fresh M), never dipping through 0. Points are drawn
-  in array order, so the caller sorts rows by x (same pipeline philosophy as the
-  table) — the x-scale places each point at its true value, so uneven spacing
-  shows as uneven gaps.
+  AreaChart — a filled region under each series over a linear (or time) x-scale.
+  Unlike the LineChart, an area reads MAGNITUDE, so its y-axis always includes a
+  zero baseline: the fill is "how much", measured up from zero.
 
-  MULTI-SERIES (Phase 2): pass `series` as an array — one line each, colored from
-  --chart-series-N by series index (SeriesDef.color overrides). By default the y
-  extent spans every series so they share one axis. With `dualAxis` (exactly two
-  series) the first series gets the LEFT y-axis and the second the RIGHT, each on
-  its own scale and tinted to match — so two very different magnitudes (e.g.
-  requests vs cost) both read legibly instead of one lying flat.
+  Two layouts (mirroring the BarChart):
+    • overlaid (default): each series is its own translucent region from the zero
+      baseline to its value, drawn back-to-front. A blank / uncoercible y BREAKS
+      that region into a gap (areaPath restarts), never dipping through 0 — the
+      same blank semantics as the line it's built on.
+    • stacked (`stacked` prop): series stack into one cumulative band each, via
+      the same stackSeries machinery the stacked bars use. A blank contributes 0
+      — the band pinches to zero thickness and everything above keeps stacking
+      (a running total, so a missing part is "nothing added here").
+
+  Each region carries a crisp top stroke (linePath) so overlapping fills stay
+  legible. Colors come from --chart-series-N by series index (SeriesDef.color
+  overrides), toggled by the optional legend.
 
   Wiring + SVG only; all math is pure in chartCore.ts:
 
-      data → x + per-series y values → linear scales → line paths (+ dots) → SVG
+      data → x + per-series y values → linear scales → area paths (+ top line) → SVG
 
-  SSR-safe (full <svg> from props alone). Accessible: role="img" with a required
-  `title` (→ <title>) and optional `description` (→ <desc>); each line carries an
-  aria-label with its series name. Theme via --chart-*. Optional dots via `points`.
+  SSR-safe (full <svg> from props alone; the hover tooltip and the optional
+  `animate` draw-in are client-only enhancements gated on onMount, so the static
+  markup is byte-identical without JS). Accessible: role="img" with a required
+  `title` (→ <title>) and optional `description` (→ <desc>); each region carries
+  an aria-label with its series name. Theme via --chart-*.
 -->
 <script lang="ts" generics="T">
 	import { onMount, type Snippet } from 'svelte';
@@ -28,12 +33,15 @@
 	import ChartLegend from './ChartLegend.svelte';
 	import ChartTooltip from './ChartTooltip.svelte';
 	import {
+		areaPath,
 		keyString,
 		linePath,
 		linearScale,
 		nearestIndex,
 		numericExtent,
 		seriesColor,
+		stackExtent,
+		stackSeries,
 		timeTicks,
 		toNumber,
 		toTime,
@@ -44,8 +52,10 @@
 	interface Props {
 		data: T[];
 		x: AxisDef<T>;
-		/** One series (single line) or many (a line each). */
+		/** One series (single region) or many (overlaid / stacked). */
 		series: SeriesDef<T> | SeriesDef<T>[];
+		/** Stack the series into cumulative bands instead of overlaying them. */
+		stacked?: boolean;
 		/** Show a clickable legend that toggles series visibility. */
 		legend?: boolean;
 		/** Hidden series keys — bindable so a parent can drive/observe visibility. */
@@ -57,23 +67,16 @@
 		description?: string;
 		/** Draw a dot at each (finite) data point. */
 		points?: boolean;
-		/** Row keys (from `rowKeyAccessor`) to emphasise; matching points are
-		 *  marked and the rest dim — the chart-side hook for a DataTable's
-		 *  `bind:selected`. Highlighting reveals the point markers even when
-		 *  `points` is off, so a selection is visible on the line. */
+		/** Row keys (from `rowKeyAccessor`) to emphasise; matching point markers are
+		 *  revealed and the rest dim — the chart-side hook for a DataTable's
+		 *  `bind:selected`. */
 		highlighted?: unknown[];
 		/** How to read a row's key, matched against `highlighted`. */
 		rowKeyAccessor?: Accessor<T>;
-		/** Two series of different magnitudes on independent axes: the first series
-		 *  on the left y-axis, the second on the right, each with its own scale.
-		 *  Requires exactly two series (ignored otherwise). */
-		dualAxis?: boolean;
 		/** Play a one-off left-to-right draw-in when the chart mounts (client-only,
 		 *  skipped under prefers-reduced-motion). Duration via --chart-animate-ms. */
 		animate?: boolean;
-		/** Override the hover tooltip body; receives (xValue, points, row) — a line
-		 *  hover snaps to one source row, passed so the tooltip can show columns the
-		 *  chart itself never plots (e.g. `row.label`). */
+		/** Override the hover tooltip body; receives (xValue, points, row). */
 		tooltip?: Snippet<[unknown, TooltipPoint[], T]>;
 	}
 
@@ -81,6 +84,7 @@
 		data,
 		x,
 		series,
+		stacked = false,
 		legend = false,
 		hidden = $bindable(new Set<string>()),
 		width = 640,
@@ -88,7 +92,6 @@
 		title,
 		description,
 		points = false,
-		dualAxis = false,
 		highlighted,
 		rowKeyAccessor,
 		animate = false,
@@ -96,8 +99,7 @@
 	}: Props = $props();
 
 	// Selection highlighting: with a non-empty `highlighted` list + a
-	// `rowKeyAccessor`, matching point markers are emphasised and the rest dim
-	// (and the markers show even when `points` is off, so the selection reads).
+	// `rowKeyAccessor`, matching point markers are emphasised and the rest dim.
 	const hlKeys = $derived(new Set((highlighted ?? []).map(keyString)));
 	const hlActive = $derived(!!rowKeyAccessor && hlKeys.size > 0);
 	const isHighlighted = (row: T): boolean =>
@@ -109,21 +111,10 @@
 	const shown = $derived(seriesList.filter((s) => !hidden.has(s.key)));
 	const multi = $derived(seriesList.length > 1);
 
-	// Dual-axis: exactly two series, first → left axis, second → right, each on
-	// its own scale so wildly different magnitudes both read legibly.
-	const dual = $derived(dualAxis && seriesList.length === 2);
-	const sA = $derived(seriesList[0]);
-	const sB = $derived(seriesList[1]);
-	const colorA = $derived(sA ? seriesColor(sA.color, 0) : '');
-	const colorB = $derived(sB ? seriesColor(sB.color, 1) : '');
-
-	// Axis labels: single-series labels the (one) left axis; dual labels both
-	// sides; plain multi-series is labelled by the legend instead.
-	const leftLabel = $derived(dual ? sA?.label : !multi ? shown[0]?.label : undefined);
-	const rightLabel = $derived(dual ? sB?.label : undefined);
+	const leftLabel = $derived(!multi ? shown[0]?.label : undefined);
 	const margin = $derived({
 		top: 18,
-		right: dual ? 52 + (rightLabel ? 20 : 0) : 18,
+		right: 18,
 		bottom: 40 + (x.label ? 22 : 0),
 		left: 52 + (leftLabel ? 20 : 0)
 	});
@@ -134,9 +125,8 @@
 		bottom: height - margin.bottom
 	});
 
-	// Time axis: x values coerce to ms timestamps (Date / ISO string / number;
-	// invalid dates are blanks). The numeric scale then works unchanged; only the
-	// ticks and their labels become calendar-aware (see timeTicks below).
+	// Time axis: x values coerce to ms timestamps; the numeric scale then works
+	// unchanged and only the ticks/labels become calendar-aware (mirrors LineChart).
 	const isTime = $derived(x.type === 'time');
 	const xNum = (row: T): number =>
 		isTime ? toTime(valueOf(row, x.value)) : toNumber(valueOf(row, x.value));
@@ -149,9 +139,6 @@
 			{ nice: !isTime }
 		)
 	);
-
-	// Calendar ticks + default label formatter for a time axis; AxisDef.format
-	// (given a Date) overrides the labels.
 	const timeT = $derived(
 		isTime ? timeTicks(xScale.domain[0], xScale.domain[1], x.ticks ?? 6) : null
 	);
@@ -163,9 +150,13 @@
 		return x.format ? x.format(v) : v === null || v === undefined ? '' : String(v);
 	};
 
-	// y extent spans every visible series so they share one axis. zero:false —
-	// lines don't force a zero baseline.
+	// Stacked totals (used both for the y extent and the bands); one entry per row.
+	const stacks = $derived(stacked ? stackSeries(data, shown) : []);
+
+	// y extent always includes zero (area = magnitude up from a baseline). Stacked
+	// spans the tallest stack; overlaid spans the widest [min, max] across series.
 	const yExtent = $derived.by<[number, number]>(() => {
+		if (stacked) return stackExtent(stacks);
 		let min = Infinity;
 		let max = -Infinity;
 		for (const s of shown) {
@@ -175,59 +166,10 @@
 		}
 		return min === Infinity ? [NaN, NaN] : [min, max];
 	});
-	const yScale = $derived(linearScale(yExtent, [plot.bottom, plot.top], { nice: true }));
-
-	// Dual axis: an independent scale per side (each fitted to its own series);
-	// both fall back to the shared yScale when not dual.
-	const yA = $derived(
-		dual
-			? linearScale(numericExtent(data, sA.value), [plot.bottom, plot.top], { nice: true })
-			: yScale
+	const yScale = $derived(
+		linearScale(yExtent, [plot.bottom, plot.top], { zero: true, nice: true })
 	);
-	const yB = $derived(
-		dual
-			? linearScale(numericExtent(data, sB.value), [plot.bottom, plot.top], { nice: true })
-			: yScale
-	);
-	const yFor = (key: string) => (dual ? (key === sA.key ? yA : yB) : yScale);
-
-	const fmtAxis = (s: SeriesDef<T> | undefined) => (v: unknown) => {
-		const n = Number(v);
-		return s?.format ? s.format(n) : Number.isFinite(n) ? n.toLocaleString('en-US') : String(v);
-	};
-
-	interface Dot extends Point {
-		hl: boolean; // this point's row is in the highlighted set
-	}
-	interface Line {
-		key: string;
-		label: string;
-		color: string;
-		d: string;
-		dots: Dot[];
-	}
-
-	// One line per visible series; a blank y yields a non-finite point, which
-	// linePath turns into a gap and the dots skip. Color by a series' position in
-	// the FULL list so hiding one doesn't recolor the rest (legend swatches match).
-	const lines = $derived.by<Line[]>(() =>
-		shown.map((s) => {
-			const idx = seriesList.findIndex((o) => o.key === s.key);
-			const scale = yFor(s.key);
-			const pts: Dot[] = data.map((row) => ({
-				x: xPix(row),
-				y: scale.map(valueOf(row, s.value)),
-				hl: isHighlighted(row)
-			}));
-			return {
-				key: s.key,
-				label: s.label,
-				color: seriesColor(s.color, idx),
-				d: linePath(pts),
-				dots: pts.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
-			};
-		})
-	);
+	const zeroY = $derived(yScale.map(0));
 
 	const yFormat = (v: unknown): string => {
 		const n = Number(v);
@@ -235,10 +177,60 @@
 		return fmt ? fmt(n) : Number.isFinite(n) ? n.toLocaleString('en-US') : String(v);
 	};
 
+	interface Dot extends Point {
+		hl: boolean; // this point's row is in the highlighted set
+	}
+	interface Area {
+		key: string;
+		label: string;
+		color: string;
+		fill: string; // the filled region path
+		stroke: string; // the crisp top edge (linePath)
+		dots: Dot[];
+	}
+
+	// One region per visible series. Overlaid: from the zero baseline to the value
+	// (a blank breaks the region). Stacked: between this series' cumulative y0 and
+	// y1 edges (a blank pinches to zero thickness). Color by a series' position in
+	// the FULL list so hiding one doesn't recolor the rest (legend swatches match).
+	const areas = $derived.by<Area[]>(() =>
+		shown.map((s, si) => {
+			const idx = seriesList.findIndex((o) => o.key === s.key);
+			const top: Dot[] = data.map((row, i) => {
+				const px = xPix(row);
+				const y = stacked
+					? yScale.map(stacks[i]?.[si]?.y1 ?? NaN)
+					: yScale.map(valueOf(row, s.value));
+				return { x: px, y, hl: isHighlighted(row) };
+			});
+			const base: Point[] = data.map((row, i) => ({
+				x: xPix(row),
+				y: stacked ? yScale.map(stacks[i]?.[si]?.y0 ?? NaN) : zeroY
+			}));
+			return {
+				key: s.key,
+				label: s.label,
+				color: seriesColor(s.color, idx),
+				fill: areaPath(top, base),
+				stroke: linePath(top),
+				dots: top.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
+			};
+		})
+	);
+
+	// The visible top of the stack/region at a row — where the hover anchors.
+	const topEdgeY = (row: T, rowIdx: number): number => {
+		const ys = shown
+			.map((s, si) =>
+				stacked ? yScale.map(stacks[rowIdx]?.[si]?.y1 ?? NaN) : yScale.map(valueOf(row, s.value))
+			)
+			.filter((y) => Number.isFinite(y));
+		return ys.length ? Math.min(...ys) : plot.top + (plot.bottom - plot.top) / 2;
+	};
+
 	// ── Hover tooltip (client-only enhancement) ──────────────────────────────
-	// Nothing here renders during SSR: `mounted` starts false, so the static SVG
-	// is byte-identical with or without JS. Pointer tracking snaps to the nearest
-	// data x via the pure nearestIndex binary search.
+	// SSR-inert: `mounted` starts false, so the static SVG is byte-identical with
+	// or without JS. Pointer tracking snaps to the nearest data x via nearestIndex.
 	let svgEl: SVGSVGElement | undefined = $state();
 	let mounted = $state(false);
 	let hoverIdx = $state<number | null>(null);
@@ -247,9 +239,9 @@
 	// prefers-reduced-motion). Never present in SSR markup — a pure enhancement.
 	let revealed = $state(false);
 	let animating = $state(false);
-	const clipId = `chart-line-clip-${Math.random().toString(36).slice(2)}`;
+	const clipId = `chart-area-clip-${Math.random().toString(36).slice(2)}`;
 	const clipActive = $derived(animate && mounted && animating);
-	const PAD = 32; // clip padding so marks near the plot edge aren't cut once revealed
+	const PAD = 32; // clip rect padding so marks near the plot edge aren't cut once revealed
 
 	onMount(() => {
 		mounted = true;
@@ -313,16 +305,10 @@
 			};
 		});
 
-		// Vertical anchor: the highest (smallest y) finite series point at this x.
-		const ys = shown
-			.map((s) => yFor(s.key).map(valueOf(row, s.value)))
-			.filter((y) => Number.isFinite(y));
-		const topY = ys.length ? Math.min(...ys) : plot.top + (plot.bottom - plot.top) / 2;
-
 		return {
 			px,
 			leftPct: (px / width) * 100,
-			topPct: (topY / height) * 100,
+			topPct: (topEdgeY(row, hoverIdx) / height) * 100,
 			xValue: valueOf(row, x.value),
 			xLabel: isTime ? xTickText(xNum(row)) : xTickText(valueOf(row, x.value)),
 			points: pts,
@@ -362,29 +348,15 @@
 
 			<Axis
 				orientation="left"
-				scale={dual ? yA : yScale}
+				scale={yScale}
 				left={plot.left}
 				right={plot.right}
 				top={plot.top}
 				bottom={plot.bottom}
-				format={dual ? fmtAxis(sA) : yFormat}
-				color={dual ? colorA : undefined}
+				format={yFormat}
 				gridlines
 				label={leftLabel}
 			/>
-			{#if dual}
-				<Axis
-					orientation="right"
-					scale={yB}
-					left={plot.left}
-					right={plot.right}
-					top={plot.top}
-					bottom={plot.bottom}
-					format={fmtAxis(sB)}
-					color={colorB}
-					label={rightLabel}
-				/>
-			{/if}
 			<Axis
 				orientation="bottom"
 				scale={xAxisScale}
@@ -397,24 +369,31 @@
 			/>
 
 			<g class="marks" clip-path={clipActive ? `url(#${clipId})` : undefined}>
-				<g class="lines">
-					{#each lines as line (line.key)}
+				<g class="areas">
+					{#each areas as area (area.key)}
 						<path
-							class="line"
+							class="area"
 							class:dim={hlActive}
-							d={line.d}
+							d={area.fill}
+							fill={area.color}
+							stroke="none"
+							aria-label={area.label}
+						/>
+						<path
+							class="edge"
+							class:dim={hlActive}
+							d={area.stroke}
 							fill="none"
-							stroke={line.color}
-							aria-label={line.label}
+							stroke={area.color}
 						/>
 						{#if showDots}
 							<g class="dots">
-								{#each line.dots as p, i (i)}
+								{#each area.dots as p, i (i)}
 									<circle
 										cx={p.x}
 										cy={p.y}
 										r={p.hl ? 4.5 : 3}
-										fill={line.color}
+										fill={area.color}
 										class:hl={p.hl}
 										class:dim={hlActive && !p.hl}
 									/>
@@ -424,6 +403,9 @@
 					{/each}
 				</g>
 			</g>
+
+			<!-- zero baseline: where the regions originate -->
+			<line class="zero-line" x1={plot.left} y1={zeroY} x2={plot.right} y2={zeroY} />
 
 			{#if hover}
 				<line class="guide" x1={hover.px} y1={plot.top} x2={hover.px} y2={plot.bottom} />
@@ -472,16 +454,22 @@
 		stroke-dasharray: 3 3;
 		pointer-events: none;
 	}
-	.line {
+	.area {
+		fill-opacity: var(--chart-area-opacity, 0.35);
+		transition: opacity 0.15s ease;
+	}
+	.edge {
 		stroke-width: 2;
 		stroke-linejoin: round;
 		stroke-linecap: round;
 		transition: opacity 0.15s ease;
 	}
-	/* Selection highlighting: fade the line so the marked points read, emphasise
-	   the selected point markers and dim the rest. */
-	.line.dim {
-		opacity: 0.45;
+	/* Selection highlighting: fade the fills so the marked points read. */
+	.area.dim {
+		opacity: 0.5;
+	}
+	.edge.dim {
+		opacity: 0.55;
 	}
 	.dots circle {
 		transition: opacity 0.15s ease;
@@ -493,6 +481,10 @@
 		stroke: var(--chart-highlight, color-mix(in srgb, currentColor 85%, transparent));
 		stroke-width: 2;
 		paint-order: stroke;
+	}
+	.zero-line {
+		stroke: var(--chart-axis, color-mix(in srgb, currentColor 55%, transparent));
+		stroke-width: 1.25;
 	}
 	/* Draw-in reveal: the clip rect scales from the left edge of the plot box. */
 	.wipe {

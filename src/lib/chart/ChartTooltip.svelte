@@ -3,8 +3,10 @@
   value as a heading, then one row per visible series (swatch + label + its
   `format`-ted value). A `tooltip` snippet on the chart overrides the body,
   receiving (xValue, points, row) — `row` is the hovered source row when the chart
-  can identify a single one (ScatterChart: one dot = one row); it is `undefined`
-  for charts whose hover spans multiple rows at an x (bar/line/combo/pie).
+  can identify a single one. In this family's wide-format model a bar/line/area/
+  combo hover snaps to exactly one row (its series are that row's columns) and a
+  scatter hover is one dot = one row, so all of them forward `row`. It is
+  `undefined` only for PieChart, whose slices come from an aggregated set.
 
   Purely presentational and positioned by the parent (left/top are percentages of
   the plot box). aria-hidden — this is pointer-transient; the accessible data is
@@ -28,8 +30,8 @@
 		tooltip?: Snippet<[unknown, TooltipPoint[], T]>;
 		xValue?: unknown;
 		/** The hovered source row, forwarded to the `tooltip` snippet as its third
-		 *  argument. Set by charts where a hover maps to exactly one row (scatter);
-		 *  undefined elsewhere. */
+		 *  argument. Set by every chart whose hover maps to one row (bar/line/area/
+		 *  combo/scatter); undefined for PieChart. */
 		row?: T;
 	}
 
@@ -65,8 +67,13 @@
 		min-width: max-content;
 		padding: 0.4em 0.6em;
 		border-radius: 6px;
-		background: var(--chart-tooltip-bg, color-mix(in srgb, currentColor 90%, transparent));
-		color: var(--chart-tooltip-fg, var(--chart-bg, #fff));
+		/* Self-contained defaults: the tooltip renders in a div OUTSIDE the svg, so
+		   it can't rely on the chart's --chart-fg/currentColor for contrast (that
+		   inherits the surrounding page's text color and silently produces e.g. a
+		   light box with light text on a dark deck). A fixed dark box + light text
+		   is always legible; decks retint via --chart-tooltip-bg / --chart-tooltip-fg. */
+		background: var(--chart-tooltip-bg, #1f2937);
+		color: var(--chart-tooltip-fg, #f4f7fa);
 		font-size: var(--chart-font-size, 13px);
 		line-height: 1.35;
 		box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
