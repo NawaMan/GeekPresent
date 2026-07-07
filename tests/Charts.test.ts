@@ -4,6 +4,8 @@ import BarChart from '../src/lib/chart/BarChart.svelte';
 import ComboChart from '../src/lib/chart/ComboChart.svelte';
 import LineChart from '../src/lib/chart/LineChart.svelte';
 import PieChart from '../src/lib/chart/PieChart.svelte';
+import ScatterChart from '../src/lib/chart/ScatterChart.svelte';
+import ScatterTooltipHost from './ScatterTooltipHost.svelte';
 import type { AxisDef, SeriesDef } from '../src/lib/chart/types';
 
 // Structure-only smoke tests (no pixels): bar/rect counts, gap in the line
@@ -708,5 +710,127 @@ describe('Selection highlighting', () => {
 		});
 		expect(container.querySelectorAll('.bars rect.dim')).toHaveLength(0);
 		expect(container.querySelectorAll('.bars rect.hl')).toHaveLength(0);
+	});
+});
+
+describe('ScatterChart', () => {
+	// x/y both continuous; one point (weight=null) is a blank → no dot.
+	type Obs = { size: number; weight: number | null; group: string };
+	const obs: Obs[] = [
+		{ size: 1, weight: 2, group: 'a' },
+		{ size: 2, weight: 5, group: 'a' },
+		{ size: 3, weight: null, group: 'b' }, // blank y → dropped
+		{ size: 4, weight: 8, group: 'b' }
+	];
+	const sizeX: AxisDef = { value: 'size', type: 'linear', label: 'Size' };
+	const weightY: SeriesDef = { key: 'weight', label: 'Weight', value: 'weight' };
+
+	it('draws one dot per non-blank row (the blank y draws none)', () => {
+		const { container } = render(ScatterChart, {
+			props: { data: obs, x: sizeX, series: weightY, title: 'Weight vs size' }
+		});
+		expect(container.querySelectorAll('.dots circle')).toHaveLength(3); // null weight omitted
+	});
+
+	it('is an accessible image with a title and per-dot coordinate labels', () => {
+		const { container } = render(ScatterChart, {
+			props: {
+				data: obs,
+				x: sizeX,
+				series: weightY,
+				title: 'Weight vs size',
+				description: 'a scatter of weight against size'
+			}
+		});
+		const svg = container.querySelector('svg')!;
+		expect(svg.getAttribute('role')).toBe('img');
+		expect(container.querySelector('title')?.textContent).toBe('Weight vs size');
+		expect(container.querySelector('desc')?.textContent).toBe('a scatter of weight against size');
+		const labels = Array.from(container.querySelectorAll('.dots circle')).map((c) =>
+			c.getAttribute('aria-label')
+		);
+		expect(labels).toContain('(1, 2)');
+	});
+
+	it('draws a dot per visible series across two clouds', () => {
+		const two: SeriesDef[] = [
+			{ key: 'weight', label: 'Weight', value: 'weight' },
+			{ key: 'size', label: 'Size', value: 'size' }
+		];
+		const { container } = render(ScatterChart, {
+			props: { data: obs, x: sizeX, series: two, title: 'Two clouds' }
+		});
+		// weight: 3 finite dots; size: 4 finite dots → 7 total
+		expect(container.querySelectorAll('.dots circle')).toHaveLength(7);
+	});
+
+	it('sizes bubbles by area when a series carries a size accessor', () => {
+		const { container } = render(ScatterChart, {
+			props: {
+				data: obs,
+				x: sizeX,
+				series: { ...weightY, size: 'size' } as SeriesDef,
+				sizeRange: [4, 20],
+				title: 'Bubbles'
+			}
+		});
+		const radii = Array.from(container.querySelectorAll('.dots circle')).map((c) =>
+			Number(c.getAttribute('r'))
+		);
+		// varied radii within the configured range (not all the default point size)
+		expect(new Set(radii).size).toBeGreaterThan(1);
+		expect(Math.min(...radii)).toBeGreaterThanOrEqual(4);
+		expect(Math.max(...radii)).toBeLessThanOrEqual(20);
+	});
+
+	it('emphasises highlighted rows and dims the rest', () => {
+		const { container } = render(ScatterChart, {
+			props: {
+				data: obs.map((r, i) => ({ ...r, id: i })),
+				x: sizeX,
+				series: weightY,
+				title: 'Highlight',
+				rowKeyAccessor: 'id',
+				highlighted: [0]
+			}
+		});
+		const dots = Array.from(container.querySelectorAll('.dots circle'));
+		expect(dots.filter((d) => d.classList.contains('hl'))).toHaveLength(1);
+		expect(dots.filter((d) => d.classList.contains('dim'))).toHaveLength(2);
+	});
+
+	it('passes the hovered source row to a custom tooltip (a field the chart never sees)', async () => {
+		const { container } = render(ScatterTooltipHost);
+		// jsdom's getBoundingClientRect is all-zero; stub it to the logical box so
+		// the pointer→logical mapping matches the SVG's own coordinates 1:1.
+		const svg = container.querySelector('svg')!;
+		(svg as SVGSVGElement).getBoundingClientRect = () =>
+			({
+				left: 0,
+				top: 0,
+				width: 640,
+				height: 400,
+				right: 640,
+				bottom: 400,
+				x: 0,
+				y: 0
+			}) as DOMRect;
+
+		expect(container.querySelector('.tooltip')).toBeNull(); // nothing until hover
+		// Hover exactly on the 'Alpha' dot by reading its rendered centre.
+		const alpha = container.querySelector('.dots circle[aria-label="(1000, 50)"]')!;
+		const cx = Number(alpha.getAttribute('cx'));
+		const cy = Number(alpha.getAttribute('cy'));
+		// jsdom's PointerEvent drops clientX/clientY; a MouseEvent typed 'pointermove'
+		// still fires onpointermove and carries the coordinates.
+		await fireEvent(
+			svg,
+			new MouseEvent('pointermove', { clientX: cx, clientY: cy, bubbles: true })
+		);
+
+		const tip = container.querySelector('.tooltip')!;
+		expect(tip).not.toBeNull();
+		expect(tip.textContent).toContain('Alpha'); // row.city — only reachable via the row arg
+		expect(tip.textContent).toContain('50'); // the series value, formatted
 	});
 });

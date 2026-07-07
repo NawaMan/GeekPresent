@@ -2,7 +2,9 @@
   ChartTooltip — the floating panel shown while hovering a chart: the hovered x
   value as a heading, then one row per visible series (swatch + label + its
   `format`-ted value). A `tooltip` snippet on the chart overrides the body,
-  receiving (xValue, points).
+  receiving (xValue, points, row) — `row` is the hovered source row when the chart
+  can identify a single one (ScatterChart: one dot = one row); it is `undefined`
+  for charts whose hover spans multiple rows at an x (bar/line/combo/pie).
 
   Purely presentational and positioned by the parent (left/top are percentages of
   the plot box). aria-hidden — this is pointer-transient; the accessible data is
@@ -21,12 +23,17 @@
 		/** left/top as percentages of the plot box (0–100). */
 		left: number;
 		top: number;
-		/** Optional body override; receives the raw x value + the points. */
-		tooltip?: Snippet<[unknown, TooltipPoint[]]>;
+		/** Optional body override; receives the raw x value, the points, and (when
+		 *  the chart can identify one) the hovered source row. */
+		tooltip?: Snippet<[unknown, TooltipPoint[], T]>;
 		xValue?: unknown;
+		/** The hovered source row, forwarded to the `tooltip` snippet as its third
+		 *  argument. Set by charts where a hover maps to exactly one row (scatter);
+		 *  undefined elsewhere. */
+		row?: T;
 	}
 
-	let { xLabel, points, left, top, tooltip, xValue }: Props = $props();
+	let { xLabel, points, left, top, tooltip, xValue, row }: Props = $props();
 </script>
 
 <div
@@ -37,7 +44,7 @@
 	aria-hidden="true"
 >
 	{#if tooltip}
-		{@render tooltip(xValue, points)}
+		{@render tooltip(xValue, points, row as T)}
 	{:else}
 		<div class="x">{xLabel}</div>
 		{#each points as p (p.key)}

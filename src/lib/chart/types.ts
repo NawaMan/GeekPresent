@@ -23,6 +23,10 @@ export interface SeriesDef<T = any> {
 	/** ComboChart only: which y-axis this series is scaled against. Defaults to
 	 *  'left' for bars and 'right' for lines. */
 	axis?: 'left' | 'right';
+	/** ScatterChart only: a per-point magnitude that sizes the dot (a bubble
+	 *  chart). Mapped area-proportionally onto the chart's `sizeRange` radii; a
+	 *  blank point falls back to the smallest radius. Omit for uniform dots. */
+	size?: Accessor<T>;
 }
 
 /** The x dimension: which value, how to scale it, how to label its ticks. */

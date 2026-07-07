@@ -7,6 +7,7 @@
 	import ComboChart from '../src/lib/chart/ComboChart.svelte';
 	import LineChart from '../src/lib/chart/LineChart.svelte';
 	import PieChart from '../src/lib/chart/PieChart.svelte';
+	import ScatterChart from '../src/lib/chart/ScatterChart.svelte';
 
 	const regions = [
 		{ region: 'us-east', net: 320 },
@@ -29,6 +30,12 @@
 		{ month: 'Jan', sessions: 4200, rate: 2.4 },
 		{ month: 'Feb', sessions: 4600, rate: 2.9 },
 		{ month: 'Mar', sessions: 5100, rate: 3.3 }
+	];
+	const cloud = [
+		{ weight: 1.2, mpg: 33 },
+		{ weight: 2.4, mpg: 25 },
+		{ weight: null, mpg: 18 }, // blank x → dropped
+		{ weight: 3.6, mpg: 16 }
 	];
 </script>
 
@@ -64,4 +71,11 @@
 	innerRadius={0.55}
 	title="Request share by region"
 	description="the paired table is the accessible representation"
+/>
+<ScatterChart
+	data={cloud}
+	x={{ value: 'weight', type: 'linear', label: 'Weight' }}
+	series={{ key: 'mpg', label: 'MPG', value: 'mpg' }}
+	title="MPG vs weight"
+	description="a dot per car; the blank weight draws none"
 />

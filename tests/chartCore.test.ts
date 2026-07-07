@@ -4,12 +4,14 @@ import {
 	arcPath,
 	avgOf,
 	bandScale,
+	bubbleRadius,
 	countOf,
 	groupRows,
 	isBlank,
 	linePath,
 	linearScale,
 	nearestIndex,
+	nearestPoint,
 	niceTicks,
 	numericExtent,
 	sampleFunction,
@@ -356,6 +358,72 @@ describe('nearestIndex', () => {
 	});
 });
 
+describe('nearestPoint', () => {
+	const pts = [
+		{ x: 0, y: 0 },
+		{ x: 10, y: 10 },
+		{ x: 20, y: 0 },
+		{ x: 30, y: 30 }
+	];
+
+	it('finds the nearest point by 2D distance', () => {
+		expect(nearestPoint(pts, 11, 9)).toBe(1); // hugging (10,10)
+		expect(nearestPoint(pts, 19, 2)).toBe(2); // hugging (20,0)
+		expect(nearestPoint(pts, 100, 100)).toBe(3); // (30,30) is closest
+	});
+
+	it('skips points with a non-finite coordinate (a blanked axis value)', () => {
+		const withGap = [
+			{ x: NaN, y: 5 },
+			{ x: 40, y: 40 },
+			{ x: 5, y: Infinity }
+		];
+		expect(nearestPoint(withGap, 0, 0)).toBe(1); // only the finite point matches
+	});
+
+	it('returns -1 when nothing is comparable', () => {
+		expect(nearestPoint([], 1, 1)).toBe(-1);
+		expect(nearestPoint([{ x: NaN, y: NaN }], 0, 0)).toBe(-1);
+	});
+
+	it('breaks ties toward the earlier index', () => {
+		const tie = [
+			{ x: 0, y: 0 },
+			{ x: 2, y: 0 }
+		];
+		expect(nearestPoint(tie, 1, 0)).toBe(0);
+	});
+});
+
+describe('bubbleRadius', () => {
+	it('maps the domain endpoints onto the radius range', () => {
+		expect(bubbleRadius(0, [0, 100], [4, 20])).toBeCloseTo(4);
+		expect(bubbleRadius(100, [0, 100], [4, 20])).toBeCloseTo(20);
+	});
+
+	it('scales AREA (not radius) linearly — the midpoint value sits between in r²', () => {
+		const r = bubbleRadius(50, [0, 100], [0, 10]);
+		// area-proportional: r² is half of the max r², so r = sqrt(50) ≈ 7.07
+		expect(r).toBeCloseTo(Math.sqrt(50));
+		expect(r).toBeGreaterThan(5); // and NOT the radius-midpoint 5
+	});
+
+	it('falls back to the smallest radius for a blank / non-finite value', () => {
+		expect(bubbleRadius(null, [0, 100], [4, 20])).toBe(4);
+		expect(bubbleRadius('nope', [0, 100], [4, 20])).toBe(4);
+	});
+
+	it('gives the mid radius for a flat or non-finite domain', () => {
+		expect(bubbleRadius(5, [7, 7], [4, 20])).toBe(12);
+		expect(bubbleRadius(5, [NaN, NaN], [4, 20])).toBe(12);
+	});
+
+	it('clamps values outside the domain to the range', () => {
+		expect(bubbleRadius(-50, [0, 100], [4, 20])).toBeCloseTo(4);
+		expect(bubbleRadius(999, [0, 100], [4, 20])).toBeCloseTo(20);
+	});
+});
+
 describe('seriesColor', () => {
 	it('prefers an explicit SeriesDef.color', () => {
 		expect(seriesColor('#abc', 3)).toBe('#abc');
@@ -515,10 +583,14 @@ describe('sampleFunction', () => {
 	});
 
 	it('turns a thrown domain error into a gap (NaN), never a crash', () => {
-		const pts = sampleFunction((x) => {
-			if (x < 0) throw new Error('domain');
-			return Math.sqrt(x);
-		}, [-1, 1], 3);
+		const pts = sampleFunction(
+			(x) => {
+				if (x < 0) throw new Error('domain');
+				return Math.sqrt(x);
+			},
+			[-1, 1],
+			3
+		);
 		expect(Number.isNaN(pts[0].y)).toBe(true); // threw → NaN
 		expect(pts[2].y).toBeCloseTo(1);
 	});
