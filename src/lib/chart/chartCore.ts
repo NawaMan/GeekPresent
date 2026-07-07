@@ -707,6 +707,50 @@ export function linePath(points: readonly Point[]): string {
 	return d;
 }
 
+/** Both endpoints of one area slice are drawable (finite x AND y on each edge).
+ *  A blank on either edge breaks the run — see areaPath. */
+function finitePair(top: Point | undefined, base: Point | undefined): boolean {
+	return (
+		top != null &&
+		base != null &&
+		Number.isFinite(top.x) &&
+		Number.isFinite(top.y) &&
+		Number.isFinite(base.x) &&
+		Number.isFinite(base.y)
+	);
+}
+
+/**
+ * SVG path for a filled band between a `top` edge and a `base` edge, the two
+ * aligned index-for-index (they share an x per index). A run BREAKS wherever
+ * either edge is non-finite (a blank), so each contiguous finite run becomes its
+ * own closed sub-polygon — a gap in a (non-stacked) area, exactly as linePath
+ * gaps a line. Within a run the top edge is traced forward, the base edge back,
+ * and the sub-path closed with Z. Returns '' when nothing is drawable. Pure
+ * geometry: AreaChart maps values → pixels and feeds the two edges here. Feed a
+ * flat base (all at the zero pixel) for a plain area; feed the previous stack's
+ * top as this one's base for a stacked area (blanks pinch to zero thickness via
+ * stackSeries, so a stack never gaps).
+ */
+export function areaPath(top: readonly Point[], base: readonly Point[]): string {
+	const n = Math.min(top.length, base.length);
+	let d = '';
+	let i = 0;
+	while (i < n) {
+		while (i < n && !finitePair(top[i], base[i])) i++; // skip to the next finite run
+		if (i >= n) break;
+		const start = i;
+		while (i < n && finitePair(top[i], base[i])) i++;
+		const end = i; // exclusive
+
+		d += `${d ? ' ' : ''}M ${coord(top[start].x)} ${coord(top[start].y)}`;
+		for (let j = start + 1; j < end; j++) d += ` L ${coord(top[j].x)} ${coord(top[j].y)}`;
+		for (let j = end - 1; j >= start; j--) d += ` L ${coord(base[j].x)} ${coord(base[j].y)}`;
+		d += ' Z';
+	}
+	return d;
+}
+
 /** A point on a circle at angle `a` measured CLOCKWISE from 12 o'clock (the pie
  *  convention): angle 0 is straight up, π/2 is 3 o'clock. */
 function polar(cx: number, cy: number, radius: number, a: number): [number, number] {

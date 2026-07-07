@@ -3,6 +3,7 @@
      proving each chart emits its complete <svg> from props alone — the same
      guarantee a prerendered slide needs, mirroring DrawSsrHost. -->
 <script lang="ts">
+	import AreaChart from '../src/lib/chart/AreaChart.svelte';
 	import BarChart from '../src/lib/chart/BarChart.svelte';
 	import ComboChart from '../src/lib/chart/ComboChart.svelte';
 	import LineChart from '../src/lib/chart/LineChart.svelte';
@@ -78,4 +79,12 @@
 	series={{ key: 'mpg', label: 'MPG', value: 'mpg' }}
 	title="MPG vs weight"
 	description="a dot per car; the blank weight draws none"
+/>
+<AreaChart
+	data={samples}
+	x={{ value: 'month', type: 'linear', label: 'Month' }}
+	series={{ key: 'latency', label: 'Latency', value: 'latency' }}
+	title="Latency area"
+	description="a filled region with a zero baseline; animate is a client-only enhancement"
+	animate
 />

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	aggregate,
 	arcPath,
+	areaPath,
 	avgOf,
 	bandScale,
 	bubbleRadius,
@@ -565,6 +566,58 @@ describe('linePath', () => {
 		expect(linePath([{ x: NaN, y: NaN }])).toBe('');
 	});
 });
+
+describe('areaPath', () => {
+	const flatBase = (top: { x: number; y: number }[], y0: number) =>
+		top.map((p) => ({ x: p.x, y: y0 }));
+
+	it('traces the top edge forward, the base edge back, and closes with Z', () => {
+		const top = [
+			{ x: 0, y: 10 },
+			{ x: 10, y: 4 },
+			{ x: 20, y: 8 }
+		];
+		const d = areaPath(top, flatBase(top, 40));
+		// top L→R, then base R→L, then close
+		expect(d).toBe('M 0 10 L 10 4 L 20 8 L 20 40 L 10 40 L 0 40 Z');
+		expect(d.endsWith('Z')).toBe(true);
+	});
+
+	it('breaks a run into separate closed sub-polygons across a blank top (a gap)', () => {
+		const top = [
+			{ x: 0, y: 10 },
+			{ x: 10, y: NaN }, // blank → the area gaps here
+			{ x: 20, y: 8 },
+			{ x: 30, y: 6 }
+		];
+		const d = areaPath(top, flatBase(top, 40));
+		// two runs → two M commands, each its own closed sub-polygon
+		expect(d.match(/M/g)).toHaveLength(2);
+		expect(d.match(/Z/g)).toHaveLength(2);
+		expect(d).not.toContain('NaN');
+	});
+
+	it('breaks a run when the base edge is blank too (stacked pinch below)', () => {
+		const top = [
+			{ x: 0, y: 5 },
+			{ x: 10, y: 4 },
+			{ x: 20, y: 3 }
+		];
+		const base = [
+			{ x: 0, y: 40 },
+			{ x: 10, y: NaN }, // blank base → break
+			{ x: 20, y: 40 }
+		];
+		expect(areaPath(top, base).match(/M/g)).toHaveLength(2);
+	});
+
+	it('rounds coordinates and returns "" when nothing is drawable', () => {
+		expect(areaPath([{ x: 1.23456, y: 2 }], [{ x: 1.23456, y: 9 }])).toBe('M 1.23 2 L 1.23 9 Z');
+		expect(areaPath([], [])).toBe('');
+		expect(areaPath([{ x: NaN, y: NaN }], [{ x: NaN, y: NaN }])).toBe('');
+	});
+});
+
 describe('sampleFunction', () => {
 	it('samples y = f(x) into `samples` points, hitting both endpoints exactly', () => {
 		const pts = sampleFunction((x) => 2 * x, [0, 10], 6);

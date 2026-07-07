@@ -68,6 +68,9 @@
 		highlighted?: unknown[];
 		/** How to read a row's key, matched against `highlighted`. */
 		rowKeyAccessor?: Accessor<T>;
+		/** Play a one-off left-to-right draw-in when the chart mounts (client-only,
+		 *  skipped under prefers-reduced-motion). Duration via --chart-animate-ms. */
+		animate?: boolean;
 		/** Override the hover tooltip body; receives (xValue, points, row) — a
 		 *  scatter hover maps to exactly one dot, so the hovered source row is
 		 *  passed too (show `row.name` etc. that the chart itself never sees). */
@@ -88,6 +91,7 @@
 		sizeRange = [5, 22],
 		highlighted,
 		rowKeyAccessor,
+		animate = false,
 		tooltip
 	}: Props = $props();
 
@@ -228,8 +232,24 @@
 	let svgEl: SVGSVGElement | undefined = $state();
 	let mounted = $state(false);
 	let hoverIdx = $state<number | null>(null);
+
+	// Draw-in reveal: a client-only left-to-right clip wipe on mount (skipped under
+	// prefers-reduced-motion). Never present in SSR markup — a pure enhancement.
+	let revealed = $state(false);
+	let animating = $state(false);
+	const clipId = `chart-scatter-clip-${Math.random().toString(36).slice(2)}`;
+	const clipActive = $derived(animate && mounted && animating);
+	const PAD = 32; // clip padding so dots/bubbles near the plot edge aren't cut once revealed
+
 	onMount(() => {
 		mounted = true;
+		const reduce =
+			typeof window !== 'undefined' &&
+			window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+		if (animate && !reduce) {
+			animating = true;
+			requestAnimationFrame(() => requestAnimationFrame(() => (revealed = true)));
+		}
 	});
 
 	function onMove(e: PointerEvent) {
@@ -304,6 +324,20 @@
 			<title>{title}</title>
 			{#if description}<desc>{description}</desc>{/if}
 
+			{#if clipActive}
+				<clipPath id={clipId}>
+					<rect
+						class="wipe"
+						class:run={revealed}
+						x={plot.left - PAD}
+						y={plot.top - PAD}
+						width={plot.right - plot.left + PAD * 2}
+						height={plot.bottom - plot.top + PAD * 2}
+						style:transform-origin="{plot.left - PAD}px {(plot.top + plot.bottom) / 2}px"
+					/>
+				</clipPath>
+			{/if}
+
 			<Axis
 				orientation="left"
 				scale={yScale}
@@ -326,18 +360,20 @@
 				label={x.label}
 			/>
 
-			<g class="dots">
-				{#each dots as d (d.key)}
-					<circle
-						cx={d.x}
-						cy={d.y}
-						r={d.r}
-						fill={d.color}
-						class:hl={d.hl}
-						class:dim={(hlActive && !d.hl) || (hover && hover.dot.key !== d.key)}
-						aria-label={d.label}
-					/>
-				{/each}
+			<g class="marks" clip-path={clipActive ? `url(#${clipId})` : undefined}>
+				<g class="dots">
+					{#each dots as d (d.key)}
+						<circle
+							cx={d.x}
+							cy={d.y}
+							r={d.r}
+							fill={d.color}
+							class:hl={d.hl}
+							class:dim={(hlActive && !d.hl) || (hover && hover.dot.key !== d.key)}
+							aria-label={d.label}
+						/>
+					{/each}
+				</g>
 			</g>
 
 			{#if hover}
@@ -404,5 +440,19 @@
 		stroke: var(--chart-highlight, color-mix(in srgb, currentColor 85%, transparent));
 		stroke-width: 2;
 		paint-order: stroke;
+	}
+	/* Draw-in reveal: the clip rect scales from the left edge of the plot box. */
+	.wipe {
+		transform-box: view-box;
+		transform: scaleX(0);
+	}
+	.wipe.run {
+		transform: scaleX(1);
+		transition: transform var(--chart-animate-ms, 850ms) cubic-bezier(0.22, 1, 0.36, 1);
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.wipe {
+			transform: none;
+		}
 	}
 </style>

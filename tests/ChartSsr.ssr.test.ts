@@ -65,14 +65,25 @@ describe('Chart (SSR)', () => {
 		expect(body).toContain('aria-label="(1.2, 33)"');
 	});
 
+	it('renders the AreaChart region server-side with a zero baseline and top edge', () => {
+		expect(body).toContain('<title>Latency area</title>');
+		// the filled region path + its crisp top edge (linePath, "M ")
+		expect(body).toMatch(/class="area[^"]*"[^>]*d="M /);
+		expect(body).toMatch(/class="edge[^"]*"[^>]*d="M /);
+		expect(body).toContain('zero-line'); // area measures magnitude up from zero
+	});
+
 	it('never emits NaN in any coordinate', () => {
 		expect(body).not.toContain('NaN');
 	});
 
-	it('never prerenders the pointer-only layers (tooltip / hover guide)', () => {
-		// The interactive layer mounts client-side; the static SVG must be complete
-		// on its own, with no tooltip panel or hover guide in the server output.
+	it('never prerenders the client-only layers (tooltip / hover guide / animate clip)', () => {
+		// The interactive + animation layers mount client-side; the static SVG must
+		// be complete on its own — no tooltip, hover guide, or reveal clip server-side
+		// (so the prerendered chart shows finished, never mid-wipe or hidden).
 		expect(body).not.toContain('class="tooltip"');
 		expect(body).not.toContain('class="guide"');
+		expect(body).not.toContain('<clipPath');
+		expect(body).not.toContain('class="wipe"');
 	});
 });
