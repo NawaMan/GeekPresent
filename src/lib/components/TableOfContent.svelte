@@ -81,6 +81,16 @@
 		left:0px;
 		margin:0px;
 		padding: 0px;
+		/* Sit above slide content (e.g. a DataTable's sticky header at z-index:1) so
+		   the open menu is never overlapped; still below the screen-fixed overlay (50). */
+		z-index: 40;
+		/* Bound the TOC to the slide's own canvas height (--canvas-h, inherited from
+		   SlideDeck; it lives inside the scaled content, so viewport units would be
+		   wrong). A flex column keeps the button pinned at the top and lets the list
+		   below scroll within whatever height is left. */
+		display: flex;
+		flex-direction: column;
+		max-height: calc(var(--canvas-h, 1080px) - var(--ctrl-top, 12px) - 12px);
 	}
 
 	.toc .content {
@@ -95,6 +105,10 @@
 		border-radius: 3px;
 		color: var(--toc-fg, #111111);
 		background-color: var(--toc-bg, #EEEEEE);
+		/* Scroll the list when it's taller than the space the flex column leaves;
+		   min-height:0 lets this flex child shrink below its content height. */
+		min-height: 0;
+		overflow-y: auto;
 	}
 
 	.toc .content ol {

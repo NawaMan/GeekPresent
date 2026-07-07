@@ -17,6 +17,7 @@ export const pages = [
     { path: "chart-bar.html",         title: "Chart — Grouped & Stacked Bars" },
     { path: "chart-line.html",        title: "Chart — Dual-Axis Line + Time" },
     { path: "chart-combo.html",       title: "Chart — Combo (Bars + Line)" },
+    { path: "chart-scatter.html",     title: "Chart — Bubble Scatter" },
     { path: "function-graph.html",    title: "Chart — Plotting y = f(x)" },
     { path: "datatable-chart.html",   title: "DataTable + Charts — One Dataset" },
     { path: "youtube-showcase.html",  title: "YouTube" },

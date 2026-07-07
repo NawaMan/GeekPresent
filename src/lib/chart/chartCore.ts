@@ -453,6 +453,53 @@ export function nearestIndex(xs: readonly number[], px: number): number {
 }
 
 /**
+ * Index of the point in `points` nearest (by squared Euclidean distance) to the
+ * pixel `(px, py)` — a scatter plot's 2D hover snap, the counterpart to the 1D
+ * `nearestIndex` a line/bar uses. Points with a non-finite x or y (a blanked
+ * coordinate) are skipped, never matched. Returns -1 when nothing is comparable.
+ * Ties go to the earlier index. O(n): a scatter re-runs this per pointer move.
+ */
+export function nearestPoint(points: readonly Point[], px: number, py: number): number {
+	let best = -1;
+	let bestDist = Infinity;
+	for (let i = 0; i < points.length; i++) {
+		const p = points[i];
+		if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+		const dx = p.x - px;
+		const dy = p.y - py;
+		const dist = dx * dx + dy * dy;
+		if (dist < bestDist) {
+			bestDist = dist;
+			best = i;
+		}
+	}
+	return best;
+}
+
+/**
+ * Radius for a bubble whose magnitude is `value`, mapped so a point's AREA (not
+ * its radius) is proportional to the value — the honest way to size a bubble, so
+ * a value twice as large reads as twice the ink rather than four times. Blanks
+ * and a non-finite value fall back to the smallest radius (`range[0]`). A flat
+ * domain (every size equal) gives the midpoint radius. Values clamp to the range.
+ */
+export function bubbleRadius(
+	value: unknown,
+	domain: [number, number],
+	range: [number, number]
+): number {
+	const [r0, r1] = range;
+	const v = toNumber(value);
+	if (Number.isNaN(v)) return r0;
+	let [d0, d1] = domain;
+	if (!Number.isFinite(d0) || !Number.isFinite(d1) || d0 === d1) return (r0 + r1) / 2;
+	if (d0 > d1) [d0, d1] = [d1, d0];
+	const t = Math.min(1, Math.max(0, (v - d0) / (d1 - d0)));
+	// Interpolate on r² so equal value-steps add equal AREA, not equal radius.
+	return Math.sqrt(r0 * r0 + t * (r1 * r1 - r0 * r0));
+}
+
+/**
  * Coerce a value to a millisecond timestamp, mirroring the DataTable's date
  * sorting: a Date → its time, a number → itself (already a timestamp), an ISO /
  * parseable string → Date.parse. Blanks and invalid dates return NaN (a blank on

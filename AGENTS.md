@@ -204,11 +204,13 @@ build steps, emphasis):
 - CSS `@keyframes` / `transition:` in a slide's `<style>` work too.
 - The `Box` component is already a worked example of CSS-transition choreography.
 
-**Important caveat to tell the user:** slide-to-slide navigation is a **full page load**
-(`NavigationBar` sets `window.location.href`), not client-side routing — so *cross-slide* transitions
-(animating from one slide to the next) don't work out of the box. Animations live *within* a slide.
-If they truly want cross-slide transitions, that's a larger change (switch nav to SvelteKit
-client-side `goto` + a shared transition layer) — scope it explicitly first.
+**Worth telling the user:** slide-to-slide navigation is a **full page load**
+(`NavigationBar` sets `window.location.href`), not client-side routing. Animations live *within* a
+slide — and *cross-slide* transitions (animating one slide into the next) **do** work, via the
+platform's cross-document **View Transitions API** (`@view-transition { navigation: auto; }`), which
+is possible precisely *because* each slide is its own document. See the `transition/` deck for worked
+examples (slide, flip, zoom, cross-fade, and shared-element `view-transition-name` morphs). No library,
+no client-side router — just a slide-scoped `<style>` opting navigation transitions in.
 
 ### "Place an element visually (LAYOUT mode)"
 

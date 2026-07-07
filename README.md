@@ -38,7 +38,7 @@ HTML-based slides aren't new — reveal.js, Slidev, Spectacle and Marp all exist
 - **Visual placement that stays "just text."** Pixel-exact positioning doesn't mean guessing numbers. Wrap an element in a `Block` (or `ImageBlock`) and flip on **LAYOUT mode** — an in-browser authoring aid (on in `pnpm dev`; on a built site via a sticky `?layout` flag) — to drag and resize it on the canvas, with snapping, aspect-lock, and global undo/redo. Then **Copy** emits the tag with its final `x`/`y`/`width`/`height` for you to paste back into source. Nothing is saved behind your back: the editor only *finds* coordinates; the slide stays plain, diffable Svelte.
 - **Presenting-specific touches.** A helper (`utils/prepare-youtube.sh`) fetches a video's thumbnail and generates a QR code into a slide folder, so the `YouTube` component shows a scannable QR overlay linking to the video.
 
-> **The trade-off:** slide-to-slide navigation is a full page load, not client-side routing — so animations live *within* a slide; cross-slide transitions don't work out of the box. That's the cost of the route-per-slide design.
+> **The design note:** slide-to-slide navigation is a full page load, not client-side routing. Animations live *within* a slide — and *cross-slide* transitions work too, via the platform's cross-document **View Transitions API** (`@view-transition { navigation: auto; }`), which is possible precisely *because* each slide is its own document (see the `transition/` deck: slide, flip, zoom, cross-fade, and shared-element morph). The route-per-slide design paying off rather than costing.
 
 ## Quick start
 

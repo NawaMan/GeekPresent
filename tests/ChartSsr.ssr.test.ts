@@ -56,6 +56,15 @@ describe('Chart (SSR)', () => {
 		expect((slice.match(/A /g) ?? []).length).toBe(2);
 	});
 
+	it('renders the ScatterChart dots server-side, dropping the blank point', () => {
+		expect(body).toContain('<title>MPG vs weight</title>');
+		// coordinate aria-labels "(x, y)" are unique to the scatter dots (the line's
+		// dots carry none): one per non-blank row → 3 (the null weight draws none).
+		const coords = body.match(/aria-label="\([^)]*\)"/g) ?? [];
+		expect(coords).toHaveLength(3);
+		expect(body).toContain('aria-label="(1.2, 33)"');
+	});
+
 	it('never emits NaN in any coordinate', () => {
 		expect(body).not.toContain('NaN');
 	});
