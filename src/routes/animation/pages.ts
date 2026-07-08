@@ -16,6 +16,8 @@ export const pages = [
     { path: "sprite-multi.html",      title: "Draw — Sprites × Many" },
     { path: "draw-keyframe.html",     title: "Draw × Sprite" },
     { path: "sprite-group.html",      title: "Draw — Sprite as Group" },
+    // Imperative escape hatch: JS/TS pixels on the same playhead.
+    { path: "canvas-draw.html",       title: "Canvas — JS Drawing" },
     // A different paradigm: scroll drives the playhead.
     { path: "scroll-anim.html",       title: "Scroll-driven Animation" },
 ];
