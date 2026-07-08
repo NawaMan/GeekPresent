@@ -32,6 +32,7 @@
 	import SizeMode       from '$lib/components/SizeMode.svelte';
 	import SlideMap       from '$lib/components/SlideMap.svelte';
 	import CtrlBtn        from '$lib/components/CtrlBtn.svelte';
+	import PresenterView  from '$lib/components/PresenterView.svelte';
 	import Seo            from '$lib/components/Seo.svelte';
 	import { SITE_DESCRIPTION } from '$lib/seo/config';
 
@@ -41,7 +42,14 @@
 	import { displayMode, displayFactor, clampFactor } from '$lib/stores/displayMode';
 	import type { DisplayMode } from '$lib/stores/displayMode';
 	import { layoutMode, canLayout, applyLayoutParam } from '$lib/stores/layoutMode';
-	import { documentTitle } from '$lib/utils/navigate';
+	import { getViewTransitions } from '$lib/presentation';
+	import {
+		presenterMode, publishCurrentSlide, subscribeCurrentSlide, subscribeAnimCommand,
+		subscribeContinue, deckKeyFromPath
+	} from '$lib/stores/presenter';
+	import { collectFinite, applyState } from '$lib/utils/slideAnim';
+	import { navigate } from '$lib/utils/deckNav';
+	import { documentTitle, getPageNavigation } from '$lib/utils/navigate';
 	import type { Page }  from '$lib/utils/navigate';
 
 	/** This deck's slide list — for the Table of Contents rendered in the shell. */
@@ -137,6 +145,7 @@
 	// wins, so a slide's favicon (declared in its pages.ts entry) overrides both the
 	// site default (app.html) and any presentation favicon set in the deck's layout.
 	$: currentSlide   = $page.url.pathname.replace(/\/+$/, '').split('/').pop();
+	$: currentIndex   = pages.findIndex((p) => p.path === currentSlide);
 	$: currentFavicon = pages.find((p) => p.path === currentSlide)?.favicon;
 	// `?clean` hides all shell chrome (ToC, display-mode control, copyright, nav bar,
 	// minimap) for an unobstructed screen capture — e.g. the /tests calibration
@@ -144,6 +153,23 @@
 	// prerender (SvelteKit forbids it — a prerendered page can't vary by query
 	// string). Client hydration re-evaluates with browser=true and picks up ?clean.
 	$: clean = browser && $page.url.searchParams.has('clean');
+	// `?present` turns THIS window into the presenter console (see stores/presenter
+	// + PresenterView). Browser-guarded like `?clean`, so it never affects SSR /
+	// prerender output. presenterMode (the store <Note> and NavigationBar read) is
+	// kept in step with it.
+	$: present = browser && $page.url.searchParams.has('present');
+	$: presenterMode.set(present);
+	// Cross-window sync: whoever navigates publishes the new slide path; the other
+	// window follows. deckKey namespaces it per deck so /slides/ and /portrait/
+	// consoles never cross-drive. This deck's paging strategy is read once for the
+	// follower to navigate exactly like a click.
+	const viewTransitions = getViewTransitions();
+	$: deckKey = browser ? deckKeyFromPath($page.url.pathname) : '/';
+	// Only the TOP window syncs. The presenter console renders the next slide in an
+	// <iframe> (a full deck instance); without this guard that iframe would publish
+	// ITS slide to the shared channel and drag every window onto the preview slide.
+	$: isTopWindow = browser && window.self === window.top;
+	$: if (isTopWindow && currentSlide) publishCurrentSlide(deckKey, currentSlide);
 	// Sticky `?layout` opt-in for the authoring LAYOUT control (see layoutMode).
 	// browser-guarded so url.searchParams is never read during prerender.
 	$: if (browser) applyLayoutParam($page.url);
@@ -187,6 +213,10 @@
 
 	function adjustSize(recenter = false) {
 		if (!container) return;
+		// Presenter mode hides the canvas and never scales it — a scale transform on
+		// .content would also make the fixed <Note> panel a transformed containing
+		// block (fixed would then track .content, not the viewport). So: no transform.
+		if (present) return;
 
 		if (mode === 'SCALED') {
 			// Exact factor: the frame is the canvas at `factor`, the content scales by
@@ -244,11 +274,49 @@
 		const unsubFactor = displayFactor.subscribe(v => { factor = clampFactor(v);   if (initialized) apply(true); });
 		const onResize = () => adjustSize(false);
 		window.addEventListener('resize', onResize);
+
+		// Follow the OTHER window: when it announces a different slide, page there.
+		// Guard on `path !== currentSlide` (our own echo / already-here) so the
+		// two-window ping-pong converges. Route through the shared navigate() so a
+		// followed hop animates like a clicked one; keep the console's ?present flag.
+		// Skipped in an iframe preview (window.top !== self) — see isTopWindow above.
+		const stopFollow = (window.self === window.top)
+			? subscribeCurrentSlide(deckKey, (path) => {
+				if (!path || path === currentSlide) return;
+				const target = present ? `./${path}?present` : `./${path}`;
+				const targetIndex = pages.findIndex((p) => p.path === path);
+				const direction = targetIndex >= 0 && targetIndex < (currentIndex ?? 0) ? 'back' : 'forward';
+				const leaving = pages.find((p) => p.path === currentSlide);
+				const kind = (direction === 'back' ? leaving?.transitionBack : leaving?.transition) ?? 'slide';
+				navigate(target, { viewTransitions, kind, direction });
+			})
+			: () => {};
+
+		// Apply relayed ANIMATE commands from the presenter console onto this window's
+		// live slide animations. Top window only (an iframe preview must not react).
+		const stopAnim = (window.self === window.top)
+			? subscribeAnimCommand(deckKey, (cmd) => {
+				const root = document.querySelector('.content');
+				if (!root) return;
+				const anims = collectFinite(root);
+				if (anims.length) applyState(anims, cmd);
+			})
+			: () => {};
+
+		// A relayed CONTINUE pulse from the console becomes a `gp:continue` DOM event;
+		// NavigationBar routes it to the slide's onContinue hook. Top window only.
+		const stopContinue = (window.self === window.top)
+			? subscribeContinue(deckKey, () => window.dispatchEvent(new CustomEvent('gp:continue')))
+			: () => {};
+
 		initialized = true;
 		apply(true);
 		return () => {
 			unsubMode();
 			unsubFactor();
+			stopFollow();
+			stopAnim();
+			stopContinue();
 			window.removeEventListener('resize', onResize);
 		};
 	});
@@ -278,6 +346,7 @@
 		class:fit-mode={isFitted}
 		class:zoom-mode={!isFitted}
 		class:clean={clean}
+		class:present={present}
 		style="--canvas-w:{width}px; --canvas-h:{height}px; --aspect:{aspectRatio}; --base-font:{baseFontSize};{contentBackground ? ` --content-bg:${contentBackground};` : ''}{contentFont ? ` --content-font:${contentFont};` : ''}"
 		bind:this={container}
 	>
@@ -310,14 +379,21 @@
 
 <!-- Screen-fixed chrome that must stay reachable regardless of pan/zoom: the
      display-mode control and the minimap. Kept OUT of .content (which is scaled
-     and panned) so they never drift off-screen. Hidden by ?clean. -->
-{#if initialized && !clean}
+     and panned) so they never drift off-screen. Hidden by ?clean and in the
+     presenter console (which has its own chrome). -->
+{#if initialized && !clean && !present}
 <div class="overlay" style="--base-font:{baseFontSize}; --ctrl-top:{ctrlTop}; --ctrl-right:{ctrlRight}; --view-scale:{viewScale};">
 	<SizeMode {width} {height} />
 	{#if mapVisible}
 	<SlideMap {width} {height} rect={mapRect} />
 	{/if}
 </div>
+{/if}
+
+<!-- Presenter console (this window loaded with ?present). Mounts OVER the hidden
+     canvas; the current slide's own <Note> supplies the notes panel. -->
+{#if initialized && present}
+<PresenterView {pages} {width} {height} />
 {/if}
 
 <style>
@@ -437,7 +513,17 @@
 	   intentionally kept: it marks the canvas edge the capture is measured against. */
 	.container.clean :global(.toc),
 	.container.clean :global(.copyright),
-	.container.clean :global(.nav) {
+	.container.clean :global(.nav),
+	.container.clean :global(.anim-bar) {
 		display: none;
+	}
+
+	/* `?present`: hide the whole slide canvas (frame, background, slide body, its
+	   chrome) with visibility so it keeps LAYOUT — the slide still mounts, so its
+	   <Note> exists. The note then flips ITSELF back to visible + fixed as the
+	   presenter panel (see Note.presenter). No transform is applied in present mode
+	   (adjustSize early-returns), so that fixed note tracks the viewport. */
+	.container.present {
+		visibility: hidden;
 	}
 </style>

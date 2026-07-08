@@ -2,10 +2,11 @@
 	import CtrlBtn from './CtrlBtn.svelte';
 
 	import { browser }            from '$app/environment';
-	import { goto }               from '$app/navigation';
 	import { page }               from '$app/stores';
 	import { onMount, onDestroy } from 'svelte';
 	import { getMode, getViewTransitions, getPages } from '$lib/presentation';
+	import { navigate as pageNavigate } from '$lib/utils/deckNav';
+	import { presenterMode, openPresenterWindow, deckKeyFromPath } from '$lib/stores/presenter';
 
 	export let firstLink = '';
 	export let prevLink  = '';
@@ -36,34 +37,24 @@
 		return (direction === 'back' ? currentPage?.transitionBack : currentPage?.transition) ?? 'slide';
 	}
 
+	// In the presenter console (?present) keep the flag across paging, so the
+	// console stays the console; the audience window pages without it.
+	function decorate(href: string): string {
+		if (!href || !$presenterMode) return href;
+		return href + (href.includes('?') ? '&' : '?') + 'present';
+	}
+
 	// Navigate to `href`, animating in `direction` when this deck uses view
-	// transitions and the browser supports them. Falls back, in order, to a plain
-	// client-side goto (still no reload/blink), then to a full-page load.
+	// transitions (delegated to the shared deckNav helper so a followed navigation
+	// in SlideDeck animates identically).
 	function navigate(href: string, direction: Dir) {
-		if (!href) return;
+		pageNavigate(decorate(href), { viewTransitions, kind: kindFor(direction), direction });
+	}
 
-		if (!viewTransitions) {
-			window.location.href = href;
-			return;
-		}
-		// @ts-ignore — startViewTransition is not in older lib.dom typings.
-		if (!browser || typeof document.startViewTransition !== 'function') {
-			goto(href);
-			return;
-		}
-
-		// These attributes key the keyframes in view-transitions.css: data-vt-kind
-		// picks the effect (the leaving slide's own), data-vt its direction. Both are
-		// cleared once the transition settles.
-		const root = document.documentElement;
-		root.dataset.vtKind = kindFor(direction);
-		root.dataset.vt = direction;
-		// @ts-ignore
-		const transition = document.startViewTransition(() => goto(href));
-		transition.finished.finally(() => {
-			delete root.dataset.vt;
-			delete root.dataset.vtKind;
-		});
+	// Open (or focus) the presenter window at the current slide. Runs in the click
+	// handler (a user gesture) so the popup isn't blocked.
+	function openPresenter() {
+		openPresenterWindow(window.location.href, deckKeyFromPath(window.location.pathname));
 	}
 
 	$: onFirst = () => navigate(firstLink, 'back');
@@ -88,16 +79,24 @@
 		}
 	}
 
+	// A CONTINUE pulse relayed from the presenter console (SlideDeck turns it into
+	// this DOM event) drives the same onContinue hook as the on-screen CONTINUE button.
+	function handleRelayedContinue() {
+		onContinue?.();
+	}
+
 	onMount(() => {
 		// Arrow-key paging only makes sense between slides, not in a document.
 		if (browser && mode !== 'text') {
 			window.addEventListener('keydown', handleGlobalKeydown);
+			window.addEventListener('gp:continue', handleRelayedContinue);
 		}
 	});
 
 	onDestroy(() => {
 		if (browser) {
 			window.removeEventListener('keydown', handleGlobalKeydown);
+			window.removeEventListener('gp:continue', handleRelayedContinue);
 		}
 	});
 </script>
@@ -133,5 +132,7 @@
 	<CtrlBtn chrome text="CONTINUE" on:click={() => onContinue?.()} isDisabled={!onContinue} />
 	<CtrlBtn chrome text="NEXT"     on:click={onNext}     isDisabled={!nextLink} />
 	<CtrlBtn chrome text="LAST"     on:click={onLast}     isDisabled={!lastLink}/>
+	<!-- Open the presenter console. Hidden inside the console itself ($presenterMode). -->
+	<CtrlBtn chrome text="⧉" hoverText="Presenter" on:click={openPresenter} isVisible={!$presenterMode} />
 </div>
 {/if}

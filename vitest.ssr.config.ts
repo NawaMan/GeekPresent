@@ -12,7 +12,8 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			$lib: new URL('./src/lib', import.meta.url).pathname,
-			'$app/environment': new URL('./tests/stubs/app-environment.ts', import.meta.url).pathname
+			'$app/environment': new URL('./tests/stubs/app-environment.ts', import.meta.url).pathname,
+			'$app/stores': new URL('./tests/stubs/app-stores.ts', import.meta.url).pathname
 		}
 	},
 	test: {
