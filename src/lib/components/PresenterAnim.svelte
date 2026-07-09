@@ -170,6 +170,9 @@
 	.track {
 		position: relative;
 		flex: 1;
+		/* The rail was only ~70px (leftover space in the 220px row). Floor it at ~3×
+		   so the audience playhead is comfortably scrubbable; the row grows to fit. */
+		min-width: 220px;
 		height: 6px;
 		border-radius: 999px;
 		background: #333b45;

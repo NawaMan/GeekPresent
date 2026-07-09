@@ -93,40 +93,39 @@
 	let raf = 0;                     // the progress-sampling rAF handle (0 = idle)
 
 	// Horizontal placement. By default the collapsed ANIMATION button parks just to
-	// the RIGHT of the slide nav bar (…LAST PRESENT), and the expanded bar shares
-	// that right edge and grows LEFT over the nav row. We measure the nav's right
-	// edge at runtime rather than hard-code a pixel — the nav and this bar share the
-	// transformed canvas as their offsetParent, so offsetLeft/Width are clean canvas
-	// px. `rightInset` is the gap from the canvas's right edge to the bar's right
-	// edge (applied as inline `right`); null means "no nav here" → keep the old
-	// centred position (e.g. embedded/startExpanded bars). `positioned` gates
-	// visibility so the bar doesn't flash at its pre-measure spot on first paint.
-	let rightInset: number | null = null;
+	// the RIGHT of the slide nav bar (…LAST PRESENT), and the expanded bar keeps that
+	// LEFT edge fixed and grows RIGHTWARD into the open space. We measure the nav's
+	// right edge at runtime rather than hard-code a pixel — the nav and this bar share
+	// the transformed canvas as their offsetParent, so offsetLeft/Width are clean
+	// canvas px. `leftPos` is the bar's left edge in canvas px (applied as inline
+	// `left`); null means "no nav here" → keep the old centred position (e.g.
+	// embedded/startExpanded bars). `positioned` gates visibility so the bar doesn't
+	// flash at its pre-measure spot on first paint.
+	let leftPos: number | null = null;
 	let topInset: number | null = null;   // canvas-px top that centres the collapsed button on the nav row
 	let positioned = false;
 
 	$: barStyle =
-		(rightInset !== null ? `right:${rightInset}px;` : '') +
+		(leftPos !== null ? `left:${leftPos}px;` : '') +
 		(topInset !== null && !expanded ? `top:${topInset}px;bottom:auto;` : '') +
 		(positioned ? '' : 'visibility:hidden;');
 
-	// Measure the nav and anchor the bar just past it. Only meaningful while the
-	// collapsed button is showing (its width sets the shared right edge); a bar that
-	// starts expanded has no button to measure, so it stays centred.
+	// Measure the nav and anchor the bar's LEFT edge just past it, so the collapsed
+	// button sits after PRESENT and the expanded bar grows rightward. A bar that
+	// starts expanded (embedded/driven) has no nav to anchor to and stays centred.
 	function positionBar() {
 		if (!browser || !root || expanded) { positioned = true; return; }
 		const parent = root.offsetParent as HTMLElement | null;
 		const nav = (parent?.querySelector('.nav') ?? null) as HTMLElement | null;
 		if (parent && nav) {
 			const GAP = 14; // canvas px between the nav's right edge and the button
-			const navRight = nav.offsetLeft + nav.offsetWidth;
-			rightInset = Math.max(8, parent.clientWidth - (navRight + GAP + root.offsetWidth));
+			leftPos = nav.offsetLeft + nav.offsetWidth + GAP;
 			// Vertically centre the collapsed button on the nav row (their boxes differ
 			// in height, so match centres, not edges).
 			const navCentre = nav.offsetTop + nav.offsetHeight / 2;
 			topInset = navCentre - root.offsetHeight / 2;
 		} else {
-			rightInset = null; // no nav on this layout — fall back to the centred spot
+			leftPos = null; // no nav on this layout — fall back to the centred spot
 			topInset = null;
 		}
 		positioned = true;
@@ -291,7 +290,7 @@
 <span class="anim-anchor" bind:this={anchor} aria-hidden="true"></span>
 
 {#if hasAnim}
-<div class="anim-bar no-print" class:expanded class:centered={rightInset === null} style={barStyle} bind:this={root}>
+<div class="anim-bar no-print" class:expanded class:centered={leftPos === null} style={barStyle} bind:this={root}>
 	{#if !expanded}
 	<!-- Low-profile reveal button (chrome, like MODE / the nav controls). One-way:
 	     pressing it shows the bar for good. -->
@@ -343,10 +342,10 @@
 	.anim-anchor { display: none; }   /* DOM-present, layout-absent (used for closest) */
 	.anim-bar {
 		position: absolute;
-		/* Anchored to the RIGHT (inline `right` from positionBar), so the collapsed
-		   button sits just past the nav bar and the expanded bar grows LEFT from that
-		   fixed right edge. `left:auto` lets the inline `right` own the horizontal. */
-		left: auto;
+		/* Anchored to the LEFT (inline `left` from positionBar), so the collapsed button
+		   sits just past the nav bar and the expanded bar grows RIGHT from that fixed
+		   left edge. `right:auto` lets the inline `left` own the horizontal. */
+		right: auto;
 		display: flex;
 		align-items: center;
 		gap: 0.6em;
@@ -366,7 +365,8 @@
 	}
 	.anim-bar.expanded {
 		/* Tuned so the tall icon row's vertical CENTRE lines up with the nav text.
-		   With the right edge fixed, this width grows the bar LEFTWARD over the nav. */
+		   With the left edge fixed (just past PRESENT), this width grows the bar
+		   RIGHTWARD into the open space. */
 		bottom: 0.35em;
 		min-height: 0.8em;
 		width: 54%;

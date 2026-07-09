@@ -2,11 +2,9 @@ export const pages = [
     { path: "title.html",             title: "Animation" },
     // Playback primitives — the timeline the rest build on.
     { path: "animation-bar.html",     title: "AnimationBar Component" },
-    { path: "timed-animation.html",   title: "Timing → Percent" },
     { path: "animation-scene.html",   title: "AnimationScene Component" },
     // Authoring a flying element with the SpriteStudio wrapper.
     { path: "keyframe-studio.html",   title: "Sprite Studio" },
-    { path: "keyframe-reuse.html",    title: "SpriteStudio Reuse" },
     { path: "keyframe-multi.html",    title: "SpriteStudio × Many" },
     // The animated Draw family.
     { path: "draw-animation.html",    title: "Draw — Animated Diagram" },
