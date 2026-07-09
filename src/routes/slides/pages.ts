@@ -15,6 +15,7 @@ export const pages = [
     { path: "datatable-tools.html",   title: "DataTable — Table Tools" },
     { path: "datatable-server.html",  title: "DataTable — Server-Side Data" },
     { path: "draw-component.html",    title: "Draw — Shapes & Arrows" },
+    { path: "connector-component.html", title: "Connector — Arrows by Name" },
     { path: "chart-bar.html",         title: "Chart — Grouped & Stacked Bars" },
     { path: "chart-line.html",        title: "Chart — Dual-Axis Line + Time" },
     { path: "chart-combo.html",       title: "Chart — Combo (Bars + Line)" },

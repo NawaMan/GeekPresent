@@ -39,7 +39,8 @@ Read the `README.md` first for the user-facing overview. This file is the *opera
   hand-written snippets; not Monaco), `ViewSource` (corner `</> Source` button that shows a page's
   own `?raw` source in a `CodeBox`), `Block` / `ImageBlock` (absolutely-positioned
   wrappers you place at exact canvas pixels — drag/resize them in **LAYOUT mode**,
-  see that playbook), plus framework-internal `Copyright`, `CtrlBtn`,
+  see that playbook), `Connector` (an arrow auto-routed between two *named* `Block`s —
+  see the diagram playbook), plus framework-internal `Copyright`, `CtrlBtn`,
   `NavigationBar`, `TableOfContent`, `SizeMode`, `Seo` (renders SEO/social metadata
   into `<svelte:head>` — see the SEO note under *Gotchas*).
 - Package manager is **pnpm** (`pnpm dev` / `build` / `deploy`). Dev server: `http://localhost:5173`.
@@ -255,6 +256,40 @@ disables it again. (Both are sticky per browser origin — see the Gotcha.)
 > (`true`/number/`false`), `bounds` (`'canvas'` clamps inside, `'none'` lets it
 > bleed off-stage), `minSize`. Match `canvasWidth`/`canvasHeight` to the deck if it
 > isn't the 1920×1080 default.
+
+### "Draw a diagram / connect these boxes with arrows"
+
+Don't compute arrow coordinates. Give each box a **`name`** and let **`Connector`** route
+between them — then a LAYOUT-mode drag moves the box *and* its arrows together.
+
+```svelte
+<Block name="api" x={200} y={400} width={280} height={140}>API</Block>
+<Block name="db"  x={900} y={400} width={280} height={140}>DB</Block>
+
+<!-- AFTER the Blocks — see the ordering rule below -->
+<Connector from="api" to="db" label="query" />
+<Connector from="db" to="api" route="curve" fromSide="bottom" toSide="bottom" dash />
+```
+
+- **Connectors must come after the Blocks they link.** Names resolve during prerendering,
+  and Blocks register in document order — a connector placed first ships an empty diagram.
+  An unknown name renders nothing (never a broken arrow), so a missing arrow means either
+  a typo in the name or a connector that jumped the queue.
+- `route`: `straight` (default), `ortho` (right angles, `radius` rounds the corners), or
+  `curve`. Sides auto-pick; override with `fromSide` / `toSide` (`top`/`right`/`bottom`/`left`).
+- Either end also takes a raw canvas point (`from={[300, 540]}`) or a literal
+  `{ x, y, width, height }` box, for pointing at something that isn't a `Block`.
+- `label` is the **visible** text on the shaft (`labelAt` 0–1 along it, `labelOffset` px
+  off it); `ariaLabel` is the accessible name, defaulting to `"<from> to <to>"`.
+- To build a diagram up arrow by arrow, stagger `drawDelay` across the connectors — they
+  share one `AnimationBar` timeline, exactly like the `Draw` shapes' `draw`/`drawDelay`.
+- Styling rides the `--draw-*` custom properties (`--draw-stroke`, `--draw-thickness`,
+  `--draw-font-size`); `color` / `thickness` / `dash` override per connector.
+- Hand-placed shapes and connectors mix: a `Connector` *inside* a `<Draw>` renders into
+  that surface's `<svg>` instead of opening its own. Standalone, it is a canvas-spanning
+  overlay with `pointer-events: none`, so it never eats a click.
+
+See `src/routes/slides/connector-component.html/` for a five-arrow, zero-coordinate diagram.
 
 ### "Host this alongside my existing blog / GitHub Pages site"
 

@@ -37,10 +37,43 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
     for extras. Demo `steps-component.html`, DOM test `tests/Steps.test.ts` (Space
     build/peel + arrows left free), SSR test `tests/StepsSsr.ssr.test.ts`
     (prerender-visible markup). No new role tokens (reveal is pure opacity/transform).
-- [ ] **`Connector` / `Arrow`** — auto-routed arrow between two named `Block`s.
+- [x] **`Connector` / `Arrow`** — auto-routed arrow between two named `Block`s.
   - Turns the `Block` system into a diagramming tool.
   - Reuse `Block` `name`-matching (same mechanism as LAYOUT-mode save) + `Draw` Line/Arc.
   - `<Connector from="api" to="db" label="query" />`
+  - Done: `src/lib/components/Connector.svelte` + all the geometry in
+    `src/lib/draw/connectorCore.ts` (pure, NaN-safe — `drawCore`'s discipline).
+    A named `Block` publishes its live box to `stores/blockAnchors.ts`; a
+    `Connector` resolves both ends by name, so **a diagram is authored in names,
+    not coordinates, and every arrow follows its boxes** as you drag them in
+    LAYOUT mode. Either end also takes a raw point (`from={[300, 540]}`) or a
+    literal box.
+  - Three routes: `straight` (attaches wherever the line crosses each border, at
+    whatever angle it arrives), `ortho` (right angles, corners rounded by
+    `radius`), `curve` (leaves/enters square to each side). Sides auto-pick the
+    edge the center-to-center ray actually crosses — `facingSide` weighs the
+    direction against the box's **diagonal**, not the raw axes, so it always
+    agrees with where `borderPoint` lands. `fromSide`/`toSide` pin one.
+  - Also: `arrow` (defaults to `end` — a Connector exists to say "A → B"),
+    `gap`, visible `label` + `labelAt`/`labelOffset`, `color`/`thickness`/`dash`,
+    and the Draw family's `draw`/`drawDelay` CSS reveal (prerenders, and
+    `AnimationBar` scrubs it — stagger `drawDelay` to build a diagram arrow by
+    arrow on one timeline).
+  - Standalone it renders its own canvas-spanning, pointer-transparent `<svg>`;
+    dropped inside a `<Draw>` it detects the surface via context and renders a
+    bare `<g>` into it, sharing one svg and one z-order.
+  - **Ordering constraint** (the one gotcha): endpoints resolve during **SSR**
+    too, and Blocks register in document order — so a `Connector` must come
+    *after* the Blocks it links, or the prerendered slide ships the boxes with
+    no arrows. An unresolved name renders nothing at all, never a broken arrow.
+    `Block`'s `track={false}` wrappers (Draw's hosted Rect/Ellipse blocks,
+    KeyframeStudio ghosts) opt out of anchoring — they only exist in LAYOUT
+    mode, so an anchor on them would blink with the toggle.
+  - Demo `connector-component.html` (five arrows, zero coordinates), unit test
+    `tests/connectorCore.test.ts`, DOM test `tests/Connector.test.ts`
+    (re-routes on move, withdraws on unmount), SSR test
+    `tests/ConnectorSsr.ssr.test.ts` (prerender-visible shaft). No new role
+    tokens — it reuses the `--draw-*` family.
 - [x] **`Callout`** — semantic admonition box (info / tip / warn / danger).
   - Distinct from `Hint`/`Box`; themeable via `roles.css`.
   - `<Callout kind="warn" title="Gotcha">…</Callout>`
@@ -117,6 +150,24 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
     without touching the visible shape order. Refactor spans `Draw.svelte` + the 4 shapes.
   - Milder today than the Block case: unselected shapes already show quiet, half-size handles
     and wide hit-strokes, so only the exact band where two strokes cross is hard to hit.
+
+## Adoption / distribution
+
+- [ ] **Skeleton project** — publish an empty GeekPresent starter (no example deck) so a new
+      project can begin from a clean slate instead of deleting the demo slides.
+  - Today `adopt-geekpresent.sh` bootstraps GeekPresent into an existing host project; the
+    skeleton is the greenfield counterpart.
+  - Decide what the skeleton keeps (theme, `roles.css`, nav/deck shell, build scripts) vs.
+    what it drops (`*-component.html` demo slides, sample content, narration assets).
+- [ ] **Versioning** — give GeekPresent itself a version so an adopted project can say which
+      release it is on and what upgrading means.
+- [ ] **Component versioning, installation, and repository** — a way to fetch/update individual
+      components after adoption, rather than copying the whole tree once.
+  - Open questions: registry format, per-component version pinning, upgrade/diff story for
+    components a project has locally edited.
+- [ ] **AGENT skills** — ship skills (à la `.claude/skills/`) that teach an agent the GeekPresent
+      conventions: authoring a slide, adding a component, LAYOUT mode, the SSR/test contract.
+  - Complements `AGENT.md`/`AGENTS.md`, which are prose-only today.
 
 ## Deliberately excluded
 

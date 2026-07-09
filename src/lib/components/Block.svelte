@@ -30,6 +30,7 @@
 	import { record } from '$lib/stores/layoutHistory';
 	import { nextChangeId, reportChange, withdrawChange } from '$lib/stores/layoutChanges';
 	import { selectedBlock, nextBlockId } from '$lib/stores/selectedBlock';
+	import { reportAnchor, withdrawAnchor } from '$lib/stores/blockAnchors';
 	import { trackPointer } from '$lib/utils/drag';
 	import { browser } from '$app/environment';
 	import { onDestroy } from 'svelte';
@@ -245,6 +246,24 @@
 			},
 		});
 	onDestroy(() => withdrawChange(changeId));
+
+	// Publish a NAMED block's live box to the page-wide anchor registry, so a
+	// <Connector from="…" to="…"> can route an arrow between boxes by name and
+	// keep following them as they're dragged. Unlike reportChange above this is
+	// NOT browser-gated: a prerendered slide must ship its connectors drawn.
+	// `track={false}` wrappers (Draw's hosted Rect/Ellipse blocks, KeyframeStudio
+	// ghosts) opt out — they only exist in LAYOUT mode, so an anchor on them
+	// would appear and vanish with the toggle.
+	// Plain object, not a `let`: mutating a field must not itself invalidate the
+	// reactive statement that writes it (that would be a self-triggering cycle).
+	const anchor = { name: '' };
+	$: if (track && name) {
+		// A renamed Block must not leave its old name behind in the registry.
+		if (anchor.name && anchor.name !== name) withdrawAnchor(anchor.name);
+		anchor.name = name;
+		reportAnchor(name, { x, y, width, height });
+	}
+	onDestroy(() => withdrawAnchor(anchor.name));
 
 	async function copy() {
 		try {
