@@ -17,14 +17,29 @@
       <Fragment tag="p" transition="fly">Then this one.</Fragment>
     </Steps>
 
-  Keys: Space builds up, Shift+Space steps back — chosen so the ARROW keys stay
-  free for NavigationBar's slide paging (→/← always page the deck, whether or not a
-  build is in progress). Space is a no-op once the build is exhausted; move on with
-  →. Space is ignored while a form field or button has focus, so focused controls
-  keep their normal Space behaviour. Use ONE Steps per slide with keys='global'
-  (the default); for extra instances set keys='off' and drive them with bind:this.
-  In `text` mode (a document artifact) every Fragment is shown at once and stepping
-  is disabled — a document has no "current step".
+  Keys: Space advances, Shift+Space reverses. While steps remain, Space reveals the
+  next Fragment; once the build is spent Space falls through to NavigationBar and
+  pages to the NEXT slide (and symmetrically, Shift+Space peels back until nothing
+  is revealed, then pages to the PREVIOUS slide). So a build simply inserts
+  sub-steps into the deck's forward march — tap Space to walk the whole deck. The
+  ARROW keys are never stepped: →/← always page, build or no build. Space is
+  ignored while a form field or button has focus, so focused controls keep their
+  normal Space behaviour.
+
+  The handoff is decided in utils/stepKeys.ts (spaceIntent), which BOTH this
+  listener and NavigationBar's consult against the same build state — so neither
+  can page a slide out from under a running build, whatever order they fire in.
+
+  Use ONE Steps per slide with keys='global' (the default); for extra instances set
+  keys='off' and drive them with bind:this. In `text` mode (a document artifact)
+  every Fragment is shown at once and stepping is disabled — a document has no
+  "current step".
+
+  Chrome: the keyboard-owning Steps publishes itself to the `activeSteps` store, so
+  NavigationBar's CONTINUE button clicks through the build and greys out when
+  nothing is left to reveal (it never pages — that's what NEXT is for). The
+  presenter console's CONTINUE relays a `gp:continue` pulse, which advances the
+  build too (see `continueKey`).
 
   Coordinates its children over Svelte context, exactly like Carousel/CarouselItem,
   so authors just nest Fragments in document order.
@@ -34,6 +49,8 @@
 	import { writable } from 'svelte/store';
 	import { browser } from '$app/environment';
 	import { getMode } from '$lib/presentation';
+	import { activeSteps } from '$lib/stores/activeSteps';
+	import { spaceIntent } from '$lib/utils/stepKeys';
 
 	/** Transition each Fragment uses unless it overrides its own. */
 	export let transition: 'fade' | 'fly' | 'slide' | 'scale' | 'none' = 'fade';
@@ -101,29 +118,32 @@
 	// In text mode keep every Fragment shown as they register.
 	$: if (isText && $revealed !== $total) revealed.set($total);
 
-	// Skip focused controls so Space keeps its native meaning there (activate a
-	// button, type a space in a field, …).
-	function isInteractive(t: EventTarget | null): boolean {
-		const el = t as HTMLElement | null;
-		if (!el) return false;
-		if (el.isContentEditable) return true;
-		return /^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(el.tagName);
-	}
+	// Publish this build to the slide chrome so NavigationBar's CONTINUE button can
+	// drive it (same action as Space) and disable itself once the build is spent.
+	// Only the keyboard-owning instance registers, matching who Space would drive.
+	const token = {};
+	$: drivesChrome = browser && !isText && keys === 'global';
+	$: if (drivesChrome) activeSteps.set({ owner: token, hasNext: !atEnd, hasPrev: !atStart, next });
 
-	// Space builds up, Shift+Space steps back. The arrow keys are deliberately left
-	// alone, so NavigationBar's paging (→/←) works whether or not a build is running.
-	// We own Space here (preventDefault stops the browser's scroll-on-space); when
-	// the build is spent it's simply a no-op and the presenter pages on with →.
+	onDestroy(() => {
+		// Only clear it if we're still the registered build (a later Steps may own it).
+		activeSteps.update((v) => (v && v.owner === token ? null : v));
+	});
+
+	// Space builds up, Shift+Space steps back. We only claim the key while a step
+	// remains — once the build is spent (or not yet started, going back) we leave
+	// the event untouched so NavigationBar pages the deck instead. The arrow keys
+	// are never handled here: →/← always page, build or no build.
 	function onKeydown(e: KeyboardEvent) {
-		if (e.defaultPrevented) return;
-		if (e.code !== 'Space' && e.key !== ' ') return;
-		if (isInteractive(e.target)) return;
-		e.preventDefault();
-		if (e.shiftKey) {
-			if (!atStart) prev();
-		} else if (!atEnd) {
+		const intent = spaceIntent(e, { hasNext: !atEnd, hasPrev: !atStart });
+		if (intent === 'reveal') {
+			e.preventDefault(); // also stops the browser's scroll-on-space
 			next();
+		} else if (intent === 'peel') {
+			e.preventDefault();
+			prev();
 		}
+		// 'page-next' / 'page-prev' / 'ignore' → not ours; NavigationBar decides.
 	}
 
 	// A CONTINUE pulse (presenter console → gp:continue) advances the build too, so

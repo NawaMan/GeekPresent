@@ -20,8 +20,9 @@
 	<div style="max-width: 780px;">
 		<p>
 			Wrap content in <b>Steps</b>; mark the pieces to reveal one at a time with
-			<b>Fragment</b>. Tap <code>Space</code> to build up, <code>Shift+Space</code>
-			to peel back. The <code>→</code>/<code>←</code> arrows stay free for slide paging.
+			<b>Fragment</b>. Tap <code>Space</code> to build up, <code>Shift+Space</code> to
+			peel back — and once the build is spent, <code>Space</code> pages to the next
+			slide. The <code>→</code>/<code>←</code> arrows always page, build or no build.
 		</p>
 
 		<QuickCode style="margin-top: 0.6em;">
@@ -55,13 +56,13 @@
 			<Fragment tag="div" style="margin-bottom: 0.3em;">③ Run the query</Fragment>
 			<Fragment tag="div" transition="scale" style="margin-top: 0.8em;">
 				<Callout kind="tip" title="…and reveal the punchline">
-					Space builds the list; the <code>→</code> arrow still pages the deck.
+					Build spent — one more <code>Space</code> now pages to the next slide.
 				</Callout>
 			</Fragment>
 		</div>
 	</Steps>
 </Block>
 
-<Hint text="Tap Space to build the list, Shift+Space to step back" />
+<Hint text="Tap Space (or click CONTINUE) to build the list, Shift+Space to step back" />
 
 <ViewSource {source} {path} />

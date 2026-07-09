@@ -7,6 +7,8 @@
 	import { getMode, getViewTransitions, getPages } from '$lib/presentation';
 	import { navigate as pageNavigate } from '$lib/utils/deckNav';
 	import { presenterMode, openPresenterWindow, deckKeyFromPath } from '$lib/stores/presenter';
+	import { activeSteps } from '$lib/stores/activeSteps';
+	import { spaceIntent } from '$lib/utils/stepKeys';
 
 	export let firstLink = '';
 	export let prevLink  = '';
@@ -62,6 +64,20 @@
 	$: onNext  = () => navigate(nextLink,  'forward');
 	$: onLast  = () => navigate(lastLink,  'forward');
 
+	// CONTINUE is the in-slide step. A <Steps> build on this slide publishes itself
+	// to `activeSteps` (it can't reach us over context — it's a sibling), so the
+	// button reveals the next Fragment and greys out once the build is spent. Unlike
+	// Space it never pages: CONTINUE is strictly the *within-slide* control, which is
+	// why it disables instead of falling through to NEXT. A slide can still pass its
+	// own onContinue hook; when both exist the click drives each of them once.
+	$: steps = $activeSteps;
+	$: canContinue = !!onContinue || !!steps?.hasNext;
+
+	function doContinue() {
+		if (steps?.hasNext) steps.next();
+		onContinue?.();
+	}
+
 	function onTop() {
 		// A Text artifact scrolls inside its own container; fall back to the window.
 		const target = document.querySelector('[data-text-scroll]') ?? window;
@@ -76,6 +92,20 @@
 		} else if (event.key === 'ArrowRight' && nextLink) {
 			event.preventDefault();
 			navigate(nextLink, 'forward');
+
+		} else {
+			// Space advances: a <Steps> build swallows it while steps remain (that
+			// listener acts on 'reveal'/'peel'), and once spent it falls to us and
+			// pages the deck. Both listeners judge the SAME build state, so it does
+			// not matter which of them the browser calls first.
+			const intent = spaceIntent(event, steps ? { hasNext: steps.hasNext, hasPrev: steps.hasPrev } : null);
+			if (intent === 'page-next' && nextLink) {
+				event.preventDefault();
+				navigate(nextLink, 'forward');
+			} else if (intent === 'page-prev' && prevLink) {
+				event.preventDefault();
+				navigate(prevLink, 'back');
+			}
 		}
 	}
 
@@ -129,7 +159,7 @@
 <div class="nav no-print">
 	<CtrlBtn chrome text="FIRST"    on:click={onFirst}    isDisabled={!firstLink} />
 	<CtrlBtn chrome text="PREV"     on:click={onPrev}     isDisabled={!prevLink} />
-	<CtrlBtn chrome text="CONTINUE" on:click={() => onContinue?.()} isDisabled={!onContinue} />
+	<CtrlBtn chrome text="CONTINUE" on:click={doContinue} isDisabled={!canContinue} />
 	<CtrlBtn chrome text="NEXT"     on:click={onNext}     isDisabled={!nextLink} />
 	<CtrlBtn chrome text="LAST"     on:click={onLast}     isDisabled={!lastLink}/>
 	<!-- Open the presenter console. A text label like the other nav buttons (not a
