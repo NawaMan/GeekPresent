@@ -17,10 +17,19 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
   - Done: `src/lib/components/Steps.svelte` (context coordinator, like Carousel) +
     `Fragment.svelte` (one build step). Fragments start hidden but keep their box
     (`visibility`, no reflow) and fade in on **Space**; **Shift+Space** peels the
-    last back off. Space (not the arrows) drives the build so →/← stay free for
-    `NavigationBar`'s slide paging during a build; Space is a no-op once spent, and
-    ignored while a form field/button has focus (native Space preserved). Also
-    advances on the presenter console's `gp:continue` pulse. Text mode shows every
+    last back off. Space (not the arrows) drives the build so →/← stay free to page
+    at any time. Once the build is spent Space **falls through and pages to the next
+    slide** (symmetrically, Shift+Space pages back once nothing is revealed), so
+    tapping Space walks the whole deck — a build just inserts sub-steps. That
+    decision lives in `utils/stepKeys.ts` (`spaceIntent`), which both the `Steps`
+    listener and `NavigationBar`'s consult against the same build state, making the
+    two window listeners order-independent. Space is
+    ignored while a form field/button has focus (native Space preserved). The
+    keyboard-owning Steps publishes itself to the `activeSteps` store (module-level,
+    like `selectedBlock` — Steps and `NavigationBar` are siblings, so context can't
+    bridge them), which drives the nav bar's **CONTINUE** button: it reveals the next
+    Fragment and disables once the build is spent (it never pages — that's NEXT's job).
+    Also advances on the presenter console's `gp:continue` pulse. Text mode shows every
     Fragment and disables stepping. Per-Fragment `transition` (fade/fly/slide/
     scale/none) via the shared context defaults; `tag` (via `<svelte:element>`)
     keeps markup semantic (`li`/`p`/…). One Steps per slide with `keys='global'`
