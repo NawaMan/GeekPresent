@@ -59,6 +59,33 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
 - [ ] **`QRCode`** — live scannable link on any slide; generalizes `utils/prepare-youtube.sh`.
 - [ ] **`StackedBarChart` / `Histogram`** (maybe **`Heatmap`**) — part-to-whole & distribution charts; fills chart-family gaps.
 
+## Authoring / LAYOUT mode
+
+- [ ] **`Block` z-index control** — author-controlled stacking order for overlapping `Block`s.
+  - Problem: overlapping Blocks paint in DOM order, so in LAYOUT mode a lower Block's
+    resize grip/body can sit beneath another Block and become unselectable.
+  - Add a `z` prop (emitted by Copy + persisted via the LAYOUT Save path, like x/y/w/h),
+    plus bring-to-front / send-to-back affordances in the edit toolbar.
+  - Stopgap already in place (`Block.svelte` editing-only stacking, `selectedBlock` store):
+    grips + Copy float above other blocks' bodies, and **selecting** a Block (grabbing it)
+    floats it to the top temporarily (transient, not persisted; Escape deselects). This
+    keeps overlapping Blocks grabbable, but true author-controlled *persistent* ordering
+    (`z` prop + front/back) is still the fix.
+
+- [ ] **Select-to-front for Draw path shapes** — extend the Block "select → float to top"
+      to `Line` / `Arc` / `Curve` / `Sprite`.
+  - `Rect` / `Ellipse` already get it: they render as real `<Block>`s, so the `selectedBlock`
+    stopgap covers them for free. Path shapes do NOT.
+  - Why it's not trivial: a Draw is ONE `<svg>` and SVG has no z-index — paint order *is*
+    DOM order *is* the **visible** overlap. So naïvely re-appending the selected shape's `<g>`
+    to raise it also reorders what's drawn on top (not just what's clickable), and breaks the
+    stable-shape-order assumption (e.g. `DrawEditing.test.ts` indexes `g.draw-line[1]`).
+  - Proper fix: hoist the selected shape's **editing chrome only** (hit-stroke + handles) into
+    a dedicated top `<g>` layer that `Draw` renders last — raises *interaction* to the front
+    without touching the visible shape order. Refactor spans `Draw.svelte` + the 4 shapes.
+  - Milder today than the Block case: unselected shapes already show quiet, half-size handles
+    and wide hit-strokes, so only the exact band where two strokes cross is hard to hit.
+
 ## Deliberately excluded
 
 - **Math / LaTeX (KaTeX)** and **Mermaid-style diagrams** — both pull heavy deps, against the
