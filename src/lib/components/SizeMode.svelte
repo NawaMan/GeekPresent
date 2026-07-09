@@ -81,7 +81,7 @@
 <div class="mode no-print" class:expanded={open} bind:this={rootRef}>
 	<!-- The LAYOUT toggle used to live here; it moved into SlideDeck's content layer
 	     so slide blocks can render on top of it (see SlideDeck `.layout-ctrl`). -->
-	<CtrlBtn chrome text={label} hoverText={`Display: ${label}`} on:click={() => (open = !open)} isSelected={open} />
+	<CtrlBtn chrome text={label} hoverText={label} on:click={() => (open = !open)} isSelected={open} />
 
 	{#if open}
 	<div class="menu">
@@ -144,7 +144,7 @@
 		position: absolute;
 		top: 100%;
 		right: 0;
-		min-width: 12em;
+		min-width: 16.8em;   /* ~40% wider than the former 12em, so the two columns breathe */
 		max-height: 80vh;
 		overflow-y: auto;
 		border: 1.5px solid var(--toc-border, #CCCCCC);
@@ -186,6 +186,10 @@
 		opacity: 0.9;
 	}
 	.menu .custom {
+		/* The other rows use space-between (label left, value right); the CUSTOM row
+		   is an input + Set button, so keep them grouped at the left instead — else
+		   Set is pushed to the menu's right edge and clipped. */
+		justify-content: flex-start;
 		gap: 0.4em;
 	}
 	.menu .custom input {

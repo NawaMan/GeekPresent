@@ -195,6 +195,20 @@
 			dirty: snippet !== initialSnippet,
 			oldTag: initialSnippet,
 			newTag: snippet,
+			// Structured geometry for the dev "Save" endpoint: `before` matches the
+			// source, `after` is what gets written.
+			before: {
+				x: Math.round(initial.x),
+				y: Math.round(initial.y),
+				width: Math.round(initial.width),
+				height: Math.round(initial.height),
+			},
+			after: {
+				x: Math.round(x),
+				y: Math.round(y),
+				width: Math.round(width),
+				height: Math.round(height),
+			},
 		});
 	onDestroy(() => withdrawChange(changeId));
 

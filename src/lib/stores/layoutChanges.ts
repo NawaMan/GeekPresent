@@ -8,6 +8,13 @@ import { writable } from 'svelte/store';
 // tree. Nothing here persists — like every LAYOUT edit, entries reset on
 // reload and Copy → paste is the only way changes reach the source.
 
+export interface Geometry {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}
+
 export interface ChangedTagEntry {
 	id: number;
 	/** Emitted tag name — 'Block', 'ImageBlock', … */
@@ -19,6 +26,10 @@ export interface ChangedTagEntry {
 	oldTag: string;
 	/** The opening tag with live geometry. */
 	newTag: string;
+	/** Geometry at mount (matches source) and now — the structured form the dev
+	    "Save" endpoint patches with, alongside the human-readable old/new tags. */
+	before: Geometry;
+	after: Geometry;
 }
 
 const entries = writable<Map<number, ChangedTagEntry>>(new Map());
@@ -47,4 +58,57 @@ export function withdrawChange(id: number): void {
 		next.delete(id);
 		return next;
 	});
+}
+
+// --- Draw shapes -----------------------------------------------------------
+//
+// Draw shapes (Curve/Line/Arc/Polyline/Rect/Ellipse) can't go through the
+// geometry registry above: a Curve has no box, only from/to/control points. So
+// they publish their WHOLE opening tag (old + new) to this separate registry,
+// which the page-level "Save" reads and applies as a literal source replacement
+// (see $lib/layout/patchSource.ts). Kept apart from `layoutChanges` so Draw's own
+// "Copy changed" — which already merges its shapes with layoutChanges Blocks —
+// doesn't read its own shapes back and double-count them. String keys namespace
+// each shape by its Draw instance so multiple <Draw>s on a page don't collide.
+
+export interface ShapeChangeEntry {
+	key: string;
+	/** Component/tag name — 'Curve', 'Line', 'Rect', … */
+	kind: string;
+	name: string;
+	/** Live tag differs from the mount-time (source) tag. */
+	dirty: boolean;
+	/** Opening tag as mounted (the literal source string to find). */
+	oldTag: string;
+	/** Opening tag with live geometry (what to write). */
+	newTag: string;
+}
+
+const shapes = writable<Map<string, ShapeChangeEntry>>(new Map());
+
+/** Readable view of every registered Draw shape. */
+export const shapeChanges = { subscribe: shapes.subscribe };
+
+let nextDrawInstance = 1;
+/** A per-<Draw> id so its shape keys never collide with another Draw's. */
+export function nextDrawInstanceId(): number {
+	return nextDrawInstance++;
+}
+
+/** Replace the full set of shapes owned by one Draw instance (upsert-by-prefix):
+    every reported shape is keyed `${instance}:...`, so we drop that instance's
+    old entries and set the new ones in a single update. */
+export function reportShapeChanges(instance: number, list: ShapeChangeEntry[]): void {
+	const prefix = `${instance}:`;
+	shapes.update((m) => {
+		const next = new Map([...m].filter(([k]) => !k.startsWith(prefix)));
+		for (const e of list) next.set(e.key, e);
+		return next;
+	});
+}
+
+/** Remove every shape a Draw instance registered (its onDestroy). */
+export function withdrawShapeChanges(instance: number): void {
+	const prefix = `${instance}:`;
+	shapes.update((m) => new Map([...m].filter(([k]) => !k.startsWith(prefix))));
 }

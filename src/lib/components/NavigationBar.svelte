@@ -132,7 +132,9 @@
 	<CtrlBtn chrome text="CONTINUE" on:click={() => onContinue?.()} isDisabled={!onContinue} />
 	<CtrlBtn chrome text="NEXT"     on:click={onNext}     isDisabled={!nextLink} />
 	<CtrlBtn chrome text="LAST"     on:click={onLast}     isDisabled={!lastLink}/>
-	<!-- Open the presenter console. Hidden inside the console itself ($presenterMode). -->
-	<CtrlBtn chrome text="⧉" hoverText="Presenter" on:click={openPresenter} isVisible={!$presenterMode} />
+	<!-- Open the presenter console. A text label like the other nav buttons (not a
+	     bare ⧉ icon), so it reads clearly at rest. Hidden inside the console itself
+	     ($presenterMode). -->
+	<CtrlBtn chrome text="PRESENT" on:click={openPresenter} isVisible={!$presenterMode} />
 </div>
 {/if}

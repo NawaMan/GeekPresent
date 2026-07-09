@@ -60,11 +60,11 @@
 <Draw title="Request flow annotation" name="flow"
 	description="A labelled arc from the client box to the server box, a dashed response line back, a rounded frame around the server, a smooth polyline drawing itself on, and a curve arrow onto the word 'here', circled by an ellipse.">
 	<Arc name="request" from={[510, 760]} to={[1410, 760]} bend={0.124} arrow="end" thickness={6} label="request from client to server" labelText="request" />
-	<Line name="response" from={[1410, 820]} to={[507, 797]} arrow="end" color="#00b356" dash label="response from server to client" labelText="response" labelOffset={28} />
+	<Line name="response" from={[845, 816]} to={[509, 820]} arrow="end" color="#00b356" dash label="response from server to client" labelText="response" labelOffset={28} />
 	<Rect name="frame" rounded={16} color="#2980b9" x={1395} y={675} width={370} height={190} />
 	<!-- Smooth Polyline (Catmull-Rom through every point) drawing itself in 2s. -->
 	<Polyline points={[[180, 1000], [400, 950], [620, 1020], [900, 1010]]} smooth draw={2} color="#f39c12" label="a smooth polyline drawing itself" />
-	<Curve name="hop" from={[900, 1010]} to={[1143, 992]} c1={[874, 844]} arrow="end" color="#e74c3c" label="curve arrow onto the word 'here'" />
+	<Curve name="hop" from={[847, 818]} to={[1143, 992]} c1={[991, 882]} arrow="end" color="#e74c3c" label="curve arrow onto the word 'here'" />
 	<Ellipse name="ring" color="#e74c3c" label="the word 'here', circled" x={1160} y={950} width={200} height={90} />
 	<!-- Raw SVG passes straight through (escape hatch). -->
 	<circle cx="960" cy="790" r="10" fill="currentColor" />
