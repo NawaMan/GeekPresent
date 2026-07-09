@@ -47,7 +47,16 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
 
 - [ ] **`Terminal`** — fake console: typed command + output. Can ride the `AnimationBar` keyframe clock.
 - [ ] **`Kbd`** — render keyboard keys (`<Kbd>⌘</Kbd><Kbd>K</Kbd>`). Trivial, no-dep.
-- [ ] **`Stat` / `StatGroup`** — big-number / KPI slide. Pure CSS; pairs with charts.
+- [x] **`Stat` / `StatGroup`** — big-number / KPI slide. Pure CSS; pairs with charts.
+  - Done: `src/lib/components/Stat.svelte` (hero figure + label + optional trend chip;
+    `up`→positive / `down`→negative / `flat`→neutral, override via `tone`; `accent`
+    tints the figure) and `StatGroup.svelte` (even, divider-separated wrapping row;
+    `columns` for a grid; `card` wraps the row in a raised panel). Demo
+    `stat-component.html`, `--stat-*` role tokens, SSR test `tests/StatSsr.ssr.test.ts`.
+  - Note: theme base tokens (`--INK` etc.) are only defined by `.theme-*` classes; the
+    main deck runs with `deckClass=''`, so the roles.css *fallbacks* render — they must
+    be the dark-default (light-on-dark) values like `--surface-fg`, not light-theme
+    darks. Label/dividers derive from the figure ink (dimmed) to stay legible in any theme.
 - [ ] **`Columns` / `Split`** — 2–3 column & media/text split layout. Thin grid wrapper; keep LAYOUT-mode compatible.
 
 ## Tier 3 — nice to have

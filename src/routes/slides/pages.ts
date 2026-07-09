@@ -24,6 +24,7 @@ export const pages = [
     { path: "youtube-showcase.html",  title: "YouTube" },
     { path: "hint-component.html",    title: "Hint" },
     { path: "callout-component.html", title: "Callout" },
+    { path: "stat-component.html",    title: "Stat & StatGroup" },
     { path: "label-component.html",   title: "Label" },
     { path: "scrolldiv-component.html", title: "ScrollDiv" },
     { path: "code-component.html",    title: "Code" },

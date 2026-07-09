@@ -68,6 +68,20 @@
 	--callout-warn-accent:   var(--ACCENT-WARM, #F0A33E);
 	--callout-danger-accent: var(--DANGER, #E5484D);
 
+	/* Stat / StatGroup — big-number KPI tiles. The figure reads in ink; the label
+	   and dividers derive from the same ink (dimmed in-component), so they stay
+	   legible in any theme. `accent` figures and trend chips pull the accent /
+	   positive / negative tones. Fallbacks mirror the dark default (light-on-dark),
+	   like --surface-fg; a theme reskins every Stat by moving these. */
+	--stat-value-fg:    var(--INK, #C0F1FF);
+	--stat-label-fg:    var(--INK, #C0F1FF);           /* dimmed via opacity in-component */
+	--stat-accent:      var(--ACCENT, #2980B9);
+	--stat-positive:    var(--ACCENT-2, #00B356);
+	--stat-negative:    var(--DANGER, #E5484D);
+	--stat-divider:     var(--INK, #C0F1FF);           /* softened via color-mix in-component */
+	--stat-card-bg:     var(--PAPER-RAISED, #1E1E1E);  /* raised panel behind a `card` group */
+	--stat-card-border: var(--LINE, #CCCCCC);          /* softened via color-mix in-component */
+
 	/* Code title bar (CodeBox / JavaCodeBox) */
 	--code-title-bg:     var(--PAPER-RAISED, #1E1E1E);
 	--code-title-fg:     var(--INK, #FFFFFF);
