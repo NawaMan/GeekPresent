@@ -104,6 +104,18 @@
 	export let articleText = 'View as article';
 	export let articleHref = '../text.html';
 
+	/* Fade the deck's own controls (NAV, TOC, DISPLAY/minimap, LAYOUT) down to a
+	   ghost until the pointer reaches them, so the slide — not the chrome — is what
+	   the audience looks at. Especially wanted where the chrome sits over someone
+	   else's pixels (a full-canvas WebPage). Opt-in: a deck that says nothing keeps
+	   the controls at full strength.
+
+	   The controls keep their full hit area while faded (opacity, not visibility),
+	   and any that are OPEN or PINNED stay lit — you can't hunt for a menu you are
+	   already using. Touch devices have no hover to reveal with, so the fade is
+	   disabled there outright. */
+	export let fadeChrome = false;
+
 	let viewport:  HTMLElement;
 	let container: HTMLElement;
 	let content:   HTMLElement;
@@ -390,6 +402,7 @@
 		class:zoom-mode={!isFitted}
 		class:clean={clean}
 		class:present={present}
+		class:fade-chrome={fadeChrome}
 		style="--canvas-w:{width}px; --canvas-h:{height}px; --aspect:{aspectRatio}; --base-font:{baseFontSize};{contentBackground ? ` --content-bg:${contentBackground};` : ''}{contentFont ? ` --content-font:${contentFont};` : ''}"
 		bind:this={container}
 	>
@@ -402,7 +415,9 @@
 			     MODE in the screen-fixed overlay, which is above all content and so
 			     obscured whatever block sat under it.) -->
 			{#if $canLayout && !clean}
-			<div class="layout-ctrl no-print">
+			<!-- `pinned` while LAYOUT is on: you are actively editing, so the toggle
+			     and SAVE must not dim out from under the cursor between drags. -->
+			<div class="layout-ctrl gp-chrome no-print" class:pinned={$layoutMode}>
 				<CtrlBtn
 					chrome
 					text="LAYOUT"
@@ -433,7 +448,7 @@
      and panned) so they never drift off-screen. Hidden by ?clean and in the
      presenter console (which has its own chrome). -->
 {#if initialized && !clean && !present}
-<div class="overlay" style="--base-font:{baseFontSize}; --ctrl-top:{ctrlTop}; --ctrl-right:{ctrlRight}; --view-scale:{viewScale};">
+<div class="overlay" class:fade-chrome={fadeChrome} style="--base-font:{baseFontSize}; --ctrl-top:{ctrlTop}; --ctrl-right:{ctrlRight}; --view-scale:{viewScale};">
 	<SizeMode {width} {height} />
 	{#if mapVisible}
 	<SlideMap {width} {height} rect={mapRect} />
@@ -513,6 +528,41 @@
 	   frame, never an overflowing box. */
 	.content:not(.ready) {
 		display: none;
+	}
+
+	/* --- Chrome fade (opt-in via `fadeChrome`) ---------------------------------
+	   Every deck control tags its own root `.gp-chrome`; the two hosts that can
+	   contain one are .container (NAV, TOC, LAYOUT) and .overlay (DISPLAY, minimap),
+	   so the rule is written once against each. :global because those roots belong
+	   to sibling components with their own scoped styles.
+
+	   Opacity, never visibility/display: a ghosted control keeps its full hit area,
+	   so the pointer can find it exactly where it always was. */
+	.container.fade-chrome :global(.gp-chrome),
+	.overlay.fade-chrome   :global(.gp-chrome) {
+		opacity: 0.12;
+		transition: opacity 160ms ease;
+	}
+	/* Lit on approach — and STAY lit while open (`.expanded`, the class TOC and
+	   SizeMode already flip) or pinned (LAYOUT mid-edit). :focus-within carries the
+	   keyboard: tabbing to a control reveals it exactly as hovering does. */
+	.container.fade-chrome :global(.gp-chrome:hover),
+	.container.fade-chrome :global(.gp-chrome:focus-within),
+	.container.fade-chrome :global(.gp-chrome.expanded),
+	.container.fade-chrome :global(.gp-chrome.pinned),
+	.overlay.fade-chrome   :global(.gp-chrome:hover),
+	.overlay.fade-chrome   :global(.gp-chrome:focus-within),
+	.overlay.fade-chrome   :global(.gp-chrome.expanded),
+	.overlay.fade-chrome   :global(.gp-chrome.pinned) {
+		opacity: 1;
+	}
+	/* No hover to reveal with (touch, pen): a ghosted control the reader cannot
+	   summon is just a lost control. Show everything. */
+	@media (hover: none) {
+		.container.fade-chrome :global(.gp-chrome),
+		.overlay.fade-chrome   :global(.gp-chrome) {
+			opacity: 1;
+		}
 	}
 	/* LAYOUT toggle, anchored to the content's top-right (left of where the MODE
 	   control floats in the overlay). It scales/pans WITH the slide — fine, since

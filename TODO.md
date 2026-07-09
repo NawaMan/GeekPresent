@@ -85,11 +85,73 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
 
 ## Web & video embeds (requested)
 
-- [ ] **`WebPage`** — show a live website full-page: an `<iframe>` filling the whole slide canvas.
-  - Sandbox the frame; lazy-load (only mount when the slide is active) to avoid background network.
-  - Iframe scales fine inside the fixed 1920×1080 transform; verify pointer/scroll interaction.
-- [ ] **`WebSite`** — show a website as a component in limited space: an `<iframe>` sized to a `Block` region.
-  - Same engine as `WebPage`, just bounded; optional "open full" affordance to hand off to a `WebPage`/new tab.
+- [x] **`WebSite`** — a live website as a component, bounded to the space you give it.
+  - Done: `src/lib/components/WebSite.svelte` — the engine behind both embeds. Fills its
+    parent, so a `<Block>` places and sizes it in canvas pixels.
+  - Three things a slide needs that a bare `<iframe>` does not:
+    - **Shield.** An iframe swallows every click, scroll and key it is given, so it would
+      eat the presenter's paging keys the moment the pointer strayed over it. The frame is
+      `pointer-events: none` behind an **invisible** shield — the embed should look like the
+      site, not like a site wearing a badge. Clicking arms it (accent ring + **Release**
+      pill), and a `pointerdown` **anywhere outside** the component disarms it — interaction
+      is always deliberate and always escapable without the keyboard. A click *inside* the
+      iframe never reaches that listener, which is the point. What advertises the shield is
+      a **tooltip** on hover, plus a faint wash and a `:focus-visible` ring (the tooltip
+      never fires for a keyboard user). `interactive` starts armed and drops it for good.
+    - **Lazy mount.** `lazy` (default) creates the iframe only once the box scrolls into
+      view (IntersectionObserver, `rootMargin: 200px`), so a server render costs no
+      third-party request and a `text` page with many embeds loads them as the reader
+      arrives. Until then the box shows a placeholder carrying a plain `<a href>`. Where
+      IntersectionObserver is absent it mounts on `onMount` — degrade to eager, never blank.
+      `lazy={false}` renders the iframe during SSR too, already shielded (no first-paint
+      window in which the frame is live).
+    - **Zoom.** `zoom={0.6}` renders the frame at `100/zoom` % and scales it down, so the
+      *desktop* layout shrinks instead of tripping the site's phone breakpoints. A zero/NaN
+      zoom falls back to 1:1 rather than an infinite frame; at 1:1 no transform is emitted.
+  - Also: fake browser bar (`chrome`) with the URL + an **Open ↗** escape hatch that stays
+    clickable while the frame is inert; `sandbox` (defaults to scripts/same-origin/popups/
+    forms — `''` locks it down, `false` drops the attribute), `allow`, `title`,
+    `width`/`height`, `style`, and a `placeholder` slot.
+  - The bar also carries a live **zoom** (`− 100% +`) and a **reload** (`⟳`) — `controls`,
+    default on. Both work *without arming the frame*, since the bar sits outside the shield.
+    Reload works by **re-keying the iframe**: a cross-origin frame's `contentWindow.location`
+    is walled off, and re-assigning the same `src` is a no-op navigation, so destroying and
+    rebuilding the element is the only refresh a third-party embed allows. Zoom seeds from
+    the `zoom` prop and re-seeds only when that prop *changes* (an unrelated re-render must
+    not stomp the viewer's zoom), and clicking the percentage snaps back to the author's
+    setting.
+  - `zoomLevels` — the stops the − / + walk, a browser's own ladder by default, overridable
+    per embed (`zoomLevels={[0.4, 0.6, 1]}`). Sorted, de-duped, junk-filtered, with a
+    fallback to the default if nothing survives; the ladder's ends *are* the clamp, and the
+    spent button disables. An explicit list beats a multiplier on two counts: the author
+    picks stops that suit the site, and it cannot drift — repeated ×1.25 / ÷1.25 lands on
+    0.9999… and would render a transform while displaying "100%". Stepping goes to the
+    nearest stop *strictly* past the current zoom, so an off-ladder authored `zoom` (0.6)
+    moves to its neighbours instead of snapping to one it already sits between. The handlers
+    read the plain state, not the reactive mirror, or two clicks in one frame both step from
+    the same stop.
+  - **The one gotcha:** many sites refuse to be framed (`X-Frame-Options` /
+    `frame-ancestors`). That is the site's call, not ours — the frame renders empty and
+    "Open ↗" is the way out. Check the target before the talk. Demos use `example.com`,
+    which frames.
+  - Demo `website-component.html`, DOM test `tests/WebSite.test.ts` (lazy gate + shield
+    arm/disarm/release + unmount cleanup), SSR test `tests/WebSiteSsr.ssr.test.ts`.
+    `--embed-*` role tokens. New `tests/stubs/app-navigation.ts` (aliased in both vitest
+    projects) so any component pulling in `NavigationBar` can be rendered under test.
+- [x] **`WebPage`** — the same site filling the whole slide canvas.
+  - Done: `src/lib/components/WebPage.svelte` — `WebSite` stretched over the fixed
+    1920×1080 canvas (`position: absolute; inset: 0` against SlideDeck's `.container`, the
+    only positioned ancestor — the same space `Block` authors in). Every `WebSite` prop
+    passes through.
+  - It renders **its own `NavigationBar`** (like `TitlePage`/`ContentPage`), so
+    `<WebPage src="…" />` *is* a complete slide and paging still works with the site on
+    screen. Nesting it in a page template would double the nav bar — pass `nav={false}`.
+  - **Layering:** no `z-index`, so it paints in DOM order. The deck's chrome (TOC, Notes)
+    and its own nav bar are later siblings and stay above it, and stay clickable — the site
+    behind them is inert until shielded-clicked anyway.
+  - `text` mode has no canvas to fill, so it drops out of the absolute layer into normal
+    flow at `height` (default 640px), with no nav bar.
+  - Demo `webpage-component.html`.
 - [ ] **`Video` (a.k.a. `VDO`)** — `<video>` with custom chrome + **time bookmarks**.
   - Controls: play/pause, restart, click-to-seek progress bar, `currentTime / duration` readout.
   - Bookmarks: `data-seek`-style chapter buttons that seek the video, with the active chapter
@@ -98,6 +160,30 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
     JS ~L1411–1500 — `data-seek`, progress bar, active-point highlighting).
 - [ ] **`VDOPage`** — page/template shell that shows a `Video` in full-page canvas space
   (sibling to `TitlePage`/`ContentPage`).
+
+## Chrome & legibility
+
+- [x] **`SlideDeck fadeChrome`** — fade the deck's own controls until pointed at.
+  - Opt-in prop. NAV, TOC, DISPLAY, the minimap and the LAYOUT toggle drop to 12% opacity
+    and lift to full on `:hover` / `:focus-within`. Wanted most where chrome sits over
+    someone else's pixels (a full-canvas `WebPage`); a deck that says nothing is unchanged.
+  - Covers NAV, TOC, DISPLAY, the minimap, LAYOUT and **ViewSource** (`</> Source`).
+  - Each control tags its own root `.gp-chrome`; `SlideDeck` owns the one rule, written
+    against the two hosts that can contain one — `.container` (NAV/TOC/LAYOUT) and
+    `.overlay` (DISPLAY/minimap) — via `:global()`, since those roots belong to sibling
+    components with their own scoped styles.
+  - **Opacity, never `visibility`/`display`:** a ghosted control keeps its full hit area, so
+    the pointer finds it exactly where it always was. Anything OPEN (`.expanded`, which TOC
+    and SizeMode already flip) or PINNED (`.layout-ctrl` while LAYOUT is on) stays lit — you
+    can't hunt for a menu you're already using, or lose SAVE between drags.
+  - `@media (hover: none)` disables the fade outright: a ghosted control a touch reader
+    cannot summon is just a lost control.
+  - On in the main `slides` deck.
+- [x] **`Hint` legibility** — the cue floats over arbitrary pixels (an image, a chart, a live
+  website), so bare text vanishes whenever the backdrop matches its colour. It now carries its
+  own translucent backdrop + hairline rule (`--hint-*` role tokens, mixed toward `transparent`
+  so neither needs to know the surface colour — they just deepen it). `boxed={false}` restores
+  the bare text for slides that know what sits behind them.
 
 ## Tier 2 — on-brand tech-talk polish
 

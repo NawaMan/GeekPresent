@@ -56,7 +56,7 @@
 	});
 </script>
 
-<div class="toc no-print" class:expanded={$isContentVisible} bind:this={tocRef}>
+<div class="toc gp-chrome no-print" class:expanded={$isContentVisible} bind:this={tocRef}>
 	<CtrlBtn chrome text="Table of Contents" hoverText="Table of Contents" on:click={toggleTableOfContent} isSelected={$isContentVisible} />
 
 	{#if $isContentVisible}
