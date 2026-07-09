@@ -60,6 +60,14 @@
 	--quickcode-bg:      var(--PAPER-RAISED, #111111);
 	--quickcode-fg:      var(--INK, #FFFFFF);
 
+	/* Callout — semantic admonition boxes (info / tip / warn / danger). Each kind
+	   is driven by a single accent; the component tints its own background and
+	   border from that accent (color-mix), so a theme only needs to move these. */
+	--callout-info-accent:   var(--ACCENT, #2980B9);
+	--callout-tip-accent:    var(--ACCENT-2, #00B356);
+	--callout-warn-accent:   var(--ACCENT-WARM, #F0A33E);
+	--callout-danger-accent: var(--DANGER, #E5484D);
+
 	/* Code title bar (CodeBox / JavaCodeBox) */
 	--code-title-bg:     var(--PAPER-RAISED, #1E1E1E);
 	--code-title-fg:     var(--INK, #FFFFFF);
