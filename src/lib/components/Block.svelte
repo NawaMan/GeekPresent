@@ -11,7 +11,9 @@
           <h2>Pinned content</h2>
       </Block>
 
-  When LAYOUT mode is ON, the wrapper grows a drag body + a bottom-right
+  The wrapped content fills the box in both axes by default (a resize rubber-bands
+  it) — pass `fill={false}` for pure positioning, where the content keeps its
+  natural size. When LAYOUT mode is ON, the wrapper grows a drag body + a bottom-right
   resize handle + a small toolbar. Dragging updates x/y/width/height live; the
   COPY button writes the updated OPENING tag — just `<Block … x={…} y={…} …>` —
   to the clipboard, so you paste that one line over your element's existing open
@@ -43,6 +45,12 @@
 	export let height = 120;
 	/** Optional label, shown in edit mode and used in the copied snippet's comment. */
 	export let name = '';
+	/** Stretch the wrapped content to fill the box in both axes (the default), so a
+	    resize rubber-bands it. A Block is a sizing frame and virtually every use
+	    wants this — content that sets its own width/height still wins. Pass
+	    `fill={false}` for pure positioning, where the content keeps its natural
+	    size and the box is just a hit/anchor region. */
+	export let fill = true;
 	/** Snap step (canvas px) while dragging/resizing. 1 = freeform. */
 	export let grid = 1;
 	/** Lock the width:height ratio while resizing. A number sets an explicit ratio
@@ -234,7 +242,7 @@
 	style="left:{x}px; top:{y}px; width:{width}px; height:{height}px; clip-path:{clipPath};"
 	on:pointerdown={(e) => startDrag('move', e)}
 >
-	<slot />
+	<div class="fill-layer" class:loose={!fill}><slot /></div>
 
 	{#if editing}
 		<div class="readout">
@@ -273,6 +281,24 @@
 	.movable {
 		position: absolute;
 		box-sizing: border-box;
+	}
+
+	/* The wrapped content fills the box by default: a Block is a sizing frame, and
+	   every real usage wants its content to take the whole box so a resize
+	   rubber-bands it. A single grid cell spanning the box stretches the child in
+	   both axes (grid's default stretch alignment); content that sets its own
+	   width/height overrides the stretch. `fill={false}` → `display:contents`, so
+	   the slot content behaves as a plain flow child (its natural size), exactly
+	   as before this layer existed. */
+	.fill-layer {
+		position: absolute;
+		inset: 0;
+		display: grid;
+		grid-template: 1fr / 1fr;
+	}
+	.fill-layer.loose {
+		position: static;
+		display: contents;
 	}
 	/* In edit mode the wrapper becomes a manipulable object: a dashed outline marks
 	   its bounds, the body is a move target, and text selection is suppressed so a

@@ -23,6 +23,7 @@ export const pages = [
     { path: "datatable-chart.html",   title: "DataTable + Charts — One Dataset" },
     { path: "youtube-showcase.html",  title: "YouTube" },
     { path: "hint-component.html",    title: "Hint" },
+    { path: "callout-component.html", title: "Callout" },
     { path: "label-component.html",   title: "Label" },
     { path: "scrolldiv-component.html", title: "ScrollDiv" },
     { path: "code-component.html",    title: "Code" },
