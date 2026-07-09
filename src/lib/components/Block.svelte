@@ -29,6 +29,7 @@
 	import { layoutMode, canLayout } from '$lib/stores/layoutMode';
 	import { record } from '$lib/stores/layoutHistory';
 	import { nextChangeId, reportChange, withdrawChange } from '$lib/stores/layoutChanges';
+	import { selectedBlock, nextBlockId } from '$lib/stores/selectedBlock';
 	import { trackPointer } from '$lib/utils/drag';
 	import { browser } from '$app/environment';
 	import { onDestroy } from 'svelte';
@@ -37,6 +38,28 @@
 	// opted-in `?layout` session) and switched on. canLayout keeps the published
 	// deck inert even if a stale layoutMode=true lingers in localStorage.
 	$: editing = $canLayout && $layoutMode;
+
+	// Selection: grabbing a Block selects it, which floats it to the top so it (and
+	// its grip) stays reachable when Blocks overlap. Transient — never written to
+	// source (that's the persisted `z` prop, TODO). One selection at a time, since
+	// every Block reads the same store.
+	const blockId = nextBlockId();
+	$: selected = editing && $selectedBlock === blockId;
+
+	// Escape clears the selection (only the selected Block listens, so exactly one
+	// handler is live). A drag's own Escape is handled by trackPointer's onCancel.
+	function handleDeselect(event: KeyboardEvent) {
+		if (event.key === 'Escape') selectedBlock.set(null);
+	}
+	$: if (browser) {
+		if (selected) window.addEventListener('keydown', handleDeselect);
+		else window.removeEventListener('keydown', handleDeselect);
+	}
+	onDestroy(() => {
+		if (browser) window.removeEventListener('keydown', handleDeselect);
+		// Don't leave a destroyed Block as the selection target.
+		if (selected) selectedBlock.set(null);
+	});
 
 	/** Top-left position and size, in canvas pixels. */
 	export let x = 0;
@@ -100,6 +123,9 @@
 		if (!editing) return;
 		event.preventDefault();
 		event.stopPropagation();
+		// Grabbing the body or the grip selects this Block (brings it to the top so
+		// the gesture — and future clicks — land on it, not a Block overlapping it).
+		selectedBlock.set(blockId);
 		dragging = mode;
 
 		const startX = x;
@@ -237,6 +263,7 @@
 <div
 	class="movable"
 	class:editing={editing}
+	class:selected={selected}
 	class:active={dragging}
 	bind:this={el}
 	style="left:{x}px; top:{y}px; width:{width}px; height:{height}px; clip-path:{clipPath};"
@@ -312,6 +339,34 @@
 	}
 	.movable.active {
 		outline-style: solid;
+	}
+	/* A selected Block reads as the active object: a solid (not dashed) outline. */
+	.movable.selected {
+		outline-style: solid;
+	}
+
+	/* Editing-only stacking so overlapping Blocks stay grabbable (Blocks otherwise
+	   paint in DOM order, so a lower Block's grip/body can hide beneath a later one
+	   and become unselectable). The ladder, low → high: grips + Copy float above
+	   other blocks' bodies (so you can click to select even when overlapped); the
+	   pointed-at block lifts on hover; the SELECTED block stays on top until another
+	   is selected (or Escape); the one being dragged/resized tops everything. All
+	   kept below the KeyframeStudio panel (z 50) and Box modal (z 1000). Idle Blocks
+	   keep z-index:auto (no stacking context) so a grip can float across a
+	   neighbour. Author-controlled bring-to-front / send-to-back is the real fix —
+	   tracked in TODO.md. */
+	.movable.editing .handle,
+	.movable.editing .copy {
+		z-index: 35;
+	}
+	.movable.editing:hover {
+		z-index: 40;
+	}
+	.movable.selected {
+		z-index: 44;
+	}
+	.movable.active {
+		z-index: 46;
 	}
 
 	.movable .readout {
