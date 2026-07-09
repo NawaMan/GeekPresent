@@ -10,10 +10,24 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
 
 ## Tier 1 — closes clear gaps
 
-- [ ] **`Steps` / `Fragment`** — accumulating ←/→ reveal within a slide.
+- [x] **`Steps` / `Fragment`** — accumulating ←/→ reveal within a slide.
   - Biggest gap; the classic reveal.js/Slidev bullet-reveal, which the deck lacks.
   - Reuse `Carousel`'s keyboard stepping (note: `Carousel` *replaces* content; `Steps` *builds up*).
   - Coordinate ←/→ with `NavigationBar` so the last fragment hands off to the next slide.
+  - Done: `src/lib/components/Steps.svelte` (context coordinator, like Carousel) +
+    `Fragment.svelte` (one build step). Fragments start hidden but keep their box
+    (`visibility`, no reflow) and fade in on **Space**; **Shift+Space** peels the
+    last back off. Space (not the arrows) drives the build so →/← stay free for
+    `NavigationBar`'s slide paging during a build; Space is a no-op once spent, and
+    ignored while a form field/button has focus (native Space preserved). Also
+    advances on the presenter console's `gp:continue` pulse. Text mode shows every
+    Fragment and disables stepping. Per-Fragment `transition` (fade/fly/slide/
+    scale/none) via the shared context defaults; `tag` (via `<svelte:element>`)
+    keeps markup semantic (`li`/`p`/…). One Steps per slide with `keys='global'`
+    (default); `keys='off'` + `bind:this` (`next`/`prev`/`goTo`/`revealAll`/`reset`)
+    for extras. Demo `steps-component.html`, DOM test `tests/Steps.test.ts` (Space
+    build/peel + arrows left free), SSR test `tests/StepsSsr.ssr.test.ts`
+    (prerender-visible markup). No new role tokens (reveal is pure opacity/transform).
 - [ ] **`Connector` / `Arrow`** — auto-routed arrow between two named `Block`s.
   - Turns the `Block` system into a diagramming tool.
   - Reuse `Block` `name`-matching (same mechanism as LAYOUT-mode save) + `Draw` Line/Arc.

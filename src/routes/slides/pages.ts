@@ -10,6 +10,7 @@ export const pages = [
     { path: "block-component.html",   title: "Block Component" },
     { path: "highlight-component.html", title: "Highlight Component" },
     { path: "carousel-component.html", title: "Carousel Component" },
+    { path: "steps-component.html",   title: "Steps & Fragment" },
     { path: "datatable-component.html", title: "DataTable — Static Data" },
     { path: "datatable-tools.html",   title: "DataTable — Table Tools" },
     { path: "datatable-server.html",  title: "DataTable — Server-Side Data" },
