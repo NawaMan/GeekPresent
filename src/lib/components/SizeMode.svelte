@@ -78,7 +78,7 @@
 	});
 </script>
 
-<div class="mode no-print" class:expanded={open} bind:this={rootRef}>
+<div class="mode gp-chrome no-print" class:expanded={open} bind:this={rootRef}>
 	<!-- The LAYOUT toggle used to live here; it moved into SlideDeck's content layer
 	     so slide blocks can render on top of it (see SlideDeck `.layout-ctrl`). -->
 	<CtrlBtn chrome text={label} hoverText={label} on:click={() => (open = !open)} isSelected={open} />

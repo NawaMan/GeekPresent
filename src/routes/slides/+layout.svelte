@@ -37,6 +37,7 @@
 	article
 	articleText="← Back to home"
 	articleHref="../"
+	fadeChrome
 >
 	<slot />
 </SlideDeck>

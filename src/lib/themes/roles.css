@@ -82,6 +82,26 @@
 	--stat-card-bg:     var(--PAPER-RAISED, #1E1E1E);  /* raised panel behind a `card` group */
 	--stat-card-border: var(--LINE, #CCCCCC);          /* softened via color-mix in-component */
 
+	/* Hint — the faint bottom cue. It floats over whatever the slide put behind it
+	   (an image, a chart, someone else's website), so it can't rely on contrast with
+	   the deck surface: it carries its own translucent backdrop and rule, both mixed
+	   from these in-component. */
+	--hint-fg:     var(--INK, #C0F1FF);
+	--hint-bg:     var(--BACKDROP, #000000);
+	--hint-border: var(--INK, #C0F1FF);
+
+	/* Web embeds (WebSite / WebPage) — the frame AROUND a live site. The site paints
+	   itself; only the fake browser bar, the border and the "click to interact"
+	   shield are ours. Fallbacks mirror the dark default (light-on-dark), like
+	   --surface-fg. The border and chrome tints are softened via color-mix
+	   in-component, so a theme only needs to move these. */
+	--embed-frame-bg:     var(--PAPER-RAISED, #1E1E1E);
+	--embed-frame-border: var(--LINE, #CCCCCC);
+	--embed-chrome-bg:    var(--PAPER-RAISED, #1E1E1E);
+	--embed-chrome-fg:    var(--INK, #C0F1FF);
+	--embed-accent:       var(--ACCENT, #2980B9);      /* armed ring + pill hover */
+	--embed-shield-bg:    var(--BACKDROP, #000000);    /* hover wash, at low alpha */
+
 	/* Code title bar (CodeBox / JavaCodeBox) */
 	--code-title-bg:     var(--PAPER-RAISED, #1E1E1E);
 	--code-title-fg:     var(--INK, #FFFFFF);

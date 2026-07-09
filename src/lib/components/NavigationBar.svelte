@@ -152,11 +152,11 @@
 </style>
 
 {#if mode === 'text'}
-<div class="nav text no-print">
+<div class="nav text gp-chrome no-print">
 	<CtrlBtn chrome text="TOP" on:click={onTop} />
 </div>
 {:else}
-<div class="nav no-print">
+<div class="nav gp-chrome no-print">
 	<CtrlBtn chrome text="FIRST"    on:click={onFirst}    isDisabled={!firstLink} />
 	<CtrlBtn chrome text="PREV"     on:click={onPrev}     isDisabled={!prevLink} />
 	<CtrlBtn chrome text="CONTINUE" on:click={doContinue} isDisabled={!canContinue} />

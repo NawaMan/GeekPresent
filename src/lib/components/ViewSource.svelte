@@ -37,7 +37,9 @@
 	let expanded = false;
 </script>
 
-<div class="view-source">
+<!-- `gp-chrome` enrols this in the deck's fadeChrome behaviour with the nav bar and
+     the ToC; `expanded` pins it lit while its own CodeBox is up. -->
+<div class="view-source gp-chrome" class:expanded>
 	<CtrlBtn {chrome} {text} hoverText="View source" isSelected={expanded} on:click={() => (expanded = true)} />
 </div>
 

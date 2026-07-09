@@ -24,6 +24,8 @@ export const pages = [
     { path: "function-graph.html",    title: "Chart — Plotting y = f(x)" },
     { path: "datatable-chart.html",   title: "DataTable + Charts — One Dataset" },
     { path: "youtube-showcase.html",  title: "YouTube" },
+    { path: "website-component.html", title: "WebSite — Embedded Site" },
+    { path: "webpage-component.html", title: "WebPage — Full-Canvas Site" },
     { path: "hint-component.html",    title: "Hint" },
     { path: "callout-component.html", title: "Callout" },
     { path: "stat-component.html",    title: "Stat & StatGroup" },
