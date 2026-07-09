@@ -1,5 +1,6 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
+import { layoutSavePlugin } from './src/lib/layout/devSavePlugin';
 
 // Absolute site base URL for SEO/social metadata (og:url, og:image, canonical,
 // sitemap). Consistent with the other GEEKPRESENT_* build vars in svelte.config.js.
@@ -16,7 +17,9 @@ const SITE_URL = (rawSiteUrl === undefined ? DEFAULT_SITE_URL : rawSiteUrl)
 
 export default defineConfig({
 	plugins: [
-		sveltekit()
+		sveltekit(),
+		// Dev-only: lets LAYOUT mode's "Save" write moved Blocks back to source.
+		layoutSavePlugin()
 	],
 	// Inject the base URL as a string literal into BOTH the SSR/prerender output and
 	// the client bundle, so prerendered pages carry absolute metadata with no

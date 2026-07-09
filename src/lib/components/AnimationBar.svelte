@@ -33,7 +33,7 @@
 	import CtrlBtn                 from './CtrlBtn.svelte';
 	import { browser }            from '$app/environment';
 	import { afterNavigate }      from '$app/navigation';
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 
 	/* Selector for the element whose subtree is searched for animations. Defaults
 	   to the slide canvas `.content`; an author can narrow it (e.g. ".page") to a
@@ -91,6 +91,46 @@
 	let expanded = startExpanded;    // false = just the ANIMATION button; true = full bar
 	let dragging = false;            // a scrub is in progress (pointer held on the rail)
 	let raf = 0;                     // the progress-sampling rAF handle (0 = idle)
+
+	// Horizontal placement. By default the collapsed ANIMATION button parks just to
+	// the RIGHT of the slide nav bar (…LAST PRESENT), and the expanded bar shares
+	// that right edge and grows LEFT over the nav row. We measure the nav's right
+	// edge at runtime rather than hard-code a pixel — the nav and this bar share the
+	// transformed canvas as their offsetParent, so offsetLeft/Width are clean canvas
+	// px. `rightInset` is the gap from the canvas's right edge to the bar's right
+	// edge (applied as inline `right`); null means "no nav here" → keep the old
+	// centred position (e.g. embedded/startExpanded bars). `positioned` gates
+	// visibility so the bar doesn't flash at its pre-measure spot on first paint.
+	let rightInset: number | null = null;
+	let topInset: number | null = null;   // canvas-px top that centres the collapsed button on the nav row
+	let positioned = false;
+
+	$: barStyle =
+		(rightInset !== null ? `right:${rightInset}px;` : '') +
+		(topInset !== null && !expanded ? `top:${topInset}px;bottom:auto;` : '') +
+		(positioned ? '' : 'visibility:hidden;');
+
+	// Measure the nav and anchor the bar just past it. Only meaningful while the
+	// collapsed button is showing (its width sets the shared right edge); a bar that
+	// starts expanded has no button to measure, so it stays centred.
+	function positionBar() {
+		if (!browser || !root || expanded) { positioned = true; return; }
+		const parent = root.offsetParent as HTMLElement | null;
+		const nav = (parent?.querySelector('.nav') ?? null) as HTMLElement | null;
+		if (parent && nav) {
+			const GAP = 14; // canvas px between the nav's right edge and the button
+			const navRight = nav.offsetLeft + nav.offsetWidth;
+			rightInset = Math.max(8, parent.clientWidth - (navRight + GAP + root.offsetWidth));
+			// Vertically centre the collapsed button on the nav row (their boxes differ
+			// in height, so match centres, not edges).
+			const navCentre = nav.offsetTop + nav.offsetHeight / 2;
+			topInset = navCentre - root.offsetHeight / 2;
+		} else {
+			rightInset = null; // no nav on this layout — fall back to the centred spot
+			topInset = null;
+		}
+		positioned = true;
+	}
 
 	$: fraction = duration > 0 ? Math.max(0, Math.min(1, playhead / duration)) : 0;
 
@@ -228,12 +268,20 @@
 			else if (startPaused) { pause(); seek(0); }  // hold on frame 0 until the viewer plays
 			else if (expanded && playing) startLoop();   // already-open: sample the live clock
 		};
+		// Measure once the bar is actually in the DOM (tick() waits for Svelte's flush
+		// of the {#if hasAnim} block), so root/offsetParent exist.
+		const place = () => { if (hasAnim) tick().then(positionBar); };
 		collect();
-		if (hasAnim) begin();
-		else requestAnimationFrame(() => { collect(); begin(); });
+		if (hasAnim) { begin(); place(); }
+		else requestAnimationFrame(() => { collect(); begin(); place(); });
 	}
 
-	onMount(refresh);
+	onMount(() => {
+		refresh();
+		// Web fonts can land after first paint and widen the nav — re-anchor then.
+		if (browser && (document as unknown as { fonts?: FontFaceSet }).fonts)
+			(document as unknown as { fonts: FontFaceSet }).fonts.ready.then(() => positionBar());
+	});
 	afterNavigate(refresh);
 	onDestroy(stopLoop);
 </script>
@@ -243,7 +291,7 @@
 <span class="anim-anchor" bind:this={anchor} aria-hidden="true"></span>
 
 {#if hasAnim}
-<div class="anim-bar no-print" class:expanded bind:this={root}>
+<div class="anim-bar no-print" class:expanded class:centered={rightInset === null} style={barStyle} bind:this={root}>
 	{#if !expanded}
 	<!-- Low-profile reveal button (chrome, like MODE / the nav controls). One-way:
 	     pressing it shows the bar for good. -->
@@ -295,8 +343,10 @@
 	.anim-anchor { display: none; }   /* DOM-present, layout-absent (used for closest) */
 	.anim-bar {
 		position: absolute;
-		left: 50%;
-		transform: translateX(-50%);
+		/* Anchored to the RIGHT (inline `right` from positionBar), so the collapsed
+		   button sits just past the nav bar and the expanded bar grows LEFT from that
+		   fixed right edge. `left:auto` lets the inline `right` own the horizontal. */
+		left: auto;
 		display: flex;
 		align-items: center;
 		gap: 0.6em;
@@ -307,8 +357,16 @@
 		width: auto;
 		bottom: 0.4em;
 	}
+	/* Fallback when no nav bar is found (embedded / start-expanded bars): keep the
+	   old centred position. */
+	.anim-bar.centered {
+		left: 50%;
+		right: auto;
+		transform: translateX(-50%);
+	}
 	.anim-bar.expanded {
-		/* Tuned so the tall icon row's vertical CENTRE lines up with the nav text. */
+		/* Tuned so the tall icon row's vertical CENTRE lines up with the nav text.
+		   With the right edge fixed, this width grows the bar LEFTWARD over the nav. */
 		bottom: 0.35em;
 		min-height: 0.8em;
 		width: 54%;

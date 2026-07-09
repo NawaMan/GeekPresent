@@ -39,18 +39,18 @@
 </ContentPage>
 
 <!-- Demo objects, parked low on the canvas so they clear the title + text. -->
-<Block name="hero" x={180} y={640} width={520} height={200} grid={10}>
+<Block name="hero" x={90} y={740} width={520} height={200} grid={10}>
 	<div class="demo a"><b>Drag me</b><br/>snaps to 10px</div>
 </Block>
 
 <!-- bounds="none": drag/resize past the canvas edge (off-stage or bleeding over). -->
-<Block name="aside" x={1180} y={560} width={400} height={280} bounds="none">
+<Block name="aside" x={1245} y={709} width={400} height={280} bounds="none">
 	<div class="demo b"><b>Resize me</b><br/>or drag me off-edge</div>
 </Block>
 
 <!-- ImageBlock: the image fills the panel, so it takes whatever shape you drag
      the box into (fit="fill", the default). -->
-<ImageBlock name="cat" src={codecat} alt="Coding Booth cat" x={760} y={560} width={320} height={320} bounds="none" />
+<ImageBlock name="cat" src={codecat} alt="Coding Booth cat" x={777} y={685} width={303} height={303} bounds="none" />
 
 <ViewSource {source} {path} />
 

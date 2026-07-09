@@ -27,10 +27,15 @@
 -->
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { getContext, setContext } from 'svelte';
+	import { getContext, setContext, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import Block from '$lib/components/Block.svelte';
-	import { layoutChanges } from '$lib/stores/layoutChanges';
+	import {
+		layoutChanges,
+		nextDrawInstanceId,
+		reportShapeChanges,
+		withdrawShapeChanges
+	} from '$lib/stores/layoutChanges';
 	import { canLayout, layoutMode } from '$lib/stores/layoutMode';
 	import { trackPointer } from '$lib/utils/drag';
 	import {
@@ -206,6 +211,35 @@
 	);
 	const dirtyBlocks = $derived([...$layoutChanges.values()].filter((e) => e.dirty));
 	const dirtyAll = $derived([...dirtyShapes, ...dirtyBlocks]);
+
+	// Publish this Draw's shapes (curves/lines/arcs/boxes) to the page-level shape
+	// registry so the top-right "Save" writes them too — they can't ride the
+	// geometry registry (a Curve has no box), so they carry their whole old/new
+	// opening tag for a literal source replacement. Keyed per Draw instance; the
+	// registry is separate from layoutChanges, so dirtyShapes above never reads
+	// these back and double-counts. onDestroy clears them when the slide unmounts.
+	const drawInstance = nextDrawInstanceId();
+	$effect(() => {
+		reportShapeChanges(drawInstance, [
+			...editors.map((e) => ({
+				key: `${drawInstance}:e:${e.id}`,
+				kind: e.kind,
+				name: e.name,
+				dirty: e.dirty,
+				oldTag: e.sourceSnippet,
+				newTag: e.snippet
+			})),
+			...blocks.map((b) => ({
+				key: `${drawInstance}:b:${b.id}`,
+				kind: b.tag,
+				name: b.name,
+				dirty: b.dirty,
+				oldTag: b.sourceSnippet,
+				newTag: b.snippet
+			}))
+		]);
+	});
+	onDestroy(() => withdrawShapeChanges(drawInstance));
 
 	const patchText = $derived(
 		[

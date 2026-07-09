@@ -42,6 +42,7 @@
 	import { displayMode, displayFactor, clampFactor } from '$lib/stores/displayMode';
 	import type { DisplayMode } from '$lib/stores/displayMode';
 	import { layoutMode, canLayout, applyLayoutParam } from '$lib/stores/layoutMode';
+	import { saveLayout } from '$lib/stores/layoutSave';
 	import { getViewTransitions } from '$lib/presentation';
 	import {
 		presenterMode, publishCurrentSlide, subscribeCurrentSlide, subscribeAnimCommand,
@@ -135,8 +136,21 @@
 		updateMap();
 		if (!container) return;
 		const r = container.getBoundingClientRect();
-		ctrlTop   = `${Math.round(Math.max(CTRL_INSET, r.top + CTRL_INSET))}px`;
+		const topPx   = Math.max(CTRL_INSET, r.top + CTRL_INSET);
+		ctrlTop   = `${Math.round(topPx)}px`;
 		ctrlRight = `${Math.round(Math.max(CTRL_INSET, window.innerWidth - r.right + CTRL_INSET))}px`;
+		// Align the in-content LAYOUT/SAVE control to the SAME screen line as the
+		// overlay's FITTED control (both at `topPx`). The LAYOUT control lives inside
+		// the transform-scaled .content (center-origin + fit slack), so a fixed canvas
+		// inset drifts from the screen-fixed FITTED button. Derive its canvas-space top
+		// from the MEASURED content top instead: screenTop = contentTop + Y*scale, so
+		// Y = (topPx - contentTop) / scale. Geometry-only (no layoutMode dependence),
+		// so it stays put whether LAYOUT is on or off.
+		if (content) {
+			const contentTop = content.getBoundingClientRect().top;
+			const y = (topPx - contentTop) / (viewScale || 1);
+			content.style.setProperty('--layout-top', `${y}px`);
+		}
 	}
 
 	// Page-level favicon. The shell renders at SSR (only the slide *content* below
@@ -173,6 +187,31 @@
 	// Sticky `?layout` opt-in for the authoring LAYOUT control (see layoutMode).
 	// browser-guarded so url.searchParams is never read during prerender.
 	$: if (browser) applyLayoutParam($page.url);
+
+	// "Save" writes the slide's moved Blocks back to source — dev only (the
+	// endpoint exists solely under `vite dev`; import.meta.env.DEV compiles this
+	// whole affordance out of a built site). The button's OWN label reports the
+	// outcome (SAVE → SAVED / NONE / ERROR) then reverts, so there's no extra
+	// chrome; a fixed min-width keeps it from jumping as the word changes. Detail
+	// (which tags didn't land, any error) goes to the console.
+	const canSave = import.meta.env.DEV;
+	let saveLabel = 'SAVE';
+	let saveTimer: ReturnType<typeof setTimeout> | undefined;
+	async function onSave() {
+		const r = await saveLayout();
+		if (!r.ok) {
+			saveLabel = 'ERROR';
+			console.error('[layout save] failed:', r.error);
+		} else if (r.patched === 0 && r.unmatched.length === 0) {
+			saveLabel = 'NONE';
+		} else {
+			saveLabel = 'SAVED';
+			if (r.unmatched.length)
+				console.warn('[layout save] not written — Copy these by hand:', r.unmatched);
+		}
+		clearTimeout(saveTimer);
+		saveTimer = setTimeout(() => (saveLabel = 'SAVE'), 1600);
+	}
 	// Page-level document title, same cascade idea as the favicon above but emitted
 	// as ONE <title> (the browser uses the FIRST <title>, so it can't stack the way
 	// the favicon links do): the current slide's own `title` from pages.ts, composed
@@ -227,6 +266,9 @@
 			content.style.transform = `scale(${factor})`;
 			content.style.transformOrigin = 'top left';
 			viewScale = factor;
+			// Expose the fit factor to canvas-space chrome (the LAYOUT/SAVE row) so it
+			// can counter-scale its screen inset to match the screen-fixed MODE control.
+			content.style.setProperty('--view-scale', String(factor));
 			if (recenter) centerScroll();
 			updateOverlay();
 			return;
@@ -257,6 +299,7 @@
 		content.style.transform = `scale(${scale})`;
 		content.style.transformOrigin = 'center center';
 		viewScale = scale;
+		content.style.setProperty('--view-scale', String(scale));
 		updateOverlay();
 	}
 
@@ -367,6 +410,14 @@
 					isSelected={$layoutMode}
 					on:click={() => layoutMode.update((v) => !v)}
 				/>
+				<!-- Save is dev-only: it writes moved Blocks back to source via the
+				     vite-dev endpoint. Shown only while LAYOUT is on. The wrapper
+				     pins a stable width so SAVE↔SAVED doesn't shift the row. -->
+				{#if canSave && $layoutMode}
+					<span class="save-btn">
+						<CtrlBtn chrome text={saveLabel} hoverText={saveLabel} on:click={onSave} />
+					</span>
+				{/if}
 			</div>
 			{/if}
 			<slot />
@@ -469,13 +520,28 @@
 	   it render on top of it (the point of moving it here). */
 	.layout-ctrl {
 		position: absolute;
-		top: 12px;
+		/* This row lives in CANVAS space (it's a .content child, so it scales/pans
+		   with the slide), but the FITTED control it sits beside is screen-fixed near
+		   the frame top. --layout-top is computed by updateOverlay() from the measured
+		   content position so the two align on the same screen line in any window size
+		   and in either LAYOUT on/off state. Fallback for first paint before measure. */
+		top: var(--layout-top, calc(12px / var(--view-scale, 1)));
 		right: 150px;
+		/* Right-anchored row: LAYOUT, then the dev-only SAVE. The box shrinks to
+		   content and grows leftward, so the right edge stays put. */
+		display: flex;
+		align-items: center;
+		gap: 8px;
 		/* No font-size here: inherit .content's --base-font (already applied one level
 		   up) so this chrome button matches the NAV / ANIMATION buttons. Re-declaring
 		   --base-font here would apply the 1.5em lever twice and render ~1.5x larger. */
 		/* Above the slide surface, but no z-index so later siblings (the slot's
 		   blocks) still paint over it. */
+	}
+	/* Pin the SAVE button's width so its label can swap (SAVE → SAVED / NONE /
+	   ERROR) without nudging the row; the text stays centred in the reserved box. */
+	.layout-ctrl .save-btn :global(button) {
+		min-width: 4.6em;
 	}
 	.content.fill {
 		/* Exact-fit: the box IS the full canvas (padding folded in via border-box),
