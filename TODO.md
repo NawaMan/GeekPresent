@@ -451,7 +451,117 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     main deck runs with `deckClass=''`, so the roles.css *fallbacks* render — they must
     be the dark-default (light-on-dark) values like `--surface-fg`, not light-theme
     darks. Label/dividers derive from the figure ink (dimmed) to stay legible in any theme.
-- [ ] **`Columns` / `Split`** — 2–3 column & media/text split layout. Thin grid wrapper; keep LAYOUT-mode compatible.
+- [x] **`Columns` / `Split`** — 2–3 column & media/text split layout. Thin grid wrapper; keep LAYOUT-mode compatible.
+  - Done: `src/lib/components/Columns.svelte` (the grid) + `Column.svelte` (one cell),
+    with the track arithmetic in `src/lib/utils/columnsCore.ts` (pure, total —
+    `drawCore`/`videoCore`/`terminalCore` discipline: a negative width, `columns={0}`,
+    a `';'` smuggled into a template all fall back to the default, and the result is
+    never the empty string, so a slide can't lose its layout to a typo).
+  - **`Split` is not a second component.** A media/text split IS a `Columns` with
+    unequal tracks, and the only prop that tells them apart is `widths` — a number
+    array (`[3, 2]` → `3fr 2fr`), a mixed one (`['360px', 1]`), or the author's own
+    `grid-template-columns` string. Shipping a `Split` whose entire body was
+    `<Columns widths={[3,2]}>` would have been a default wearing a component's name.
+    (Same call `Connector`/`Arrow` made.)
+  - **Even tracks are `minmax(0, 1fr)`, never a bare `1fr`** — and children get
+    `min-width: 0`. This is the one thing a naive grid gets wrong: a grid item's
+    automatic minimum size is its *min-content* width, so a single unbreakable token
+    (a URL, a wide `<pre>` line) makes its track exceed its share and pushes the whole
+    grid off the 1920px canvas. Applied to every child, not just `<Column>`, because a
+    bare `<div>` is a perfectly good grid item.
+  - **`span` is clamped to the tracks that exist.** Over-spanning is the trap: grid
+    quietly *adds* an implicit column to fit it, so `span={3}` in a two-column group
+    silently makes it three, rather than erroring. `Columns` publishes its track count
+    over context (a store, since the props are reactive) and `Column` clamps against
+    it. A raw `grid-template-columns` string can't be counted (`repeat(3, 1fr)` is
+    three tracks and `1fr 1fr` is two — that's a CSS parser), so it reports `null` and
+    the author's `span` is trusted as written.
+  - **The divider is the column's own leading edge**, a `::before` centred in the
+    gutter by `calc(var(--columns-gap) / -2)` — so it is drawn once per gutter and
+    never at the grid's outer edges, and `Columns` needs no `:global()` selector
+    reaching into `Column`'s markup. Its `display` rides an *inherited custom
+    property* (`--columns-rule`) rather than a rule in the parent, because
+    inheritance ignores specificity: Svelte hashes the child's own selector to
+    (0,4,1), which a parent's `:global(.gp-column)::before` could never outrank. Same
+    single-row caveat `StatGroup`'s dividers carry — more children than tracks wraps
+    them, and pure CSS can't see the row break.
+  - **The narrow-window collapse is `text` mode ONLY**, and that is the design point.
+    A presentation is authored on a fixed 1920×1080 canvas that `SlideDeck`
+    *transform-scales* to the window, so the canvas is 1920px wide no matter how small
+    the window gets — a width media query would fire on the *window* and collapse a
+    slide that never actually narrowed. A Text artifact has no canvas (its width really
+    is the window's), so there, and only there, the columns stack under 720px. The
+    collapse must undo what the columns did: the tracks, the rules (via
+    `--columns-rule: none`), and the inline `--column-span` — hence the one
+    `!important`, since a stylesheet rule may beat an inline declaration where an
+    inherited custom property may not.
+  - **The divider drags** (`resizable` for a viewer; LAYOUT mode always, `resizable`
+    or not). `trackPointer`'s fifth consumer, so the gutter tracks the cursor in
+    FITTED and in SCALED at any zoom.
+    - **You cannot drag the authored widths — only the ones the browser resolved.**
+      `1fr` is a share of the space left over, so the component *measures*
+      (`getComputedStyle(...).gridTemplateColumns` returns the used px) and does its
+      arithmetic on that. Which is why the handles are client-only and **never
+      prerender**: a server-rendered grip would sit at x=0 and drag nothing — the
+      same rule `Terminal`'s transport follows.
+    - A drag redistributes only the two tracks its gutter separates. Their **sum is
+      invariant**, so the grid never resizes and no other divider moves — that is
+      what makes the gesture feel local.
+    - It re-emits them as **`fr` weights taken from the measured px**, which is exact
+      rather than an approximation: an `fr` track gets `free space × (w / Σw)`, and
+      the measured widths already sum to the free space. So nothing jumps on the
+      first frame, and the grid stays fluid (raw `px` tracks would refuse to reflow
+      when the `Block` around them is resized). The cost: a track authored as a fixed
+      `'360px'` rail comes out proportional. **A drag is a ratio editor.** Still
+      `minmax(0, Nfr)`, or a wide child's min-content would overrule the drag.
+    - **Nothing is saved** — each slide is its own page load, so a live drag is gone
+      when you page away. LAYOUT mode adds a `widths` chip that copies
+      `widths={[1.17, 0.83]}` to the clipboard to paste back into source; double-click
+      any divider to reset it. The same bargain every LAYOUT gesture makes.
+    - **A focused handle owns ←/→** (Shift for a bigger step), and it is the *only*
+      control in the deck that may. `NavigationBar` claims the arrows on `window` with
+      no focus guard — but in the **bubble** phase, so a `stopPropagation()` at a
+      focused handle is both sufficient and scoped: the arrows page the deck again the
+      instant focus leaves. Pinned by a test that watches a window listener see
+      nothing. (`Video` and `Terminal` both concluded "a scrub bar can never own the
+      arrows"; the missing half of that sentence was *while unfocused*.)
+    - **It must not be a `<button>`.** A focused button swallows Space — `spaceIntent`
+      stands down for one — and Space is how the presenter advances. So it is the ARIA
+      window-splitter: `div[role="separator"][tabindex="0"]` with `aria-valuenow`,
+      which Svelte's a11y lint doesn't recognise as interactive (hence the two
+      `svelte-ignore`s, the only ones outside `draw/`).
+    - The grab strip is **14px wide and invisible**; the 1px line inside it is the
+      whole visual, because nobody can press a 1px target. `pointerdown` is stopped so
+      a `Block` wrapping the grid doesn't read the grab as the start of a move. With
+      `divider` off there is no resting rule — the handle advertises itself on hover
+      and focus, the bargain `WebSite`'s invisible shield makes — and `@media (hover:
+      none)` draws it outright, since a touch reader has no hover to reveal it with.
+    - `minTrack` (canvas px, default 40) floors both sides. A pair already too narrow
+      to honour it is left **untouched** rather than jumping to a size nobody asked
+      for — `resizeTracks` is total, like everything else in the core.
+  - Also: `columns` (even count), `gap` (omit it and the theme's `--columns-gap`
+    keeps its say), `align` + per-`Column` `align` (unknown values fall back rather
+    than emitting a value the stylesheet doesn't know — `ContentPage`'s rule), `stack`
+    (collapse on demand), and `style`. A `Column` used outside a `Columns` is an
+    ordinary block: no span, no rule, no complaint.
+  - LAYOUT-mode compatible for free: `Block` fills its content, so a
+    `<Block><Columns>…</Columns></Block>` stretches the grid to the box and a resize
+    rubber-bands the columns. The demo parks both bands that way.
+  - Demo `columns-component.html` (the lower band is `resizable` — drag it), unit test
+    `tests/columnsCore.test.ts` (template / count / clamp / alignment / the drag
+    geometry, all the bad inputs), SSR test `tests/ColumnsSsr.ssr.test.ts` (the static
+    contract the stylesheet reads, and that no handle prerenders), DOM test
+    `tests/Columns.test.ts` and drag test `tests/ColumnsDrag.test.ts` — all sharing
+    `tests/ColumnsHost.svelte`, since what a `Column` knows it learns from its parent,
+    so neither can be rendered alone.
+    - jsdom has no grid engine, so `getComputedStyle` never resolves a track to px —
+      the one input the drag reads. It is stubbed to a known grid and everything
+      downstream is the real code. `Columns.test.ts` pins what a server render can't
+      see: the track count travels by **store**, so a `Column` re-clamps its `span`
+      when the group's shape changes under it (a plain context snapshot would be right
+      once and stale after).
+    - New `--columns-divider` and `--columns-handle` role tokens, and a `--columns-gap`
+      metric.
 
 ## Tier 3 — nice to have
 
