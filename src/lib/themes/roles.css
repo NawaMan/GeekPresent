@@ -99,6 +99,19 @@
 	--quote-avatar-ring: var(--LINE, #CCCCCC);         /* softened via color-mix in-component */
 	--quote-border:      var(--LINE, #CCCCCC);         /* optional card border; softened in-component */
 
+	/* Timeline / TimelineItem — a narrative event spine. The spine reads as a dim
+	   rule (the ink, softened via color-mix in-component); the marker dots and the
+	   time/phase kicker pull the accent; titles read in ink and bodies are that ink
+	   dimmed (in-component), so they track the theme without a fragile muted token,
+	   like Stat/Quote. The icon glyph sits on the accent-filled dot, so it takes the
+	   on-accent ink. Fallbacks mirror the dark default (light-on-dark). */
+	--timeline-line:     var(--INK, #C0F1FF);          /* the spine; softened via color-mix in-component */
+	--timeline-dot:      var(--ACCENT, #2980B9);       /* marker fill (per-item `color` overrides) */
+	--timeline-time-fg:  var(--ACCENT, #2980B9);       /* the time / phase kicker */
+	--timeline-title-fg: var(--INK, #C0F1FF);
+	--timeline-body-fg:  var(--INK, #C0F1FF);          /* dimmed via opacity in-component */
+	--timeline-icon-fg:  var(--ON-ACCENT, #FFFFFF);    /* glyph on the accent-filled dot */
+
 	/* Columns / Column — the gutter rule of a divided group. Derived from the ink and
 	   softened via color-mix in-component, like --stat-divider, so it reads as a
 	   hairline on any surface. The grid itself paints nothing else, except a
@@ -203,4 +216,7 @@
 
 	/* Columns: the gutter between columns. A per-group `gap` prop overrides it. */
 	--columns-gap:        2em;
+
+	/* Timeline: vertical space between events. A per-Timeline `gap` prop overrides it. */
+	--timeline-gap:       1.6em;
 }

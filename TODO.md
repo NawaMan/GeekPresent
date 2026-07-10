@@ -691,7 +691,68 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     self-contained `grace.svg`), SSR test `tests/QuoteSsr.ssr.test.ts` (text/slot,
     footer parts, image-vs-initials choice, the align/mark/rule class contract the
     stylesheet reads, the bad-`align` fallback). New `--quote-*` role tokens.
-- [ ] **`Timeline`** — narrative event timeline (distinct from charts).
+- [x] **`Timeline`** — narrative event timeline (distinct from charts).
+  - Done: `src/lib/components/Timeline.svelte` (the spine) + `TimelineItem.svelte`
+    (one event: marker dot, `time`/phase kicker, `title`, and a body — `text` prop
+    or the default slot, the Quote/Callout escape hatch). Pure CSS, purely
+    declarative (no `onMount`, no browser APIs), so it prerenders. The Tier-3
+    container/item pair, the same shape as `StatGroup`/`Stat` and `Columns`/`Column`.
+  - **`side` is the only thing the container owns, and it travels by context.** A
+    `TimelineItem` learns which edge of the spine to sit on from its `Timeline`
+    (`'right'` default / `'left'` / `'alternate'`), the same "what a Column knows it
+    learns from its parent" plumbing — a store, since `side` is reactive, read by
+    every item. Standalone (no parent) an item falls to `'right'`. An unknown `side`
+    falls back to `'right'` rather than emitting a class that matches nothing
+    (ContentPage/Quote discipline).
+  - **The spine is one continuous line, trimmed to run dot-to-dot.** Each item is a
+    grid; the marker column is fixed-width so the dots align across events whatever
+    their content, and its `::before` draws a thin rule extended past the bottom by
+    the list `gap` so segments bridge into one line. `:first-child` starts it at the
+    first dot, `:last-child` stops it at the last, and a lone event draws no line at
+    all — so the spine never floats above the first event or past the last.
+  - **The dot is pinned by its centre, not its box.** Absolute + `translate(-50%,-50%)`
+    at `--tl-dot-center`, so an `icon`-enlarged dot (a glyph inside a bigger disc)
+    grows around the same point and never shifts the spine or breaks the end-trim
+    math — one number keeps the whole line consistent. Per-event `color` retints just
+    that dot + its kicker (a `--tl-color` override); `active` adds a soft halo ring
+    ("you are here"), static so it survives SSR and reduced motion.
+  - **`alternate` zig-zags by `:nth-child`, no per-item index needed.** Three-track
+    grid (`1fr auto 1fr`), spine centred; odd events' content in the right track,
+    `:nth-child(even)` flips it to the left and right-aligns it. The items are direct
+    `<li>` children of the `<ol>`, so structural `:nth-child` counts them correctly
+    (the same reason first/last trim works).
+  - Colours from `--timeline-*` role tokens (spine dim-ink softened via color-mix;
+    dots/kicker pull the accent; titles ink, bodies ink dimmed via opacity — the
+    Stat/Quote no-muted-token trick; icon glyph takes the on-accent ink), fallbacks
+    the dark default (light-on-dark). `--timeline-gap` metric. Sized in `em`, and
+    LAYOUT-compatible for free — `Block` fills its content, so `<Block><Timeline>…`
+    sizes it (the demo parks both bands that way).
+  - **Also horizontal** (`orientation="horizontal"`): events in a row on a
+    fixed-height `band`, `side` = `below` (default) / `above` / `alternate`. The two
+    orientations use *different* layout engines and that is deliberate: vertical is a
+    per-event grid (height is the content's own, so events flow naturally), but
+    horizontal is a **fixed band with the spine at a constant y and the dot + content
+    absolutely placed off it** — because a per-item grid would let a taller
+    above/below event push its dot out of line and bow the spine. Absolute placement
+    keeps the row's spine dead straight whatever the content. `orientation` travels
+    over the same context as `side`; the two `side` naming sets alias across
+    orientations (`left`≈`above`, `right`≈`below`) with the orientation's default as
+    the fallback.
+  - **A long horizontal timeline pans in a `ScrollDiv axis="x"`.** Each event is a
+    fixed `itemWidth` and the list is `width: max-content`, so an over-long history
+    is just wider than its viewport — give ScrollDiv an `innerWidth` of about
+    `events × (itemWidth + gap)` and it wheels/drags cleanly, spine continuous across
+    the pan. `band` and `itemWidth` are horizontal-only props (ignored when vertical).
+  - Demo `timeline-component.html` (vertical: default `side` left + `side="alternate"`
+    right — icon dots, a `color` override, `active` halos) and
+    `timeline-horizontal.html` (a `side="alternate"` band + a 14-event history panned
+    in a `ScrollDiv`). SSR test `tests/TimelineSsr.ssr.test.ts` +
+    `tests/TimelineHost.svelte` (the orient/side classes, each event's parts, the
+    slot-vs-`text` body, icon/active/colour markers, the horizontal side aliases +
+    bad-input fallback, and both orientation AND side reaching the items over
+    context). Verified by rendering both slides to PNGs — including a seeded-scroll
+    frame proving the pan reveals the later years — not just by test. New
+    `--timeline-*` role tokens.
 - [ ] **`Tabs`** — switch panels in one slide (e.g. same code in N languages).
 - [ ] **`CodeDiff`** — added/removed line styling; extends `Code` `revealLines`.
 - [x] **`QRCode`** — live scannable link on any slide; generalizes `utils/prepare-youtube.sh`.
