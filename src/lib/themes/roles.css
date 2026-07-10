@@ -19,7 +19,9 @@
   custom properties inherit downward only, and the frame/border is a parent of
   `.content`.)
 
-  All values are 6-digit UPPERCASE hex by convention.
+  All COLOUR values are 6-digit UPPERCASE hex by convention. A few non-colour
+  METRIC tokens (sizes and spacing a theme legitimately wants to move, e.g. the
+  page header's) are grouped at the end of this file and labelled as such.
 */
 
 .gp-deck {
@@ -29,6 +31,7 @@
 	--frame-border:      var(--LINE, #CCCCCC);
 	--page-bg:           var(--BACKDROP, #000000);
 	--page-title-fg:     var(--ACCENT-WARM, #F0A33E);  /* TitlePage / ContentPage titles */
+	--page-subtitle-fg:  var(--INK, #C0F1FF);          /* ContentPage subtitle */
 	--link-fg:           var(--LINK, #1E6FB0);         /* unvisited <a> */
 
 	/* Controls — nav buttons, TOC toggle, mode toggle (CtrlBtn) */
@@ -142,4 +145,18 @@
 	/* Tooltip (kept dark-on-light: inverted from the surface) */
 	--tooltip-bg:        var(--INK, #000000);
 	--tooltip-fg:        var(--PAPER, #FFFFFF);
+
+	/* ── METRICS (non-colour) ──────────────────────────────────────────────────
+	   Sizes and spacing a theme may legitimately want to move. Same contract as
+	   the colours: these values reproduce the stock look, and a component's own
+	   var() fallback repeats them, so a deck with neither this file nor a theme
+	   renders identically. */
+
+	/* Page header (ContentPage): title, subtitle, and the rule under them. */
+	--page-title-size:    2.5em;
+	--page-subtitle-size: 1.2em;
+	--page-title-gap:     0.5em;   /* title → subtitle */
+	--page-rule-gap:      15px;    /* header text → rule */
+	--page-rule-weight:   4.5px;   /* the rule's thickness (its colour is --subtitle-rule) */
+	--page-content-gap:   1em;     /* header → content */
 }

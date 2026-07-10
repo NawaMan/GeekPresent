@@ -23,6 +23,7 @@
 		&lt;/ContentPage&gt;
 	</QuickCode>
 	<p>The content area is styled with justified text, straight from the template default &mdash; no per-slide font tuning.</p>
+	<p>Both header lines are optional, and so is the rule under them &mdash; see the next slide.</p>
 	<p>
 		Prefer to read it in the editor? <CtrlBtn text="Show code" on:click={() => (showCode = true)} />
 	</p>

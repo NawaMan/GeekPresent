@@ -237,23 +237,52 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
 
 ## Page templates (`ContentPage` header)
 
-`src/lib/templates/ContentPage.svelte` hard-wires a left-aligned `<h1>`, a `.subtitle`
-span, and a rule drawn as the subtitle's `::after`. All three are effectively mandatory:
-an empty `title`/`subtitle` still renders its box, and the rule is welded to the subtitle,
-so a slide with no subtitle keeps the subtitle's gap and the rule drops too low.
+`src/lib/templates/ContentPage.svelte` used to hard-wire a left-aligned `<h1>`, a
+`.subtitle` span, and a rule drawn as the subtitle's `::after`. All three were effectively
+mandatory: an empty `title`/`subtitle` still rendered its box, and the rule was welded to
+the subtitle, so a slide with no subtitle kept the subtitle's gap and the rule dropped too
+low. **All of that is now fixed** (the four boxes below); only the `Hint` check remains.
 
-- [ ] **Center the title** — opt-in `align` (`left` default / `center`), applied to the
-      title (and, when centered, presumably the subtitle and the rule with it).
-- [ ] **Optional subtitle** — omitting it should pull the rule *up* to sit right under
-      the title, not leave the empty span's margins behind. Needs the rule to stop being
-      `.subtitle::after` and become its own element.
-- [ ] **Every header part optional** — title, subtitle and rule each independently
-      omittable (`title=""` / `subtitle=""` / `rule={false}`), with the survivors closing
-      the gap. Header absent entirely → content starts at the top of the canvas.
-- [ ] **Styling pass on the header** — sizes, spacing and the rule's weight/colour should
-      come from `roles.css` role tokens (`--page-title-fg` and `--subtitle-rule` exist;
-      the rest is hard-coded `em`s). Remember the fallbacks *are* the main deck's theme,
-      so they must read as light-on-dark.
+- [x] **Center the title** — opt-in `align` (`left` default / `center`).
+  - Done: `align="center"` centers the title *and* the subtitle (one `text-align` on the
+    header, which they inherit). The **rule needs no alignment** — it spans the header's
+    full width either way, so centering it is a no-op. `align` moves the *header only*:
+    the content box stays justified, because a centered title is a design choice about
+    the heading, not about the paragraph under it. An unrecognized value falls back to
+    left rather than emitting a class that matches nothing.
+- [x] **Optional subtitle** — omitting it pulls the rule *up* under the title.
+- [x] **Every header part optional** — `title=""` / `subtitle=""` / `rule={false}`, each
+      independently, with the survivors closing the gap; all three gone → no `<header>`
+      element at all and the content starts at the top of the canvas.
+  - Done together, since they are one change: **the rule is now its own element**
+    (`<div class="rule">`), not `.subtitle::after`, so it no longer dies with the subtitle
+    or drags the empty span's margins along. Each part is an `{#if}`, so an omitted part
+    leaves *no box* — which is the whole complaint being fixed.
+  - **The gaps close by margin collapsing, not by conditional CSS.** The rule carries
+    `margin-top: var(--page-rule-gap)` and every part above it has no bottom margin, so
+    adjacent-sibling collapse yields the *same* gap whether the rule follows the subtitle,
+    the title, or nothing. That is why the default render is **pixel-identical** to the
+    old `::after`: an `::after` block inside a `display: block` span occupied exactly the
+    same flow position the sibling `<div>` now does. All 76 existing `ContentPage` slides
+    pass both `title` and `subtitle`, so nothing in the repo moves.
+  - `rule` defaults to **true**, so a bare `<ContentPage>` still draws a divider — a rule
+    with nothing above it is a legitimate slide, and dropping the rule by default would
+    have silently restyled every deck. A headerless slide asks for it: `rule={false}`.
+- [x] **Styling pass on the header** — sizes, spacing and the rule's weight now come from
+      role tokens.
+  - Done: `--page-title-size`, `--page-subtitle-size`, `--page-title-gap`, `--page-rule-gap`,
+    `--page-rule-weight`, `--page-content-gap`, plus a new `--page-subtitle-fg` colour.
+    The rule's colour keeps its existing name (`--subtitle-rule`) — themes already set it.
+  - These are the file's **first non-colour tokens**, so `roles.css` grows a labelled
+    `METRICS` group at the end and its header comment now says "all *colour* values are
+    hex". The alternative — leaving metrics as component-only `var()` fallbacks — would
+    have made them un-discoverable in the one file a theme author reads.
+  - Fallbacks reproduce today's look exactly (`2.5em` / `1.2em` / `15px` / `4.5px` /
+    `#F0F8FF`), because `.gp-deck` is **opt-in per deck** and the main `slides` deck sets
+    no theme class — the fallbacks *are* its theme.
+  - Demo `content-header.html` (the slide *is* the demo: centered, subtitle-less, so the
+    rule rides up under the title), SSR test `tests/ContentPageSsr.ssr.test.ts` (each part
+    independently omittable, absent header leaves no element, `align` reaches the markup).
 - [ ] **Styling pass on `Hint`** — verify the backdrop/hairline treatment (the `--hint-*`
       tokens added under *Chrome & legibility*) across themes and backdrops, and against
       the header above it.

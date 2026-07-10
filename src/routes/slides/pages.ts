@@ -4,6 +4,7 @@ export const pages = [
     { path: "project-structure.html", title: "Project Structure" },
     { path: "title-page.html",        title: "Using TitlePage" },
     { path: "content-page.html",      title: "Using ContentPage" },
+    { path: "content-header.html",    title: "The ContentPage Header" },
     { path: "navigation.html",        title: "Navigation" },
     { path: "components.html",        title: "Components" },
     { path: "box-component.html",     title: "Box Component" },
