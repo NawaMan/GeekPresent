@@ -440,7 +440,61 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     `tests/TerminalSsr.ssr.test.ts` (transcript prerenders; the transport does *not* —
     a server-rendered play button would be a control that controls nothing). New
     `--terminal-*` role tokens.
-- [ ] **`Kbd`** — render keyboard keys (`<Kbd>⌘</Kbd><Kbd>K</Kbd>`). Trivial, no-dep.
+- [x] **`Kbd`** — render keyboard keys (`<Kbd>⌘</Kbd><Kbd>K</Kbd>`). Trivial, no-dep.
+  - Done: `src/lib/components/Kbd.svelte`, with the parsing in
+    `src/lib/utils/kbdCore.ts` (pure, total — `drawCore`/`videoCore`/`columnsCore`
+    discipline: a lone `+`, a chord of nothing but separators, a key nobody has an
+    alias for, all yield a legend or no chord at all, never a throw).
+  - **The spec is one string, not a pile of tags.** Whitespace separates *chords*
+    (press, release, press again), `+` separates the keys within one — so
+    `keys="Ctrl+K Ctrl+S"` is the whole shortcut. The stated usage
+    (`<Kbd>⌘</Kbd><Kbd>K</Kbd>`) makes the author typeset the shortcut *and* pick
+    the glyphs; `keys` makes them name it. The bare slot survives as the escape
+    hatch: no `keys` → the slot is one cap, rendered as written.
+  - **`Mod` is why the component is not trivial.** It's the portable modifier —
+    Ctrl on a PC, ⌘ on a Mac — so a deck writes `Mod+Shift+P` once and says it
+    correctly to whichever audience is looking. `platform` is `pc` (default),
+    `mac`, or `auto`. **`auto` is client-only by nature**: there is no navigator
+    during SSR, so a server render (and every Text artifact built from one) resolves
+    `pc` — deterministic, never a Mac's ⌘ baked into a PC's prerendered page. A deck
+    demoing a Mac app should just say `platform="mac"`. `detectPlatform` takes the
+    navigator as an *argument* rather than reading the global, so it stays pure and
+    a test can be a Mac without being one; it reads `userAgentData` first, since
+    `navigator.platform` is exactly what that deprecated.
+  - **`+` is a separator AND a key**, so the split cannot be `String.split('+')`: a
+    `+` with nothing to its left is the plus cap (`Ctrl++` → Ctrl and Plus), a run
+    of them collapses to one (`++` is the plus key, not two), and a trailing `+` has
+    already spent itself as a separator. That's `tokenizeChord`, and it's the one
+    piece of the parser that earns a test each way.
+  - **The Mac symbol set carries the chord joiner with it.** A Mac shortcut is
+    written `⇧⌘P`, glyphs run together; a PC one is written `Ctrl+Shift+P`. So
+    `chordJoiner` is empty exactly when the glyphs are in play — turn `symbols` off
+    and the `+` comes back, because `Shift Cmd P` would not read as a chord.
+    `symbols` is a no-op on a PC, whose keyboard prints words on its caps.
+  - **Arrows are glyphs on every platform** and live outside the symbol set: `↑` is
+    not shorthand for the Up key, it is the legend engraved on the cap. Conversely
+    `win`/`super` never maps to `⌘` — there is no Windows key on a Mac, so it falls
+    through to its word.
+  - **Glyph caps are decorative, so the root speaks instead.** A screen reader
+    announcing "⌘" helps nobody: under Mac symbols the wrapper carries the
+    spelled-out shortcut as its `aria-label` and the caps go `aria-hidden`. Word caps
+    read correctly on their own and keep their `<kbd>` semantics — an `aria-label`
+    there would only mute the elements a reader wants announced. The markup is the
+    HTML spec's own nesting: an outer `<kbd>` per chord, an inner one per key.
+  - Sized in `em` and coloured from `--kbd-*` role tokens, so a cap tracks whatever
+    text it sits in (a heading, a paragraph, `<small>`) and a theme reskins every
+    key. The cap's raised "lip" is an **inset box-shadow, not a blurred drop shadow**
+    — it must stay crisp at whatever scale `SlideDeck` transforms the canvas to. The
+    border and lip are `color-mix`ed from one token, `Callout`'s trick, so neither
+    needs to know the surface colour.
+  - Also: `join` (override the in-chord separator), `then` (the word between chords
+    of a sequence, `''` for a bare gap), and `style`.
+  - Demo `kbd-component.html` (the same four shortcuts rendered side by side on both
+    keyboards — same `keys`, only `platform` differs), unit test `tests/kbdCore.test.ts`
+    (aliases, the `+`-as-a-key cases, platform/symbol matrix, the SSR-safe
+    `detectPlatform` fallback), SSR test `tests/KbdSsr.ssr.test.ts` (the nested `<kbd>`
+    contract, `auto` prerendering as `pc`, and that an empty spec renders *no element*
+    rather than a blank cap). New `--kbd-*` role tokens.
 - [x] **`Stat` / `StatGroup`** — big-number / KPI slide. Pure CSS; pairs with charts.
   - Done: `src/lib/components/Stat.svelte` (hero figure + label + optional trend chip;
     `up`→positive / `down`→negative / `flat`→neutral, override via `tone`; `accent`
