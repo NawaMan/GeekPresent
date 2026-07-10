@@ -18,7 +18,14 @@
 		&lt;Hint text="Look below &mdash; this is a hint" /&gt;
 	</QuickCode>
 	<p style="margin-top: 0.6em; opacity: 0.8;">
-		Props: <code>text</code>, <code>isVisible</code> (default <code>true</code>).
+		It rests semi-transparent and sharpens when you point at it &mdash; hover the
+		hint below &mdash; and carries an <b>(X)</b> to dismiss it once read. Set
+		<code>dim</code> for a fainter rest, <code>dismissible=&#123;false&#125;</code> to drop the (X).
+	</p>
+	<p style="margin-top: 0.6em; opacity: 0.8;">
+		Props: <code>text</code>, <code>isVisible</code>, <code>boxed</code>,
+		<code>dim</code> (resting opacity), <code>dismissible</code> (default
+		<code>true</code>); fires <code>close</code> when dismissed.
 	</p>
 </ContentPage>
 

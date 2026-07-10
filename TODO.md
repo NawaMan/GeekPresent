@@ -283,9 +283,43 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
   - Demo `content-header.html` (the slide *is* the demo: centered, subtitle-less, so the
     rule rides up under the title), SSR test `tests/ContentPageSsr.ssr.test.ts` (each part
     independently omittable, absent header leaves no element, `align` reaches the markup).
-- [ ] **Styling pass on `Hint`** — verify the backdrop/hairline treatment (the `--hint-*`
-      tokens added under *Chrome & legibility*) across themes and backdrops, and against
-      the header above it.
+- [x] **Styling pass on `Hint`** — verified the backdrop/hairline treatment (the `--hint-*`
+      tokens added under *Chrome & legibility*) across themes and backdrops. **It holds.**
+  - Verified by *rendering*, not by reading: the exact CSS (`Hint.svelte` + `roles.css` +
+    `themes.css`) over a 4-theme × 6-backdrop matrix — deck surface, `Video`'s black
+    letterbox, `Terminal`'s `#0C0C0C` screen, a white site / QR plate, a busy chart, and
+    the bare `boxed={false}` control — plus the WCAG arithmetic on the composited pixels.
+  - **`opacity` here is a GROUP opacity**, and that is the thing a token audit misses. It
+    multiplies the fill's 62% down to **55.8%** and the rule's 28% to **25.2%** *before*
+    either lands on the backdrop, so the numbers worth judging are never the ones written
+    in the stylesheet. Measured on the composite, text-on-pill is **≥ 3.63:1 everywhere**
+    (worst: `theme-light` over `Video`'s letterbox; then `3.84` over `Terminal`, `4.11` for
+    the dark themes over a white site). The cue renders at **36px bold** — 1.5em of
+    `.content`'s 24px `--base-font` — so 3:1 is the bar, and every combination clears it.
+    Nothing reaches the 4.5:1 normal-text bar, which is the correct trade for a *cue*.
+  - **On the deck surface the fill is invisible** (~1.1:1 against it) and the hairline alone
+    (1.6–2.1:1) draws the pill. That is the design working, not failing: quiet at home,
+    opaque enough to rescue the text abroad.
+  - **`theme-light` inverts the pill.** `--hint-bg` is `--BACKDROP`, which is light beige
+    there, so the box *lightens* its backdrop instead of deepening it — and dark `--hint-fg`
+    stays legible on it. The component's comment claimed the fill "just deepens" whatever is
+    behind it, which was only ever true of the dark themes. Corrected.
+  - **Dead code found and removed.** `.text` carried `margin-left/right: auto`, which never
+    applied: per CSS 2.1 §10.3.7, when `left`, `width` and `right` are all `auto` the auto
+    margins are first set to 0. The pill is centred by its **static position** — its flow
+    parent is `SlideDeck`'s `.content`, a flex container with `justify-content: center`
+    (and transform-scaled, which is also what makes it the containing block). Proven both
+    ways: deleting the margins renders **pixel-identical** (same md5), while changing
+    `justify-content` moves the pill. The mechanism is now written down where it lives.
+  - **The two paths nobody was exercising**, which is why this needed a look at all: no
+    themed deck uses a `Hint` (`geeklight` is `theme-light`, `transition` is `theme-green`;
+    both are Hint-free), and `boxed={false}` is used nowhere in the repo. Added
+    `tests/HintSsr.ssr.test.ts` — `Hint`'s **first test of any kind** — pinning the class
+    contract the stylesheet reads (boxed by default, `boxed={false}` bare, `isVisible`).
+    The `--hint-*` tokens themselves can't be asserted from a server render: the scoped
+    `<style>` never reaches `body`. They are verified by rendering, as above.
+  - "**Against the header above it**" turned out to be a non-question: a `Hint` is pinned to
+    the bottom of the canvas and `ContentPage`'s header sits at the top. They never meet.
 
 ## Tier 2 — on-brand tech-talk polish
 
