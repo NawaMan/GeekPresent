@@ -34,6 +34,7 @@
 	import { browser }            from '$app/environment';
 	import { afterNavigate }      from '$app/navigation';
 	import { onMount, onDestroy, tick } from 'svelte';
+	import { pauseGroup, playGroup } from '$lib/utils/slideAnim';
 
 	/* Selector for the element whose subtree is searched for animations. Defaults
 	   to the slide canvas `.content`; an author can narrow it (e.g. ".page") to a
@@ -201,11 +202,19 @@
 		playhead = clamped;
 	}
 
-	function pause() { for (const a of anims) a.pause(); playing = false; stopLoop(); }
+	function pause() { pauseGroup(anims); playing = false; stopLoop(); }
 
 	function play() {
-		if (allFinished()) seek(0);    // a finished animation replays from the top
-		for (const a of anims) a.play();
+		// A spent animation replays from the top. Judge that on the PLAYHEAD, not on
+		// playState: scrubbing to the end leaves every animation *paused* at its end, never
+		// 'finished', and playGroup (rightly) will not restart a finished animation — so a
+		// playState test would make Play a no-op there.
+		if (sample() >= duration) seek(0);
+		// `playGroup`, not a bare a.play() loop: play() on an animation that has reached its
+		// end auto-rewinds it. The animations here do NOT share an end — `drawDelay` staggers
+		// a Draw/Connector reveal — so resuming a half-played slide would redraw the shapes
+		// that had already finished.
+		playGroup(anims);
 		playing = true;
 		startLoop();
 	}

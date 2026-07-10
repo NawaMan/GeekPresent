@@ -36,6 +36,7 @@ export const pages = [
     { path: "code-component.html",    title: "Code" },
     { path: "javacode-component.html", title: "JavaCode" },
     { path: "codebox-component.html", title: "CodeBox" },
+    { path: "terminal-component.html", title: "Terminal" },
     { path: "speaker-notes.html",     title: "Speaker Notes" },
     { path: "thank-you.html",         title: "Thank You" },
 ];

@@ -13,7 +13,7 @@
 	import { browser } from '$app/environment';
 	import { afterNavigate } from '$app/navigation';
 	import { onMount, onDestroy } from 'svelte';
-	import { collectFinite, envelope, sampleFraction, isPlaying, endTimeOf } from '$lib/utils/slideAnim';
+	import { collectFinite, envelope, sampleFraction, isPlaying, endTimeOf, playGroup, pauseGroup } from '$lib/utils/slideAnim';
 	import type { AnimState } from '$lib/utils/slideAnim';
 
 	/** Relay a command to the audience window. */
@@ -64,14 +64,18 @@
 	}
 
 	function play() {
-		if (anims.every((a) => a.playState === 'finished')) seekTo(0);
-		for (const a of anims) a.play();
+		// Judge "spent" on the playhead, not playState: a scrubbed-to-the-end group is
+		// *paused* at its end, never 'finished', and playGroup will not restart it.
+		if (sampleFraction(anims) >= 1) seekTo(0);
+		// Not a bare a.play() loop: that rewinds any animation already at its end, and a
+		// staggered reveal (drawDelay) is full of them mid-timeline. See slideAnim.playGroup.
+		playGroup(anims);
 		playing = true;
 		startLoop();
 		emit();
 	}
 	function pause() {
-		for (const a of anims) a.pause();
+		pauseGroup(anims);
 		playing = false;
 		stopLoop();
 		emit();
@@ -90,7 +94,9 @@
 		pause();
 		seekTo(fracAt(e.clientX));
 		emit();
-		track.setPointerCapture(e.pointerId);
+		// Optional, like the release below: pointer capture is a nicety for dragging past the
+		// rail's edge, not a requirement, and it is absent in some environments.
+		track.setPointerCapture?.(e.pointerId);
 	}
 	function onPointerMove(e: PointerEvent) { if (dragging) { seekTo(fracAt(e.clientX)); emit(); } }
 	function onPointerUp(e: PointerEvent) {
