@@ -33,6 +33,8 @@ export const pages = [
     { path: "callout-component.html", title: "Callout" },
     { path: "stat-component.html",    title: "Stat & StatGroup" },
     { path: "quote-component.html",   title: "Quote" },
+    { path: "timeline-component.html", title: "Timeline" },
+    { path: "timeline-horizontal.html", title: "Timeline — Horizontal & Scroll" },
     { path: "columns-component.html", title: "Columns & Column" },
     { path: "kbd-component.html",     title: "Kbd" },
     { path: "qrcode-component.html",  title: "QRCode" },
