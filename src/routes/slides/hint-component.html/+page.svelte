@@ -14,9 +14,7 @@
 		cues like &ldquo;click to expand&rdquo; or &ldquo;scroll right&rdquo;.
 		Look at the bottom of this slide. &darr;
 	</p>
-	<QuickCode style="margin-top: 0.5em;">
-		&lt;Hint text="Look below &mdash; this is a hint" /&gt;
-	</QuickCode>
+	<QuickCode style="margin-top: 0.5em;" lang="svelte" code={`<Hint text="Look below — this is a hint" />`} />
 	<p style="margin-top: 0.6em; opacity: 0.8;">
 		It rests semi-transparent and sharpens when you point at it &mdash; hover the
 		hint below &mdash; and carries an <b>(X)</b> to dismiss it once read. Set

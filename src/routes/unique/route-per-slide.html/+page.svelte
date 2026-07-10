@@ -11,12 +11,10 @@
 	<p>
 		Each slide is its own SvelteKit route folder &mdash; <b>this very slide</b> is:
 	</p>
-	<QuickCode>
-		src/routes/unique/<b>route-per-slide.html/</b><br/>
-		&nbsp;&nbsp;+page.svelte&nbsp;&nbsp;<span style="opacity:0.6;"># the slide content</span><br/>
-		&nbsp;&nbsp;+layout.js&nbsp;&nbsp;&nbsp;&nbsp;<span style="opacity:0.6;"># prerender = true</span><br/>
-		&nbsp;&nbsp;diagram.png&nbsp;&nbsp;&nbsp;<span style="opacity:0.6;"># assets live RIGHT HERE, colocated</span>
-	</QuickCode>
+	<QuickCode lang="bash" code={`src/routes/unique/route-per-slide.html/
+  +page.svelte  # the slide content
+  +layout.js    # prerender = true
+  diagram.png   # assets live RIGHT HERE, colocated`} />
 	<p style="margin-top: 0.6em;">
 		That folder <b>is</b> the URL: <code>src/routes/unique/route-per-slide.html/</code>
 		is served at <code>/unique/route-per-slide.html</code> &mdash; the very page

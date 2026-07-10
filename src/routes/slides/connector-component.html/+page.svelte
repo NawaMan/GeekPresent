@@ -28,12 +28,10 @@
 			when you drag them in LAYOUT mode.
 		</p>
 
-		<QuickCode style="margin-top: 0.6em;">
-			&lt;Block name="api" …&gt;API&lt;/Block&gt;<br/>
-			&lt;Block name="db"  …&gt;DB&lt;/Block&gt;<br/>
-			<br/>
-			&lt;Connector from="api" to="db" label="query" /&gt;
-		</QuickCode>
+		<QuickCode style="margin-top: 0.6em;" lang="svelte" code={`<Block name="api" …>API</Block>
+<Block name="db"  …>DB</Block>
+
+<Connector from="api" to="db" label="query" />`} />
 
 		<p style="margin-top: 0.7em;">
 			<code>route</code> picks the shape: <code>straight</code> attaches wherever

@@ -16,12 +16,10 @@
 
 <ContentPage title="Using ContentPage" subtitle="The template for most of your slides">
 	<p>ContentPage takes <b>title</b> and <b>subtitle</b> props, with a default slot for content:</p>
-	<QuickCode>
-		&lt;ContentPage title="My Title" subtitle="Optional"&gt;<br/>
-		&nbsp;&nbsp;&lt;p&gt;Any HTML or Svelte components here.&lt;/p&gt;<br/>
-		&nbsp;&nbsp;&lt;ul&gt;&lt;li&gt;Bullet points&lt;/li&gt;&lt;/ul&gt;<br/>
-		&lt;/ContentPage&gt;
-	</QuickCode>
+	<QuickCode lang="svelte" code={`<ContentPage title="My Title" subtitle="Optional">
+  <p>Any HTML or Svelte components here.</p>
+  <ul><li>Bullet points</li></ul>
+</ContentPage>`} />
 	<p>The content area is styled with justified text, straight from the template default &mdash; no per-slide font tuning.</p>
 	<p>Both header lines are optional, and so is the rule under them &mdash; see the next slide.</p>
 	<p>

@@ -51,13 +51,11 @@
 			(drag ghosts or type <code>L/T/W/H/R</code>), retime the Curve's reveal in the
 			toolbar's <b>draw-on</b> fields (and the Ellipse's under its box), then Copy.
 		</p>
-		<QuickCode style="margin-top: 0.5em;">
-			&lt;Draw&gt;<br/>
-			&nbsp;&nbsp;&lt;Curve from=&#123;[330, 940]&#125; to=&#123;[1560, 620]&#125; c1=&#123;[855, 620]&#125; dash draw=&#123;4&#125; /&gt;<br/>
-			&nbsp;&nbsp;&lt;Ellipse x=&#123;1400&#125; … draw=&#123;0.8&#125; drawDelay=&#123;3.2&#125; /&gt;<br/>
-			&nbsp;&nbsp;&lt;Sprite name="launch" animate=&#123;4&#125; fontScale=&#123;0.84&#125; stops=&#123;stops&#125;&gt;🚀&lt;/Sprite&gt;<br/>
-			&lt;/Draw&gt;
-		</QuickCode>
+		<QuickCode style="margin-top: 0.5em;" lang="svelte" code={`<Draw>
+  <Curve from={[330, 940]} to={[1560, 620]} c1={[855, 620]} dash draw={4} />
+  <Ellipse x={1400} … draw={0.8} drawDelay={3.2} />
+  <Sprite name="launch" animate={4} fontScale={0.84} stops={stops}>🚀</Sprite>
+</Draw>`} />
 	</div>
 </ContentPage>
 

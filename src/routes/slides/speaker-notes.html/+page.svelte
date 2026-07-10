@@ -10,12 +10,10 @@
 
 <ContentPage title="Speaker Notes" subtitle="Notes visible below the slide in SCALED mode">
 	<p>Switch to <b>SCALED</b> mode (top-right) and zoom out below the fit to see notes below the slide.</p>
-	<QuickCode>
-		&lt;Note&gt;<br/>
-		&nbsp;&nbsp;&lt;p&gt;Remember to explain X.&lt;/p&gt;<br/>
-		&nbsp;&nbsp;&lt;p&gt;Mention Y as a follow-up.&lt;/p&gt;<br/>
-		&lt;/Note&gt;
-	</QuickCode>
+	<QuickCode lang="svelte" code={`<Note>
+  <p>Remember to explain X.</p>
+  <p>Mention Y as a follow-up.</p>
+</Note>`} />
 	<p>Notes are hidden in <b>FITTED</b> mode and when printing.</p>
 </ContentPage>
 

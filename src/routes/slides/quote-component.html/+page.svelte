@@ -32,15 +32,13 @@
 
 <!-- Usage sample, parked top-right so it clears the intro on the left. -->
 <Block name="usage" x={980} y={250} width={840} height={230} grid={10} fill={false}>
-	<QuickCode>
-		&lt;Quote author="Grace Hopper"<br/>
-		&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;role="Rear Admiral, US Navy" {'{avatar}'}&gt;<br/>
-		&nbsp;&nbsp;We've always done it this way.<br/>
-		&lt;/Quote&gt;<br/>
-		<br/>
-		&lt;Quote border radius="18px"<br/>
-		&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;background="#12181f" ... /&gt;
-	</QuickCode>
+	<QuickCode lang="svelte" code={`<Quote author="Grace Hopper"
+      role="Rear Admiral, US Navy" {avatar}>
+  We've always done it this way.
+</Quote>
+
+<Quote border radius="18px"
+      background="#12181f" ... />`} />
 </Block>
 
 <!-- Left-aligned, image avatar, left rule + mark. -->

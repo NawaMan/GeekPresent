@@ -13,9 +13,7 @@
 		You design against one fixed <b>1920&times;1080</b> canvas, so an exact pixel means
 		the same thing on every screen:
 	</p>
-	<QuickCode>
-		&lt;div style="position: absolute; <b>left: 960px; top: 540px;</b>"&gt;dead center&lt;/div&gt;
-	</QuickCode>
+	<QuickCode lang="svelte" code={`<div style="position: absolute; left: 960px; top: 540px;">dead center</div>`} />
 	<ul style="margin-top: 0.6em;">
 		<li>
 			Most HTML-slide tools push you toward <b>responsive flow</b> &mdash; layouts

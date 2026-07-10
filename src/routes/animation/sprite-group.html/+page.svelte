@@ -30,7 +30,7 @@
 	title="Draw — Sprite as Group"
 	subtitle="A whole diagram, authored in local coords inside a nested Draw, flies and banks as one rigid unit"
 >
-	<div style="line-height: 1.4em;">
+	<div style="line-height: 1.4em; font-size: 0.8em">
 		<p>
 			The <Label>Sprite</Label> renders its children in a transformable HTML box,
 			and a <Label>Draw</Label> is just an <code>&lt;svg&gt;</code> — so nesting one
@@ -61,12 +61,12 @@
 			the inner dialog). The nested Draw only shows its chrome while isolated,
 			so nothing lingers on the flying badge.
 		</p>
-		<QuickCode style="margin-top: 0.4em;">
-			&lt;Sprite name="badge" animate=&#123;4&#125; stops=&#123;[…]&#125;&gt; &lt;Draw
-			width=&#123;600&#125; height=&#123;360&#125; decorative&gt; &lt;Line arrow="end"
-			animate=&#123;4&#125; stops=&#123;[…same %s as the flight…]&#125; …/&gt; …
-			&lt;/Draw&gt; &lt;/Sprite&gt;
-		</QuickCode>
+		<QuickCode style="margin-top: 0.4em;" lang="svelte" code={`<Sprite name="badge" animate={4} stops={[…]}>
+  <Draw width={600} height={360} decorative>
+    <Line arrow="end" animate={4} stops={[…same %s as the flight…]} …/>
+    …
+  </Draw>
+</Sprite>`} />
 	</div>
 </ContentPage>
 

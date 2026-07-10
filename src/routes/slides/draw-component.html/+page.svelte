@@ -37,10 +37,8 @@
 			<b>Copy changed (N)</b> grabs one OLD/NEW patch of all of them — paste it
 			to your AI assistant (or apply it by hand) to update the source in one go.
 		</p>
-		<QuickCode style="margin-top: 0.5em;">
-			&lt;Arc name="request" from=&#123;[510, 760]&#125; to=&#123;[1410, 760]&#125; bend=&#123;0.124&#125; arrow="end" /&gt;<br/>
-			&lt;!-- LAYOUT → drag → Copy → paste that one line back --&gt;
-		</QuickCode>
+		<QuickCode style="margin-top: 0.5em;" lang="svelte" code={`<Arc name="request" from={[510, 760]} to={[1410, 760]} bend={0.124} arrow="end" />
+<!-- LAYOUT → drag → Copy → paste that one line back -->`} />
 	</div>
 </ContentPage>
 

@@ -43,10 +43,8 @@
 
 <!-- Usage sample, parked top-right so it clears the intro on the left. -->
 <Block name="usage" x={940} y={230} width={880} height={220} grid={10} fill={false}>
-	<QuickCode>
-		&lt;QRCode value="https://geekpresent.dev" label="Slides" /&gt;<br/>
-		&lt;QRCode value={'{'}url{'}'} ecc="H" size={'{'}300{'}'} /&gt;
-	</QuickCode>
+	<QuickCode lang="svelte" code={`<QRCode value="https://geekpresent.dev" label="Slides" />
+<QRCode value={url} ecc="H" size={300} />`} />
 </Block>
 
 <!-- The hero: a real, scannable code. Block fills its content, and an <svg> keeps its

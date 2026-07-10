@@ -40,12 +40,10 @@
 <!-- Usage sample, parked top-right so it clears the intro on the left. fill=false
      keeps QuickCode at its natural size instead of stretching to the box. -->
 <Block name="usage" x={940} y={250} width={880} height={260} grid={10} fill={false}>
-	<QuickCode>
-		&lt;Kbd keys="Mod+Shift+P" /&gt;<br/>
-		&lt;Kbd keys="Mod+Shift+P" platform="mac" /&gt;<br/>
-		&lt;Kbd keys="Ctrl+K Ctrl+S" /&gt;<br/>
-		&lt;Kbd&gt;Any&lt;/Kbd&gt;
-	</QuickCode>
+	<QuickCode lang="svelte" code={`<Kbd keys="Mod+Shift+P" />
+<Kbd keys="Mod+Shift+P" platform="mac" />
+<Kbd keys="Ctrl+K Ctrl+S" />
+<Kbd>Any</Kbd>`} />
 </Block>
 
 <!-- The same four shortcuts, side by side on both keyboards: the PC column spells

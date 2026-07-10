@@ -58,17 +58,15 @@
 <!-- Usage sample, parked top-right so it clears the intro on the left. fill=false
      keeps QuickCode at its natural size instead of stretching to the box. -->
 <Block name="usage" x={980} y={220} width={840} height={280} grid={10} fill={false}>
-	<QuickCode>
-		&lt;Terminal<br/>
-		&nbsp;&nbsp;title="zsh — geekpresent"<br/>
-		&nbsp;&nbsp;keys="global"&nbsp;&nbsp;<i>&lt;!-- Space steps --&gt;</i><br/>
-		&nbsp;&nbsp;lines=&#123;[<br/>
-		&nbsp;&nbsp;&nbsp;&nbsp;&#123; cmd: 'pnpm build' &#125;,<br/>
-		&nbsp;&nbsp;&nbsp;&nbsp;'vite v5.4.2  building...',<br/>
-		&nbsp;&nbsp;&nbsp;&nbsp;&#123; out: '✓ done', tone: 'ok' &#125;,<br/>
-		&nbsp;&nbsp;]&#125;<br/>
-		/&gt;
-	</QuickCode>
+	<QuickCode lang="svelte" code={`<Terminal
+  title="zsh — geekpresent"
+  keys="global"  <!-- Space steps -->
+  lines={[
+    { cmd: 'pnpm build' },
+    'vite v5.4.2  building...',
+    { out: '✓ done', tone: 'ok' },
+  ]}
+/>`} />
 </Block>
 
 <!-- The console itself, in a Block so LAYOUT mode can place and size it. Block fills

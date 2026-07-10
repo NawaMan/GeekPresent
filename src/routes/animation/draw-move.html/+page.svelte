@@ -38,12 +38,10 @@
 			stop's handle or add keyframes from the toolbar's panel; press
 			<b>ANIMATE</b> and <b>drag</b> the bar to park the whole shape anywhere.
 		</p>
-		<QuickCode style="margin-top: 0.5em;">
-			&lt;Curve from=&#123;[330, 812]&#125; to=&#123;[1420, 932]&#125; c1=&#123;[875, 620]&#125;<br/>
-			&nbsp;&nbsp;stops=&#123;[&#123; pct: 0, to: [1420, 932], c1: [875, 760] &#125;,<br/>
-			&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#123; pct: 100, to: [1420, 392], c1: [875, 470] &#125;]&#125;<br/>
-			&nbsp;&nbsp;animate=&#123;4&#125; arrow="end" /&gt;
-		</QuickCode>
+		<QuickCode style="margin-top: 0.5em;" lang="svelte" code={`<Curve from={[330, 812]} to={[1420, 932]} c1={[875, 620]}
+  stops={[{ pct: 0, to: [1420, 932], c1: [875, 760] },
+        { pct: 100, to: [1420, 392], c1: [875, 470] }]}
+  animate={4} arrow="end" />`} />
 	</div>
 </ContentPage>
 

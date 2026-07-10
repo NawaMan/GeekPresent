@@ -44,9 +44,7 @@
 			that follows the playhead as you press <b>ANIMATE</b> and drag the bar
 			(the panel stays up while you scrub).
 		</p>
-		<QuickCode style="margin-top: 0.4em;">
-			&lt;Line stops=&#123;[&#123; pct: 0, drawn: 0, ease: "ease-in" &#125;, &#123; pct: 25, drawn: 0.05, ease: "ease-out" &#125;, …]&#125; animate=&#123;4&#125; /&gt;
-		</QuickCode>
+		<QuickCode style="margin-top: 0.4em;" lang="svelte" code={`<Line stops={[{ pct: 0, drawn: 0, ease: "ease-in" }, { pct: 25, drawn: 0.05, ease: "ease-out" }, …]} animate={4} />`} />
 	</div>
 </ContentPage>
 

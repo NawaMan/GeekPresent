@@ -16,13 +16,11 @@
 
 <ContentPage title="Using TitlePage" subtitle="The template for title and section divider slides">
 	<p>TitlePage has three named slots:</p>
-	<QuickCode>
-		&lt;TitlePage&gt;<br/>
-		&nbsp;&nbsp;&lt;span slot="<b>title</b>"&gt;Big Title&lt;/span&gt;<br/>
-		&nbsp;&nbsp;&lt;span slot="<b>subtitle</b>"&gt;Subtitle&lt;/span&gt;<br/>
-		&nbsp;&nbsp;&lt;span slot="<b>subsubtitle</b>"&gt;Your Name&lt;/span&gt;<br/>
-		&lt;/TitlePage&gt;
-	</QuickCode>
+	<QuickCode lang="svelte" code={`<TitlePage>
+  <span slot="title">Big Title</span>
+  <span slot="subtitle">Subtitle</span>
+  <span slot="subsubtitle">Your Name</span>
+</TitlePage>`} />
 	<p>Navigation is handled automatically based on <b>pages.ts</b>.</p>
 	<p>
 		Prefer to read it in the editor? <CtrlBtn text="Show code" on:click={() => (showCode = true)} />

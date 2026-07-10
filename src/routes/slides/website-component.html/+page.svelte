@@ -22,11 +22,9 @@
 			in a <code>Block</code> and it fills the box.
 		</p>
 
-		<QuickCode style="margin-top: 0.6em;">
-			&lt;Block x={'{'}120{'}'} y={'{'}260{'}'} width={'{'}760{'}'} height={'{'}520{'}'}&gt;<br/>
-			&nbsp;&nbsp;&lt;WebSite src="https://example.com" /&gt;<br/>
-			&lt;/Block&gt;
-		</QuickCode>
+		<QuickCode style="margin-top: 0.6em;" lang="svelte" code={`<Block x={120} y={260} width={760} height={520}>
+  <WebSite src="https://example.com" />
+</Block>`} />
 
 		<p style="margin-top: 0.7em;">
 			The frame is <b>inert</b> until you click it — otherwise it would swallow the

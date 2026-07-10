@@ -17,9 +17,7 @@
 			Hover over <Label bind:isHovered={hovered}>this term</Label> &mdash; the cursor
 			becomes a help pointer{#if hovered} <b>&mdash; hovering now!</b>{/if}.
 		</p>
-		<QuickCode style="margin-top: 0.5em;">
-			&lt;Label&gt;important term&lt;/Label&gt;
-		</QuickCode>
+		<QuickCode style="margin-top: 0.5em;" lang="svelte" code={`<Label>important term</Label>`} />
 		<p style="margin-top: 0.6em; opacity: 0.8;">
 			Props: <code>style</code>, <code>isHovered</code> (bindable). Dispatches
 			<code>mouseover</code> / <code>mouseout</code> events.
