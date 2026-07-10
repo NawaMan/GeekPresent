@@ -26,6 +26,8 @@ export const pages = [
     { path: "youtube-showcase.html",  title: "YouTube" },
     { path: "website-component.html", title: "WebSite — Embedded Site" },
     { path: "webpage-component.html", title: "WebPage — Full-Canvas Site" },
+    { path: "video-component.html",   title: "Video — Player & Bookmarks" },
+    { path: "videopage-component.html", title: "VideoPage — Full-Canvas Video" },
     { path: "hint-component.html",    title: "Hint" },
     { path: "callout-component.html", title: "Callout" },
     { path: "stat-component.html",    title: "Stat & StatGroup" },

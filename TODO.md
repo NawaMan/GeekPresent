@@ -152,14 +152,64 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
   - `text` mode has no canvas to fill, so it drops out of the absolute layer into normal
     flow at `height` (default 640px), with no nav bar.
   - Demo `webpage-component.html`.
-- [ ] **`Video` (a.k.a. `VDO`)** — `<video>` with custom chrome + **time bookmarks**.
-  - Controls: play/pause, restart, click-to-seek progress bar, `currentTime / duration` readout.
-  - Bookmarks: `data-seek`-style chapter buttons that seek the video, with the active chapter
-    auto-highlighted on `timeupdate` (last bookmark whose time ≤ currentTime).
-  - Inspiration: CodingBooth `../CodingBooth/site/index.html` demo-player (markup ~L1107–1146,
-    JS ~L1411–1500 — `data-seek`, progress bar, active-point highlighting).
-- [ ] **`VDOPage`** — page/template shell that shows a `Video` in full-page canvas space
+- [x] **`Video` (a.k.a. `VDO`)** — `<video>` with custom chrome + **time bookmarks**.
+  - Controls: play/pause, restart, click-to-seek progress bar, `currentTime / duration` readout,
+    mute. Bookmarks: chapter buttons that seek, the active one (last whose time ≤ `currentTime`)
+    highlighted in the list *and* as a tick on the track.
+  - Done: `src/lib/components/Video.svelte`, with all the arithmetic in
+    `src/lib/utils/videoCore.ts` (pure, total — `drawCore`/`connectorCore` discipline:
+    bad input yields NaN/-1/0/`'0:00'`, never a throw, so a slide can't blow up over
+    a typo'd time or a duration that is still NaN).
+  - **Bookmarks are the component.** `at` takes seconds (`74`) or a clock string
+    (`'1:14'`, `'1:02:03'`); the list is parsed and **sorted**, so chapters may be
+    written in any order, and an unparseable time is *dropped* rather than shipped as
+    a button that seeks nowhere. Plus optional `tag` badge (`HOST` / `BOOTH`).
+  - **The keyboard belongs to the deck** (the one design constraint): `NavigationBar`'s
+    window listener claims →/← unconditionally, so a scrub bar can never own them. The
+    progress track is therefore a *pointer* affordance — `tabindex="-1"`,
+    `aria-hidden`, and it ignores a coordinate-less (`detail === 0`) activation, which
+    would otherwise rewind the video to 0:00 on Enter. **The chapter buttons are the
+    keyboard's seek**, and they say where they go, which a scrub bar never can.
+  - Media state rides Svelte's own `bind:paused`/`currentTime`/`duration`/`muted`
+    rather than hand-wired `timeupdate` listeners. `autoplay` defaults `muted` to true —
+    the only way a browser will honour it.
+  - **Space steps the bookmarks** (`keys="global"`, opt-in). Not a second stepping
+    mechanism: the Video registers with the very same `activeSteps` store a `Steps`
+    build uses, so `spaceIntent` arbitrates the handoff for both — Space seeks to the
+    next chapter, and once the last is behind the playhead it falls through and pages
+    the deck (Shift+Space walks back, then pages back). NavigationBar's **CONTINUE**
+    and the presenter console's `gp:continue` pulse seek the next chapter for free.
+    `hasPrev` is `active > 0`, not `>= 0`: from the first chapter there is no earlier
+    one, which also stops a mark at `0:00` from trapping the presenter on it.
+    Opt-in because Space is the deck's advance key and **only one build per slide may
+    own it** — a Steps run exists to be stepped, a video exists to be played, and a
+    presenter tapping Space to leave a slide shouldn't sit through every chapter.
+  - Also: `start` (seek on `loadedmetadata`), `poster`, `loop`, `playsinline`,
+    `preload`, `chapters={false}` (bar only), `controls={false}` (element only), and
+    `native` (hand the bar to the browser, keep our chapters).
+  - Demo `video-component.html` with a locally generated 29 KB `demo.mp4` — **imported
+    as an asset**, not written as `/media/demo.mp4`, so it survives a Pages base path
+    (the same reason `YouTube` takes imported images). Unit test `tests/videoCore.test.ts`,
+    DOM test `tests/Video.test.ts` (bookmarks, transport, track clamp + keyboard
+    inertness; jsdom's `play`/`pause` are `notImplemented` stubs, so they are faked
+    closely enough that Svelte's media bindings sync off the *events*), SSR test
+    `tests/VideoSsr.ssr.test.ts` (chapter list prerenders; no `NaN` reaches the markup).
+    New `--video-*` role tokens (the stage stays black in every theme — that's the
+    letterbox behind the footage, not a surface).
+- [x] **`VDOPage`** — page/template shell that shows a `Video` in full-page canvas space
   (sibling to `TitlePage`/`ContentPage`).
+  - Done as **`src/lib/components/VideoPage.svelte`** — named for the `Video` it wraps,
+    as `WebPage` is for `WebSite`. `<VideoPage src={demo} />` *is* a complete slide.
+  - Follows `WebPage` exactly: absolute over SlideDeck's `.container` (no `z-index`, so
+    the deck's chrome and its own nav bar stay above it and stay clickable), its own
+    `NavigationBar` (`nav={false}` when nesting in a template, or you get two), and a
+    `text`-mode fallback out of the absolute layer into normal flow at `height`.
+  - Every `Video` prop passes through. `keys="global"` earns its keep here: when the
+    video IS the slide, Space walking chapter to chapter and then paging on is just
+    the deck's forward march. Demo `videopage-component.html` does exactly that.
+  - SSR test in `tests/VideoSsr.ssr.test.ts` (nav bar present, `nav={false}` drops it,
+    props reach the player). Both demo slides import the same `demo.mp4`, which Vite
+    de-dupes to one hashed asset.
 
 ## Chrome & legibility
 

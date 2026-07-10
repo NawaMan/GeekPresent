@@ -102,6 +102,15 @@
 	--embed-accent:       var(--ACCENT, #2980B9);      /* armed ring + pill hover */
 	--embed-shield-bg:    var(--BACKDROP, #000000);    /* hover wash, at low alpha */
 
+	/* Video player (Video) — our chrome around a <video>. The stage stays black
+	   whatever the theme: that is the letterbox behind the footage, not a surface. */
+	--video-bg:        #000000;                     /* the stage behind the frame */
+	--video-border:    var(--LINE, #CCCCCC);
+	--video-chrome-bg: var(--PAPER-RAISED, #1E1E1E);
+	--video-chrome-fg: var(--INK, #C0F1FF);
+	--video-accent:    var(--ACCENT, #2980B9);      /* progress fill + active chapter */
+	--video-track:     var(--INK, #C0F1FF);         /* empty track, at low alpha */
+
 	/* Code title bar (CodeBox / JavaCodeBox) */
 	--code-title-bg:     var(--PAPER-RAISED, #1E1E1E);
 	--code-title-fg:     var(--INK, #FFFFFF);

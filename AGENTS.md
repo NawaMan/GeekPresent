@@ -40,7 +40,11 @@ Read the `README.md` first for the user-facing overview. This file is the *opera
   own `?raw` source in a `CodeBox`), `Block` / `ImageBlock` (absolutely-positioned
   wrappers you place at exact canvas pixels — drag/resize them in **LAYOUT mode**,
   see that playbook), `Connector` (an arrow auto-routed between two *named* `Block`s —
-  see the diagram playbook), plus framework-internal `Copyright`, `CtrlBtn`,
+  see the diagram playbook), `Video` (a `<video>` with themeable chrome and *time
+  bookmarks* — chapter buttons that seek, the current one highlighted; import the
+  file as an asset rather than hard-coding a path) and `VideoPage` (the same player
+  filling the canvas, nav bar included — a complete slide, as `WebPage` is), plus
+  framework-internal `Copyright`, `CtrlBtn`,
   `NavigationBar`, `TableOfContent`, `SizeMode`, `Seo` (renders SEO/social metadata
   into `<svelte:head>` — see the SEO note under *Gotchas*).
 - Package manager is **pnpm** (`pnpm dev` / `build` / `deploy`). Dev server: `http://localhost:5173`.
