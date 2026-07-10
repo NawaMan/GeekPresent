@@ -34,6 +34,7 @@ export const pages = [
     { path: "stat-component.html",    title: "Stat & StatGroup" },
     { path: "columns-component.html", title: "Columns & Column" },
     { path: "kbd-component.html",     title: "Kbd" },
+    { path: "qrcode-component.html",  title: "QRCode" },
     { path: "label-component.html",   title: "Label" },
     { path: "scrolldiv-component.html", title: "ScrollDiv" },
     { path: "code-component.html",    title: "Code" },

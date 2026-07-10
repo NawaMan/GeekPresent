@@ -273,24 +273,38 @@ Keep a page's images next to its `+page.svelte` and `import` them — Vite bundl
 
 (`static/` is still there for truly site-wide files.)
 
-There's also a helper that fetches a YouTube thumbnail and generates a QR code straight into a page folder:
+There's also a helper that fetches a YouTube thumbnail (and, optionally, generates a QR code) straight into a page folder:
 
 ```bash
 cd src/routes/slides/my-slide.html
 ../../../../utils/prepare-youtube.sh https://youtu.be/<id> . my-video
 ```
 
-then feed them to the `YouTube` component (which shows the thumbnail with a QR overlay that links to the video):
+then feed the thumbnail to the `YouTube` component, which shows it with a QR overlay linking to the video:
 
 ```svelte
 <script>
   import YouTube   from '$lib/components/YouTube.svelte';
   import thumbnail from './my-video-TN.png';
-  import qr        from './my-video-QR.png';
 </script>
 
-<YouTube {thumbnail} {qr} alt="My talk" youtubeId="<id>" />
+<YouTube {thumbnail} alt="My talk" youtubeId="<id>" />
 ```
+
+The QR is **encoded from the watch URL at render time**, so it can never drift from the
+video — the `-QR.png` the script writes is only needed if you want to pin an existing
+slide's exact pixels (`<YouTube {thumbnail} {qr} … />` still works).
+
+Anywhere else, drop a code on a slide with `QRCode`:
+
+```svelte
+<QRCode value="https://geekpresent.dev" label="Slides" />
+```
+
+It encodes the symbol itself (`$lib/utils/qrCore.ts`, written from ISO/IEC 18004 — no npm
+package, no `qrencode` binary) and draws it as SVG, so it stays crisp at whatever size the
+projector scales the canvas to. An `http`/`mailto`/`tel` value links itself, so the code is
+scannable by the room and clickable by whoever reads the deck as a page.
 
 ### Other components
 
