@@ -48,8 +48,12 @@ Read the `README.md` first for the user-facing overview. This file is the *opera
   see that playbook), `Connector` (an arrow auto-routed between two *named* `Block`s —
   see the diagram playbook), `Video` (a `<video>` with themeable chrome and *time
   bookmarks* — chapter buttons that seek, the current one highlighted; import the
-  file as an asset rather than hard-coding a path) and `VideoPage` (the same player
-  filling the canvas, nav bar included — a complete slide, as `WebPage` is), plus
+  file as an asset rather than hard-coding a path), `VideoPage` (the same player
+  filling the canvas, nav bar included — a complete slide, as `WebPage` is) and
+  `Columns` / `Column` (a thin grid for two- and three-column layouts; a media/text
+  *split* is the same component with unequal `widths`, not a second one. `resizable`
+  lets a viewer drag the gutters, and LAYOUT mode always does — with a `widths` chip
+  that copies the dragged ratio back into source, since a drag saves nothing), plus
   framework-internal `Copyright`, `CtrlBtn`,
   `NavigationBar`, `TableOfContent`, `SizeMode`, `Seo` (renders SEO/social metadata
   into `<svelte:head>` — see the SEO note under *Gotchas*).

@@ -85,6 +85,14 @@
 	--stat-card-bg:     var(--PAPER-RAISED, #1E1E1E);  /* raised panel behind a `card` group */
 	--stat-card-border: var(--LINE, #CCCCCC);          /* softened via color-mix in-component */
 
+	/* Columns / Column — the gutter rule of a divided group. Derived from the ink and
+	   softened via color-mix in-component, like --stat-divider, so it reads as a
+	   hairline on any surface. The grid itself paints nothing else, except a
+	   draggable divider (`resizable` / LAYOUT mode), which lights the accent on
+	   hover, focus and drag — the same "this is a control" cue the deck's chrome uses. */
+	--columns-divider: var(--INK, #C0F1FF);
+	--columns-handle:  var(--ACCENT, #2980B9);
+
 	/* Hint — the faint bottom cue. It floats over whatever the slide put behind it
 	   (an image, a chart, someone else's website), so it can't rely on contrast with
 	   the deck surface: it carries its own translucent backdrop and rule, both mixed
@@ -159,4 +167,7 @@
 	--page-rule-gap:      15px;    /* header text → rule */
 	--page-rule-weight:   4.5px;   /* the rule's thickness (its colour is --subtitle-rule) */
 	--page-content-gap:   1em;     /* header → content */
+
+	/* Columns: the gutter between columns. A per-group `gap` prop overrides it. */
+	--columns-gap:        2em;
 }
