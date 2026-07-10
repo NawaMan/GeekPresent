@@ -33,6 +33,7 @@ export const pages = [
     { path: "callout-component.html", title: "Callout" },
     { path: "stat-component.html",    title: "Stat & StatGroup" },
     { path: "columns-component.html", title: "Columns & Column" },
+    { path: "kbd-component.html",     title: "Kbd" },
     { path: "label-component.html",   title: "Label" },
     { path: "scrolldiv-component.html", title: "ScrollDiv" },
     { path: "code-component.html",    title: "Code" },

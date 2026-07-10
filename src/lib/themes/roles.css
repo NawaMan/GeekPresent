@@ -140,6 +140,15 @@
 	--terminal-accent:    var(--ACCENT, #2980B9);   /* transport fill, knob, play disc */
 	--terminal-track:     #E6EDF3;                  /* empty track + ticks, at low alpha */
 
+	/* Kbd — keycaps. A key is a raised surface with ink on it, so it borrows the
+	   raised-panel background and the deck's ink. The border (and the cap's bottom
+	   lip, drawn from it) is softened via color-mix in-component, so the cap reads
+	   as raised on any surface without knowing that surface's colour. */
+	--kbd-bg:     var(--PAPER-RAISED, #1E1E1E);
+	--kbd-fg:     var(--INK, #C0F1FF);
+	--kbd-border: var(--LINE, #CCCCCC);
+	--kbd-sep-fg: var(--INK, #C0F1FF);   /* the `+` and "then"; dimmed in-component */
+
 	/* Code title bar (CodeBox / JavaCodeBox) */
 	--code-title-bg:     var(--PAPER-RAISED, #1E1E1E);
 	--code-title-fg:     var(--INK, #FFFFFF);
