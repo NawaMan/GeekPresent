@@ -85,6 +85,20 @@
 	--stat-card-bg:     var(--PAPER-RAISED, #1E1E1E);  /* raised panel behind a `card` group */
 	--stat-card-border: var(--LINE, #CCCCCC);          /* softened via color-mix in-component */
 
+	/* Quote — pull-quote with attribution. The quotation reads in ink; the author
+	   is ink and the role is that same ink dimmed (in-component), so they track the
+	   theme without a fragile muted token, like Stat's label. The decorative mark,
+	   the left rule and the initials-avatar disc all pull the accent; the image
+	   avatar's ring derives from the line token, softened via color-mix so it reads
+	   on any surface. Fallbacks mirror the dark default (light-on-dark). */
+	--quote-fg:          var(--INK, #C0F1FF);
+	--quote-author-fg:   var(--INK, #C0F1FF);
+	--quote-cite-fg:     var(--INK, #C0F1FF);          /* dimmed via opacity in-component */
+	--quote-mark:        var(--ACCENT, #2980B9);       /* glyph, left rule tint, initials disc */
+	--quote-rule:        var(--ACCENT, #2980B9);
+	--quote-avatar-ring: var(--LINE, #CCCCCC);         /* softened via color-mix in-component */
+	--quote-border:      var(--LINE, #CCCCCC);         /* optional card border; softened in-component */
+
 	/* Columns / Column — the gutter rule of a divided group. Derived from the ink and
 	   softened via color-mix in-component, like --stat-divider, so it reads as a
 	   hairline on any surface. The grid itself paints nothing else, except a

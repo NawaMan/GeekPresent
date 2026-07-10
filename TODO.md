@@ -653,7 +653,44 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
 
 ## Tier 3 — nice to have
 
-- [ ] **`Quote`** — blockquote + attribution/avatar.
+- [x] **`Quote`** — blockquote + attribution/avatar.
+  - Done: `src/lib/components/Quote.svelte`, the Tier-3 companion to `Stat`/`Callout`
+    on a testimonial / "what people say" slide. Pure CSS, no deps, purely
+    declarative (no `onMount`, no browser APIs), so its full markup comes from
+    props and it prerenders.
+  - A `<figure>` with a decorative opening-quote glyph, a left accent rule, a
+    `<blockquote>` body, and a `<figcaption>` footer carrying the speaker. `text`
+    prop or the default slot (same escape hatch as `Hint`/`Callout`); `author` +
+    `role` (a dim second line, the author's ink at reduced opacity — tracks the
+    theme without a fragile muted token, `Stat`'s label trick).
+  - **The avatar needs no image.** Pass `avatar` (import it, so a Pages base path
+    survives — the reason `YouTube`/`Video` take imported assets) for an `<img>`;
+    omit it and the component draws an **initials disc** from `author` (first
+    letters of up to two words, accent-tinted), so a quote looks finished without a
+    picture. An empty/space-only author yields no initials and the disc is dropped
+    rather than shipped as a blank circle. The image ring and disc tints are
+    `color-mix`ed from one token each (`Callout`/`Kbd` discipline).
+  - `align` (`left` default / `center`) — center centres text + footer and **drops
+    the left rule** (a centred bar reads as a divider, not a quote). Unknown value
+    falls back to left rather than emitting a class that matches nothing
+    (`ContentPage`'s rule). `mark` / `rule` each opt out independently; footer
+    absent entirely when there's no author/role/avatar.
+  - **Optional card: `border` + `radius` + `background`.** A border and/or a
+    background turns the quote into a padded card (`radius` any CSS length); the
+    mark then sits **fully inside the top of the frame** (line-height 1, in flow),
+    not the tucked-above-text watermark the bare variant uses. (A first cut had it
+    *straddle* the top border fieldset-legend style with a cut swatch behind the
+    glyph — it read as awkward, so the mark just lives inside the frame now.)
+    `--quote-border` token, softened via `color-mix` like the avatar ring. Verified
+    by rendering the framed variants to a PNG, not just by test.
+  - Sized in `em` so a quote tracks whatever text it sits in; `--quote-*` role
+    tokens (fg / author-fg / cite-fg / mark / rule / avatar-ring), fallbacks the
+    dark default (light-on-dark) like `--surface-fg`. LAYOUT-compatible for free —
+    `Block` fills its content, so `<Block><Quote/></Block>` sizes it.
+  - Demo `quote-component.html` (left w/ image avatar + centred w/ initials disc,
+    self-contained `grace.svg`), SSR test `tests/QuoteSsr.ssr.test.ts` (text/slot,
+    footer parts, image-vs-initials choice, the align/mark/rule class contract the
+    stylesheet reads, the bad-`align` fallback). New `--quote-*` role tokens.
 - [ ] **`Timeline`** — narrative event timeline (distinct from charts).
 - [ ] **`Tabs`** — switch panels in one slide (e.g. same code in N languages).
 - [ ] **`CodeDiff`** — added/removed line styling; extends `Code` `revealLines`.
