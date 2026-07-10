@@ -111,6 +111,24 @@
 	--video-accent:    var(--ACCENT, #2980B9);      /* progress fill + active chapter */
 	--video-track:     var(--INK, #C0F1FF);         /* empty track, at low alpha */
 
+	/* Terminal (Terminal) — our fake console. Like the video stage, the screen stays
+	   dark in every theme: it is a terminal being shown, not a surface being themed,
+	   so bg/fg are literals rather than palette lookups. Everything that carries
+	   MEANING — the prompt, the caret, the output tones — comes from the palette, so a
+	   theme reskins the session without bleaching the screen. */
+	--terminal-bg:        #0C0C0C;                  /* the screen behind the session */
+	--terminal-fg:        #E6EDF3;
+	--terminal-border:    var(--LINE, #CCCCCC);     /* softened via color-mix in-component */
+	--terminal-chrome-bg: var(--PAPER-RAISED, #1E1E1E);
+	--terminal-chrome-fg: var(--INK, #C0F1FF);
+	--terminal-prompt:    var(--ACCENT-2, #00B356);
+	--terminal-caret:     var(--ACCENT-2, #00B356); /* also the ACTIVE command's tick */
+	--terminal-ok:        var(--ACCENT-2, #00B356);
+	--terminal-warn:      var(--ACCENT-WARM, #F0A33E);
+	--terminal-error:     var(--DANGER, #E5484D);   /* `muted` is the fg, dimmed in-component */
+	--terminal-accent:    var(--ACCENT, #2980B9);   /* transport fill, knob, play disc */
+	--terminal-track:     #E6EDF3;                  /* empty track + ticks, at low alpha */
+
 	/* Code title bar (CodeBox / JavaCodeBox) */
 	--code-title-bg:     var(--PAPER-RAISED, #1E1E1E);
 	--code-title-fg:     var(--INK, #FFFFFF);

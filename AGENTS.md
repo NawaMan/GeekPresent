@@ -36,7 +36,13 @@ Read the `README.md` first for the user-facing overview. This file is the *opera
   `ScrollDiv` (wheel-pannable container, `axis` x/y/both, optional draggable `scrollbar`;
   `WideDiv` is its `axis="x"` alias),
   `Code`, `JavaCode`, `CodeBox`, `JavaCodeBox`, `QuickCode` (small dark monospace box for short
-  hand-written snippets; not Monaco), `ViewSource` (corner `</> Source` button that shows a page's
+  hand-written snippets; not Monaco), `Terminal` (a fake console — a command types itself out,
+  the machine pauses, the output prints; the typing is pure CSS `@keyframes`, so the session
+  is seekable: it waits behind a play button, carries a transport with a tick per command, and
+  `keys="global"` lets Space run it one command at a time and then page the deck. Don't put an
+  `<AnimationBar />` on a Terminal slide — both would drive the same clock; pass
+  `controls={false}` if you want the bar to own it),
+  `ViewSource` (corner `</> Source` button that shows a page's
   own `?raw` source in a `CodeBox`), `Block` / `ImageBlock` (absolutely-positioned
   wrappers you place at exact canvas pixels — drag/resize them in **LAYOUT mode**,
   see that playbook), `Connector` (an arrow auto-routed between two *named* `Block`s —

@@ -235,9 +235,182 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
   so neither needs to know the surface colour — they just deepen it). `boxed={false}` restores
   the bare text for slides that know what sits behind them.
 
+## Page templates (`ContentPage` header)
+
+`src/lib/templates/ContentPage.svelte` hard-wires a left-aligned `<h1>`, a `.subtitle`
+span, and a rule drawn as the subtitle's `::after`. All three are effectively mandatory:
+an empty `title`/`subtitle` still renders its box, and the rule is welded to the subtitle,
+so a slide with no subtitle keeps the subtitle's gap and the rule drops too low.
+
+- [ ] **Center the title** — opt-in `align` (`left` default / `center`), applied to the
+      title (and, when centered, presumably the subtitle and the rule with it).
+- [ ] **Optional subtitle** — omitting it should pull the rule *up* to sit right under
+      the title, not leave the empty span's margins behind. Needs the rule to stop being
+      `.subtitle::after` and become its own element.
+- [ ] **Every header part optional** — title, subtitle and rule each independently
+      omittable (`title=""` / `subtitle=""` / `rule={false}`), with the survivors closing
+      the gap. Header absent entirely → content starts at the top of the canvas.
+- [ ] **Styling pass on the header** — sizes, spacing and the rule's weight/colour should
+      come from `roles.css` role tokens (`--page-title-fg` and `--subtitle-rule` exist;
+      the rest is hard-coded `em`s). Remember the fallbacks *are* the main deck's theme,
+      so they must read as light-on-dark.
+- [ ] **Styling pass on `Hint`** — verify the backdrop/hairline treatment (the `--hint-*`
+      tokens added under *Chrome & legibility*) across themes and backdrops, and against
+      the header above it.
+
 ## Tier 2 — on-brand tech-talk polish
 
-- [ ] **`Terminal`** — fake console: typed command + output. Can ride the `AnimationBar` keyframe clock.
+- [x] **`Terminal`** — fake console: typed command + output, riding the `AnimationBar` keyframe clock.
+  - Done: `src/lib/components/Terminal.svelte`, with the schedule in
+    `src/lib/utils/terminalCore.ts` (pure, total — `drawCore`/`videoCore` discipline:
+    junk timing falls back to the defaults, a malformed entry is dropped rather than
+    rendered as a blank row, and nothing ever yields NaN).
+  - **Settles the open design question: NOT a `Code` variant.** `Code`/`CodeBox` are
+    CDN-loaded Monaco (which renders blank after a client-side `goto` anyway), and a
+    console needs none of what Monaco is: it wants a prompt, a caret, per-line timing
+    and a scrubbable clock, not a language service. `Terminal` is `QuickCode`-family —
+    plain DOM and CSS.
+  - **The typing is CSS, not a timer**, and that is the whole design. A finite
+    `@keyframes` animation is also a Web Animations object, so the session can be held,
+    seeked and replayed by moving one clock, and a scrub backwards puts every character
+    back where it was. A timer-driven typewriter could do none of it. The caret's blink
+    is deliberately **infinite**, so it is excluded from that clock and keeps blinking
+    while the session is paused — as a real prompt does.
+  - **A Terminal is a video of a session**, so it wears `Video`'s clothes: a centre
+    **play button** (it opens held at frame 0 unless `autoplay`), a **transport** —
+    play/pause, restart, and a rail you **click to seek and drag to scrub** — and a
+    **tick per command**. No chapter *list*, though: unlike a video's, a terminal's
+    chapters are already on screen, and printing them again would be noise.
+  - **A tick marks a STOP, not a command.** It is drawn at the checkpoint — the end of a
+    command's output, where Space parks — never at the command's start. Drawn at the
+    starts (the first cut) the rail lied: the first Space halts at the first command's
+    *end*, which sits under the *second* tick, so stepping looked like it skipped tick
+    one and jumped to tick two, then to the end. `checkpointsOf` is what the ticks, the
+    snapping and `nextCheckpoint` all read, so the marks and the ladder cannot drift
+    apart again. The last tick is therefore the end of the session, and a tick lights
+    once the playhead has passed it (`reachedCount`).
+  - **The rail is the only thing on the rail.** The knob is `pointer-events: none` over
+    an invisible grab strip taller than itself, so pressing the white circle lands on the
+    track and drags. Which means nothing else may sit there and swallow the press — and
+    the ticks are therefore inert **marks**, exactly as `Video`'s are, not buttons. (They
+    were buttons first, and that was a bug: Space parks the playhead *on* a tick, so a
+    clickable tick sat under the knob at precisely the moment you reached for it, and the
+    knob could not be grabbed where stepping leaves it.) A click near a tick still lands
+    on that stop, because `snapTime` makes the marks magnetic within 1.5% of the
+    envelope — the visible marks mean what they look like they mean, without being
+    targets. A scrub pauses (the playhead is following the pointer now), and the rail
+    ignores a secondary button and a second finger.
+  - **Do not copy `Video`'s `detail === 0` guard onto a pointer handler.** That guard is
+    right where it lives — on a `click`, `detail` is the click count and 0 means a
+    keyboard activation carrying no coordinates. But on a **pointer** event `detail` is
+    *always* 0, so the same line rejects every real press: click and drag both died in
+    the browser while a DOM test forging `detail: 1` passed. Enter never fires
+    `pointerdown`, so there was nothing to guard against anyway. The test fakes now
+    default to `detail: 0`, which is what a browser actually sends.
+  - **`keys="global"` makes it a build.** Space plays *forward* to the end of the next
+    command's output and stops dead there — you watch it type, it halts, you talk.
+    Shift+Space jumps back a stop, and from the first one to the beginning. Once the last
+    is behind the playhead, Space stops claiming the key and **pages the deck**, the same
+    handoff a `Steps` run makes, through the same `activeSteps` store and `spaceIntent` —
+    so CONTINUE and the presenter console's `gp:continue` pulse drive it for free.
+    Opt-in, because only one build per slide may own Space.
+    - Space *plays to* the checkpoint rather than seeking to it — the deliberate
+      departure from `Video`, which jumps. Footage is worth jumping through; a
+      typewriter you would never see type. Backwards *is* a jump: re-watching a command
+      type on the way back is nobody's idea of stepping back.
+    - **Both directions walk one set of stops:** `0` (a blank console) and every
+      checkpoint. Shift+Space exists to undo Space, so it cannot step to a command's
+      *start* — that is a state no forward step ever produces. Stepping back to marker
+      starts was the first cut and it was wrong twice over: it landed on states the
+      presenter had never seen, and from the first command's start there was nothing
+      earlier, so `hasPrev` went false and **Shift+Space paged the deck away instead of
+      rewinding**. `prevCheckpoint` (not `prevMarkerStart`) is the fix; the invariant is
+      that `prevCheckpoint` and `nextCheckpoint` enumerate the same ladder.
+  - **One owner per clock.** `AnimationBar` collects every finite CSS animation in the
+    slide's `.content`, this one included, so with `controls` on the two would fight
+    over the playhead (the bar's Play would run straight past the markers).
+    `controls={false}` renders a bare console and hands the clock back to a bar — the
+    only supported way to combine them. The demo slide therefore ships no `AnimationBar`.
+  - **Never bare-`play()` a group of staggered animations.** Per the Web Animations spec,
+    `play()` on an animation whose `currentTime` has reached its end **auto-rewinds it to
+    0**. Every line of the session is its own animation with its own end, so resuming at a
+    checkpoint replayed every command already typed — command 1 re-typing alongside
+    command 2. (The DOM test's fake `play()` models the auto-rewind, or it could not see
+    this.) A finished animation is left where it is: its fill-mode holds its final frame
+    whether or not it is attached to a clock.
+    - Now `slideAnim.playGroup()` / `pauseGroup()`, **one implementation shared by
+      `Terminal`, `AnimationBar` and the presenter console** (`PresenterAnim` +
+      `applyState`, the audience-relay path). All three had the same bare loop: pausing a
+      staggered `Draw`/`Connector` reveal (`drawDelay`) partway and hitting Play redrew
+      the shapes that had already finished, and the presenter's Play relayed that same
+      restart to the audience window. Fixed with `tests/slideAnim.test.ts`,
+      `tests/AnimationBar.test.ts` and `tests/PresenterAnim.test.ts` — none of the three
+      had any test before. The presenter harness drives the console and then replays each
+      emitted command onto an *independent* group of animations, which is the relay
+      contract itself: what the presenter emits must land the audience in the presenter's
+      state.
+    - Also, `PresenterAnim` called `setPointerCapture` **unguarded** while guarding its
+      matching `releasePointerCapture`. jsdom implements neither, and it swallows an
+      exception thrown inside an event listener (reporting a window `error` instead of
+      failing the dispatch) — so the scrub tests passed either way. Now optional-called,
+      like `Terminal`'s and `AnimationBar`'s, and pinned by a test that listens for that
+      window `error`.
+    - Fixing that surfaced a **second bug** in the same two `play()`s: "is it spent?" was
+      judged on `playState === 'finished'`. But scrubbing to the end leaves every
+      animation *paused* at its end, never `'finished'` — and `playGroup` rightly refuses
+      to restart a finished animation, so Play became a no-op there. "Spent" is now judged
+      on the **playhead** (`sample() >= duration`), which is what the question actually
+      means.
+  - **Degrade, never blank.** With no transport, no stepping *and* no autoplay nothing
+    could ever start the session, so it starts itself. Where `getAnimations` is absent
+    there is no clock: the chrome that could not drive anything never renders, and
+    Space stops claiming the key rather than trapping the presenter on the slide.
+    Reduced motion removes the animations outright, which empties the clock and hides
+    the transport by the same rule — no `matchMedia` needed.
+  - The reveal is the **width** of the typed span, clipped to a whole number of `ch`
+    and walked by `steps(n, end)` — monospace is a console's premise anyway. Every
+    reveal keyframe declares only a `from`: the implicit `to` is the property's own
+    cascaded value, so one rule serves every line length *and* every tone (a `muted`
+    line fades 0 → 0.6, not 0 → 1) without generating per-line keyframes. An empty
+    command still gets `steps(1)` — `steps(0)` is invalid CSS and would drop the
+    animation entirely.
+  - The caret rides the end of the typed text for free (the growing inline-block
+    carries it). Its gate is a **window**: `visibility: visible` under fill-mode
+    `none`, so the caret exists exactly between its command's start and end. The
+    resting caret fills `forwards` instead — it opens at the end of the envelope and
+    stays. The blink runs on `opacity`, a *different property*, so the two animations
+    never fight over one declaration. One layout trap: `overflow: hidden` moves an
+    inline-block's baseline to its bottom margin edge, so the typed span is pinned to
+    one row height and aligned `top` — otherwise the command sinks below its prompt.
+  - `lines` takes `{ cmd }` (typed), `{ out, tone }` (printed), or a bare string
+    (shorthand for output — the common case). Tones `ok`/`warn`/`error`/`muted`, all
+    `--terminal-*` role tokens: the screen stays dark in every theme (like `Video`'s
+    letterbox — it's a terminal being shown, not a surface being themed), while
+    everything that carries *meaning* — prompt, caret, tones, transport accent — comes
+    from the palette. Also `prompt`, `title`, `chrome`, `caret`, `typing`, `controls`,
+    `autoplay`, `keys`, `continueKey`, and the timing knobs
+    `charMs` / `startMs` / `pauseMs` / `outMs`.
+  - The track is a **pointer** affordance (`tabindex="-1"`, `aria-hidden`) —
+    `NavigationBar` claims →/← unconditionally, so a scrub bar can never own them. Same
+    call `Video` made. The play/pause and restart buttons are the keyboard's transport;
+    Space is the keyboard's seek.
+  - `text` mode prints the session whole (a reader can't wait for a typewriter, and
+    there's nothing to scrub), as do `typing={false}` and `prefers-reduced-motion`.
+  - **The one gotcha:** a slide's markup never reaches the static build — `SlideDeck`
+    gates its content behind `initialized` — so "the transcript prerenders" is a
+    *Text-artifact* benefit, not a slide one. What SSR-safety buys a slide is the
+    absence of a mount-time flash and a component that cannot desynchronise from the
+    scrub bar. Asserted in `tests/TerminalSsr.ssr.test.ts` against `svelte/server`,
+    never against a built page.
+  - Demo `terminal-component.html` (`keys="global"` — Space runs it command by command,
+    then pages on), unit test `tests/terminalCore.test.ts` (schedule + marker/checkpoint
+    arithmetic), DOM test `tests/Terminal.test.ts` (jsdom has no Web Animations, so the
+    clock is faked closely enough to exercise the real seek/sample/pause logic: hold at
+    frame 0, play-to-checkpoint with the overshoot snapped back, the spent-build handoff,
+    the no-clock degradation, and the caret left blinking), SSR test
+    `tests/TerminalSsr.ssr.test.ts` (transcript prerenders; the transport does *not* —
+    a server-rendered play button would be a control that controls nothing). New
+    `--terminal-*` role tokens.
 - [ ] **`Kbd`** — render keyboard keys (`<Kbd>⌘</Kbd><Kbd>K</Kbd>`). Trivial, no-dep.
 - [x] **`Stat` / `StatGroup`** — big-number / KPI slide. Pure CSS; pairs with charts.
   - Done: `src/lib/components/Stat.svelte` (hero figure + label + optional trend chip;
@@ -312,5 +485,7 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
 
 ## Open design questions
 
-- Should `Terminal` be a `Code` variant rather than a standalone component?
+- ~~Should `Terminal` be a `Code` variant rather than a standalone component?~~ **No** —
+  standalone, `QuickCode`-family. `Code` is CDN-loaded Monaco; a console needs a caret and a
+  scrubbable CSS clock, not a language service. See the `Terminal` entry above.
 - Should `Stat` live inside `Callout`, or stay separate?
