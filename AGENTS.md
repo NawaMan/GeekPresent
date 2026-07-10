@@ -53,8 +53,12 @@ Read the `README.md` first for the user-facing overview. This file is the *opera
   `Columns` / `Column` (a thin grid for two- and three-column layouts; a media/text
   *split* is the same component with unequal `widths`, not a second one. `resizable`
   lets a viewer drag the gutters, and LAYOUT mode always does — with a `widths` chip
-  that copies the dragged ratio back into source, since a drag saves nothing), plus
-  framework-internal `Copyright`, `CtrlBtn`,
+  that copies the dragged ratio back into source, since a drag saves nothing),
+  `QRCode` (a scannable link, encoded on the slide — the symbol is computed from the
+  text, not fetched, and drawn as SVG so it survives the canvas transform. `value` is
+  all it needs; an `http`/`mailto`/`tel` value links itself. Prefer it over committing
+  a `-QR.png`, and note `YouTube`'s `qr` prop is now optional for exactly that reason),
+  plus framework-internal `Copyright`, `CtrlBtn`,
   `NavigationBar`, `TableOfContent`, `SizeMode`, `Seo` (renders SEO/social metadata
   into `<svelte:head>` — see the SEO note under *Gotchas*).
 - Package manager is **pnpm** (`pnpm dev` / `build` / `deploy`). Dev server: `http://localhost:5173`.

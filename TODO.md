@@ -623,8 +623,83 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
 - [ ] **`Timeline`** — narrative event timeline (distinct from charts).
 - [ ] **`Tabs`** — switch panels in one slide (e.g. same code in N languages).
 - [ ] **`CodeDiff`** — added/removed line styling; extends `Code` `revealLines`.
-- [ ] **`QRCode`** — live scannable link on any slide; generalizes `utils/prepare-youtube.sh`.
+- [x] **`QRCode`** — live scannable link on any slide; generalizes `utils/prepare-youtube.sh`.
+  - Done: `src/lib/components/QRCode.svelte`, a thin `<svg>` over
+    `src/lib/utils/qrCore.ts` — **a QR encoder written from the spec** (ISO/IEC 18004),
+    pure and total (`drawCore`/`videoCore`/`kbdCore` discipline: an empty value, a junk
+    mask, a 3000-character URL all yield `null` or a clamped default, never a throw).
+  - **The point is that a QR becomes a pure function of its text.** Today the code is a
+    PNG that `utils/prepare-youtube.sh` shells out to the `qrencode` *binary* to make, and
+    commits next to the slide, where it goes stale the moment the URL changes. Now nothing
+    is fetched and nothing is generated ahead of time — no npm package, no binary. Change
+    the URL, the code changes. It draws as **SVG**, so it stays crisp through SlideDeck's
+    canvas transform; a raster QR softens with the projector, and a soft QR is one that
+    takes three tries to scan from row twelve.
+  - **`YouTube`'s `qr` prop is now optional**, and omitting it is the better answer: the
+    component encodes the watch URL from `youtubeId`, so the code cannot drift from the
+    video it points at. Slides that pass the PNG render exactly as before.
+    `tests/YouTubeSsr.ssr.test.ts` pins both paths — and that the auto-linked code does not
+    nest an `<a>` inside the card's own anchor.
+  - **Byte mode only, and that is a decision.** The spec's alphanumeric mode packs denser
+    but excludes lowercase, so a real URL falls out of it on the first lowercase letter and
+    lands back in byte mode anyway. One mode encodes anything, in UTF-8, and needs no
+    segmentation pass. Lone surrogates encode as U+FFFD rather than as invalid UTF-8 that no
+    scanner could decode. Versions 1–40, all four ECC levels, 2953 bytes at the ceiling.
+  - **Dark-on-light, whatever the theme.** The one place `roles.css` does *not* follow the
+    deck's ink: a dark theme's ink is light, and an inverted QR is something scanners may
+    refuse. `--qr-dark` / `--qr-light` default to literal black on literal white — the same
+    call `Video`'s letterbox and `Terminal`'s screen make. The quiet zone (4 modules) is
+    *part of the symbol*, not padding: a scanner finds the finders by their outer light
+    edge, so the plate paints under it. `shape-rendering: crispEdges`, because a blurred
+    module boundary is exactly what a scanner cannot resolve — and the svg's default
+    `preserveAspectRatio` means a `Block` that stretches the box **letterboxes** the code
+    instead of skewing it. A skewed QR is an unreadable one.
+  - Also: `ecc`, `size` (canvas px or any CSS length), `quiet`, `minVersion` (hold a module
+    size steady across URLs of differing length), `mask`, `label` (or the default slot),
+    `plate`, `alt`, and auto-`href` — a QR is scanned by the room *and* clicked by whoever
+    reads the deck as a page, so an `http`/`mailto`/`tel` value links itself (`link={false}`
+    opts out; a `WIFI:` payload is not a destination and never links). The dark modules are
+    emitted as **one `<path>` with horizontal runs merged**, not one `<rect>` per module.
+  - **Verified against `qrencode`, not against itself.** `tests/fixtures/qr-golden.json` holds
+    reference grids for readable payloads plus sha256 digests for **all 160 (version × ECC)
+    combinations, twice each** — once packed to exactly full capacity (no padding, every block
+    used) and once below it (terminator + `0xEC`/`0x11` pad codewords in play). 329 symbols,
+    matched module for module. One wrong entry in the ECC block tables moves exactly one
+    digest and nothing else, which is what makes the fixture worth its 60 KB. The capacity
+    table was not transcribed from a book either: it was *probed* out of `qrencode` by
+    binary search, and `byteCapacity` is asserted against all 160 of its answers.
+  - **The mask is pinned, not compared** — the one real subtlety. Mask selection is a
+    heuristic scored by the spec's four penalty rules, and the rules admit more than one
+    honest reading (is a finder-alike counted once per occurrence, or once per satisfied
+    side? does the quiet zone beyond the edge count as the light margin?). Conforming
+    encoders differ on ~7% of payloads. Since the chosen mask is *written into the symbol's
+    own format bits*, a decoder reads whichever we picked and never has to agree with us. So
+    the golden test encodes at the mask it decoded out of the reference symbol, and
+    everything downstream of that choice must match exactly. `penaltyScore` is then tested
+    directly against the spec's rules on hand-built grids (a checkerboard scores 0; an
+    all-light 5×5 scores exactly 30 + 48 + 100), and auto-selection is tested to be a true
+    argmin. Rule 3 matches the finder's 1:1:3:1:1 **ratio at any scale**, not the 11-module
+    window — a scanner reads ratios, so 2:2:6:2:2 is just as misleading.
+  - Three things the tests caught, all worth recording: the alignment-pattern step is
+    `⌊(4v + 2·numAlign + 1) / (2·numAlign − 2)⌋ × 2` and **version 32 is a published
+    irregularity** (26, where the formula yields 28); the positions must be filled from the
+    far edge inward, so the slack falls in the *first* gap rather than smearing across all of
+    them; and `qrencode` never once picks mask 5 across the 329 fixtures, so the eight mask
+    formulas are pinned separately against an independent transcription of Table 10, inside a
+    window of the v10 symbol proven clear of every function pattern.
+  - Demo `qrcode-component.html` (one URL at all four ECC levels — the symbol grows as the
+    redundancy does), unit test `tests/qrCore.test.ts` (362 cases), SSR test
+    `tests/QRCodeSsr.ssr.test.ts`. New `--qr-*` role tokens.
+  - **The one gotcha:** as with `Terminal`, a slide's markup never reaches the static build
+    (`SlideDeck` gates its content behind `initialized`), so "the symbol prerenders" is a
+    **Text-artifact** benefit, not a slide one. What SSR-safety buys a slide is no mount-time
+    flash, and a symbol that cannot differ between the server's idea of it and the browser's.
+    Asserted against `svelte/server`, never against a built page.
 - [ ] **`StackedBarChart` / `Histogram`** (maybe **`Heatmap`**) — part-to-whole & distribution charts; fills chart-family gaps.
+- [ ] **Multi-segment path** — one `Draw` shape whose geometry chains several segments
+      (line + curve + arc) instead of composing separate `Line` / `Curve` / `Arc` elements.
+  - Gives a single continuous stroke: one `draw`/`drawDelay` reveal, one arrowhead at the
+    real end, joins that meet cleanly instead of butting stroke caps together.
 
 ## Authoring / LAYOUT mode
 

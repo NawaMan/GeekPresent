@@ -149,6 +149,16 @@
 	--kbd-border: var(--LINE, #CCCCCC);
 	--kbd-sep-fg: var(--INK, #C0F1FF);   /* the `+` and "then"; dimmed in-component */
 
+	/* QRCode — the modules and the plate they sit on. The ONLY tokens here that do
+	   not track the theme: a QR must be dark-on-light to be read, so a dark deck's
+	   ink (which is light) would invert it into something scanners may refuse. Literal
+	   black on literal white, in every theme — the same call Video's letterbox and
+	   Terminal's screen make. A theme may still tint them, but it owns the contrast
+	   ratio when it does. The caption is ordinary text and does follow the ink. */
+	--qr-dark:        #000000;
+	--qr-light:       #FFFFFF;
+	--qr-caption-fg:  var(--INK, #C0F1FF);
+
 	/* Code title bar (CodeBox / JavaCodeBox) */
 	--code-title-bg:     var(--PAPER-RAISED, #1E1E1E);
 	--code-title-fg:     var(--INK, #FFFFFF);
