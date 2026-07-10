@@ -36,6 +36,7 @@ export const pages = [
     { path: "timeline-component.html", title: "Timeline" },
     { path: "timeline-horizontal.html", title: "Timeline — Horizontal & Scroll" },
     { path: "columns-component.html", title: "Columns & Column" },
+    { path: "tabs-component.html",    title: "Tabs & Tab" },
     { path: "kbd-component.html",     title: "Kbd" },
     { path: "qrcode-component.html",  title: "QRCode" },
     { path: "label-component.html",   title: "Label" },

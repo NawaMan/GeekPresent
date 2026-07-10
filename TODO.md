@@ -753,7 +753,52 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     context). Verified by rendering both slides to PNGs — including a seeded-scroll
     frame proving the pan reveals the later years — not just by test. New
     `--timeline-*` role tokens.
-- [ ] **`Tabs`** — switch panels in one slide (e.g. same code in N languages).
+- [x] **`Tabs`** — switch panels in one slide (e.g. same code in N languages).
+  - Done: `src/lib/components/Tabs.svelte` (the strip) + `Tab.svelte` (one panel),
+    with the index arithmetic in `src/lib/utils/tabsCore.ts` (pure, total —
+    `drawCore`/`videoCore`/`columnsCore` discipline: an empty list, a NaN `start`, a
+    strip of nothing but disabled tabs all yield a sane index, never a throw or an
+    out-of-range read). The container/item pair, the same shape as
+    `Carousel`/`CarouselItem` and `Timeline`/`TimelineItem`.
+  - **The Tab owns its label; the strip is drawn from it.** Each `<Tab label="…">`
+    registers its label (and optional `icon`, `disabled`) UP to the `Tabs` over
+    context — the content stays in the Tab. So a diagram-in-N-languages is authored as
+    labelled panels, not as a strip plus a parallel array of bodies to keep in sync.
+  - **The one ordering subtlety (SSR):** the strip's `{#each $tabs}` sits *after*
+    `<slot/>` in the template, so a Tab registering during slot render is visible to
+    the strip in a single server pass — the same ordering `Carousel`'s dot row relies
+    on. It is floated back above the panels with `order: -1`. Put the strip first and
+    the prerendered markup would ship an empty strip.
+  - **Panels are grid-stacked**, so the container is as tall as the *tallest* panel and
+    switching a tab never resizes it — the strip stays put. Inactive panels keep their
+    box (`visibility`, not `display`) so they still size the stack, and go `inert`.
+  - **Keyboard is the ARIA tablist, and it claims nothing global.** Roving tabindex
+    (one tab-stop); ←/→ (and ↑/↓), Home/End move selection, skipping disabled tabs and
+    wrapping. It owns the arrows ONLY while a tab is focused, by `stopPropagation` in
+    the **bubble** phase — so `NavigationBar`'s window paging resumes the instant focus
+    leaves (the exact scoped ownership `Columns`' resize handle takes). Deliberately
+    **no `keys='global'`** and no Space claim: a Tabs never contends with a
+    `Steps`/`Video`/`Terminal` build on the same slide. Clicking is the primary path.
+  - `text` mode has no canvas and nothing to click, so it drops the strip and shows
+    every panel in flow under its own label heading (the Steps "text shows all" rule).
+  - `start` (clamped, nudged off a disabled tab), `align`
+    (`start`/`center`/`end`/`stretch`, unknown → `start` — the ContentPage/Timeline
+    fallback), `transition` (`fade`/`none`), and a `bind:this` API (`goTo`/`next`/`prev`).
+  - Sized in `em`, `--tabs-*` role tokens (inactive label ink dimmed in-component like
+    Stat/Timeline — no fragile muted token; active label full ink; accent indicator +
+    baseline rule + hover wash), fallbacks the dark default (light-on-dark).
+    LAYOUT-compatible for free — `Block` fills its content, so `<Block><Tabs>…` sizes it.
+  - Demo `tabs-component.html` (one greeting in JS/Python/Go + a disabled "soon" tab),
+    unit test `tests/tabsCore.test.ts` (clamp/skip/wrap/align, all the bad inputs), DOM
+    test `tests/Tabs.test.ts` (click switch, roving keyboard skip+wrap, disabled inert,
+    arrows owned only while focused), SSR test `tests/TabsSsr.ssr.test.ts` +
+    `tests/TabsHost.svelte` (the strip reflects the registered tabs, one panel per Tab,
+    the initial selection off a disabled `start`, the align/transition contract). New
+    `--tabs-*` role tokens.
+  - **The one gotcha** (as with Terminal/QRCode): a slide's markup never reaches the
+    static build (`SlideDeck` gates its content behind `initialized`), so the strip
+    prerendering is a *Text-artifact* benefit, not a slide one. What SSR-safety buys a
+    slide is no mount-time flash. Asserted against `svelte/server`, never a built page.
 - [ ] **`CodeDiff`** — added/removed line styling; extends `Code` `revealLines`.
 - [x] **`QRCode`** — live scannable link on any slide; generalizes `utils/prepare-youtube.sh`.
   - Done: `src/lib/components/QRCode.svelte`, a thin `<svg>` over
