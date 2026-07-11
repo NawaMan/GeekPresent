@@ -63,6 +63,17 @@
 	--quickcode-bg:      var(--PAPER-RAISED, #111111);
 	--quickcode-fg:      var(--INK, #FFFFFF);
 
+	/* CodeDiff — before/after code with added/removed line styling. The screen is a
+	   dark code surface (like QuickCode); the add/del tokens are single accents that
+	   the component mixes toward transparent for the row wash + the accent bar, so a
+	   theme only moves the accent and the contrast follows. Add is green, del is red,
+	   whatever the theme's ink — a diff's colours carry meaning, not decoration. */
+	--codediff-bg:         var(--PAPER-RAISED, #111111);
+	--codediff-fg:         var(--INK, #FFFFFF);
+	--codediff-add:        var(--ACCENT-2, #00B356);   /* added lines: wash, bar, sign */
+	--codediff-del:        var(--DANGER, #E5484D);     /* removed lines */
+	--codediff-gutter-fg:  var(--INK, #C0F1FF);        /* line numbers + context sign; dimmed in-component */
+
 	/* Callout — semantic admonition boxes (info / tip / warn / danger). Each kind
 	   is driven by a single accent; the component tints its own background and
 	   border from that accent (color-mix), so a theme only needs to move these. */

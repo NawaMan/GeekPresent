@@ -38,7 +38,7 @@
 
 	import { browser }    from '$app/environment';
 	import { page }       from '$app/stores';
-	import { onMount }    from 'svelte';
+	import { onMount } from 'svelte';
 	import { displayMode, displayFactor, clampFactor } from '$lib/stores/displayMode';
 	import type { DisplayMode } from '$lib/stores/displayMode';
 	import { layoutMode, canLayout, applyLayoutParam } from '$lib/stores/layoutMode';
@@ -46,7 +46,7 @@
 	import { getViewTransitions } from '$lib/presentation';
 	import {
 		presenterMode, publishCurrentSlide, subscribeCurrentSlide, subscribeAnimCommand,
-		subscribeContinue, deckKeyFromPath
+		subscribeContinue, deckKeyFromPath, openPresenterWindow
 	} from '$lib/stores/presenter';
 	import { collectFinite, applyState } from '$lib/utils/slideAnim';
 	import { navigate } from '$lib/utils/deckNav';
@@ -124,9 +124,9 @@
 	let factor = clampFactor($displayFactor);
 	let initialized = false;
 	// On-screen scale of the slide content set by adjustSize() (the FITTED fit factor,
-	// or the SCALED zoom factor). The screen-fixed overlay chrome (DISPLAY control)
-	// multiplies its font by this so it renders the same size as the in-content NAV /
-	// ANIMATION buttons, which the content transform already scales by the same amount.
+	// or the SCALED zoom factor), exposed to the content as --view-scale for any chrome
+	// that needs to counter the slide transform. (DISPLAY no longer uses it — it's a
+	// viewport control now, sized independently of the slide.)
 	let viewScale = 1;
 	$: isFitted = mode === 'FITTED';
 	$: aspectRatio = width / height;
@@ -137,32 +137,13 @@
 	let mapRect = { left: 0, top: 0, width: 1, height: 1 };
 	const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 
-	// Anchor the overlay's display-mode control to the FRAME's top-right corner, so
-	// it sits on the slide instead of adrift in the letterbox margin — but clamp it
-	// to the viewport so it stays reachable when a zoomed-in SCALED frame pushes that
-	// corner off-screen. Recomputed (with the minimap) on scroll / resize / change.
-	let ctrlTop = '12px';
-	let ctrlRight = '16px';
-	const CTRL_INSET = 12;
+	// DISPLAY now attaches to the VIEWPORT's top-right corner (see SizeMode) — a
+	// window control, reachable no matter how the slide is scaled or panned — so there
+	// is nothing frame-relative to recompute here. The authoring LAYOUT/PRESENT cluster
+	// lives ON the slide (.content, canvas space) and rides the slide's own transform.
+	// updateOverlay is kept as the minimap's recompute hook.
 	function updateOverlay() {
 		updateMap();
-		if (!container) return;
-		const r = container.getBoundingClientRect();
-		const topPx   = Math.max(CTRL_INSET, r.top + CTRL_INSET);
-		ctrlTop   = `${Math.round(topPx)}px`;
-		ctrlRight = `${Math.round(Math.max(CTRL_INSET, window.innerWidth - r.right + CTRL_INSET))}px`;
-		// Align the in-content LAYOUT/SAVE control to the SAME screen line as the
-		// overlay's FITTED control (both at `topPx`). The LAYOUT control lives inside
-		// the transform-scaled .content (center-origin + fit slack), so a fixed canvas
-		// inset drifts from the screen-fixed FITTED button. Derive its canvas-space top
-		// from the MEASURED content top instead: screenTop = contentTop + Y*scale, so
-		// Y = (topPx - contentTop) / scale. Geometry-only (no layoutMode dependence),
-		// so it stays put whether LAYOUT is on or off.
-		if (content) {
-			const contentTop = content.getBoundingClientRect().top;
-			const y = (topPx - contentTop) / (viewScale || 1);
-			content.style.setProperty('--layout-top', `${y}px`);
-		}
 	}
 
 	// Page-level favicon. The shell renders at SSR (only the slide *content* below
@@ -223,6 +204,12 @@
 		}
 		clearTimeout(saveTimer);
 		saveTimer = setTimeout(() => (saveLabel = 'SAVE'), 1600);
+	}
+	// Open (or focus) the presenter console at the current slide. Moved here from the
+	// nav bar so PRESENT sits with LAYOUT in the slide's top-right chrome cluster.
+	// Runs in the click handler (a user gesture) so the popup isn't blocked.
+	function openPresenter() {
+		openPresenterWindow(window.location.href, deckKeyFromPath(window.location.pathname));
 	}
 	// Page-level document title, same cascade idea as the favicon above but emitted
 	// as ONE <title> (the browser uses the FIRST <title>, so it can't stack the way
@@ -408,16 +395,15 @@
 	>
 		<div class="content" class:fill class:ready={initialized} bind:this={content}>
 			{#if initialized}
-			<!-- LAYOUT toggle (authoring only). Lives HERE, inside the content layer and
-			     BEFORE the slot, so the slide's own blocks (in the slot) paint ON TOP of
-			     it instead of being covered by it — while the opaque slide surface still
-			     sits behind it so it stays visible/clickable. (It used to live next to
-			     MODE in the screen-fixed overlay, which is above all content and so
-			     obscured whatever block sat under it.) -->
-			{#if $canLayout && !clean}
-			<!-- `pinned` while LAYOUT is on: you are actively editing, so the toggle
-			     and SAVE must not dim out from under the cursor between drags. -->
-			<div class="layout-ctrl gp-chrome no-print" class:pinned={$layoutMode}>
+			<!-- Slide-owned chrome, pinned to the SLIDE's top-right corner (canvas space,
+			     so it rides the slide's own scale/pan — its home is the page, not the
+			     window). LAYOUT (authoring) + PRESENT (open the console) live here together;
+			     the viewport-anchored DISPLAY control sits separately in the overlay below.
+			     Being a .content child placed BEFORE the slot, the slide's own blocks paint
+			     over it. Hidden by ?clean; PRESENT hides inside the console itself. -->
+			{#if !clean && ($canLayout || !$presenterMode)}
+			<div class="slide-chrome gp-chrome no-print" class:pinned={$layoutMode}>
+				{#if $canLayout}
 				<CtrlBtn
 					chrome
 					text="LAYOUT"
@@ -425,14 +411,18 @@
 					isSelected={$layoutMode}
 					on:click={() => layoutMode.update((v) => !v)}
 				/>
-				<!-- Save is dev-only: it writes moved Blocks back to source via the
-				     vite-dev endpoint. Shown only while LAYOUT is on. The wrapper
-				     pins a stable width so SAVE↔SAVED doesn't shift the row. -->
+				<!-- Save is dev-only: it writes moved Blocks back to source via the vite-dev
+				     endpoint. Shown only while LAYOUT is on. The wrapper pins a stable width
+				     so SAVE↔SAVED doesn't shift the row. -->
 				{#if canSave && $layoutMode}
 					<span class="save-btn">
 						<CtrlBtn chrome text={saveLabel} hoverText={saveLabel} on:click={onSave} />
 					</span>
 				{/if}
+				{/if}
+				<!-- PRESENT opens the presenter console; a text label like the other chrome
+				     buttons, hidden inside the console itself ($presenterMode). -->
+				<CtrlBtn chrome text="PRESENT" on:click={openPresenter} isVisible={!$presenterMode} />
 			</div>
 			{/if}
 			<slot />
@@ -443,12 +433,14 @@
 	</div>
 </div>
 
-<!-- Screen-fixed chrome that must stay reachable regardless of pan/zoom: the
-     display-mode control and the minimap. Kept OUT of .content (which is scaled
-     and panned) so they never drift off-screen. Hidden by ?clean and in the
+<!-- Viewport-fixed chrome that must stay reachable regardless of pan/zoom: the
+     display-mode (DISPLAY) control and the minimap. DISPLAY anchors to the WINDOW's
+     top-right corner (SizeMode's own fixed inset), so it's always in reach even when a
+     SCALED slide is panned or the frame is letterboxed — a window control, distinct
+     from the slide-owned LAYOUT/PRESENT cluster above. Hidden by ?clean and in the
      presenter console (which has its own chrome). -->
 {#if initialized && !clean && !present}
-<div class="overlay" class:fade-chrome={fadeChrome} style="--base-font:{baseFontSize}; --ctrl-top:{ctrlTop}; --ctrl-right:{ctrlRight}; --view-scale:{viewScale};">
+<div class="overlay" class:fade-chrome={fadeChrome} style="--base-font:{baseFontSize};">
 	<SizeMode {width} {height} />
 	{#if mapVisible}
 	<SlideMap {width} {height} rect={mapRect} />
@@ -532,9 +524,9 @@
 
 	/* --- Chrome fade (opt-in via `fadeChrome`) ---------------------------------
 	   Every deck control tags its own root `.gp-chrome`; the two hosts that can
-	   contain one are .container (NAV, TOC, LAYOUT) and .overlay (DISPLAY, minimap),
-	   so the rule is written once against each. :global because those roots belong
-	   to sibling components with their own scoped styles.
+	   contain one are .container (NAV, TOC, LAYOUT/PRESENT) and .overlay (DISPLAY,
+	   minimap), so the rule is written once against each. :global because those roots
+	   belong to sibling components with their own scoped styles.
 
 	   Opacity, never visibility/display: a ghosted control keeps its full hit area,
 	   so the pointer can find it exactly where it always was. */
@@ -542,6 +534,14 @@
 	.overlay.fade-chrome   :global(.gp-chrome) {
 		opacity: 0.12;
 		transition: opacity 160ms ease;
+	}
+	/* The overlay chrome (DISPLAY, minimap) rests much more OPAQUE than the on-slide
+	   chrome: it lives in the viewport corner, out of the way of slide content, so it
+	   can stay readable at a glance instead of hiding until pointed at. It still lifts
+	   to full on hover/focus below (that rule outranks this one via :hover). Same
+	   selector as the shared 0.12 rule above, placed after it, so source order wins. */
+	.overlay.fade-chrome :global(.gp-chrome) {
+		opacity: 0.75;
 	}
 	/* Lit on approach — and STAY lit while open (`.expanded`, the class TOC and
 	   SizeMode already flip) or pinned (LAYOUT mid-edit). :focus-within carries the
@@ -564,33 +564,26 @@
 			opacity: 1;
 		}
 	}
-	/* LAYOUT toggle, anchored to the content's top-right (left of where the MODE
-	   control floats in the overlay). It scales/pans WITH the slide — fine, since
-	   layout authoring happens in FITTED. Being a content child, blocks placed over
-	   it render on top of it (the point of moving it here). */
-	.layout-ctrl {
+	/* LAYOUT / PRESENT cluster — pinned to the SLIDE's own top-right corner, in CANVAS
+	   space (a .content child), so it rides the slide's scale/pan: its home is the page,
+	   not the window. That is the whole point of the split — the DISPLAY control belongs
+	   to the viewport (overlay), this belongs to the slide. Inset a little from the
+	   corner so it sits ON the slide, not on its edge. No font-size: it inherits
+	   .content's --base-font like the nav bar, so these read at the same size as the
+	   other in-slide chrome. */
+	.slide-chrome {
 		position: absolute;
-		/* This row lives in CANVAS space (it's a .content child, so it scales/pans
-		   with the slide), but the FITTED control it sits beside is screen-fixed near
-		   the frame top. --layout-top is computed by updateOverlay() from the measured
-		   content position so the two align on the same screen line in any window size
-		   and in either LAYOUT on/off state. Fallback for first paint before measure. */
-		top: var(--layout-top, calc(12px / var(--view-scale, 1)));
-		right: 150px;
-		/* Right-anchored row: LAYOUT, then the dev-only SAVE. The box shrinks to
-		   content and grows leftward, so the right edge stays put. */
+		top: 24px;
+		right: 24px;
+		/* Right-anchored row: LAYOUT, the dev-only SAVE, then PRESENT. The box shrinks to
+		   content, so an absent LAYOUT (viewer, not authoring) just leaves PRESENT. */
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		/* No font-size here: inherit .content's --base-font (already applied one level
-		   up) so this chrome button matches the NAV / ANIMATION buttons. Re-declaring
-		   --base-font here would apply the 1.5em lever twice and render ~1.5x larger. */
-		/* Above the slide surface, but no z-index so later siblings (the slot's
-		   blocks) still paint over it. */
 	}
 	/* Pin the SAVE button's width so its label can swap (SAVE → SAVED / NONE /
 	   ERROR) without nudging the row; the text stays centred in the reserved box. */
-	.layout-ctrl .save-btn :global(button) {
+	.slide-chrome .save-btn :global(button) {
 		min-width: 4.6em;
 	}
 	.content.fill {

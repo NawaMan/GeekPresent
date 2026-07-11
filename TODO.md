@@ -37,6 +37,20 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
     for extras. Demo `steps-component.html`, DOM test `tests/Steps.test.ts` (Space
     build/peel + arrows left free), SSR test `tests/StepsSsr.ssr.test.ts`
     (prerender-visible markup). No new role tokens (reveal is pure opacity/transform).
+- [ ] **Note-driven highlight** — let a `Note` line call attention to a component on the
+      slide as the speaker covers it.
+  - A note line references an on-slide target by name (reuse `Block` `name`-matching + the
+    `stores/blockAnchors.ts` live-box registry that `Connector` already resolves against),
+    e.g. `<li data-highlight="db">Now the query hits the database</li>`.
+  - Activating the line spotlights the named component — a ring/glow/dim-the-rest overlay
+    positioned from the registered box, so it tracks the component even in LAYOUT mode.
+  - Tie the trigger into the existing presenter check-off: covering a line (or a dedicated
+    click/keystroke) fires the highlight; leaving it clears it. Reuse the `checklist`
+    action's per-line plumbing rather than a second line-scanning pass.
+  - Open question: is the highlight **audience-visible** (drawn on the live slide, like a
+    laser pointer) or **presenter-only** (an aid in the console preview)? Likely want both,
+    author-selectable — decide before building.
+
 - [x] **`Connector` / `Arrow`** — auto-routed arrow between two named `Block`s.
   - Turns the `Block` system into a diagramming tool.
   - Reuse `Block` `name`-matching (same mechanism as LAYOUT-mode save) + `Draw` Line/Arc.
@@ -799,7 +813,65 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     static build (`SlideDeck` gates its content behind `initialized`), so the strip
     prerendering is a *Text-artifact* benefit, not a slide one. What SSR-safety buys a
     slide is no mount-time flash. Asserted against `svelte/server`, never a built page.
-- [ ] **`CodeDiff`** — added/removed line styling; extends `Code` `revealLines`.
+- [x] **`CodeDiff`** — added/removed line styling; a before/after code block.
+  - Done: `src/lib/components/CodeDiff.svelte`, with all the diff arithmetic in
+    `src/lib/utils/codeDiffCore.ts` (pure, total — `drawCore`/`videoCore`/`tabsCore`/
+    `qrCore` discipline: a null source, a lone `+`/`-` marker, two versions that share
+    nothing, a 10 000-line paste all yield a sane `DiffLine[]`, never a throw and never
+    an out-of-range read).
+  - **The gap it closes: a slide could show a snippet (`QuickCode`) or a file
+    (`Code`/`CodeBox`), but not a *change*** — the line you added, the line you took
+    out, which a tech talk lives on. Each line gets a `+`/`−` gutter, a green/red wash +
+    accent bar, and optional old/new line numbers.
+  - **NOT a `Code`/Monaco variant — the same call `Terminal` made** (and the reason the
+    TODO's "extends `Code` `revealLines`" was the wrong frame). Monaco is a CDN-loaded
+    language service that re-bootstraps per mount and renders blank after this deck's
+    client-side `goto` (memory `monaco-breaks-on-spa-nav`); a diff wants per-line control
+    and token colours, not a language service. So it is **`QuickCode`-family**: it owns
+    its own row markup and borrows only Shiki's colours — plain DOM + CSS, no deps.
+  - **Two authoring paths, one `DiffLine[]`.** `before`/`after` → the diff is *computed*
+    (`diffLines`, an LCS over lines with a shared head/tail trim so the quadratic core is
+    usually empty, and an `LCS_MAX` guard that degrades a pathological paste to a coarse
+    block-replace rather than allocating a huge matrix — totality never depends on size).
+    Or a git-style `+`/`-`/space-prefixed `diff` string → `parseDiff` (exact control;
+    the marker set is `git diff`'s, minus `@@` hunk headers). A bare `code` prop degrades
+    to an all-context block. **Line numbering is load-bearing** (a wrong old/new number is
+    a lie the audience reads): context advances both counters, an add only the new, a del
+    only the old — asserted on every shape in the unit test.
+  - **Reveal is deferred to `Steps`/`Fragment`, not reinvented.** A CodeDiff is a static
+    block, so the deck's existing reveal machinery drives it; it grows no stepping logic
+    of its own (the `revealLines` idea, done the composable way).
+  - **Shiki by line, not by blob.** New `highlightToLines` in `utils/highlight.ts`
+    (alongside `highlightToHtml`) returns Shiki's tokens grouped *per line* via
+    `codeToTokens`, so the component colours each line's text while wrapping the line in
+    its own diff row. The whole block is highlighted at once (not line-by-line) to keep
+    multi-line grammar context, then zipped back onto the rows under a
+    `tokens.length === lines.length` guard — a mismatch keeps plain text. Like QuickCode
+    it renders **plain text first, then swaps in the colours on mount**, so it is SSR-safe
+    and never flashes.
+    - **The one gotcha, worth recording:** the swap paints through a template that
+      references `tokenLines` **directly** (`{#if tokenLines && tokenLines[i]}`), *not*
+      through a `tokensFor(i)` helper. A function call in the markup hides its reactive
+      dependency from Svelte — the colours computed but never repainted. Caught by the DOM
+      test, which is exactly why it exists.
+  - Sized in `em`, `--codediff-*` role tokens (`add` green / `del` red, mixed toward
+    transparent in-component for the wash + bar so neither needs the surface colour — the
+    `Callout`/`Hint` trick; the screen is a dark code surface like QuickCode; numbers +
+    context sign dimmed from the gutter ink), fallbacks the dark default (light-on-dark).
+    Add/del stay green/red **whatever the theme's ink** — a diff's colours carry meaning,
+    not decoration. LAYOUT-compatible for free — `Block` fills its content, so
+    `<Block><CodeDiff/></Block>` sizes it (the demo parks both bands that way).
+  - Demo `codediff-component.html` (left: `before`/`after` computed, with a `summary`
+    chip; right: an explicit git-style `diff` with line numbers), unit test
+    `tests/codeDiffCore.test.ts` (LCS shapes, numbering, the git-marker convention, all
+    the bad inputs), SSR test `tests/CodeDiffSsr.ssr.test.ts` (the row/class/gutter/number
+    structure the stylesheet reads, and that **no** token colours reach the server), DOM
+    test `tests/CodeDiff.test.ts` (the mount-time plain→colour swap, aligned per line).
+    New `--codediff-*` role tokens.
+  - **The one gotcha** (as with Terminal/Tabs/QRCode): a slide's markup never reaches the
+    static build (`SlideDeck` gates its content behind `initialized`), so the block
+    prerendering is a *Text-artifact* benefit, not a slide one. What SSR-safety buys a
+    slide is no mount-time flash. Asserted against `svelte/server`, never a built page.
 - [x] **`QRCode`** — live scannable link on any slide; generalizes `utils/prepare-youtube.sh`.
   - Done: `src/lib/components/QRCode.svelte`, a thin `<svg>` over
     `src/lib/utils/qrCore.ts` — **a QR encoder written from the spec** (ISO/IEC 18004),

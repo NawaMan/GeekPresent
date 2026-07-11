@@ -6,7 +6,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { getMode, getViewTransitions, getPages } from '$lib/presentation';
 	import { navigate as pageNavigate } from '$lib/utils/deckNav';
-	import { presenterMode, openPresenterWindow, deckKeyFromPath } from '$lib/stores/presenter';
+	import { presenterMode } from '$lib/stores/presenter';
 	import { activeSteps } from '$lib/stores/activeSteps';
 	import { spaceIntent } from '$lib/utils/stepKeys';
 
@@ -51,12 +51,6 @@
 	// in SlideDeck animates identically).
 	function navigate(href: string, direction: Dir) {
 		pageNavigate(decorate(href), { viewTransitions, kind: kindFor(direction), direction });
-	}
-
-	// Open (or focus) the presenter window at the current slide. Runs in the click
-	// handler (a user gesture) so the popup isn't blocked.
-	function openPresenter() {
-		openPresenterWindow(window.location.href, deckKeyFromPath(window.location.pathname));
 	}
 
 	$: onFirst = () => navigate(firstLink, 'back');
@@ -162,9 +156,5 @@
 	<CtrlBtn chrome text="CONTINUE" on:click={doContinue} isDisabled={!canContinue} />
 	<CtrlBtn chrome text="NEXT"     on:click={onNext}     isDisabled={!nextLink} />
 	<CtrlBtn chrome text="LAST"     on:click={onLast}     isDisabled={!lastLink}/>
-	<!-- Open the presenter console. A text label like the other nav buttons (not a
-	     bare ⧉ icon), so it reads clearly at rest. Hidden inside the console itself
-	     ($presenterMode). -->
-	<CtrlBtn chrome text="PRESENT" on:click={openPresenter} isVisible={!$presenterMode} />
 </div>
 {/if}
