@@ -41,7 +41,7 @@
 	import { onMount } from 'svelte';
 	import { displayMode, displayFactor, clampFactor } from '$lib/stores/displayMode';
 	import type { DisplayMode } from '$lib/stores/displayMode';
-	import { layoutMode, canLayout, applyLayoutParam } from '$lib/stores/layoutMode';
+	import { layoutMode, canLayout, canSave, setLayoutOffered, applyLayoutParam } from '$lib/stores/layoutMode';
 	import { saveLayout } from '$lib/stores/layoutSave';
 	import { getViewTransitions } from '$lib/presentation';
 	import {
@@ -118,6 +118,18 @@
 	   disabled there outright. */
 	export let fadeChrome = false;
 
+	/* Offer the LAYOUT authoring control on EVERY slide of this deck, even in a build.
+	   Almost no deck wants this — LAYOUT is off in production by default, and the usual
+	   way to demo it is per-slide: set `layout: true` on the individual pages.ts entries
+	   for the slides that actually teach it (see Page.layout), which is what the /slides
+	   deck does. This deck-wide switch exists for the rare deck that is ENTIRELY about
+	   authoring.
+
+	   Either way it makes LAYOUT *available*, not *active*: the mode still starts off, so
+	   the audience sees a normal slide until the speaker flips it. `vite dev` offers the
+	   control regardless, and a sticky `?layout=off` outranks both (layout/layoutAccessCore). */
+	export let layout = false;
+
 	let viewport:  HTMLElement;
 	let container: HTMLElement;
 	let content:   HTMLElement;
@@ -179,33 +191,78 @@
 	// ITS slide to the shared channel and drag every window onto the preview slide.
 	$: isTopWindow = browser && window.self === window.top;
 	$: if (isTopWindow && currentSlide) publishCurrentSlide(deckKey, currentSlide);
-	// Sticky `?layout` opt-in for the authoring LAYOUT control (see layoutMode).
-	// browser-guarded so url.searchParams is never read during prerender.
+	// Does THIS slide offer LAYOUT? Its own pages.ts `layout` flag, or the deck-wide
+	// `layout` prop. Re-runs on every slide change, so paging off a LAYOUT demo onto an
+	// ordinary slide takes the control away again. The sticky `?layout` flag outranks
+	// both (layout/layoutAccessCore). Browser-guarded so url.searchParams is never read
+	// during prerender.
+	$: slideOffersLayout = pages.find((p) => p.path === currentSlide)?.layout === true;
+	$: layoutOffered = slideOffersLayout || layout;
+	$: if (browser) setLayoutOffered(layoutOffered);
 	$: if (browser) applyLayoutParam($page.url);
 
-	// "Save" writes the slide's moved Blocks back to source — dev only (the
-	// endpoint exists solely under `vite dev`; import.meta.env.DEV compiles this
-	// whole affordance out of a built site). The button's OWN label reports the
-	// outcome (SAVE → SAVED / NONE / ERROR) then reverts, so there's no extra
-	// chrome; a fixed min-width keeps it from jumping as the word changes. Detail
-	// (which tags didn't land, any error) goes to the console.
-	const canSave = import.meta.env.DEV;
+	// On a slide that INVITES you to use LAYOUT, the button is the SUBJECT, not backstage
+	// machinery — so it wears the featured look (filled warm pill) instead of receding
+	// into the chrome like its neighbours. Not when the control merely happens to be
+	// around (dev, or a sticky `?layout` the speaker set three slides ago): there it's a
+	// tool, and a tool that shouts on every slide is just noise.
+	$: featureLayoutBtn = layoutOffered;
+	// …and it pulses only until it is USED. Once LAYOUT is on, the button has done its
+	// job of being found: it drops to CtrlBtn's ordinary selected-green and stops calling
+	// for attention, so the thing the audience now watches is the slide, not the chrome.
+	// The pill geometry is kept in BOTH states, so toggling it doesn't jiggle the row.
+	$: callLayoutBtn = layoutOffered && !$layoutMode;
+
+	// "Save" writes the slide's moved Blocks back to source. It only reaches a source
+	// tree under `vite dev` (the endpoint lives in the dev server — see
+	// layout/devSavePlugin); on a static host there is nothing to rewrite.
+	//
+	// The button looks and behaves like a NORMAL control either way — no pre-emptive
+	// greying-out. Where it can't fire, it says so ON CLICK: the label flips to
+	// NOT ALLOWED and a tooltip explains that saving isn't allowed in this setup. That
+	// ordering is the whole point of a LAYOUT demo. A button disabled from the start
+	// invites the audience to assume the feature is missing or broken; a button that
+	// answers when pressed teaches them that saving is *refused here*, and why — the
+	// deck is static, and there is no source tree behind it to rewrite.
+	//
+	// `$canSave` is a store (not `import.meta.env.DEV` inline) precisely so this refusal
+	// path survives into the build instead of being compiled away.
+	//
+	// Either way the button's OWN label carries the outcome (SAVE → SAVED / NONE / ERROR
+	// / NOT ALLOWED) and then reverts, so there's no extra chrome. Detail (which tags
+	// didn't land, any error) goes to the console.
 	let saveLabel = 'SAVE';
+	let saveRefused = false;
 	let saveTimer: ReturnType<typeof setTimeout> | undefined;
+
+	function flashSave(label: string, ms: number) {
+		saveLabel = label;
+		clearTimeout(saveTimer);
+		saveTimer = setTimeout(() => {
+			saveLabel = 'SAVE';
+			saveRefused = false;
+		}, ms);
+	}
+
 	async function onSave() {
+		if (!$canSave) {
+			// Held longer than a normal outcome flash: this one has a tooltip to read,
+			// and it's the beat the demo is built around.
+			saveRefused = true;
+			flashSave('NOT ALLOWED', 2600);
+			return;
+		}
 		const r = await saveLayout();
 		if (!r.ok) {
-			saveLabel = 'ERROR';
+			flashSave('ERROR', 1600);
 			console.error('[layout save] failed:', r.error);
 		} else if (r.patched === 0 && r.unmatched.length === 0) {
-			saveLabel = 'NONE';
+			flashSave('NONE', 1600);
 		} else {
-			saveLabel = 'SAVED';
+			flashSave('SAVED', 1600);
 			if (r.unmatched.length)
 				console.warn('[layout save] not written — Copy these by hand:', r.unmatched);
 		}
-		clearTimeout(saveTimer);
-		saveTimer = setTimeout(() => (saveLabel = 'SAVE'), 1600);
 	}
 	// Open (or focus) the presenter console at the current slide. Moved here from the
 	// nav bar so PRESENT sits with LAYOUT in the slide's top-right chrome cluster.
@@ -414,21 +471,37 @@
 			     Being a .content child placed BEFORE the slot, the slide's own blocks paint
 			     over it. Hidden by ?clean; PRESENT hides inside the console itself. -->
 			{#if !clean && ($canLayout || !$presenterMode)}
-			<div class="slide-chrome gp-chrome no-print" class:pinned={$layoutMode}>
+			<div
+				class="slide-chrome gp-chrome no-print"
+				class:pinned={$layoutMode}
+				class:featuring={featureLayoutBtn}
+			>
 				{#if $canLayout}
-				<CtrlBtn
-					chrome
-					text="LAYOUT"
-					hoverText={$layoutMode ? 'LAYOUT on' : 'LAYOUT off'}
-					isSelected={$layoutMode}
-					on:click={() => layoutMode.update((v) => !v)}
-				/>
-				<!-- Save is dev-only: it writes moved Blocks back to source via the vite-dev
-				     endpoint. Shown only while LAYOUT is on. The wrapper pins a stable width
-				     so SAVE↔SAVED doesn't shift the row. -->
-				{#if canSave && $layoutMode}
-					<span class="save-btn">
+				<!-- Featured on a slide that invites you to use LAYOUT (its pages.ts `layout`
+				     flag), muted where the control is merely around (dev, a sticky ?layout).
+				     `calling` adds the halo, and lasts only until the button is used. -->
+				<span class="layout-btn" class:featured={featureLayoutBtn} class:calling={callLayoutBtn}>
+					<CtrlBtn
+						chrome
+						text="LAYOUT"
+						hoverText={$layoutMode ? 'LAYOUT on' : 'LAYOUT off'}
+						isSelected={$layoutMode}
+						on:click={() => layoutMode.update((v) => !v)}
+					/>
+				</span>
+				<!-- Save writes moved Blocks back to source via the vite-dev endpoint. Shown
+				     whenever LAYOUT is on, and it looks like an ordinary control in BOTH worlds
+				     — it isn't greyed out where it can't fire. It answers on click instead:
+				     NOT ALLOWED, plus a tooltip saying why. A button disabled from the start
+				     invites the audience to assume the feature is missing or broken; a button
+				     that refuses when pressed teaches them saving is *forbidden here*. -->
+				{#if $layoutMode}
+					<span class="save-btn" class:refused={saveRefused}>
 						<CtrlBtn chrome text={saveLabel} hoverText={saveLabel} on:click={onSave} />
+						{#if saveRefused}
+							<!-- aria-live so the refusal is announced, not just drawn. -->
+							<span class="save-tip" role="status">Save not allowed in this setup.</span>
+						{/if}
 					</span>
 				{/if}
 				{/if}
@@ -597,10 +670,114 @@
 		align-items: center;
 		gap: 8px;
 	}
-	/* Pin the SAVE button's width so its label can swap (SAVE → SAVED / NONE /
-	   ERROR) without nudging the row; the text stays centred in the reserved box. */
+	/* Pin the SAVE button's width so its label can swap (SAVE → SAVED / NONE / ERROR)
+	   without nudging the row; the text stays centred in the reserved box.
+
+	   NOT ALLOWED is far wider than any of those, and reserving room for it would pad
+	   the button with dead space on every slide to spare one transient state a nudge.
+	   So it isn't in the pin: the button grows for the ~2.6s the refusal is up, then
+	   settles. The row moving there is fine — it moves BECAUSE of the click the audience
+	   just watched, so it reads as the answer, not as a glitch. */
 	.slide-chrome .save-btn :global(button) {
 		min-width: 4.6em;
+	}
+	/* The refusal has to be READ from the back of a room, so it doesn't get the muted
+	   chrome grey. Danger red, and the same token the demo slide's own prose uses, so
+	   the words in the chrome and the words on the slide are literally one colour. */
+	.slide-chrome .save-btn.refused :global(button) {
+		color: var(--ctrl-forbidden-fg, #E5484D);
+	}
+	/* The tooltip: why it refused, not just that it did. Anchored under the button and
+	   centred on it; `left: 50%` + translate keeps it centred as the button grows into
+	   the NOT ALLOWED label. Never intercepts the pointer. */
+	.slide-chrome .save-btn {
+		position: relative;
+	}
+	.slide-chrome .save-tip {
+		position: absolute;
+		top: calc(100% + 8px);
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 10;
+		white-space: nowrap;
+		pointer-events: none;
+		padding: 0.3em 0.7em;
+		border-radius: 6px;
+		font-size: 0.72em;
+		font-weight: bold;
+		background: var(--tooltip-bg, #000000);
+		color: var(--tooltip-fg, #FFFFFF);
+		border: 1px solid var(--ctrl-forbidden-fg, #E5484D);
+	}
+	/* ── The featured LAYOUT button ────────────────────────────────────────────────
+	   On a slide that TEACHES layout, this button is the subject of the slide. Two
+	   forces work against it being seen, and both have to be answered:
+
+	   1. The chrome look (--ctrl-fg) is a near-invisible grey on the dark frame — it is
+	      DESIGNED to be missed, which is right for a tool and wrong for a demo.
+	   2. `fadeChrome` (which the /slides deck sets) drops the whole cluster to
+	      opacity 0.12 until pointed at. That multiplies over any colour we pick, so
+	      restyling alone would have left the button a ghost on exactly the slides that
+	      point at it. Hence the exemption below — it is the load-bearing half.
+
+	   So: a filled warm pill, at full opacity, with a halo pulsing out of it until it's
+	   used. Loud on purpose; it only ever appears on the handful of slides that ask for
+	   it by name. */
+
+	/* (2) A featuring slide opts its chrome OUT of the fade entirely. The whole cluster
+	   stays lit, not just LAYOUT: opacity on the parent can't be undone by a child, and
+	   on a slide whose subject IS the chrome, chrome that hides is the wrong default.
+	   Beats the 0.12 rule on specificity (two classes to its one). */
+	.container.fade-chrome :global(.slide-chrome.featuring) {
+		opacity: 1;
+	}
+
+	/* Geometry, applied in BOTH states (warm and selected-green) so toggling LAYOUT
+	   recolours the button without resizing it — the control row never jiggles. The
+	   min-width also absorbs the hover label swap (LAYOUT → "LAYOUT off"). */
+	.slide-chrome .layout-btn.featured :global(button) {
+		margin-left: 0;
+		padding: 0.28em 1.05em;
+		border-radius: 999px;
+		font-size: 1em;
+		letter-spacing: 0.04em;
+		min-width: 7.4em;
+	}
+	/* The colour, only while unselected. Once LAYOUT is on, CtrlBtn's own selected-green
+	   takes over — the button has been found, and green is the right "you are in this
+	   mode" signal. */
+	.slide-chrome .layout-btn.featured :global(button:not(.selected)) {
+		background: var(--ctrl-featured-fg, #F0A33E);
+		color: var(--ctrl-featured-on, #1A1206);
+	}
+
+	/* The halo: a ring expanding out of the button and fading. It rides a pseudo-element
+	   on the WRAPPER rather than a box-shadow on the button, so it needs no alpha colour
+	   (the role tokens are opaque hex by convention) and can't disturb the filled pill. */
+	.slide-chrome .layout-btn {
+		display: inline-flex;
+		position: relative;
+	}
+	.slide-chrome .layout-btn.calling::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: 999px;
+		border: 2px solid var(--ctrl-featured-fg, #F0A33E);
+		pointer-events: none;
+		animation: gp-layout-halo 1.9s ease-out infinite;
+	}
+	@keyframes gp-layout-halo {
+		0%   { transform: scale(1);    opacity: 0.75; }
+		100% { transform: scale(1.5);  opacity: 0;    }
+	}
+	/* Motion is an attention-getter, not information — the pill and its colour already
+	   carry the message, so drop the pulse for anyone who asked for less movement. */
+	@media (prefers-reduced-motion: reduce) {
+		.slide-chrome .layout-btn.calling::after {
+			animation: none;
+			opacity: 0.75;
+		}
 	}
 	.content.fill {
 		/* Exact-fit: the box IS the full canvas (padding folded in via border-box),

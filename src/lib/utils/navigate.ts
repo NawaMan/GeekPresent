@@ -19,6 +19,18 @@ export interface Page {
     /** Optional alt text for this slide's social image; falls back to the deck's
         imageAlt, then a default describing the site card. */
     imageAlt?: string;
+    /** Does this slide OFFER the LAYOUT authoring control in a built site?
+
+        A published deck hides LAYOUT by default. A slide that *demonstrates* it —
+        one whose own prose says "flip LAYOUT and drag this box" — sets this, and the
+        control appears in the chrome (rendered prominently, since on such a slide the
+        button is the point rather than backstage machinery).
+
+        It makes LAYOUT **available, not active**: the mode still starts off, so the
+        audience sees a normal slide until the speaker flips it. `vite dev` offers the
+        control everywhere regardless, and a speaker's sticky `?layout=off` still
+        outranks this. See lib/layout/layoutAccessCore.ts for the precedence. */
+    layout?: boolean;
     /** Optional leave-transition for a View-Transition deck (see setViewTransitions).
         Names the animation used when paging AWAY from this slide — so a slide can be
         animated with the very transition it discusses. NavigationBar exposes it as

@@ -9,6 +9,11 @@ import { defineConfig } from 'vitest/config';
 // vitest.workspace.ts.
 export default defineConfig({
 	plugins: [svelte()],
+	// Same build-time global vite.config.ts injects (see $lib/seo/config.ts) — needed
+	// by anything that renders <SlideDeck>, which pulls in <Seo>.
+	define: {
+		__GEEKPRESENT_SITE_URL__: JSON.stringify('https://example.test')
+	},
 	resolve: {
 		alias: {
 			$lib: new URL('./src/lib', import.meta.url).pathname,

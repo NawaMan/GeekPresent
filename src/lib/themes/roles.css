@@ -45,6 +45,15 @@
 	--ctrl-selected-bg:  var(--ACCENT-2, #00B356);
 	--ctrl-active-shadow:var(--ACCENT, #0056B3);
 	--ctrl-disabled-fg:  var(--INK-DIM, #222222);
+	/* A chrome control the slide WANTS you to press — the LAYOUT button on a slide that
+	   teaches LAYOUT. The chrome look is built to be missed; this one must not be. It is
+	   a FILLED pill, so it needs both the fill and an ink that reads on it (the warm
+	   accent is light, so the ink is near-black rather than the usual --on-accent white). */
+	--ctrl-featured-fg:  var(--ACCENT-WARM, #F0A33E);
+	--ctrl-featured-on:  var(--BACKDROP, #1A1206);
+	/* A control REFUSING, and saying so — SAVE's NOT ALLOWED on a static build. Distinct
+	   from --ctrl-disabled-fg, which recedes; this has to be read from the back of a room. */
+	--ctrl-forbidden-fg: var(--DANGER, #E5484D);
 	--on-accent:         var(--ON-ACCENT, #FFFFFF);
 
 	/* Table of Contents popover */

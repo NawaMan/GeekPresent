@@ -248,11 +248,37 @@ numbers. Wrap the element in a **`Block`** (or **`ImageBlock`** for a picture) a
 turn on **LAYOUT mode** to drag/resize it in the browser, then copy the resulting
 tag — with its final `x`/`y`/`width`/`height` — back into the source by hand.
 
-**LAYOUT mode is an authoring aid, not a viewer feature, and it saves nothing** — it
-only helps you *find* coordinates to paste yourself. It is on by default in
-`pnpm dev`. On a built/deployed site it is OFF, with a deliberate escape hatch:
-append **`?layout`** to any slide URL to enable the control there; **`?layout=off`**
-disables it again. (Both are sticky per browser origin — see the Gotcha.)
+**LAYOUT mode is an authoring aid, not a viewer feature.** It is on by default in
+`pnpm dev`, where **SAVE** writes moved `Block`s straight back into the slide's
+`.svelte` file. **In production it is OFF.** Three things can offer the control,
+highest authority first:
+
+1. **`pnpm dev`** — always, and nothing can take it away.
+2. **`?layout`** on any slide URL — the escape hatch on a built/deployed site;
+   **`?layout=off`** disables it again. (Both sticky per browser origin — see the
+   Gotcha.) The speaker asked, so this outranks the content.
+3. **`layout: true` on the slide's `pages.ts` entry** — a *per-slide* opt-in, so a
+   slide that TEACHES layout can offer the control in the build while the rest of the
+   deck ships LAYOUT-free. Set it on the slides whose prose says "flip LAYOUT and drag
+   this box" — the button must be there when the audience is told to look for it. On
+   such a slide the button is rendered **featured**: a filled warm pill with a halo that
+   pulses until it's used, and the slide's chrome is exempted from `fadeChrome` (which
+   would otherwise hold it at `opacity: 0.12` until pointed at — worth knowing, because
+   it defeats any amount of restyling). There the button is the subject, not backstage
+   machinery. See `layout-mode.html`, and `layout` on `<SlideDeck>` for the rare deck
+   that is entirely about authoring.
+
+Offered is not active: the mode still starts **off**. Precedence lives in
+`src/lib/layout/layoutAccessCore.ts` (pure, unit-tested).
+
+**SAVE cannot follow LAYOUT into a build.** It POSTs to `/__geekpresent/layout-save`,
+an endpoint that exists only inside the vite dev server; a static host has no source
+tree to rewrite. The button is **not** greyed out there — it looks ordinary and
+**refuses on click**: the label flips to `NOT ALLOWED` and a tooltip says *"Save not
+allowed in this setup."* That ordering is the point. A button disabled from the start
+invites the audience to assume the feature is missing or broken; a button that answers
+when pressed teaches them saving is *forbidden here*, and why. **Copy** is the
+write-back path that works everywhere.
 
 1. In the slide's `+page.svelte`, wrap the element:
    ```svelte
