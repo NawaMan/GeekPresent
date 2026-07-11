@@ -348,9 +348,15 @@
 		},
 		get drawEdit() {
 			return drawSecs ? drawApi : null;
+		},
+		get chrome() {
+			return chrome;
 		}
 	};
 	const isSelected = $derived(ctx?.selected === editor);
+	// Selected → Draw renders our `chrome` snippet in its top layer instead, so
+	// we must not also render it inline (select-to-front; see DrawContext).
+	const isHoisted = $derived(ctx?.hoisted === editor);
 	const select = () => ctx?.select(editor);
 	$effect(() => {
 		if (!ctx?.registerShape) return;
@@ -557,10 +563,20 @@
 	{/if}
 
 	{#if editing}
-		<!-- Editing chrome only: hit stroke, endpoint handles, and the bend
-		     handle riding the apex. -->
+		<!-- The hit stroke stays HOME even when selected: it only ever competes
+		     with other shapes' hit strokes, and raising it would seal off the band
+		     where two strokes cross. See Draw's chrome layer. -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<path class="draw-hit" d={baseD} onpointerdown={select} />
+		{#if !isHoisted}{@render chrome()}{/if}
+	{/if}
+</g>
+
+{#snippet chrome()}
+	<!-- Editing chrome: endpoint handles and the bend handle riding the apex —
+	     wrapped so <Draw> can re-parent them whole into its top layer once this
+	     shape is selected (select-to-front). -->
+	<g class="draw-chrome" data-shape={name || 'Arc'}>
 		{#if !(geomAnim && S?.some((s) => s.from))}
 			<DrawHandle selected={isSelected}
 				point={F}
@@ -644,8 +660,8 @@
 				{/if}
 			{/each}
 		{/if}
-	{/if}
-</g>
+	</g>
+{/snippet}
 
 <style>
 	.draw-label {

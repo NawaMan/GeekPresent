@@ -86,6 +86,30 @@
 	let selected = $state.raw<ShapeEditor | null>(null);
 	// Path shapes register on mount (raw for the same identity reason).
 	let editors = $state.raw<ShapeEditor[]>([]);
+
+	// --- Select-to-front: the selected shape's editing chrome (guides +
+	// handles) is re-parented into the top layer below, so its handles are
+	// grabbable wherever they lie — even under a shape drawn after it. SVG has
+	// no z-index, so this re-parenting is the only lever; moving the CHROME
+	// rather than the shape's own <g> raises interaction while leaving the
+	// visible overlap the author drew exactly as authored.
+	//
+	// `frozen` is the hold that makes it safe. A drag that begins on an
+	// UNSELECTED handle selects and grabs in one gesture, and hoisting mid-drag
+	// would re-create the very node under the pointer — dropping its pointer
+	// capture, so a release outside the window is never seen and the drag sticks
+	// to the cursor. So the hoist parks on whatever it showed when the gesture
+	// began and catches up on release; a handle already in hand has no use for
+	// being in front.
+	//
+	// A flag suffices — a second finger landing on another handle cannot strand
+	// it. `trackPointer` listens for pointerup on the WINDOW and filters no
+	// pointerId, so any release tears down every gesture in flight (and Esc
+	// cancels them all likewise). Overlapping drags therefore always end
+	// together: the deck is single-gesture by construction, here as in Block.
+	let gesture = $state(false);
+	let frozen = $state.raw<ShapeEditor | null>(null);
+	const hoisted = $derived(gesture ? frozen : selected);
 	// Box-geometry shapes (Rect/Ellipse) — Draw hosts one editing <Block> per
 	// registration as an HTML sibling of the svg (HTML can't live inside it).
 	let blocks = $state<BlockShapeRegistration[]>([]);
@@ -106,11 +130,30 @@
 		select(editor) {
 			selected = editor;
 		},
+		get hoisted() {
+			return hoisted;
+		},
+		beginGesture() {
+			// Snapshot BEFORE the handle's own select() lands, so the chrome under
+			// the pointer stays exactly where the pointer found it. Only the FIRST
+			// live gesture may snapshot: a second finger landing on another handle
+			// would otherwise re-snapshot to the shape the first grab just selected,
+			// hoisting it mid-drag — re-homing the node under the first pointer,
+			// which is the exact thing the hold exists to prevent.
+			if (!gesture) frozen = selected;
+			gesture = true;
+		},
+		endGesture() {
+			gesture = false;
+		},
 		registerShape(editor) {
 			editors = [...editors, editor];
 			return () => {
 				editors = editors.filter((e) => e.id !== editor.id);
 				if (selected === editor) selected = null;
+				// A shape that unmounts mid-gesture must not keep the hoist pinned
+				// to an editor nobody renders any more.
+				if (frozen === editor) frozen = null;
 			};
 		},
 		registerBlock(shape) {
@@ -300,6 +343,17 @@
 	{#if !decorative && title}<title>{title}</title>{/if}
 	{#if !decorative && description}<desc>{description}</desc>{/if}
 	{@render children?.()}
+	{#if editing && hoisted?.chrome}
+		<!-- The top chrome layer (select-to-front). Last child of the surface, so
+		     the selected shape's guides and handles paint — and hit-test — above
+		     every shape and every other shape's 24px-wide hit stroke. The shape
+		     that owns this chrome renders none of its own inline, so it lives in
+		     exactly one place. Hit strokes deliberately stay put: they only ever
+		     compete with each other, and raising the selected shape's would seal
+		     off the crossing band where a neighbour's stroke is the one you're
+		     trying to click. -->
+		{@render hoisted.chrome()}
+	{/if}
 </svg>
 
 {#if editing}

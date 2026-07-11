@@ -90,6 +90,11 @@
 	function start(event: PointerEvent) {
 		event.preventDefault();
 		event.stopPropagation();
+		// Hold Draw's select-to-front hoist for the length of the gesture BEFORE
+		// selecting: on an unselected shape, onselect() would otherwise re-parent
+		// this very knob into the top chrome layer mid-press, destroying the node
+		// trackPointer is about to capture the pointer on. See DrawContext.
+		ctx?.beginGesture?.();
 		onselect?.();
 		const [sx, sy] = point;
 		let current: Point = [sx, sy];
@@ -106,10 +111,16 @@
 				onmove(p);
 			},
 			onEnd: () => {
+				// trackPointer has already torn its listeners down and released the
+				// capture, so the hoist that lands here can safely re-home this knob.
+				ctx?.endGesture?.();
 				if (current[0] === sx && current[1] === sy) return;
 				oncommit?.([sx, sy], current);
 			},
-			onCancel: () => onmove([sx, sy])
+			onCancel: () => {
+				ctx?.endGesture?.();
+				onmove([sx, sy]);
+			}
 		});
 	}
 </script>

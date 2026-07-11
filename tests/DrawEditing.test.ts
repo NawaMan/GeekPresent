@@ -17,6 +17,17 @@ const moveTo = (clientX: number, clientY: number, init: MouseEventInit = {}) =>
 const release = () => window.dispatchEvent(new MouseEvent('pointerup'));
 const escape = () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
 
+// A shape's editing chrome (guide lines + handles) sits inside its own <g>
+// until the shape is SELECTED — at which point Draw re-parents that chrome into
+// the surface's top layer, so its handles out-rank every other shape's stroke
+// and handles (select-to-front; SVG has no z-index). Chrome is therefore
+// addressed by its OWNER, never by where it currently sits: the wrapper carries
+// data-shape and matches in either home.
+const handlesOf = (c: HTMLElement, shape: string, kind = '') =>
+	c.querySelectorAll(`g.draw-chrome[data-shape="${shape}"] circle.draw-handle${kind}`);
+const guidesOf = (c: HTMLElement, shape: string) =>
+	c.querySelectorAll(`g.draw-chrome[data-shape="${shape}"] .draw-guide`);
+
 // jsdom has no PointerEvent and fireEvent.pointerDown drops the coordinates;
 // a bubbling MouseEvent with a pointerId reaches Svelte's delegated handler
 // with everything trackPointer reads.
@@ -124,8 +135,7 @@ describe('Line editing (LAYOUT mode)', () => {
 		layoutMode.set(false);
 	});
 
-	const handles = (c: HTMLElement) =>
-		c.querySelector('g.draw-line')!.querySelectorAll('circle.draw-handle');
+	const handles = (c: HTMLElement) => handlesOf(c, 'main');
 	const mainPath = (c: HTMLElement) =>
 		c.querySelector('g.draw-line path:not(.draw-hit):not(.draw-selglow)')!;
 
@@ -207,10 +217,9 @@ describe('Curve editing (LAYOUT mode)', () => {
 
 	it('renders endpoint + control handles and guide lines while editing', () => {
 		const { container } = render(DrawEditHost);
-		const g = curveG(container);
-		expect(g.querySelectorAll('circle.draw-handle')).toHaveLength(4); // from, to, c1, c2
-		expect(g.querySelectorAll('circle.draw-handle.control')).toHaveLength(2);
-		const guides = g.querySelectorAll('.draw-guide');
+		expect(handlesOf(container, 'hop')).toHaveLength(4); // from, to, c1, c2
+		expect(handlesOf(container, 'hop', '.control')).toHaveLength(2);
+		const guides = guidesOf(container, 'hop');
 		expect(guides).toHaveLength(2);
 		expect(guides[0].getAttribute('d')).toBe('M 200 200 L 100 300'); // c1 → from
 		expect(guides[1].getAttribute('d')).toBe('M 400 200 L 500 300'); // c2 → to
@@ -219,21 +228,20 @@ describe('Curve editing (LAYOUT mode)', () => {
 	it('guide lines and handles never render outside LAYOUT mode', async () => {
 		layoutMode.set(false);
 		const { container } = render(DrawEditHost);
-		const g = curveG(container);
-		expect(g.querySelectorAll('.draw-guide')).toHaveLength(0);
-		expect(g.querySelectorAll('circle.draw-handle')).toHaveLength(0);
+		expect(guidesOf(container, 'hop')).toHaveLength(0);
+		expect(handlesOf(container, 'hop')).toHaveLength(0);
 	});
 
 	it('dragging a control point reshapes the curve and its guide; undo restores', async () => {
 		const { container } = render(DrawEditHost);
 		const g = curveG(container);
-		const c1Handle = g.querySelectorAll('circle.draw-handle.control')[0];
-		await grab(c1Handle);
+		await grab(handlesOf(container, 'hop', '.control')[0]);
 		moveTo(50, -100);
 		release();
 		await tick();
 		expect(g.querySelector('path')!.getAttribute('d')).toBe('M 100 300 C 250 100 400 200 500 300');
-		expect(g.querySelectorAll('.draw-guide')[0].getAttribute('d')).toBe('M 250 100 L 100 300');
+		// the drag selected the curve, so its guides now live in Draw's top layer
+		expect(guidesOf(container, 'hop')[0].getAttribute('d')).toBe('M 250 100 L 100 300');
 
 		undo();
 		await tick();
@@ -253,7 +261,7 @@ describe('animated-Line stop editing (LAYOUT mode)', () => {
 
 	// the host's animated line is the second g.draw-line
 	const beamG = (c: HTMLElement) => c.querySelectorAll('g.draw-line')[1];
-	const beamHandles = (c: HTMLElement) => beamG(c).querySelectorAll('circle.draw-handle');
+	const beamHandles = (c: HTMLElement) => handlesOf(c, 'beam');
 
 	it('shows a handle per stop position and hides the base handle for the animated point', () => {
 		const { container } = render(DrawEditHost);
@@ -607,9 +615,8 @@ describe('Arc editing (LAYOUT mode)', () => {
 
 	it('renders endpoint handles plus one bend handle at the apex', () => {
 		const { container } = render(DrawEditHost);
-		const g = arcG(container);
-		expect(g.querySelectorAll('circle.draw-handle')).toHaveLength(3);
-		const bendHandle = g.querySelector('circle.draw-handle.bend')!;
+		expect(handlesOf(container, 'loop')).toHaveLength(3);
+		const bendHandle = handlesOf(container, 'loop', '.bend')[0];
 		// arc [100,500]→[500,500] bend 0.25: apex at [300, 500 − 0.25·400]
 		expect(bendHandle.getAttribute('cx')).toBe('300');
 		expect(bendHandle.getAttribute('cy')).toBe('400');
@@ -618,14 +625,15 @@ describe('Arc editing (LAYOUT mode)', () => {
 	it('dragging the bend handle across the chord flips the sign of bend', async () => {
 		const { container } = render(DrawEditHost);
 		const g = arcG(container);
-		await grab(g.querySelector('circle.draw-handle.bend')!);
+		await grab(handlesOf(container, 'loop', '.bend')[0]);
 		moveTo(0, 200); // from apex [300,400] down to [300,600] — 100 past the chord
 		release();
 		await tick();
 		// bend −0.25 → sweep flag flips from 1 to 0, same radius
 		expect(g.querySelector('path')!.getAttribute('d')).toContain(' 0 0 0 500 500');
-		// and the handle re-rendered on the new apex, below the chord
-		expect(g.querySelector('circle.draw-handle.bend')!.getAttribute('cy')).toBe('600');
+		// and the handle re-rendered on the new apex, below the chord (the drag
+		// selected the arc, so its chrome is now in Draw's top layer)
+		expect(handlesOf(container, 'loop', '.bend')[0].getAttribute('cy')).toBe('600');
 
 		undo();
 		await tick();
@@ -782,9 +790,7 @@ describe('selection + Copy toolbar (LAYOUT mode)', () => {
 		});
 		const { container } = render(DrawEditHost);
 		// drag the line's from-handle by (30, 50) — this also selects the shape
-		const fromHandle = container
-			.querySelector('g.draw-line')!
-			.querySelectorAll('circle.draw-handle')[0];
+		const fromHandle = handlesOf(container, 'main')[0];
 		await grab(fromHandle);
 		moveTo(30, 50);
 		release();
@@ -872,9 +878,7 @@ describe('selection + Copy toolbar (LAYOUT mode)', () => {
 		await tick();
 
 		// drag the line's from-handle…
-		const fromHandle = container
-			.querySelector('g.draw-line')!
-			.querySelectorAll('circle.draw-handle')[0];
+		const fromHandle = handlesOf(container, 'main')[0];
 		await grab(fromHandle);
 		moveTo(30, 50);
 		release();
@@ -1041,12 +1045,11 @@ describe('Path editing (LAYOUT mode)', () => {
 
 	it('renders one handle per vertex — start, each `to`, controls, and arc bend', () => {
 		const { container } = render(DrawEditHost);
-		const g = pathG(container);
 		// start + seg0.to + seg1.to + seg1.c1 + seg2.to + seg2.bend
-		expect(g.querySelectorAll('circle.draw-handle')).toHaveLength(6);
-		expect(g.querySelectorAll('circle.draw-handle.control')).toHaveLength(1); // the curve's c1
-		expect(g.querySelectorAll('circle.draw-handle.bend')).toHaveLength(1); // the arc's apex
-		const guides = g.querySelectorAll('.draw-guide');
+		expect(handlesOf(container, 'route')).toHaveLength(6);
+		expect(handlesOf(container, 'route', '.control')).toHaveLength(1); // the curve's c1
+		expect(handlesOf(container, 'route', '.bend')).toHaveLength(1); // the arc's apex
+		const guides = guidesOf(container, 'route');
 		expect(guides).toHaveLength(2); // c1 → from, c1 → to (the quadratic segment)
 		expect(guides[0].getAttribute('d')).toBe('M 1000 700 L 900 700');
 		expect(guides[1].getAttribute('d')).toBe('M 1000 700 L 1100 600');
@@ -1055,15 +1058,14 @@ describe('Path editing (LAYOUT mode)', () => {
 	it('handles and guides never render outside LAYOUT mode', () => {
 		layoutMode.set(false);
 		const { container } = render(DrawEditHost);
-		const g = pathG(container);
-		expect(g.querySelectorAll('circle.draw-handle')).toHaveLength(0);
-		expect(g.querySelectorAll('.draw-guide')).toHaveLength(0);
-		expect(g.querySelector('.draw-hit')).toBeNull();
+		expect(handlesOf(container, 'route')).toHaveLength(0);
+		expect(guidesOf(container, 'route')).toHaveLength(0);
+		expect(pathG(container).querySelector('.draw-hit')).toBeNull();
 	});
 
 	it('dragging the start point re-chains the whole stroke; undo restores', async () => {
 		const { container } = render(DrawEditHost);
-		const startHandle = pathG(container).querySelectorAll('circle.draw-handle')[0];
+		const startHandle = handlesOf(container, 'route')[0];
 		expect(startHandle.getAttribute('cx')).toBe('700'); // the start vertex
 		await grab(startHandle);
 		moveTo(20, -30);
@@ -1080,7 +1082,7 @@ describe('Path editing (LAYOUT mode)', () => {
 		const writeText = vi.fn().mockResolvedValue(undefined);
 		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
 		const { container } = render(DrawEditHost);
-		await grab(pathG(container).querySelectorAll('circle.draw-handle')[0]); // start, also selects
+		await grab(handlesOf(container, 'route')[0]); // start, also selects
 		moveTo(20, -30);
 		release();
 		await tick();
@@ -1126,7 +1128,7 @@ describe('Path editing (LAYOUT mode)', () => {
 		const writeText = vi.fn().mockResolvedValue(undefined);
 		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
 		const { container } = render(DrawEditHost);
-		const bendHandle = pathG(container).querySelector('circle.draw-handle.bend')!;
+		const bendHandle = handlesOf(container, 'route', '.bend')[0];
 		// apex of arc from[1100,600]→to[1300,600] bend 0.4: midpoint [1200,600]
 		// offset up by the sagitta (80) → [1200, 520].
 		expect(bendHandle.getAttribute('cx')).toBe('1200');
@@ -1163,8 +1165,8 @@ describe('animated-Path stop editing (LAYOUT mode)', () => {
 		const g = morphG(container);
 		expect(g.querySelector('style')!.textContent).toContain('@keyframes draw-move-');
 		// 2 stops × (start + 2 segment `to`s) = 6; the later (100%) stop's are hollow.
-		expect(g.querySelectorAll('circle.draw-handle')).toHaveLength(6);
-		expect(g.querySelectorAll('circle.draw-handle.control')).toHaveLength(3);
+		expect(handlesOf(container, 'morph')).toHaveLength(6);
+		expect(handlesOf(container, 'morph', '.control')).toHaveLength(3);
 	});
 
 	it('Copy round-trips the stops + animate; a stop drag rewrites its pose (undo restores)', async () => {
@@ -1172,7 +1174,7 @@ describe('animated-Path stop editing (LAYOUT mode)', () => {
 		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
 		const { container } = render(DrawEditHost);
 		// drag the 100% stop's start handle (a hollow handle at [700,900]) up-left
-		const handle = morphG(container).querySelectorAll('circle.draw-handle')[3];
+		const handle = handlesOf(container, 'morph')[3];
 		await grab(handle);
 		moveTo(20, -30);
 		release();

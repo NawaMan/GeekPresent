@@ -398,9 +398,15 @@
 		},
 		get drawEdit() {
 			return drawSecs ? drawApi : null;
+		},
+		get chrome() {
+			return chrome;
 		}
 	};
 	const isSelected = $derived(ctx?.selected === editor);
+	// Selected → Draw renders our `chrome` snippet in its top layer instead, so
+	// we must not also render it inline (select-to-front; see DrawContext).
+	const isHoisted = $derived(ctx?.hoisted === editor);
 	const select = () => ctx?.select(editor);
 	$effect(() => {
 		if (!ctx?.registerShape) return;
@@ -642,179 +648,190 @@
 		{/if}
 
 		{#if editing}
-			<!-- Editing chrome only (never in published output). -->
+			<!-- The hit stroke stays HOME even when selected: it only ever competes
+			     with other shapes' hit strokes, and raising it would seal off the band
+			     where two strokes cross. See Draw's chrome layer. -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<path class="draw-hit" d={baseD} onpointerdown={select} />
-			{#if !geomAnim}
-				<!-- Static handles: one per vertex — start, each `to`, controls, and
-				     an accent bend handle at each arc's apex. -->
-				{#if showStart}
-					<DrawHandle
-						selected={isSelected}
-						point={START}
-						{grid}
-						title="start · Shift = H/V/45°"
-						shiftSnap={(p) => snapToAngles(p, shapes[0].to)}
-						onselect={select}
-						onmove={(p) => setStart(p)}
-						oncommit={(b, a) => commitStart(b, a)}
-					/>
-				{/if}
-				{#if editable}
-					{#each shapes as shape, i (i)}
-						{@const seg = SEGS[i]}
-						{#if shape.kind === 'quadratic'}
-							<path class="draw-guide" d={linePath(shape.c1, shape.from)} />
-							<path class="draw-guide" d={linePath(shape.c1, shape.to)} />
-						{:else if shape.kind === 'cubic'}
-							<path class="draw-guide" d={linePath(shape.c1, shape.from)} />
-							<path class="draw-guide" d={linePath(shape.c2, shape.to)} />
-						{/if}
-						{#if seg.from}
-							<DrawHandle
-								selected={isSelected}
-								point={shape.from}
-								{grid}
-								title={`segment ${i + 1} · from (sub-path) · Shift = H/V/45°`}
-								shiftSnap={(p) => snapToAngles(p, shape.to)}
-								onselect={select}
-								onmove={(p) => setSeg(i, 'from', p)}
-								oncommit={(b, a) => commitSeg(i, 'from', b, a)}
-							/>
-						{/if}
-						<DrawHandle
-							selected={isSelected}
-							point={shape.to}
-							{grid}
-							title={`segment ${i + 1} · to · Shift = H/V/45°`}
-							shiftSnap={(p) => snapToAngles(p, shape.from)}
-							onselect={select}
-							onmove={(p) => setSeg(i, 'to', p)}
-							oncommit={(b, a) => commitSeg(i, 'to', b, a)}
-						/>
-						{#if shape.kind === 'quadratic' || shape.kind === 'cubic'}
-							<DrawHandle
-								selected={isSelected}
-								point={shape.c1}
-								{grid}
-								kind="control"
-								title={`segment ${i + 1} · c1`}
-								onselect={select}
-								onmove={(p) => setSeg(i, 'c1', p)}
-								oncommit={(b, a) => commitSeg(i, 'c1', b, a)}
-							/>
-						{/if}
-						{#if shape.kind === 'cubic'}
-							<DrawHandle
-								selected={isSelected}
-								point={shape.c2}
-								{grid}
-								kind="control"
-								title={`segment ${i + 1} · c2`}
-								onselect={select}
-								onmove={(p) => setSeg(i, 'c2', p)}
-								oncommit={(b, a) => commitSeg(i, 'c2', b, a)}
-							/>
-						{/if}
-						{#if shape.kind === 'arc'}
-							<DrawHandle
-								selected={isSelected}
-								point={pointAt(shape, 0.5)}
-								kind="bend"
-								title={`segment ${i + 1} · bend · drag across the chord to flip`}
-								onselect={select}
-								onmove={(p) => setSegBend(i, bendFromApex(shape.from, shape.to, p))}
-								oncommit={(b, a) =>
-									commitSegBend(i, bendFromApex(shape.from, shape.to, b), bendFromApex(shape.from, shape.to, a))}
-							/>
-						{/if}
-					{/each}
-				{/if}
-			{:else if S}
-				<!-- Animated: one handle set per stop pose. The lowest-pct stop is
-				     the solid "base pose" (kept synced to start/segments); later
-				     stops are hollow, timeline-styled (dashed before the playhead). -->
-				{#each S as s, i (i)}
-					{#if hasGeom(s)}
-						{@const pose = poseShapes(s)}
-						{@const solid = i === lowestGeomStop}
-						{@const kind = solid ? 'point' : 'control'}
-						<DrawHandle
-							selected={isSelected}
-							point={poseStart(s)}
-							{grid}
-							{kind}
-							pct={clampPct(s.pct)}
-							{playhead}
-							title={`start · ${clampPct(s.pct)}%`}
-							onselect={select}
-							onmove={(p) => setStopStart(i, p, solid)}
-							oncommit={(b, a) => commitStopStart(i, solid, b, a)}
-						/>
-						{#if pose.length === poseSegs(s).length}
-							{#each pose as shape, j (j)}
-								<DrawHandle
-									selected={isSelected}
-									point={shape.to}
-									{grid}
-									{kind}
-									pct={clampPct(s.pct)}
-									{playhead}
-									title={`segment ${j + 1} · to · ${clampPct(s.pct)}%`}
-									onselect={select}
-									onmove={(p) => setStopSeg(i, j, 'to', p, solid)}
-									oncommit={(b, a) => commitStopSeg(i, j, 'to', solid, b, a)}
-								/>
-								{#if shape.kind === 'quadratic' || shape.kind === 'cubic'}
-									<DrawHandle
-										selected={isSelected}
-										point={shape.c1}
-										{grid}
-										kind="control"
-										pct={clampPct(s.pct)}
-										{playhead}
-										title={`segment ${j + 1} · c1 · ${clampPct(s.pct)}%`}
-										onselect={select}
-										onmove={(p) => setStopSeg(i, j, 'c1', p, solid)}
-										oncommit={(b, a) => commitStopSeg(i, j, 'c1', solid, b, a)}
-									/>
-								{/if}
-								{#if shape.kind === 'cubic'}
-									<DrawHandle
-										selected={isSelected}
-										point={shape.c2}
-										{grid}
-										kind="control"
-										pct={clampPct(s.pct)}
-										{playhead}
-										title={`segment ${j + 1} · c2 · ${clampPct(s.pct)}%`}
-										onselect={select}
-										onmove={(p) => setStopSeg(i, j, 'c2', p, solid)}
-										oncommit={(b, a) => commitStopSeg(i, j, 'c2', solid, b, a)}
-									/>
-								{/if}
-								{#if shape.kind === 'arc'}
-									<DrawHandle
-										selected={isSelected}
-										point={pointAt(shape, 0.5)}
-										kind="bend"
-										pct={clampPct(s.pct)}
-										{playhead}
-										title={`segment ${j + 1} · bend · ${clampPct(s.pct)}%`}
-										onselect={select}
-										onmove={(p) => setStopSegBend(i, j, bendFromApex(shape.from, shape.to, p), solid)}
-										oncommit={(b, a) =>
-											commitStopSegBend(i, j, solid, bendFromApex(shape.from, shape.to, b), bendFromApex(shape.from, shape.to, a))}
-									/>
-								{/if}
-							{/each}
-						{/if}
-					{/if}
-				{/each}
-			{/if}
+			{#if !isHoisted}{@render chrome()}{/if}
 		{/if}
 	</g>
 {/if}
+
+{#snippet chrome()}
+	<!-- Editing chrome (never in published output): guide lines and one handle
+	     per vertex — wrapped so <Draw> can re-parent them whole into its top
+	     layer once this shape is selected (select-to-front). -->
+	<g class="draw-chrome" data-shape={name || 'Path'}>
+		{#if !geomAnim}
+			<!-- Static handles: one per vertex — start, each `to`, controls, and
+			     an accent bend handle at each arc's apex. -->
+			{#if showStart}
+				<DrawHandle
+					selected={isSelected}
+					point={START}
+					{grid}
+					title="start · Shift = H/V/45°"
+					shiftSnap={(p) => snapToAngles(p, shapes[0].to)}
+					onselect={select}
+					onmove={(p) => setStart(p)}
+					oncommit={(b, a) => commitStart(b, a)}
+				/>
+			{/if}
+			{#if editable}
+				{#each shapes as shape, i (i)}
+					{@const seg = SEGS[i]}
+					{#if shape.kind === 'quadratic'}
+						<path class="draw-guide" d={linePath(shape.c1, shape.from)} />
+						<path class="draw-guide" d={linePath(shape.c1, shape.to)} />
+					{:else if shape.kind === 'cubic'}
+						<path class="draw-guide" d={linePath(shape.c1, shape.from)} />
+						<path class="draw-guide" d={linePath(shape.c2, shape.to)} />
+					{/if}
+					{#if seg.from}
+						<DrawHandle
+							selected={isSelected}
+							point={shape.from}
+							{grid}
+							title={`segment ${i + 1} · from (sub-path) · Shift = H/V/45°`}
+							shiftSnap={(p) => snapToAngles(p, shape.to)}
+							onselect={select}
+							onmove={(p) => setSeg(i, 'from', p)}
+							oncommit={(b, a) => commitSeg(i, 'from', b, a)}
+						/>
+					{/if}
+					<DrawHandle
+						selected={isSelected}
+						point={shape.to}
+						{grid}
+						title={`segment ${i + 1} · to · Shift = H/V/45°`}
+						shiftSnap={(p) => snapToAngles(p, shape.from)}
+						onselect={select}
+						onmove={(p) => setSeg(i, 'to', p)}
+						oncommit={(b, a) => commitSeg(i, 'to', b, a)}
+					/>
+					{#if shape.kind === 'quadratic' || shape.kind === 'cubic'}
+						<DrawHandle
+							selected={isSelected}
+							point={shape.c1}
+							{grid}
+							kind="control"
+							title={`segment ${i + 1} · c1`}
+							onselect={select}
+							onmove={(p) => setSeg(i, 'c1', p)}
+							oncommit={(b, a) => commitSeg(i, 'c1', b, a)}
+						/>
+					{/if}
+					{#if shape.kind === 'cubic'}
+						<DrawHandle
+							selected={isSelected}
+							point={shape.c2}
+							{grid}
+							kind="control"
+							title={`segment ${i + 1} · c2`}
+							onselect={select}
+							onmove={(p) => setSeg(i, 'c2', p)}
+							oncommit={(b, a) => commitSeg(i, 'c2', b, a)}
+						/>
+					{/if}
+					{#if shape.kind === 'arc'}
+						<DrawHandle
+							selected={isSelected}
+							point={pointAt(shape, 0.5)}
+							kind="bend"
+							title={`segment ${i + 1} · bend · drag across the chord to flip`}
+							onselect={select}
+							onmove={(p) => setSegBend(i, bendFromApex(shape.from, shape.to, p))}
+							oncommit={(b, a) =>
+								commitSegBend(i, bendFromApex(shape.from, shape.to, b), bendFromApex(shape.from, shape.to, a))}
+						/>
+					{/if}
+				{/each}
+			{/if}
+		{:else if S}
+			<!-- Animated: one handle set per stop pose. The lowest-pct stop is
+			     the solid "base pose" (kept synced to start/segments); later
+			     stops are hollow, timeline-styled (dashed before the playhead). -->
+			{#each S as s, i (i)}
+				{#if hasGeom(s)}
+					{@const pose = poseShapes(s)}
+					{@const solid = i === lowestGeomStop}
+					{@const kind = solid ? 'point' : 'control'}
+					<DrawHandle
+						selected={isSelected}
+						point={poseStart(s)}
+						{grid}
+						{kind}
+						pct={clampPct(s.pct)}
+						{playhead}
+						title={`start · ${clampPct(s.pct)}%`}
+						onselect={select}
+						onmove={(p) => setStopStart(i, p, solid)}
+						oncommit={(b, a) => commitStopStart(i, solid, b, a)}
+					/>
+					{#if pose.length === poseSegs(s).length}
+						{#each pose as shape, j (j)}
+							<DrawHandle
+								selected={isSelected}
+								point={shape.to}
+								{grid}
+								{kind}
+								pct={clampPct(s.pct)}
+								{playhead}
+								title={`segment ${j + 1} · to · ${clampPct(s.pct)}%`}
+								onselect={select}
+								onmove={(p) => setStopSeg(i, j, 'to', p, solid)}
+								oncommit={(b, a) => commitStopSeg(i, j, 'to', solid, b, a)}
+							/>
+							{#if shape.kind === 'quadratic' || shape.kind === 'cubic'}
+								<DrawHandle
+									selected={isSelected}
+									point={shape.c1}
+									{grid}
+									kind="control"
+									pct={clampPct(s.pct)}
+									{playhead}
+									title={`segment ${j + 1} · c1 · ${clampPct(s.pct)}%`}
+									onselect={select}
+									onmove={(p) => setStopSeg(i, j, 'c1', p, solid)}
+									oncommit={(b, a) => commitStopSeg(i, j, 'c1', solid, b, a)}
+								/>
+							{/if}
+							{#if shape.kind === 'cubic'}
+								<DrawHandle
+									selected={isSelected}
+									point={shape.c2}
+									{grid}
+									kind="control"
+									pct={clampPct(s.pct)}
+									{playhead}
+									title={`segment ${j + 1} · c2 · ${clampPct(s.pct)}%`}
+									onselect={select}
+									onmove={(p) => setStopSeg(i, j, 'c2', p, solid)}
+									oncommit={(b, a) => commitStopSeg(i, j, 'c2', solid, b, a)}
+								/>
+							{/if}
+							{#if shape.kind === 'arc'}
+								<DrawHandle
+									selected={isSelected}
+									point={pointAt(shape, 0.5)}
+									kind="bend"
+									pct={clampPct(s.pct)}
+									{playhead}
+									title={`segment ${j + 1} · bend · ${clampPct(s.pct)}%`}
+									onselect={select}
+									onmove={(p) => setStopSegBend(i, j, bendFromApex(shape.from, shape.to, p), solid)}
+									oncommit={(b, a) =>
+										commitStopSegBend(i, j, solid, bendFromApex(shape.from, shape.to, b), bendFromApex(shape.from, shape.to, a))}
+								/>
+							{/if}
+						{/each}
+					{/if}
+				{/if}
+			{/each}
+		{/if}
+	</g>
+{/snippet}
 
 <style>
 	.draw-label {

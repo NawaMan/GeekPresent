@@ -61,7 +61,8 @@ Read the `README.md` first for the user-facing overview. This file is the *opera
   plus framework-internal `Copyright`, `CtrlBtn`,
   `NavigationBar`, `TableOfContent`, `SizeMode`, `Seo` (renders SEO/social metadata
   into `<svelte:head>` — see the SEO note under *Gotchas*).
-- Package manager is **pnpm** (`pnpm dev` / `build` / `deploy`). Dev server: `http://localhost:5173`.
+- Package manager is **pnpm** (`pnpm dev` / `build` / `deploy`). The **user** runs the dev server —
+  `http://localhost:31173` by default — not you (Rule 6).
 
 ## Two kinds of artifact: presentations and texts
 
@@ -124,9 +125,18 @@ linking to the sample Text (`/text.html`) and the two presentations.
    respect any base path — hardcoded `/foo.png` breaks under a subpath deploy.
 5. **The presentation folder(s) under `src/routes/` are the source of truth** (`slides/` is the
    default one). There is no `example/` folder anymore; don't recreate one.
-6. **Verify before declaring done.** Run `pnpm dev` and load the affected slide
-   (`/slides/<name>.html`); screenshot if you can. The build is static, so also sanity-check it isn't
-   relying on any server feature.
+6. **The user runs the dev server — you don't.** The user keeps `pnpm dev` running themselves, on
+   **port 31173** by default. Never start, restart, or kill it. To see how a change looks, *ask the
+   user* to load the page (`http://localhost:31173/slides/<name>.html`) and tell you what they see.
+   What you *can* do unprompted: a static build
+   (`npm_config_verify_deps_before_run=false pnpm exec vite build`) and the tests (`pnpm test`) —
+   those don't touch the dev server.
+7. **Verify before declaring done.** Cover the change with a test (`tests/*.test.ts`, or
+   `tests/*.ssr.test.ts` for prerender behavior) and/or have the user check the slide in dev. The
+   build is static, so also sanity-check it isn't relying on any server feature.
+8. **Never commit unless the user explicitly says so.** Leave your work in the working tree. Don't
+   `git add`, `git commit`, `git push`, or create branches on your own initiative — "the change is
+   done" is not permission to commit it. When the user asks for a commit message, use `/commit-msg`.
 
 ---
 
@@ -150,7 +160,7 @@ linking to the sample Text (`/text.html`) and the two presentations.
    ];
    ```
 5. Remove now-orphaned colocated assets from the deleted folders.
-6. Run `pnpm dev` and confirm both slides load and nav works.
+6. Ask the user to open both slides in their dev server and confirm they load and nav works.
 
 ### "Add a new slide"
 
@@ -258,7 +268,7 @@ disables it again. (Both are sticky per browser origin — see the Gotcha.)
    ```svelte
    <ImageBlock src={photo} alt="…" x={760} y={560} width={320} height={320} />
    ```
-2. Run `pnpm dev` and open the slide. The **SizeMode** control (top-right) now shows
+2. Have the user open the slide in their dev server. The **SizeMode** control (top-right) now shows
    a LAYOUT toggle — turn it on. A dashed outline appears around each `Block`.
 3. **Drag** the body to move, **drag the bottom-right grip** to resize. Snap to a
    grid with the `grid` prop; hold **Alt** to break an aspect lock; **Esc** cancels

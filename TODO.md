@@ -37,6 +37,36 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
     for extras. Demo `steps-component.html`, DOM test `tests/Steps.test.ts` (Space
     build/peel + arrows left free), SSR test `tests/StepsSsr.ssr.test.ts`
     (prerender-visible markup). No new role tokens (reveal is pure opacity/transform).
+- [ ] **`AppendixPage`** — a side page any slide can jump *into* and then return *from*,
+      landing back where it was called. A slide as a **function call**, not a destination.
+  - Use case: the deep-dive a talk only sometimes needs — a proof, a full API table, a
+    backup demo. Today linking to one strands you: the deck's forward march resumes from
+    the appendix, not from the slide that asked the question.
+  - The return address rides in a **query parameter**
+    (`/slides/appendix-gc?return=heap-layout`), so it survives reload and needs no store —
+    the page reads it and renders a RETURN affordance (plus a key binding) back to the
+    caller. Degrade gracefully when the param is absent (direct link, TOC entry): no return
+    affordance, or fall back to the deck index.
+  - Open questions: should an appendix sit **outside the deck's linear order** (skipped by
+    →/Space, hidden from the TOC) so a straight run-through never wanders into it? Does the
+    caller's build state (`Steps` fragments already revealed) need restoring on return, or
+    is landing on the slide enough? Can an appendix call an appendix (nesting)?
+  - Nothing new to depend on; the appendix's own route dir still needs its `+layout.js` with
+    `trailingSlash: 'never'`, same as any slide.
+
+- [ ] **State demo slide** — a worked example of how a deck carries state: query parameters,
+      `localStorage`, and the deck's own stores.
+  - Motivation: the mechanisms are all in the codebase already but scattered and implicit —
+    `presenter` persists check-offs to `localStorage`, `displayMode` is a store, `?present`
+    is a query param, and `AppendixPage` (above) will thread a return address through the
+    URL. Nothing *shows an author* how to reach for any of it.
+  - Make the demo slide itself stateful (a counter that survives reload, a `?…=` param that
+    changes what renders), so the slide **is** the documentation — the same trick
+    `content-header.html` and `videopage-component.html` already play.
+  - Spell out the boundary: what is safe during **SSR/prerender** (no `window`, no
+    `localStorage` — guard with `browser`) versus what must wait for the client. That is the
+    part authors get wrong, and it fails the build rather than degrading at runtime.
+
 - [x] **Note-driven highlight** — let a `Note` line call attention to a component on the
       slide as the speaker covers it.
   - A note line references an on-slide target by name (reuse `Block` `name`-matching + the
@@ -1125,6 +1155,30 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
 
 ## Authoring / LAYOUT mode
 
+- [ ] **LAYOUT visible in production (demo mode)** — let a deployed deck *show* LAYOUT so a
+      talk can demonstrate the authoring workflow live, with SAVE reading **NOT ALLOWED**.
+  - Half of this exists: `canLayout` (`stores/layoutMode.ts`) is already true in `vite dev`
+    and opt-in-able on a built site via the sticky `?layout` flag. What's missing is a way to
+    ship a deck with it **on by default** — a build/deck-level option, not a URL flag the
+    speaker must remember to type on stage.
+  - SAVE is the real work. Today `canSave = import.meta.env.DEV` (`SlideDeck.svelte:192`)
+    and the button is simply **not rendered** in a build — so a production LAYOUT demo shows
+    a mode with a hole where its payoff should be. Instead render SAVE **disabled**, labelled
+    **`NOT ALLOWED`**, so the audience sees the affordance and immediately understands why it
+    can't fire here: `saveLayout()` POSTs to `/__geekpresent/layout-save`, a *vite-dev-server*
+    endpoint (`layout/devSavePlugin.ts`) that rewrites the slide's Svelte source. There is no
+    source tree to rewrite on a static host — this is a genuine boundary, not a lock to pick.
+  - `NOT ALLOWED`, not `NO SAVE`: the point is that saving is *forbidden here*, which is what
+    the demo is teaching. "NO SAVE" only reports that it's absent, and leaves the audience to
+    guess whether the feature is missing, broken, or withheld.
+  - Cost of that wording: the SAVE button pins its width so the label can swap
+    (SAVE → SAVED / NONE / ERROR) without shifting the control row, and `NOT ALLOWED` is
+    longer than any of those. Re-measure the pinned width (or let this one state widen the
+    button) — a shifting row is the lesser evil against a label that doesn't say why.
+  - Everything else in LAYOUT already works in a build (drag, resize, handles, **Copy** —
+    which is the paste-it-yourself path and needs no server), so the demo is honest: you can
+    show the whole loop except the write-back.
+
 - [x] **`Block` z-index control** — author-controlled stacking order for overlapping `Block`s.
   - Problem: overlapping Blocks paint in DOM order, so a lower Block sits beneath a
     later one with no way to say otherwise (and in LAYOUT mode its grip/body can hide).
@@ -1176,19 +1230,80 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     clean), and four new `tests/layoutPatch.test.ts` cases pinning the insert-only-when-
     non-zero / rewrite-in-place / never-`z={0}` Save contract.
 
-- [ ] **Select-to-front for Draw path shapes** — extend the Block "select → float to top"
-      to `Line` / `Arc` / `Curve` / `Sprite`.
-  - `Rect` / `Ellipse` already get it: they render as real `<Block>`s, so the `selectedBlock`
-    stopgap covers them for free. Path shapes do NOT.
-  - Why it's not trivial: a Draw is ONE `<svg>` and SVG has no z-index — paint order *is*
-    DOM order *is* the **visible** overlap. So naïvely re-appending the selected shape's `<g>`
-    to raise it also reorders what's drawn on top (not just what's clickable), and breaks the
-    stable-shape-order assumption (e.g. `DrawEditing.test.ts` indexes `g.draw-line[1]`).
-  - Proper fix: hoist the selected shape's **editing chrome only** (hit-stroke + handles) into
-    a dedicated top `<g>` layer that `Draw` renders last — raises *interaction* to the front
-    without touching the visible shape order. Refactor spans `Draw.svelte` + the 4 shapes.
-  - Milder today than the Block case: unselected shapes already show quiet, half-size handles
-    and wide hit-strokes, so only the exact band where two strokes cross is hard to hit.
+- [x] **Select-to-front for Draw path shapes** — extend the Block "select → float to top"
+      to `Line` / `Arc` / `Curve` / `Path` / `Sprite`.
+  - `Rect` / `Ellipse` already got it: they render as real `<Block>`s, so the `selectedBlock`
+    stopgap covered them for free. Path shapes did NOT.
+  - Why it wasn't trivial: a Draw is ONE `<svg>` and SVG has no z-index — paint order *is*
+    DOM order *is* hit order *is* the **visible** overlap. So re-appending the selected
+    shape's `<g>` to raise it would also reorder what's drawn on top, not just what's
+    clickable.
+  - Done: each shape now declares its editing chrome as a **`{#snippet chrome()}`** and hands
+    it to `Draw` on the `ShapeEditor` (`types.ts`). The shape renders it inline, inside its
+    own `<g>`, exactly while it is NOT the hoisted one; when it IS, `Draw` renders that very
+    snippet last inside the surface instead. So the chrome is **re-parented, never copied** —
+    it exists in exactly one place, and the shape's own `<g>` (and the author's visible
+    overlap) is untouched. A snippet is the whole trick: it's a value, so the child can define
+    the markup and the parent can decide where it lands. Two things had to be checked before
+    building on it, and both hold: a `<script>` can hold a reference to a template-declared
+    snippet, and a top-level snippet rendered inside an `<svg>` creates **SVG-namespaced**
+    nodes (Svelte infers the namespace from the element name, the same reason `DrawHandle`'s
+    bare `<circle>` root has always worked).
+  - **Only the HANDLES (and guide lines) hoist — the hit stroke deliberately stays home**,
+    which is the one place this departs from the sketch above. The hit strokes are the only
+    chrome that competes *with each other*, so raising the selected shape's would seal off the
+    band where two strokes cross — the very place a neighbour's stroke is the one you mean to
+    click, and you'd have no way to select it. And raising it buys nothing: clicking the
+    stroke of an already-selected shape just re-selects it. Handles above every hit stroke +
+    hit strokes in their original order is strictly better than the "hit-stroke + handles"
+    hoist originally sketched. Same call for `Sprite`: the per-stop handles hoist, the ghost
+    BOXES (a wide `sprite-hit` rect) stay home for the same reason.
+  - **The one real hazard is the pointer, not the paint.** A drag that begins on an
+    *unselected* handle selects and grabs in ONE gesture — so hoisting on selection would
+    destroy and re-create the very node under the pointer, and a node that leaves the document
+    drops the pointer capture `trackPointer` just took. Without capture, a release outside the
+    window is never delivered, `pointerup` never fires, and the drag **sticks to the cursor**:
+    move the mouse back over the page with no button held and the shape is still dragging.
+    So `Draw` **holds the hoist for the length of a gesture** (`beginGesture`/`endGesture` on
+    the context, called by `DrawHandle` around `trackPointer`; `hoisted = gesture ? frozen :
+    selected`) and lets it land on release, once the listeners are already torn down. Nothing
+    is lost by waiting — being in front only matters for *grabbing* a handle, and the handle
+    is already in hand. This is the kind of bug jsdom cannot see (it implements neither
+    `setPointerCapture` nor `releasePointerCapture`, which is why they're optional-called), so
+    it's pinned instead by asserting the node under the pointer is the **same live node**
+    mid-drag, and re-homes only after `pointerup`.
+    - **Only the FIRST live gesture may snapshot** (`if (!gesture) frozen = selected`) — a
+      found-by-test bug, not a theoretical one. A second finger landing on another handle
+      re-snapshotted `frozen` to the shape the first grab had just selected, hoisting it
+      **mid-drag** and re-homing the node under the first pointer: precisely what the hold
+      exists to prevent, reintroduced by the hold itself.
+    - A flag, not a count, is nonetheless enough on the *release* side: `trackPointer` listens
+      for `pointerup` on the **window** and filters no `pointerId`, so any release tears down
+      every gesture in flight (Esc likewise). Overlapping drags always end together — the deck
+      is single-gesture by construction, here as in `Block`.
+  - **What it does NOT fix, honestly:** an *unselected* shape's handles can still be swallowed
+    by a later shape's 24px hit stroke where they cross — you select the shape first (click its
+    stroke anywhere clear of the crossing), and *then* its handles are reachable everywhere.
+    That IS the select-to-front workflow; the residue is only that the first click can't be on
+    the buried handle itself.
+  - The chrome wrapper carries `class="draw-chrome" data-shape="…"`, so chrome is addressed by
+    its **owner** rather than by where it currently sits — which is exactly how the tests query
+    it now, in either home (`handlesOf(c, 'main')`), instead of reaching into `g.draw-line`.
+  - No demo slide: this is LAYOUT-mode chrome, so it can't show on a published deck at all
+    (`canLayout` is false in a build) — it's exercised in dev on any existing Draw demo with
+    overlapping shapes. No new role tokens (the handles keep the `--ctrl-*` family).
+  - DOM test `tests/DrawSelectFront.test.ts` (hoists to the surface's LAST child so it follows
+    every shape group; only ONE shape's chrome is ever up there; it moves rather than
+    duplicates; the hit stroke stays home; deselect brings it back; the frozen-gesture
+    invariant above, including the second-grab case; a shape that unmounts **while hoisted**,
+    and one that unmounts **mid-drag**, take their chrome with them and strand nothing — the
+    teardown paths, where Draw renders markup owned by a component being destroyed, via
+    `tests/DrawHoistUnmountHost.svelte`; nothing at all outside LAYOUT or in a published
+    build), SSR assertion in
+    `tests/DrawSsr.ssr.test.ts` (no chrome prerenders — worth pinning for the hoisted layer in
+    particular, since it's the one piece of chrome `Draw` renders *itself*, so a stray
+    `hoisted` would ship handles into a published slide). `tests/DrawEditing.test.ts` keeps all
+    55 cases, re-pointed at the by-owner query.
 
 ## Adoption / distribution
 

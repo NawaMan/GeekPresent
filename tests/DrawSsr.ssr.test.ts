@@ -42,4 +42,15 @@ describe('Draw (SSR)', () => {
 		expect(body).toContain('>ROCKET<'); // …with its slot content
 		expect(body).not.toContain('NaN');
 	});
+
+	it('ships no editing chrome — neither at home nor in the select-to-front layer', () => {
+		const { body } = render(DrawSsrHost, { props: {} });
+		// Editing chrome is gated on LAYOUT, which no server render is in. Worth
+		// pinning for the hoisted layer in particular: it is the one piece of
+		// chrome <Draw> renders ITSELF, rather than a shape rendering its own, so
+		// a stray `hoisted` would put handles in a published, prerendered slide.
+		expect(body).not.toContain('draw-chrome');
+		expect(body).not.toContain('draw-handle');
+		expect(body).not.toContain('draw-hit');
+	});
 });

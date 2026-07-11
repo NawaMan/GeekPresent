@@ -45,16 +45,16 @@
 </ContentPage>
 
 <!-- The four nodes of the path, parked low to clear the title + text. -->
-<Block name="browser" x={90} y={690} width={280} height={140}>
+<Block name="browser" x={90} y={760} width={280} height={140}>
 	<div class="node a"><b>Browser</b></div>
 </Block>
-<Block name="edge" x={560} y={690} width={280} height={140}>
+<Block name="edge" x={560} y={760} width={280} height={140}>
 	<div class="node b"><b>Edge</b></div>
 </Block>
-<Block name="origin" x={1030} y={690} width={280} height={140}>
+<Block name="origin" x={1030} y={760} width={280} height={140}>
 	<div class="node c"><b>Origin</b></div>
 </Block>
-<Block name="db" x={1500} y={690} width={280} height={140}>
+<Block name="db" x={1500} y={760} width={280} height={140}>
 	<div class="node d"><b>DB</b></div>
 </Block>
 
@@ -62,11 +62,11 @@
      numbers-only diff), each with its beat's draw/drawDelay. -->
 <Draw title="A request's path, drawn in sequence" name="path"
 	description="An arrow from the browser to the edge draws first, then edge to origin, then origin to the database; a dashed response arc returns underneath from the database to the browser, and finally an ellipse circles the origin as the hot node.">
-	<Line name="request" from={[370, 745]} to={[560, 745]} arrow="end" thickness={6} label="request from the browser to the edge" labelText="request" draw={1} />
-	<Line name="route" from={[840, 745]} to={[1030, 745]} arrow="end" thickness={6} label="route from the edge to the origin" labelText="route" draw={1} drawDelay={1} />
-	<Line name="query" from={[1310, 745]} to={[1500, 745]} arrow="end" thickness={6} label="query from the origin to the database" labelText="query" draw={1} drawDelay={2} />
-	<Arc name="response" from={[1640, 840]} to={[230, 840]} bend={0.08} arrow="end" color="#00b356" dash label="response from the database back to the browser" labelText="response" labelOffset={-32} draw={1.4} drawDelay={3} />
-	<Ellipse name="hot" color="#e74c3c" label="the origin, circled as the hot node" draw={0.8} drawDelay={4.4} x={1010} y={668} width={320} height={184} />
+	<Line name="request" from={[370, 815]} to={[560, 815]} arrow="end" thickness={6} label="request from the browser to the edge" labelText="request" draw={1} />
+	<Line name="route" from={[840, 815]} to={[1030, 815]} arrow="end" thickness={6} label="route from the edge to the origin" labelText="route" draw={1} drawDelay={1} />
+	<Line name="query" from={[1310, 815]} to={[1500, 815]} arrow="end" thickness={6} label="query from the origin to the database" labelText="query" draw={1} drawDelay={2} />
+	<Arc name="response" from={[1640, 910]} to={[230, 910]} bend={0.064} arrow="end" color="#00b356" dash label="response from the database back to the browser" labelText="response" labelOffset={-32} draw={1.4} drawDelay={3} />
+	<Ellipse name="hot" color="#e74c3c" label="the origin, circled as the hot node" draw={0.8} drawDelay={4.4} x={1010} y={738} width={320} height={184} />
 </Draw>
 
 <!-- The ANIMATE control, opened so the build is obvious: one envelope over the
