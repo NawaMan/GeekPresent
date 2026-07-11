@@ -8,6 +8,7 @@ import {
 	bubbleRadius,
 	countOf,
 	groupRows,
+	heatmapMatrix,
 	histogramBins,
 	isBlank,
 	linePath,
@@ -844,5 +845,106 @@ describe('histogramBins', () => {
 		const bins = histogramBins([1, 2, 3], { edges: [5] });
 		expect(bins.length).toBeGreaterThan(0);
 		expect(sum(bins)).toBe(3);
+	});
+});
+
+describe('heatmapMatrix', () => {
+	type Row = { d: string; s: string; v: number | null };
+	// Find the single cell at (x, y) — the component looks up by scale, the test
+	// by category, so the row-major cell order never leaks into the assertions.
+	const at = (m: ReturnType<typeof heatmapMatrix>, x: unknown, y: unknown) =>
+		m.cells.find((c) => c.x === x && c.y === y);
+
+	it('pivots rows into the FULL grid, categories in first-seen order', () => {
+		const rows: Row[] = [
+			{ d: 'Mon', s: 'AM', v: 1 },
+			{ d: 'Tue', s: 'AM', v: 3 },
+			{ d: 'Mon', s: 'PM', v: 5 }
+		];
+		const m = heatmapMatrix(rows, { x: 'd', y: 's', value: 'v' });
+		expect(m.xs).toEqual(['Mon', 'Tue']); // first-seen
+		expect(m.ys).toEqual(['AM', 'PM']);
+		expect(m.cells).toHaveLength(4); // 2×2 full grid, missing combos included
+		expect(at(m, 'Mon', 'AM')?.value).toBe(1);
+		expect(at(m, 'Tue', 'AM')?.value).toBe(3);
+		// Tue × PM never appeared → an explicit blank cell, not a hole
+		expect(at(m, 'Tue', 'PM')?.value).toBeNull();
+	});
+
+	it('averages rows sharing a cell, excluding blanks from the mean', () => {
+		const rows: Row[] = [
+			{ d: 'Mon', s: 'AM', v: 2 },
+			{ d: 'Mon', s: 'AM', v: null }, // dropped, not counted as 0
+			{ d: 'Mon', s: 'AM', v: 4 }
+		];
+		const m = heatmapMatrix(rows, { x: 'd', y: 's', value: 'v' });
+		expect(at(m, 'Mon', 'AM')?.value).toBe(3); // mean(2, 4), not mean(2, 0, 4)
+	});
+
+	it('leaves an all-blank cell null (never the low-end colour)', () => {
+		const rows: Row[] = [
+			{ d: 'Mon', s: 'AM', v: null },
+			{ d: 'Tue', s: 'AM', v: 6 }
+		];
+		const m = heatmapMatrix(rows, { x: 'd', y: 's', value: 'v' });
+		const blank = at(m, 'Mon', 'AM');
+		expect(blank?.value).toBeNull();
+		expect(blank?.t).toBeNaN(); // a blank never lands on the ramp
+	});
+
+	it('normalises values to t ∈ [0,1] across the data extent', () => {
+		const rows: Row[] = [
+			{ d: 'Mon', s: 'AM', v: 1 },
+			{ d: 'Tue', s: 'AM', v: 3 },
+			{ d: 'Mon', s: 'PM', v: 5 }
+		];
+		const m = heatmapMatrix(rows, { x: 'd', y: 's', value: 'v' });
+		expect([m.min, m.max]).toEqual([1, 5]);
+		expect(at(m, 'Mon', 'AM')?.t).toBe(0); // min → 0
+		expect(at(m, 'Mon', 'PM')?.t).toBe(1); // max → 1
+		expect(at(m, 'Tue', 'AM')?.t).toBe(0.5); // midway
+	});
+
+	it('maps a flat matrix (every value equal) to t = 0.5', () => {
+		const rows: Row[] = [
+			{ d: 'Mon', s: 'AM', v: 7 },
+			{ d: 'Tue', s: 'AM', v: 7 }
+		];
+		const m = heatmapMatrix(rows, { x: 'd', y: 's', value: 'v' });
+		expect(at(m, 'Mon', 'AM')?.t).toBe(0.5);
+		expect(at(m, 'Tue', 'AM')?.t).toBe(0.5);
+	});
+
+	it('honours a colour-scale domain override, clamping t', () => {
+		const rows: Row[] = [
+			{ d: 'Mon', s: 'AM', v: 0 },
+			{ d: 'Tue', s: 'AM', v: 50 }
+		];
+		const m = heatmapMatrix(rows, { x: 'd', y: 's', value: 'v', domain: [0, 100] });
+		expect([m.min, m.max]).toEqual([0, 100]);
+		expect(at(m, 'Tue', 'AM')?.t).toBe(0.5); // 50 of [0,100], not of [0,50]
+	});
+
+	it('ignores a degenerate domain override', () => {
+		const rows: Row[] = [{ d: 'Mon', s: 'AM', v: 2 }];
+		const m = heatmapMatrix(rows, { x: 'd', y: 's', value: 'v', domain: [5, 5] });
+		expect([m.min, m.max]).toEqual([2, 2]); // fell back to the data extent
+	});
+
+	it('is total on empty / all-blank input', () => {
+		const empty = heatmapMatrix([] as Row[], { x: 'd', y: 's', value: 'v' });
+		expect(empty.xs).toEqual([]);
+		expect(empty.ys).toEqual([]);
+		expect(empty.cells).toEqual([]);
+		expect(empty.min).toBeNaN();
+		expect(empty.max).toBeNaN();
+
+		const allBlank = heatmapMatrix([{ d: 'Mon', s: 'AM', v: null }] as Row[], {
+			x: 'd',
+			y: 's',
+			value: 'v'
+		});
+		expect(allBlank.min).toBeNaN(); // no finite value → no colour scale
+		expect(at(allBlank, 'Mon', 'AM')?.value).toBeNull();
 	});
 });

@@ -24,6 +24,7 @@ export const pages = [
     { path: "chart-area.html",        title: "Chart — Stacked Area + Draw-In" },
     { path: "function-graph.html",    title: "Chart — Plotting y = f(x)" },
     { path: "histogram-component.html", title: "Chart — Histogram (Distribution)" },
+    { path: "heatmap-component.html", title: "Chart — Heatmap (2-D Distribution)" },
     { path: "datatable-chart.html",   title: "DataTable + Charts — One Dataset" },
     { path: "youtube-showcase.html",  title: "YouTube" },
     { path: "website-component.html", title: "WebSite — Embedded Site" },

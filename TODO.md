@@ -944,7 +944,7 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     **Text-artifact** benefit, not a slide one. What SSR-safety buys a slide is no mount-time
     flash, and a symbol that cannot differ between the server's idea of it and the browser's.
     Asserted against `svelte/server`, never against a built page.
-- [~] **`StackedBarChart` / `Histogram`** (maybe **`Heatmap`**) — part-to-whole & distribution charts; fills chart-family gaps.
+- [x] **`StackedBarChart` / `Histogram`** (and **`Heatmap`**) — part-to-whole & distribution charts; fills chart-family gaps.
   - **`StackedBarChart` was already covered** — a stacked bar is `<BarChart stacked>`
     (Phase 2), the same call `Split`/`Arrow` made: a layout of an existing component is a
     prop, not a second component. Shipping a `StackedBarChart` whose body was
@@ -980,7 +980,48 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
       SSR assertion + host in `tests/ChartSsr(.ssr).test.ts` (bins prerender with predictable
       aria-labels), DOM smoke tests in `tests/Charts.test.ts` (bar count, labels, empty-bin
       gap, zero baseline, no reveal clip by default).
-  - Still open: **`Heatmap`** (a 2-D distribution / matrix), the remaining chart-family gap.
+  - [x] **`Heatmap`** — the 2-D distribution / matrix, the remaining chart-family gap: a
+    BarChart plots one bar per category and a Histogram bins one variable, but nothing
+    turned a *two-key* table (weekday × time-of-day, service × region) into a shape. Done:
+    `src/lib/chart/Heatmap.svelte` over pure `heatmapMatrix` in `chartCore.ts` (the family's
+    discipline — junk in yields empty `xs`/`ys`/`cells` and `NaN` min/max, never a throw).
+    - **Both axes are categorical bands; the third dimension is the cell's COLOUR** — the
+      counterpart decision to the Histogram's linear x. Two `bandScale`s (padding 0 so the
+      cells tile the plot edge-to-edge; `gap` insets each rect so neighbours read apart), and
+      the value rides a sequential ramp.
+    - **The pivot is pure and total.** `heatmapMatrix` buckets rows into the distinct x/y
+      categories (first-seen order, the same keying `bandScale`/`groupRows` use) and emits the
+      **FULL grid** row-major — so a missing (x, y) combination is an *explicit blank cell*,
+      never a hole the component has to infer. Rows sharing a cell are **averaged**, blanks
+      excluded from both the sum and the divisor (the `avgOf` discipline), so a missing
+      measurement never drags a cell's mean toward 0. A cell with no finite value is `null`.
+    - **Colour is a `color-mix`, not a baked palette.** Each cell's value is normalised to
+      `t ∈ [0,1]` across the colour-scale domain (a flat matrix maps to `t = 0.5`; a `domain`
+      override lets several heatmaps share one scale, clamping `t`), and the component fills
+      it as `color-mix(in oklab, var(--chart-heat-high) t%, var(--chart-heat-low))`. So the
+      ramp is themeable per deck via two tokens, the steps stay perceptually even (oklab), and
+      no continuous palette is baked in. **A blank cell is drawn EMPTY** (`--chart-heat-empty`,
+      a faint neutral), never the ramp's low end — the same call the Histogram makes dropping a
+      blank rather than counting it 0. The value ink (when `showValues` prints numbers in the
+      cells) flips light/dark past the ramp's midpoint so it stays legible on any fill.
+    - **SSR-safe** exactly as the rest of the family: the full `<svg>` — every cell rect with
+      its `color-mix` fill, both band axes, and a **static colour-ramp legend** (a
+      `linear-gradient(in oklab …)` bar with the scale ends) — renders from props alone. The
+      hover tooltip (2-D pointer snap to the nearest cell centre via `nearestPoint`, a cell
+      outline + `ChartTooltip`) and the `animate` clip-wipe are client-only and never reach the
+      prerender. `role="img"` + required `title`, one aria-label per cell (`"Mon × AM: 42"` /
+      `"Tue × PM: no data"`). Reuses the whole `--chart-*` family plus new `--chart-heat-low`/
+      `-high`/`-empty` tokens (with in-component ColorBrewer-"Blues" fallbacks, so it reads
+      even on a deck that sets no vars — the `seriesColor` pattern).
+    - Demo `heatmap-component.html` (one weekday × time-of-day request-load table drives two
+      heatmaps: auto-scaled with `animate` + legend vs. `showValues` printing each number with a
+      tooltip; two monitoring-gap slots carry `null` and draw empty). Unit tests in
+      `tests/chartCore.test.ts` (`heatmapMatrix`: pivot/first-seen order, mean-aggregation with
+      blanks excluded, full-grid blank cells, `t` normalisation + clamp, flat/domain/empty),
+      SSR assertion + host in `tests/ChartSsr(.ssr).test.ts` (the 2×2 grid prerenders with
+      per-cell aria-labels, the blank drawn empty, `color-mix` fills, the legend), DOM tests in
+      `tests/Charts.test.ts` (cell count, labels, empty-cell class, `showValues`, no reveal clip
+      by default). New `--chart-heat-*` role tokens.
 - [ ] **Multi-segment path** — one `Draw` shape whose geometry chains several segments
       (line + curve + arc) instead of composing separate `Line` / `Curve` / `Arc` elements.
   - Gives a single continuous stroke: one `draw`/`drawDelay` reveal, one arrowhead at the
