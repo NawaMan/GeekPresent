@@ -9,6 +9,7 @@ export { default as Canvas } from './Canvas.svelte';
 export { default as Curve } from './Curve.svelte';
 export { default as Draw } from './Draw.svelte';
 export { default as Line } from './Line.svelte';
+export { default as Path } from './Path.svelte';
 export { default as Polyline } from './Polyline.svelte';
 export { default as Rect } from './Rect.svelte';
 export { default as Ellipse } from './Ellipse.svelte';

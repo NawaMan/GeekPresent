@@ -121,6 +121,47 @@ export interface PathLabelProps {
 	labelOffset?: number;
 }
 
+/** One segment of a multi-segment <Path>: its endpoint `to`, plus optional
+ *  control data that selects the segment KIND — `bend` makes it an arc, `c1`
+ *  (optionally `c2`) makes it a Bézier curve, and neither makes it a straight
+ *  line. Each segment's start point defaults to the previous segment's `to`
+ *  (or the Path's `start`, for the first), so a chain is authored as a start
+ *  point plus a list of destinations. Give an explicit `from` to lift the pen
+ *  and begin a disjoint sub-path. */
+export interface PathSegment {
+	/** This segment's endpoint (canvas px). Required. */
+	to: Point;
+	/** Override the chained start point (defaults to the previous `to`). */
+	from?: Point;
+	/** First control point → a Bézier curve (quadratic unless `c2` is set). */
+	c1?: Point;
+	/** Second control point → a cubic Bézier (only used when `c1` is set too). */
+	c2?: Point;
+	/** Signed sagitta fraction → a circular arc (see Arc's `bend`); takes
+	 *  precedence over `c1`/`c2` when both are given. */
+	bend?: number;
+}
+
+/** One keyframe for an animated multi-segment <Path>: a percent (0–100) plus a
+ *  whole pose at that moment — the pen `start` and/or the full `segments` list
+ *  (each omitted → the base prop), and/or a `drawn` self-draw fraction. Geometry
+ *  and reveal are independent tracks on the shared `animate` timeline (see
+ *  CurveStop). Because a chain's command structure varies across segments (and
+ *  arc flags don't interpolate), the geometry track SAMPLES each pose into a
+ *  fixed-count polyline — so keep the segment count/kinds matching the base and
+ *  across stops for a smooth morph. */
+export interface PathStop {
+	pct: number;
+	/** Pen start at this keyframe (omitted → the base `start`). */
+	start?: Point;
+	/** The whole segment list at this keyframe (omitted → the base `segments`). */
+	segments?: PathSegment[];
+	/** Self-draw progress 0 (nothing) → 1 (full) at this keyframe. */
+	drawn?: number;
+	/** CSS timing function for the segment starting here — see LineStop. */
+	ease?: string;
+}
+
 /** The geometry of a path-like shape, as evaluators and path builders see it.
  *  Discriminated by `kind`; every variant is plain data (canvas px + the
  *  human-readable `bend`), so drawCore's pointAt/angleAt/shortenShape stay

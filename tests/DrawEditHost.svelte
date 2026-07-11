@@ -7,6 +7,7 @@
 	import Draw from '../src/lib/draw/Draw.svelte';
 	import Ellipse from '../src/lib/draw/Ellipse.svelte';
 	import Line from '../src/lib/draw/Line.svelte';
+	import Path from '../src/lib/draw/Path.svelte';
 	import Rect from '../src/lib/draw/Rect.svelte';
 </script>
 
@@ -26,4 +27,6 @@
 	<Line name="beam" from={[100, 600]} to={[500, 600]} stops={[{ pct: 0, to: [500, 600] }, { pct: 100, to: [500, 400] }]} animate={2} />
 	<Line name="reveal" from={[100, 700]} to={[500, 700]} draw={2} drawDelay={0.5} />
 	<Curve name="progress" from={[100, 900]} to={[500, 900]} c1={[300, 800]} stops={[{ pct: 0, c1: [300, 800], drawn: 0 }, { pct: 100, c1: [300, 700], drawn: 1 }]} animate={3} />
+	<Path name="route" start={[700, 700]} arrow="end" segments={[{ to: [900, 700] }, { to: [1100, 600], c1: [1000, 700] }, { to: [1300, 600], bend: 0.4 }]} />
+	<Path name="morph" start={[700, 900]} segments={[{ to: [900, 900] }, { to: [1100, 900] }]} stops={[{ pct: 0, segments: [{ to: [900, 900] }, { to: [1100, 900] }] }, { pct: 100, segments: [{ to: [900, 700] }, { to: [1100, 700] }] }]} animate={2} />
 </Draw>

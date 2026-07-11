@@ -8,7 +8,7 @@
 // into the SVG (the same discipline as KeyframeStudio's r()). All numbers
 // pass through finite()/round() before reaching an attribute string.
 
-import type { PathShape, Point } from './types';
+import type { PathSegment, PathShape, Point } from './types';
 
 /** Coerce a possibly non-finite number to a safe finite one. */
 export function finite(value: number, fallback = 0): number {
@@ -483,4 +483,160 @@ function trimParameter(shape: PathShape, by: number): number {
 	}
 	if (speed < 1e-9) return 0;
 	return clamp01(1 - by / speed);
+}
+
+// ─── Multi-segment path (Phase 4) ───────────────────────────────────────────
+// One continuous stroke chaining line/curve/arc segments — so a whole route
+// is ONE <path> with one draw/drawDelay reveal, one arrowhead at the real end,
+// and joins that meet (round linejoin) instead of butting stroke caps. All the
+// per-segment math reuses the evaluators above, so the NaN-safety discipline is
+// inherited for free: a half-typed segment is dropped, never emitted as NaNpx.
+
+/** Coerce a possibly-malformed point to a safe finite one. */
+function safePoint(p: Point | undefined): Point {
+	return Array.isArray(p) ? finitePoint(p) : [0, 0];
+}
+
+/** Resolve a chained segment list into concrete PathShapes. Each segment's
+ *  start defaults to the previous segment's `to` (or `start` for the first),
+ *  so a path is authored as a start point plus a list of destinations; an
+ *  explicit `from` lifts the pen for a disjoint sub-path. Kind is chosen by the
+ *  control data present: `bend` → arc, else `c1` → curve (cubic when `c2` is
+ *  set, else quadratic), else line. A malformed segment (no `to`) is dropped
+ *  rather than throwing, so a mid-edit typo can't blow up the stroke. */
+export function pathShapes(start: Point, segments: PathSegment[]): PathShape[] {
+	if (!Array.isArray(segments)) return [];
+	const shapes: PathShape[] = [];
+	let cursor = safePoint(start);
+	for (const seg of segments) {
+		if (!seg || !Array.isArray(seg.to)) continue;
+		const from = Array.isArray(seg.from) ? finitePoint(seg.from) : cursor;
+		const to = finitePoint(seg.to);
+		if (seg.bend != null) {
+			shapes.push({ kind: 'arc', from, to, bend: clampBend(seg.bend) });
+		} else if (seg.c1 != null) {
+			const c1 = safePoint(seg.c1);
+			if (seg.c2 != null) shapes.push({ kind: 'cubic', from, to, c1, c2: safePoint(seg.c2) });
+			else shapes.push({ kind: 'quadratic', from, to, c1 });
+		} else {
+			shapes.push({ kind: 'line', from, to });
+		}
+		cursor = to;
+	}
+	return shapes;
+}
+
+/** The `d` string for a single PathShape, via the existing per-kind builders. */
+function shapePath(shape: PathShape): string {
+	switch (shape.kind) {
+		case 'line':
+			return linePath(shape.from, shape.to);
+		case 'quadratic':
+			return curvePath(shape.from, shape.to, shape.c1);
+		case 'cubic':
+			return curvePath(shape.from, shape.to, shape.c1, shape.c2);
+		case 'arc':
+			return arcPath(shape.from, shape.to, shape.bend);
+	}
+}
+
+/** One `d` string for a chained shape list: each segment's builder joined,
+ *  with the redundant leading `M` dropped wherever a segment starts exactly
+ *  where the previous one ended (the pen is already there). A segment whose
+ *  `from` differs from the previous `to` keeps its `M` — a genuine pen lift, so
+ *  disjoint sub-paths render as gaps rather than a spurious connecting line. */
+export function multiPath(shapes: PathShape[]): string {
+	if (!Array.isArray(shapes) || shapes.length === 0) return '';
+	let d = '';
+	let prevTo: Point | null = null;
+	for (const s of shapes) {
+		const from = finitePoint(s.from);
+		const full = shapePath(s);
+		if (prevTo && from[0] === prevTo[0] && from[1] === prevTo[1]) {
+			d += ' ' + full.replace(/^M\s+\S+\s+\S+\s+/, '');
+		} else {
+			d += (d ? ' ' : '') + full;
+		}
+		prevTo = finitePoint(s.to);
+	}
+	return d;
+}
+
+/** Approximate arc length of one shape by chord summation (enough for label
+ *  placement and global-t location). */
+function shapeLength(shape: PathShape, samples = 24): number {
+	const n = Math.max(1, Math.floor(finite(samples, 24)));
+	let len = 0;
+	let prev = pointAt(shape, 0);
+	for (let k = 1; k <= n; k++) {
+		const p = pointAt(shape, k / n);
+		len += Math.hypot(p[0] - prev[0], p[1] - prev[1]);
+		prev = p;
+	}
+	return len;
+}
+
+/** The segment (and local parameter) at global t ∈ [0, 1] across a chained
+ *  shape list, distributed by cumulative arc length so t is roughly uniform
+ *  along the whole stroke. Null for an empty list; a zero-length total (all
+ *  degenerate) reports the last shape at t. */
+function locateMulti(shapes: PathShape[], t: number): { shape: PathShape; u: number } | null {
+	if (!Array.isArray(shapes) || shapes.length === 0) return null;
+	const u = clamp01(t);
+	const lens = shapes.map((s) => shapeLength(s));
+	const total = lens.reduce((a, b) => a + b, 0);
+	const lastShape = shapes[shapes.length - 1];
+	if (total === 0) return { shape: lastShape, u };
+	let target = u * total;
+	for (let i = 0; i < shapes.length; i++) {
+		if (target <= lens[i] || i === shapes.length - 1) {
+			return { shape: shapes[i], u: lens[i] === 0 ? 0 : clamp01(target / lens[i]) };
+		}
+		target -= lens[i];
+	}
+	return { shape: lastShape, u: 1 };
+}
+
+/** The point at global t ∈ [0, 1] along a chained shape list (empty → [0, 0]). */
+export function pointAtMulti(shapes: PathShape[], t: number): Point {
+	const loc = locateMulti(shapes, t);
+	return loc ? pointAt(loc.shape, loc.u) : [0, 0];
+}
+
+/** The tangent angle (radians) at global t along a chained shape list
+ *  (empty → 0). */
+export function angleAtMulti(shapes: PathShape[], t: number): number {
+	const loc = locateMulti(shapes, t);
+	return loc ? angleAt(loc.shape, loc.u) : 0;
+}
+
+/** Anchor for a chained path's visible label: the point at global `at`, offset
+ *  `offset` px perpendicular to the local tangent (positive = to the LEFT of
+ *  travel — screen-up on a left-to-right stroke). The multi-segment twin of
+ *  labelPos. */
+export function labelPosMulti(shapes: PathShape[], at = 0.5, offset = 20): Point {
+	const [x, y] = pointAtMulti(shapes, at);
+	const a = angleAtMulti(shapes, at);
+	const o = finite(offset);
+	return [round(x + Math.sin(a) * o), round(y - Math.cos(a) * o)];
+}
+
+/** The whole chained path sampled into a fixed-count polyline `d` (M + `segments`
+ *  L's), for ANIMATING a multi-segment Path. A keyframe morph tweens `d: path()`
+ *  only when every keyframe's `d` shares one command structure — but a Path's
+ *  segment kinds (and even count) can differ between keyframes, and arc flags
+ *  don't interpolate at all. Sampling the whole chain to the SAME number of
+ *  straight segments at every keyframe sidesteps both: constant-count polylines
+ *  morph smoothly. (The multi-segment twin of `samplePath`; the static render
+ *  still uses the exact `multiPath`.) Empty chain → '' */
+export function sampleMultiPath(shapes: PathShape[], segments = 96): string {
+	if (!Array.isArray(shapes) || shapes.length === 0) return '';
+	const n = Math.max(1, Math.floor(finite(segments, 96)));
+	const p0 = pointAtMulti(shapes, 0);
+	let d = `M ${round(p0[0])} ${round(p0[1])}`;
+	for (let k = 1; k <= n; k++) {
+		const p = pointAtMulti(shapes, k / n);
+		d += ` L ${round(p[0])} ${round(p[1])}`;
+	}
+	return d;
 }

@@ -10,8 +10,14 @@ import {
 	finite,
 	finitePoint,
 	labelPos,
+	labelPosMulti,
 	linePath,
+	multiPath,
+	pathShapes,
 	pointAt,
+	pointAtMulti,
+	angleAtMulti,
+	sampleMultiPath,
 	polygonPoints,
 	polylinePath,
 	smoothPath,
@@ -23,7 +29,7 @@ import {
 	shortenShape,
 	snapToAngles
 } from '../src/lib/draw/drawCore';
-import type { PathShape, Point } from '../src/lib/draw/types';
+import type { PathSegment, PathShape, Point } from '../src/lib/draw/types';
 
 /** Angles compared on the unit circle, so 3π/2 ≡ -π/2. */
 function expectAngle(actual: number, expected: number) {
@@ -516,5 +522,139 @@ describe('polygonPoints', () => {
 
 	it('never contains NaN', () => {
 		expect(polygonPoints([[NaN, Infinity]])).toBe('0,0');
+	});
+});
+
+describe('pathShapes (multi-segment resolution)', () => {
+	it('chains each segment start from the previous end (or `start` for the first)', () => {
+		const shapes = pathShapes([0, 0], [{ to: [100, 0] }, { to: [100, 100] }]);
+		expect(shapes).toEqual([
+			{ kind: 'line', from: [0, 0], to: [100, 0] },
+			{ kind: 'line', from: [100, 0], to: [100, 100] }
+		]);
+	});
+
+	it('picks the KIND from the control data present', () => {
+		const [line, quad, cubic, arc] = pathShapes(
+			[0, 0],
+			[
+				{ to: [10, 0] },
+				{ to: [20, 0], c1: [15, 10] },
+				{ to: [30, 0], c1: [24, 10], c2: [26, -10] },
+				{ to: [40, 0], bend: 0.3 }
+			]
+		);
+		expect(line.kind).toBe('line');
+		expect(quad.kind).toBe('quadratic');
+		expect(cubic.kind).toBe('cubic');
+		expect(arc.kind).toBe('arc');
+	});
+
+	it('gives `bend` precedence over control points, clamped to [-1, 1]', () => {
+		const [seg] = pathShapes([0, 0], [{ to: [100, 0], bend: 5, c1: [50, 50] }]);
+		expect(seg).toEqual({ kind: 'arc', from: [0, 0], to: [100, 0], bend: 1 });
+	});
+
+	it('honors an explicit per-segment `from` (a disjoint sub-path)', () => {
+		const shapes = pathShapes([0, 0], [{ to: [100, 0] }, { from: [200, 0], to: [300, 0] }]);
+		expect(shapes[1].from).toEqual([200, 0]);
+	});
+
+	it('drops a malformed segment (no `to`) rather than throwing', () => {
+		const shapes = pathShapes([0, 0], [{ to: [50, 0] }, { c1: [10, 10] } as PathSegment, { to: [80, 0] }]);
+		// The good segments still chain: the bad one is skipped, not a break.
+		expect(shapes).toEqual([
+			{ kind: 'line', from: [0, 0], to: [50, 0] },
+			{ kind: 'line', from: [50, 0], to: [80, 0] }
+		]);
+	});
+
+	it('is total on junk input (non-array segments, NaN points)', () => {
+		expect(pathShapes([0, 0], 'nope' as unknown as PathSegment[])).toEqual([]);
+		expect(pathShapes(undefined as unknown as Point, [])).toEqual([]);
+		const [seg] = pathShapes([NaN, 5] as Point, [{ to: [Infinity, 10] }]);
+		expect(seg).toEqual({ kind: 'line', from: [0, 5], to: [0, 10] });
+	});
+});
+
+describe('multiPath', () => {
+	it('joins a continuous chain into one path, dropping redundant Ms', () => {
+		const shapes = pathShapes([0, 0], [{ to: [100, 0] }, { to: [100, 100] }]);
+		expect(multiPath(shapes)).toBe('M 0 0 L 100 0 L 100 100');
+	});
+
+	it('keeps the M where a segment lifts the pen (a real gap)', () => {
+		const shapes = pathShapes([0, 0], [{ to: [100, 0] }, { from: [200, 0], to: [300, 0] }]);
+		const d = multiPath(shapes);
+		expect(d).toBe('M 0 0 L 100 0 M 200 0 L 300 0');
+		expect(d.match(/M /g)).toHaveLength(2); // two sub-paths
+	});
+
+	it('carries curve and arc commands through the chain', () => {
+		const shapes = pathShapes(
+			[0, 0],
+			[{ to: [100, 0], c1: [50, 80] }, { to: [200, 0], bend: 0.5 }]
+		);
+		const d = multiPath(shapes);
+		expect(d.startsWith('M 0 0 Q 50 80 100 0 ')).toBe(true);
+		expect(d).toContain('A '); // the arc segment, no second M
+		expect(d.match(/M /g)).toHaveLength(1);
+	});
+
+	it('is total: empty / non-array → empty string, never NaN', () => {
+		expect(multiPath([])).toBe('');
+		expect(multiPath(undefined as unknown as PathShape[])).toBe('');
+		expect(multiPath(pathShapes([NaN, NaN] as Point, [{ to: [NaN, NaN] }]))).not.toContain('NaN');
+	});
+});
+
+describe('pointAtMulti / angleAtMulti / labelPosMulti', () => {
+	const shapes = pathShapes([0, 0], [{ to: [100, 0] }, { to: [100, 100] }]);
+
+	it('walks the whole chain by arc length: t=0 start, t=1 end', () => {
+		expect(pointAtMulti(shapes, 0)).toEqual([0, 0]);
+		expect(pointAtMulti(shapes, 1)).toEqual([100, 100]);
+	});
+
+	it('lands the midpoint at the shared join (equal-length segments)', () => {
+		expect(pointAtMulti(shapes, 0.5)).toEqual([100, 0]);
+	});
+
+	it('reports the local tangent of the containing segment', () => {
+		expectAngle(angleAtMulti(shapes, 0), 0); // first segment points +x
+		expectAngle(angleAtMulti(shapes, 1), Math.PI / 2); // last segment points +y (down)
+	});
+
+	it('offsets a label perpendicular to the local tangent', () => {
+		expect(labelPosMulti(shapes, 0.5, 20)).toEqual([100, -20]);
+	});
+
+	it('is total on an empty chain (never NaN)', () => {
+		expect(pointAtMulti([], 0.5)).toEqual([0, 0]);
+		expect(angleAtMulti([], 0.5)).toBe(0);
+		expect(labelPosMulti([]).every(Number.isFinite)).toBe(true);
+	});
+});
+
+describe('sampleMultiPath (animation morph)', () => {
+	const shapes = pathShapes([0, 0], [{ to: [100, 0] }, { to: [100, 100] }]);
+
+	it('samples the whole chain into a fixed-count polyline (M + n L segments)', () => {
+		expect(sampleMultiPath(shapes, 4)).toBe('M 0 0 L 50 0 L 100 0 L 100 50 L 100 100');
+	});
+
+	it('always emits the same command count regardless of segment kinds (so d:path morphs)', () => {
+		const curvy = pathShapes([0, 0], [{ to: [100, 0], c1: [50, 80] }, { to: [200, 0], bend: 0.6 }]);
+		const a = sampleMultiPath(shapes, 32);
+		const b = sampleMultiPath(curvy, 32);
+		const count = (d: string) => (d.match(/L /g) ?? []).length;
+		expect(count(a)).toBe(32);
+		expect(count(b)).toBe(32); // same L-count → the two poses interpolate
+		expect(a.startsWith('M ')).toBe(true);
+	});
+
+	it('is total: empty chain → empty string, never NaN', () => {
+		expect(sampleMultiPath([])).toBe('');
+		expect(sampleMultiPath(pathShapes([NaN, NaN] as Point, [{ to: [NaN, NaN] }]), 8)).not.toContain('NaN');
 	});
 });

@@ -6,6 +6,7 @@ import Curve from '../src/lib/draw/Curve.svelte';
 import Draw from '../src/lib/draw/Draw.svelte';
 import Ellipse from '../src/lib/draw/Ellipse.svelte';
 import Line from '../src/lib/draw/Line.svelte';
+import Path from '../src/lib/draw/Path.svelte';
 import Polyline from '../src/lib/draw/Polyline.svelte';
 import Rect from '../src/lib/draw/Rect.svelte';
 
@@ -327,6 +328,162 @@ describe('Polyline', () => {
 	it('renders nothing for fewer than 2 points', () => {
 		const { container } = render(Polyline, { points: [[5, 5]] as [number, number][] });
 		expect(container.querySelector('path')).toBeNull();
+	});
+});
+
+describe('Path (multi-segment stroke)', () => {
+	const segments = [
+		{ to: [500, 300] as [number, number] },
+		{ to: [800, 150] as [number, number], c1: [650, 300] as [number, number] },
+		{ to: [1150, 150] as [number, number], bend: 0.5 }
+	];
+
+	it('chains line + curve + arc into ONE continuous path (redundant Ms dropped)', () => {
+		const { container } = render(Path, { start: [200, 300] as [number, number], segments });
+		const d = container.querySelector('path')?.getAttribute('d') ?? '';
+		expect(d.startsWith('M 200 300 L 500 300 Q 650 300 800 150 ')).toBe(true);
+		expect(d).toContain(' A '); // the arc segment
+		expect(d.match(/M /g)).toHaveLength(1); // a single sub-path, not one M per segment
+	});
+
+	it('uses round joins so segments meet instead of butting caps', () => {
+		const { container } = render(Path, { start: [200, 300] as [number, number], segments });
+		const path = container.querySelector('path')!;
+		expect(path.getAttribute('stroke-linejoin')).toBe('round');
+	});
+
+	it('draws ONE arrowhead at the real end, its tip on the last `to`', () => {
+		const { container } = render(Path, {
+			start: [200, 300] as [number, number],
+			segments,
+			arrow: 'end' as const
+		});
+		const heads = container.querySelectorAll('polygon');
+		expect(heads).toHaveLength(1); // not one head per shape
+		expect(heads[0].getAttribute('points')).toContain('1150,150');
+	});
+
+	it('reveals the whole stroke as one draw-on; the head fades in last', () => {
+		const { container } = render(Path, {
+			start: [200, 300] as [number, number],
+			segments,
+			arrow: 'end' as const,
+			draw: 2
+		});
+		const path = container.querySelector('path')!;
+		expect(path.getAttribute('pathLength')).toBe('1');
+		expect(path.getAttribute('class')).toContain('draw-anim');
+		expect(path.getAttribute('style')).toContain('animation-duration: 2s');
+		const head = container.querySelector('polygon')!;
+		expect(head.getAttribute('style')).toContain('animation-delay: 1.6s');
+	});
+
+	it('renders a visible label as SVG text', () => {
+		const { container } = render(Path, {
+			start: [200, 300] as [number, number],
+			segments,
+			labelText: 'route'
+		});
+		expect(container.querySelector('text')?.textContent).toBe('route');
+	});
+
+	it('renders nothing for an empty segment list', () => {
+		const { container } = render(Path, { start: [0, 0] as [number, number], segments: [] });
+		expect(container.querySelector('path')).toBeNull();
+	});
+});
+
+describe('Path geometry keyframes (stops + animate)', () => {
+	const props = {
+		start: [200, 300] as [number, number],
+		segments: [{ to: [500, 300] }, { to: [800, 300] }] as { to: [number, number] }[],
+		stops: [
+			{ pct: 0, segments: [{ to: [500, 300] }, { to: [800, 300] }] },
+			{ pct: 100, segments: [{ to: [500, 100] }, { to: [800, 100] }] }
+		] as { pct: number; segments: { to: [number, number] }[] }[],
+		animate: 4
+	};
+
+	it('emits SAMPLED d:path() keyframes per stop and binds the animation to the shaft', () => {
+		const { container } = render(Path, props);
+		const style = container.querySelector('g style')!;
+		expect(style).not.toBeNull();
+		// Both poses sampled from the same start; the 0% pose ends at y=300, the
+		// 100% pose at y=100 — the sampled polylines share one command count, so
+		// the browser morphs them.
+		expect(style.textContent).toContain('d: path("M 200 300 ');
+		expect(style.textContent).toContain('L 800 300");'); // 0% pose end
+		expect(style.textContent).toContain('L 800 100");'); // 100% pose end
+		const path = container.querySelector('path.draw-path-shaft')!;
+		expect(path.getAttribute('style')).toMatch(/animation: draw-move-\d+ 4s ease-in-out both/);
+		// the static (no-CSS) fallback stays the EXACT base geometry, not sampled
+		expect(path.getAttribute('d')).toBe('M 200 300 L 500 300 L 800 300');
+	});
+
+	it('the arrowhead rides the moving end via transform keyframes', () => {
+		const { container } = render(Path, { ...props, arrow: 'end' as const, arrowSize: 20 });
+		const style = container.querySelector('g style')!;
+		expect(style.textContent).toContain('translate(800px, 300px)'); // end @ 0%
+		expect(style.textContent).toContain('translate(800px, 100px)'); // end @ 100%
+		const head = container.querySelector('polygon')!;
+		expect(head.getAttribute('points')).toBe('0,0 -20,10 -20,-10'); // tip at origin
+		expect(head.getAttribute('style')).toMatch(/animation: draw-move-\d+-end 4s/);
+	});
+
+	it('a reveal track (drawn) keyframes stroke-dashoffset independently', () => {
+		const { container } = render(Path, {
+			start: [0, 0] as [number, number],
+			segments: [{ to: [100, 0] }, { to: [100, 100] }] as { to: [number, number] }[],
+			stops: [
+				{ pct: 0, drawn: 0 },
+				{ pct: 100, drawn: 1 }
+			],
+			animate: 3
+		});
+		const path = container.querySelector('path.draw-path-shaft')!;
+		expect(path.getAttribute('pathLength')).toBe('1');
+		const style = container.querySelector('g style')!.textContent ?? '';
+		expect(style).toContain('-reveal {');
+		expect(style).toContain('stroke-dashoffset: 1'); // 0% = undrawn
+		expect(style).toContain('stroke-dashoffset: 0'); // 100% = fully drawn
+	});
+
+	it('stops take precedence over draw; fewer than 2 geom stops means no animation', () => {
+		const both = render(Path, { ...props, draw: 1.5 });
+		// geometry keyframes win: no flat draw-on reveal
+		expect(both.container.querySelector('path.draw-path-shaft')?.getAttribute('pathLength')).toBeNull();
+		const one = render(Path, {
+			...props,
+			stops: [{ pct: 0, segments: [{ to: [500, 300] }, { to: [800, 300] }] }]
+		});
+		expect(one.container.querySelector('g style')).toBeNull();
+	});
+
+	// The scrubbing demo (animation/path-move.html): a line+curve+arc chain whose
+	// whole pose morphs. Pin its exact props so the demo can't silently break.
+	it('morphs a line+curve+arc chain (the path-move demo) end-to-end', () => {
+		const { container } = render(Path, {
+			start: [260, 820] as [number, number],
+			segments: [{ to: [700, 820] }, { to: [1140, 820], c1: [920, 820] }, { to: [1580, 820], bend: 0 }],
+			stops: [
+				{ pct: 0, segments: [{ to: [700, 820] }, { to: [1140, 820], c1: [920, 820] }, { to: [1580, 820], bend: 0 }] },
+				{ pct: 100, segments: [{ to: [700, 520] }, { to: [1140, 780], c1: [920, 320] }, { to: [1580, 540], bend: 0.55 }] }
+			],
+			animate: 4,
+			arrow: 'end' as const,
+			labelText: 'route'
+		});
+		const style = container.querySelector('g style')!.textContent ?? '';
+		expect(style).toContain('@keyframes draw-move-');
+		expect(style).toContain('d: path("M 260 820 '); // both poses start at the pinned start
+		// The shaft is trimmed behind the end arrowhead, so the true end positions
+		// live in the head's transform keyframes, not the sampled shaft.
+		expect(style).toContain('translate(1580px, 820px)'); // arrowhead at the 0% (flat) end
+		expect(style).toContain('translate(1580px, 540px)'); // arrowhead at the 100% (peaked) end
+		expect(style).toContain('-label {'); // the label rides along
+		expect(container.querySelector('path.draw-path-shaft')?.getAttribute('style')).toMatch(
+			/animation: draw-move-\d+ 4s/
+		);
 	});
 });
 
