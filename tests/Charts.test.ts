@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import AreaChart from '../src/lib/chart/AreaChart.svelte';
 import BarChart from '../src/lib/chart/BarChart.svelte';
 import ComboChart from '../src/lib/chart/ComboChart.svelte';
+import Histogram from '../src/lib/chart/Histogram.svelte';
 import LineChart from '../src/lib/chart/LineChart.svelte';
 import PieChart from '../src/lib/chart/PieChart.svelte';
 import ScatterChart from '../src/lib/chart/ScatterChart.svelte';
@@ -885,6 +886,64 @@ describe('AreaChart', () => {
 	it('renders no reveal clip by default (animate off → static markup)', () => {
 		const { container } = render(AreaChart, {
 			props: { data: samples, x: monthX, series: latencySeries, title: 'Latency area' }
+		});
+		expect(container.querySelector('clipPath')).toBeNull();
+		expect(container.querySelector('.wipe')).toBeNull();
+	});
+});
+describe('Histogram', () => {
+	type V = { v: number | null };
+	const sample: V[] = [
+		{ v: 2 },
+		{ v: 5 },
+		{ v: 12 },
+		{ v: 24 },
+		{ v: 30 },
+		{ v: null } // blank → dropped, not counted as 0
+	];
+
+	it('draws one rect per non-empty bin, counting every finite value', () => {
+		const { container } = render(Histogram, {
+			props: { data: sample, value: 'v', edges: [0, 10, 20, 30], title: 'Dist' }
+		});
+		const bars = container.querySelectorAll('.bars rect');
+		expect(bars).toHaveLength(3); // [0,10) [10,20) [20,30] all non-empty
+	});
+
+	it('labels each bar with its range and count; the blank is dropped', () => {
+		const { container } = render(Histogram, {
+			props: { data: sample, value: 'v', edges: [0, 10, 20, 30], title: 'Dist' }
+		});
+		const labels = Array.from(container.querySelectorAll('.bars rect')).map((r) =>
+			r.getAttribute('aria-label')
+		);
+		expect(labels).toContain('0–10: 2');
+		expect(labels).toContain('10–20: 1');
+		expect(labels).toContain('20–30: 2'); // 30 lands in the closed final bin
+	});
+
+	it('omits an empty bin entirely (a gap, never a zero-height stub)', () => {
+		// nothing in [10,20): that bin draws no rect
+		const gapped: V[] = [{ v: 1 }, { v: 2 }, { v: 25 }];
+		const { container } = render(Histogram, {
+			props: { data: gapped, value: 'v', edges: [0, 10, 20, 30], title: 'Dist' }
+		});
+		expect(container.querySelectorAll('.bars rect')).toHaveLength(2);
+	});
+
+	it('is an accessible image with a title and a zero baseline', () => {
+		const { container } = render(Histogram, {
+			props: { data: sample, value: 'v', bins: 4, title: 'Latency', description: 'ms' }
+		});
+		expect(container.querySelector('svg')!.getAttribute('role')).toBe('img');
+		expect(container.querySelector('title')?.textContent).toBe('Latency');
+		expect(container.querySelector('desc')?.textContent).toBe('ms');
+		expect(container.querySelector('.zero-line')).not.toBeNull();
+	});
+
+	it('renders no reveal clip by default (animate off → static markup)', () => {
+		const { container } = render(Histogram, {
+			props: { data: sample, value: 'v', title: 'Dist' }
 		});
 		expect(container.querySelector('clipPath')).toBeNull();
 		expect(container.querySelector('.wipe')).toBeNull();

@@ -400,6 +400,129 @@ export function stackExtent(stacks: readonly StackSegment[][]): [number, number]
 	return [min, max];
 }
 
+/**
+ * One bar of a histogram: the half-open value interval `[x0, x1)` and how many
+ * of the sample's finite values fell in it. The LAST bin is closed on the right
+ * (`[x0, x1]`) so the maximum value isn't dropped off the end.
+ */
+export interface HistogramBin {
+	x0: number; // lower edge, inclusive
+	x1: number; // upper edge, exclusive (the last bin includes x1)
+	count: number; // finite values in [x0, x1)
+}
+
+/** Options for `histogramBins`. */
+export interface HistogramOptions {
+	/** Desired bin count. The real count is snapped to round ("nice") edges, so
+	 *  it may differ by one or two. Ignored when `edges` is given. Defaults to
+	 *  Sturges' rule (⌈log₂ n⌉ + 1) from the sample size. */
+	bins?: number;
+	/** Clamp the binned range to `[lo, hi]`; the edges are still niced within it,
+	 *  and a value beyond the outermost edge is dropped. Defaults to the finite
+	 *  extent of the data. Ignored when `edges` is given. */
+	domain?: [number, number];
+	/** Explicit bin boundaries (≥ 2 finite values). Sorted and de-duplicated;
+	 *  overrides `bins`/`domain`. A value below the first or above the last edge
+	 *  is dropped. An unusable list (< 2 finite values) falls back to computed
+	 *  edges. */
+	edges?: number[];
+}
+
+/**
+ * The bin edges for a histogram, as an ascending list (one more entry than the
+ * bin count). Explicit `edges` win (sanitised to a sorted, de-duplicated, finite
+ * set); otherwise round "nice" edges are computed with the same `niceTicks`
+ * machinery the axes use, so bins fall on human numbers (…, 10, 20, 30, …) rather
+ * than 8.33-wide raw slices. Pure and total — returns `[]` when there is neither
+ * data nor a domain to work from.
+ */
+function histogramEdges(nums: readonly number[], options: HistogramOptions): number[] {
+	// Explicit edges win: keep only a sorted, de-duplicated, finite set.
+	if (options.edges) {
+		const clean = Array.from(new Set(options.edges.filter((e) => Number.isFinite(e)))).sort(
+			(a, b) => a - b
+		);
+		if (clean.length >= 2) return clean;
+		// too few usable edges → fall through to computed ones
+	}
+
+	// Domain: a valid override, else the data's own extent.
+	let d0: number;
+	let d1: number;
+	const dom = options.domain;
+	if (dom && Number.isFinite(dom[0]) && Number.isFinite(dom[1]) && dom[0] !== dom[1]) {
+		d0 = Math.min(dom[0], dom[1]);
+		d1 = Math.max(dom[0], dom[1]);
+	} else {
+		d0 = Infinity;
+		d1 = -Infinity;
+		for (const n of nums) {
+			if (n < d0) d0 = n;
+			if (n > d1) d1 = n;
+		}
+		if (!Number.isFinite(d0)) return []; // no data and no domain → nothing to bin
+	}
+
+	// A single distinct value: widen so it still gets a real, centred bin.
+	if (d0 === d1) {
+		d0 -= 0.5;
+		d1 += 0.5;
+	}
+
+	// Bin count: the hint (clamped), else Sturges' rule from the sample size.
+	let k: number;
+	if (options.bins !== undefined && Number.isFinite(options.bins) && options.bins >= 1) {
+		k = Math.min(1000, Math.floor(options.bins));
+	} else {
+		k = Math.max(1, Math.ceil(Math.log2(Math.max(1, nums.length))) + 1);
+	}
+
+	const edges = niceTicks(d0, d1, k);
+	return edges.length >= 2 ? edges : [d0, d1];
+}
+
+/**
+ * Bin a sample of numbers into a frequency histogram — the distribution
+ * counterpart to the categorical BarChart. Blanks and non-finite values are
+ * dropped (never binned as 0), so a missing measurement doesn't invent a count.
+ * Interior edges are half-open `[x0, x1)`; the final bin is closed so the
+ * maximum value lands in it. See `histogramEdges` for how the edges are chosen.
+ * Pure and total — junk input yields `[]` or empty bins, never a throw.
+ */
+export function histogramBins(
+	values: Iterable<unknown>,
+	options: HistogramOptions = {}
+): HistogramBin[] {
+	// Finite numbers only — the same blank discipline as the rest of the family.
+	const nums: number[] = [];
+	for (const v of values) {
+		const n = toNumber(v);
+		if (Number.isFinite(n)) nums.push(n);
+	}
+
+	const edges = histogramEdges(nums, options);
+	if (edges.length < 2) return [];
+
+	const binCount = edges.length - 1;
+	const counts = new Array<number>(binCount).fill(0);
+	const first = edges[0];
+	const last = edges[binCount];
+	for (const v of nums) {
+		if (v < first || v > last) continue; // outside the outermost edges → dropped
+		// Rightmost bin whose lower edge ≤ v; an interior edge goes to the upper
+		// bin ([x0, x1)), and v === last lands in the closed final bin.
+		let i = 0;
+		while (i < binCount - 1 && v >= edges[i + 1]) i++;
+		counts[i]++;
+	}
+
+	const out: HistogramBin[] = [];
+	for (let i = 0; i < binCount; i++) {
+		out.push({ x0: edges[i], x1: edges[i + 1], count: counts[i] });
+	}
+	return out;
+}
+
 /** Fallback hex palette behind the --chart-series-N custom properties, so a
  *  series still has a distinct color if the deck sets no theme vars. Mirrors the
  *  eight-swatch palette named in CHART-1's theming section. */
