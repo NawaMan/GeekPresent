@@ -10,6 +10,7 @@ import type { Point } from '../src/lib/draw/types';
 import { redo, undo } from '../src/lib/stores/layoutHistory';
 import { canLayout, layoutMode } from '../src/lib/stores/layoutMode';
 import DrawEditHost from './DrawEditHost.svelte';
+import PathHost from './PathHost.svelte';
 
 const moveTo = (clientX: number, clientY: number, init: MouseEventInit = {}) =>
 	window.dispatchEvent(new MouseEvent('pointermove', { clientX, clientY, ...init }));
@@ -1020,5 +1021,175 @@ describe('selection + Copy toolbar (LAYOUT mode)', () => {
 		layoutMode.set(false);
 		await tick();
 		expect(container.querySelector('.draw-toolbar')).toBeNull();
+	});
+});
+
+describe('Path editing (LAYOUT mode)', () => {
+	beforeEach(() => {
+		canLayout.set(true);
+		layoutMode.set(true);
+	});
+	afterEach(() => {
+		canLayout.set(false);
+		layoutMode.set(false);
+	});
+
+	// Host Path: start [700,700], arrow="end", segments =
+	//   line → [900,700], quad → [1100,600] c1[1000,700], arc → [1300,600] bend 0.4
+	const pathG = (c: HTMLElement) => c.querySelector('g.draw-path')!;
+	const shaft = (c: HTMLElement) => pathG(c).querySelector('path.draw-path-shaft')!;
+
+	it('renders one handle per vertex — start, each `to`, controls, and arc bend', () => {
+		const { container } = render(DrawEditHost);
+		const g = pathG(container);
+		// start + seg0.to + seg1.to + seg1.c1 + seg2.to + seg2.bend
+		expect(g.querySelectorAll('circle.draw-handle')).toHaveLength(6);
+		expect(g.querySelectorAll('circle.draw-handle.control')).toHaveLength(1); // the curve's c1
+		expect(g.querySelectorAll('circle.draw-handle.bend')).toHaveLength(1); // the arc's apex
+		const guides = g.querySelectorAll('.draw-guide');
+		expect(guides).toHaveLength(2); // c1 → from, c1 → to (the quadratic segment)
+		expect(guides[0].getAttribute('d')).toBe('M 1000 700 L 900 700');
+		expect(guides[1].getAttribute('d')).toBe('M 1000 700 L 1100 600');
+	});
+
+	it('handles and guides never render outside LAYOUT mode', () => {
+		layoutMode.set(false);
+		const { container } = render(DrawEditHost);
+		const g = pathG(container);
+		expect(g.querySelectorAll('circle.draw-handle')).toHaveLength(0);
+		expect(g.querySelectorAll('.draw-guide')).toHaveLength(0);
+		expect(g.querySelector('.draw-hit')).toBeNull();
+	});
+
+	it('dragging the start point re-chains the whole stroke; undo restores', async () => {
+		const { container } = render(DrawEditHost);
+		const startHandle = pathG(container).querySelectorAll('circle.draw-handle')[0];
+		expect(startHandle.getAttribute('cx')).toBe('700'); // the start vertex
+		await grab(startHandle);
+		moveTo(20, -30);
+		release();
+		await tick();
+		expect(shaft(container).getAttribute('d')).toMatch(/^M 720 670 L 900 700 Q 1000 700 1100 600 /);
+
+		undo();
+		await tick();
+		expect(shaft(container).getAttribute('d')).toMatch(/^M 700 700 L 900 700 Q 1000 700 1100 600 /);
+	});
+
+	it('Copy emits the whole <Path> tag with the live start point after a drag', async () => {
+		const writeText = vi.fn().mockResolvedValue(undefined);
+		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+		const { container } = render(DrawEditHost);
+		await grab(pathG(container).querySelectorAll('circle.draw-handle')[0]); // start, also selects
+		moveTo(20, -30);
+		release();
+		await tick();
+
+		(container.querySelector('.draw-toolbar .tb-copy') as HTMLButtonElement).click();
+		await tick();
+		expect(writeText).toHaveBeenCalledWith(
+			'<Path name="route" start={[720, 670]} segments={[{ to: [900, 700] }, { to: [1100, 600], c1: [1000, 700] }, { to: [1300, 600], bend: 0.4 }]} arrow="end" />'
+		);
+		undo();
+	});
+
+	// The demo authors these Paths on ONE line each so the LAYOUT "Save"
+	// endpoint (literal indexOf(oldTag) in patchSource) can find and rewrite
+	// them. This pins that canonical single-line form: an author selecting the
+	// shape and hitting Copy must get back the exact string sitting in source.
+	it('a Path Copies back its exact canonical single-line source tag (Save round-trip)', async () => {
+		const writeText = vi.fn().mockResolvedValue(undefined);
+		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+		const { container } = render(PathHost);
+		const paths = container.querySelectorAll('g.draw-path');
+
+		const copyOf = async (g: Element) => {
+			const ev = new MouseEvent('pointerdown', { bubbles: true });
+			Object.defineProperty(ev, 'pointerId', { value: 1 });
+			g.querySelector('.draw-hit')!.dispatchEvent(ev);
+			await tick();
+			writeText.mockClear();
+			(container.querySelector('.draw-toolbar .tb-copy') as HTMLButtonElement).click();
+			await tick();
+			return writeText.mock.calls[0][0] as string;
+		};
+
+		expect(await copyOf(paths[0])).toBe(
+			'<Path name="flow" start={[200, 620]} segments={[{ to: [520, 620] }, { to: [820, 470], c1: [670, 620] }, { to: [1180, 470], bend: 0.5 }, { to: [1520, 620], c1: [1360, 470], c2: [1400, 620] }]} arrow="end" color="#2980b9" thickness={6} label="a straight line, a curve, an arc and a cubic chained into one arrow" labelText="one continuous stroke" labelAt={0.4} labelOffset={40} />'
+		);
+		expect(await copyOf(paths[1])).toBe(
+			'<Path name="wave" start={[220, 940]} segments={[{ to: [480, 940], bend: 0.6 }, { to: [740, 940], bend: -0.6 }, { to: [1000, 940], bend: 0.6 }, { to: [1260, 940], bend: -0.6 }, { to: [1520, 940], bend: 0.6 }]} color="#f39c12" thickness={5} label="a serpentine of alternating arcs drawing itself on as one stroke" draw={2.5} />'
+		);
+	});
+
+	it('the arc bend handle rides the apex; dragging it across the chord retimes bend', async () => {
+		const writeText = vi.fn().mockResolvedValue(undefined);
+		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+		const { container } = render(DrawEditHost);
+		const bendHandle = pathG(container).querySelector('circle.draw-handle.bend')!;
+		// apex of arc from[1100,600]→to[1300,600] bend 0.4: midpoint [1200,600]
+		// offset up by the sagitta (80) → [1200, 520].
+		expect(bendHandle.getAttribute('cx')).toBe('1200');
+		expect(bendHandle.getAttribute('cy')).toBe('520');
+		await grab(bendHandle);
+		moveTo(0, 100); // apex → [1200, 620]: across the chord, bend flips to −0.1
+		release();
+		await tick();
+
+		(container.querySelector('.draw-toolbar .tb-copy') as HTMLButtonElement).click();
+		await tick();
+		expect(writeText).toHaveBeenCalledWith(
+			'<Path name="route" start={[700, 700]} segments={[{ to: [900, 700] }, { to: [1100, 600], c1: [1000, 700] }, { to: [1300, 600], bend: -0.1 }]} arrow="end" />'
+		);
+		undo();
+	});
+});
+
+describe('animated-Path stop editing (LAYOUT mode)', () => {
+	beforeEach(() => {
+		canLayout.set(true);
+		layoutMode.set(true);
+	});
+	afterEach(() => {
+		canLayout.set(false);
+		layoutMode.set(false);
+	});
+
+	// The host's animated Path (`morph`, stops + animate) is the second g.draw-path.
+	const morphG = (c: HTMLElement) => c.querySelectorAll('g.draw-path')[1];
+
+	it('generates sampled morph keyframes and one handle set per stop pose', () => {
+		const { container } = render(DrawEditHost);
+		const g = morphG(container);
+		expect(g.querySelector('style')!.textContent).toContain('@keyframes draw-move-');
+		// 2 stops × (start + 2 segment `to`s) = 6; the later (100%) stop's are hollow.
+		expect(g.querySelectorAll('circle.draw-handle')).toHaveLength(6);
+		expect(g.querySelectorAll('circle.draw-handle.control')).toHaveLength(3);
+	});
+
+	it('Copy round-trips the stops + animate; a stop drag rewrites its pose (undo restores)', async () => {
+		const writeText = vi.fn().mockResolvedValue(undefined);
+		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+		const { container } = render(DrawEditHost);
+		// drag the 100% stop's start handle (a hollow handle at [700,900]) up-left
+		const handle = morphG(container).querySelectorAll('circle.draw-handle')[3];
+		await grab(handle);
+		moveTo(20, -30);
+		release();
+		await tick();
+
+		(container.querySelector('.draw-toolbar .tb-copy') as HTMLButtonElement).click();
+		await tick();
+		const tag = writeText.mock.calls[0][0] as string;
+		expect(tag).toContain('animate={2}');
+		expect(tag).toContain('stops={[');
+		expect(tag).toContain('start: [720, 870]'); // the dragged 100% stop gained an explicit start
+
+		undo();
+		await tick();
+		writeText.mockClear();
+		(container.querySelector('.draw-toolbar .tb-copy') as HTMLButtonElement).click();
+		await tick();
+		expect(writeText.mock.calls[0][0] as string).not.toContain('start: [720, 870]');
 	});
 });

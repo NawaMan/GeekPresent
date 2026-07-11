@@ -1022,10 +1022,76 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
       per-cell aria-labels, the blank drawn empty, `color-mix` fills, the legend), DOM tests in
       `tests/Charts.test.ts` (cell count, labels, empty-cell class, `showValues`, no reveal clip
       by default). New `--chart-heat-*` role tokens.
-- [ ] **Multi-segment path** — one `Draw` shape whose geometry chains several segments
+- [x] **Multi-segment path** — one `Draw` shape whose geometry chains several segments
       (line + curve + arc) instead of composing separate `Line` / `Curve` / `Arc` elements.
   - Gives a single continuous stroke: one `draw`/`drawDelay` reveal, one arrowhead at the
     real end, joins that meet cleanly instead of butting stroke caps together.
+  - Done: `src/lib/draw/Path.svelte`, with the chaining/geometry in `drawCore.ts`
+    (`pathShapes`/`multiPath` + the `pointAtMulti`/`angleAtMulti`/`labelPosMulti`
+    evaluators — pure, total, the family's `drawCore` discipline: junk in yields `[]`
+    or `''`, never a throw or a `NaN` in the `d`).
+  - **The route is authored as a `start` point + a `segments` list**, each segment's
+    start defaulting to the previous one's `to` — so a whole path is a start plus a
+    list of destinations, not a pile of `<Line>/<Curve>/<Arc>` tags whose endpoints
+    must be kept in sync by hand. **The KIND is inferred from the control data**
+    present: `bend` → arc, `c1`(/`c2`) → curve (quadratic/cubic), neither → line
+    (`bend` wins if both are given). An explicit per-segment `from` lifts the pen for
+    a disjoint sub-path.
+  - **It is ONE `<path>`, which is the whole point.** `multiPath` concatenates each
+    segment's builder and **drops the redundant leading `M`** wherever a segment
+    starts exactly where the previous ended (the pen is already there) — so the chain
+    is a single sub-path with `stroke-linejoin: round`, joins that MEET instead of
+    butting stroke caps. A segment whose `from` differs keeps its `M` (a genuine
+    gap), so disjoint runs render as gaps, never a spurious connector. That single
+    path gets **one `draw`/`drawDelay` reveal** for the whole route (`pathLength=1`,
+    CSS-only — prerenders, `AnimationBar` scrubs it) and **one arrowhead at the real
+    end**: only the last shape's tail (and, for `arrow="start"`, the first shape's
+    start) is trimmed behind its head via `shortenShape`, the middle joins untouched
+    — Arc's shaft trick applied to the ends of a chain. The head's tip and tangent
+    come from the ORIGINAL end shape (`angleAt(shape, 1)`), so it lands exactly on
+    `to`.
+  - Renders geometry + reveal + arrowheads + a `labelText` (placed by `labelPosMulti`,
+    the arc-length twin of `labelPos`).
+  - **Geometry keyframes (`stops` + `animate`), now shipped** — the whole chain morphs
+    between poses on the AnimationBar timeline, the same model as `Line`/`Curve`/`Arc`
+    (heads/label ride transform keyframes; an independent `drawn` reveal track; the
+    toolbar's per-stop **keyframes** panel; per-stop on-canvas handles). The one real
+    difference: a single Line/Curve/Arc tweens `d: path()` exactly, but a Path's command
+    structure varies across segments (and arc flags don't interpolate), so the geometry
+    track **samples each pose into a fixed-count polyline** (`sampleMultiPath` over
+    `pointAtMulti`) — constant command count at every stop ⇒ a smooth morph regardless of
+    segment mix. The static (no-CSS) render still uses the exact `multiPath` and
+    prerenders. New `PathStop` type (`{ pct, start?, segments?, drawn?, ease? }` — a full
+    pose per stop, like `SpriteStop`). Tests: `sampleMultiPath` unit (constant L-count
+    across kinds), DOM keyframes (sampled `d:path` frames, head/label transforms, reveal
+    track, `stops` beats `draw`, <2 stops = no anim), SSR (morph keyframes prerender),
+    and animated-stop editing (per-stop handle set, stop-drag → Copy round-trips
+    `stops`/`animate`, undo restores).
+  - **LAYOUT-editable like `Line`/`Curve`/`Arc`** (the follow-on, now shipped): with
+    the deck's LAYOUT control on, every vertex grows a handle — the `start` point, each
+    segment's `to`, a hollow control handle per Bézier control point (with the guide
+    line), an explicit-`from` handle for a disjoint sub-path, and an accent **bend
+    handle at each arc's apex** (dragging across the chord flips the sign via
+    `bendFromApex`, the same inverse `Arc` uses). It registers a `ShapeEditor` so the
+    Draw toolbar's **Copy** emits the whole `<Path start=… segments=[…]>` tag with the
+    live geometry — attribute order matches Copy, so a drag → Copy → paste is a
+    numbers-only diff. Edits are finder state (reset on reload; Copy → paste is the
+    only persistence) and every completed drag records to the LAYOUT undo/redo.
+    Generalizing `Curve`/`Arc`'s per-endpoint editing over a *list*, the one new
+    wrinkle is index alignment: `pathShapes` drops a malformed (no-`to`) segment, so
+    per-segment handles gate on `shapes.length === segments.length` (they'd otherwise
+    mis-map onto the wrong segment) — the hit stroke + start handle stay live either
+    way. Tests in `tests/DrawEditing.test.ts` + `DrawEditHost.svelte` (handle-per-vertex
+    count, guides, start-drag re-chains the stroke, the arc bend handle rides the apex
+    and flips to −0.1 across the chord, Copy emits the live tag, undo restores).
+  - Demo `path-component.html` (a headline `Path` chaining line → curve → arc → cubic
+    into one end arrow, plus a serpentine of alternating arcs drawing itself on as one
+    stroke), unit tests in `tests/drawCore.test.ts` (chaining/kind-inference/`bend`
+    precedence/gap/dropped-`M`/the evaluators/all the bad inputs), SSR assertion +
+    host in `tests/DrawSsr(.ssr).test.ts`/`DrawSsrHost.svelte` (the continuous `d`
+    prerenders, the head tip lands on the last `to`), DOM tests in `tests/Draw.test.ts`
+    (one path, one head, round joins, the single draw-on reveal, the empty-list
+    no-render). No new role tokens — it reuses the `--draw-*` family.
 
 ## Authoring / LAYOUT mode
 

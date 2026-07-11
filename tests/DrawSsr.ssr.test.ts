@@ -25,6 +25,15 @@ describe('Draw (SSR)', () => {
 		expect(body).toContain('"900,700 '); // …whose head tip still lands exactly on `to`
 		expect(body).toContain('A 623.33 623.33 0 0 1 1500 540'); // the Arc from bend=0.3
 		expect(body).toContain('>round trip</text>'); // the visible Arc label
+		// The multi-segment Path: line → curve → arc, all in ONE continuous <path>
+		// (the redundant Ms dropped so the chain is a single sub-path).
+		expect(body).toContain('d="M 200 300 L 500 300 Q 650 300 800 150 '); // line then quadratic, no second M
+		expect(body).toContain('1150,150'); // its end arrowhead tip lands exactly on the last `to`
+		expect(body).toContain('>route</text>'); // the Path's visible label
+		expect(body).toContain('stroke-linejoin="round"'); // clean joins, not butting caps
+		// The animated Path: geometry keyframes prerender as sampled d:path() frames.
+		expect(body).toContain('@keyframes draw-move-'); // its morph keyframes, server-side
+		expect(body).toContain('d: path("M 100 460 '); // a sampled pose (raw via @html)
 		expect(body).toContain('pathLength="1"'); // draw-on plumbing, CSS-only
 		expect(body).toContain('animation-duration:1.5s'); // …with its duration inline
 		expect(body).toContain('<foreignObject'); // the Sprite's moving HTML element

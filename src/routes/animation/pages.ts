@@ -9,6 +9,7 @@ export const pages = [
     // The animated Draw family.
     { path: "draw-animation.html",    title: "Draw — Animated Diagram" },
     { path: "draw-move.html",         title: "Draw — Keyframed Geometry" },
+    { path: "path-move.html",         title: "Path — Keyframed Geometry" },
     { path: "draw-progress.html",     title: "Draw — Keyframed Progress" },
     { path: "draw-sprite.html",       title: "Draw — Flying Sprite" },
     { path: "sprite-multi.html",      title: "Draw — Sprites × Many" },
