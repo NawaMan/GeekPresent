@@ -7,6 +7,13 @@ import { defineConfig } from 'vitest/config';
 // plugin still picks up svelte.config.js (vitePreprocess for lang="ts").
 export default defineConfig({
 	plugins: [svelte(), svelteTesting()],
+	// The one build-time global vite.config.ts injects (see $lib/seo/config.ts).
+	// Anything that pulls in <Seo> — which means anything that renders <SlideDeck> —
+	// hits a bare ReferenceError without it. The value is irrelevant to the tests;
+	// its presence is not.
+	define: {
+		__GEEKPRESENT_SITE_URL__: JSON.stringify('https://example.test')
+	},
 	resolve: {
 		alias: {
 			// SvelteKit aliases for the standalone test build: $lib as usual;

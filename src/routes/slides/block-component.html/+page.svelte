@@ -60,10 +60,10 @@
 <!-- Stacking order: `front` comes FIRST in the markup, so DOM paint order alone
      would bury it — but z={1} lifts it over `back` (default z=0). Flip LAYOUT on
      and use the ⤒ / ⤓ buttons to reorder them; Copy/Save writes the z back. -->
-<Block name="front" x={1331} y={310} width={280} height={168} z={1}>
+<Block name="front" x={1443} y={278} width={280} height={168} z={1}>
 	<div class="demo c"><b>front</b><br/>z=1</div>
 </Block>
-<Block name="back" x={1518} y={399} width={280} height={168}>
+<Block name="back" x={1580} y={344} width={280} height={168}>
 	<div class="demo d"><b>back</b><br/>z=0 (default)</div>
 </Block>
 

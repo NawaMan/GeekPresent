@@ -1155,29 +1155,92 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
 
 ## Authoring / LAYOUT mode
 
-- [ ] **LAYOUT visible in production (demo mode)** — let a deployed deck *show* LAYOUT so a
+- [x] **LAYOUT visible in production (demo mode)** — let a deployed deck *show* LAYOUT so a
       talk can demonstrate the authoring workflow live, with SAVE reading **NOT ALLOWED**.
-  - Half of this exists: `canLayout` (`stores/layoutMode.ts`) is already true in `vite dev`
-    and opt-in-able on a built site via the sticky `?layout` flag. What's missing is a way to
-    ship a deck with it **on by default** — a build/deck-level option, not a URL flag the
-    speaker must remember to type on stage.
-  - SAVE is the real work. Today `canSave = import.meta.env.DEV` (`SlideDeck.svelte:192`)
-    and the button is simply **not rendered** in a build — so a production LAYOUT demo shows
-    a mode with a hole where its payoff should be. Instead render SAVE **disabled**, labelled
-    **`NOT ALLOWED`**, so the audience sees the affordance and immediately understands why it
-    can't fire here: `saveLayout()` POSTs to `/__geekpresent/layout-save`, a *vite-dev-server*
-    endpoint (`layout/devSavePlugin.ts`) that rewrites the slide's Svelte source. There is no
-    source tree to rewrite on a static host — this is a genuine boundary, not a lock to pick.
-  - `NOT ALLOWED`, not `NO SAVE`: the point is that saving is *forbidden here*, which is what
-    the demo is teaching. "NO SAVE" only reports that it's absent, and leaves the audience to
-    guess whether the feature is missing, broken, or withheld.
-  - Cost of that wording: the SAVE button pins its width so the label can swap
-    (SAVE → SAVED / NONE / ERROR) without shifting the control row, and `NOT ALLOWED` is
-    longer than any of those. Re-measure the pinned width (or let this one state widen the
-    button) — a shifting row is the lesser evil against a label that doesn't say why.
-  - Everything else in LAYOUT already works in a build (drag, resize, handles, **Copy** —
-    which is the paste-it-yourself path and needs no server), so the demo is honest: you can
-    show the whole loop except the write-back.
+  - Done, and the opt-in is **per SLIDE, not per deck**: `layout: true` on a slide's
+    `pages.ts` entry (`Page.layout`). LAYOUT stays **off in production** deck-wide; the 14
+    slides that *teach* it — the ones whose own prose says "flip LAYOUT and drag this box" —
+    offer the control in the BUILD. The criterion is exactly that: if the slide tells the
+    audience to press the button, the button had better be there. A deck-wide `layout` prop
+    on `SlideDeck` survives for the rare deck that is *entirely* about authoring.
+    **`layout-mode.html`** is the demo — it explains the flag while the flag's own button
+    sits lit in the chrome above it, and its Blocks really drag in the deployed build.
+  - **Offered ≠ active.** The flag only puts the button in the chrome; `layoutMode` still
+    starts off, so the audience sees a normal slide until the speaker flips it. Nothing had
+    to change in `Block`/`Draw`/`Columns` for this: they already gate on
+    `$canLayout && $layoutMode`, so a stale persisted mode is inert on a slide that doesn't
+    offer the control.
+  - **Precedence is the design, so it moved to a pure core**: `layout/layoutAccessCore.ts`
+    (`readSticky` / `readLayoutParam` / `resolveCanLayout` — pure, total,
+    `drawCore`/`connectorCore` discipline: a corrupt localStorage value, a URL with no query,
+    a bare `?layout=`, each has one defined answer). The order is **dev > the speaker's
+    sticky `?layout` > what the slide declares > off**. Two consequences worth keeping: a
+    garbage sticky value resolves to "no choice" and falls THROUGH to the slide's declaration
+    rather than vetoing it (one bad byte must not silently hide a demo slide's button); and
+    `?layout=off` still outranks the flag, so a demo slide can be hushed for a run-through.
+  - **The LAYOUT button is featured where the slide teaches it** — a filled warm pill
+    (`--ctrl-featured-fg` on `--ctrl-featured-on`) with a halo pulsing out of it, instead of
+    the chrome grey that is *designed* to be missed. Only on a slide that declared the flag:
+    where LAYOUT merely happens to be around (dev, or a sticky `?layout` set three slides
+    ago) it stays muted, because a tool that shouts on every slide is just noise.
+  - **`fadeChrome` was the real obstacle, and restyling alone would not have beaten it.** The
+    `/slides` deck sets `fadeChrome`, which drops `.gp-chrome` to **`opacity: 0.12`** until
+    pointed at — and that multiplies over whatever colour the button wears, so the first cut's
+    warm accent was still a 12% ghost on precisely the slides that tell the audience to look
+    at it. A featuring slide now opts its chrome OUT of the fade
+    (`.slide-chrome.featuring { opacity: 1 }`, which beats the fade rule on specificity). The
+    whole cluster stays lit, not just LAYOUT: parent opacity can't be undone by a child, and
+    on a slide whose subject IS the chrome, chrome that hides is the wrong default.
+  - The halo **stops once the button is used** (`calling` = featured && !layoutMode): it says
+    "find me", so it has no business still pulsing after it's been found. The pill geometry is
+    kept in BOTH states, so toggling only recolours the button (warm → CtrlBtn's selected
+    green) and the control row never jiggles. The halo rides an `::after` on the wrapper rather
+    than a `box-shadow`, so it needs no alpha colour (role tokens are opaque hex by
+    convention); it's dropped under `prefers-reduced-motion`, since the fill already carries
+    the message and the motion is only an attention-getter.
+  - **SAVE looks normal and refuses on CLICK**, rather than sitting there pre-emptively
+    greyed out. Press it on a static build and the label flips to `NOT ALLOWED` for ~2.6s with
+    a tooltip: *"Save not allowed in this setup."* That ordering is the whole point. A button
+    disabled from the start invites the audience to assume the feature is missing or broken; a
+    button that answers when pressed teaches them saving is *forbidden here*, and why.
+    `NOT ALLOWED`, not `NO SAVE`, for the same reason — the latter reports absence and explains
+    nothing.
+  - **`canSave` had to stop being a `const`.** As `const canSave = import.meta.env.DEV` it read
+    as a compile-time branch guard and Vite dead-code-eliminated the whole SAVE affordance out
+    of every build — the hole the demo was showing. It is now a **store** in
+    `stores/layoutMode.ts`, so the refusal path survives into the bundle as a real runtime
+    choice (verified: the tooltip string is present in the built chunk). Being settable is also
+    the only reason a test can reach the built-site case at all, since `import.meta.env.DEV` is
+    true under vitest.
+  - The boundary is genuine, not a lock to pick: `saveLayout()` POSTs to
+    `/__geekpresent/layout-save`, a *vite-dev-server* endpoint (`layout/devSavePlugin.ts`) that
+    rewrites the slide's Svelte source. A static host has no source tree. **Copy** is the
+    write-back path that works everywhere, so the demo is honest: the whole loop, and exactly
+    where it stops.
+  - **The width pin stayed at `4.6em`.** It exists so SAVE↔SAVED/NONE/ERROR can't shift the
+    control row. `NOT ALLOWED` is far wider than any of those, and reserving room for it would
+    pad the button with dead space on every slide to spare one transient state a nudge — so it
+    is deliberately *not* in the pin. The button grows while the refusal is up, then settles;
+    the row moves BECAUSE of the click the audience just watched, so it reads as the answer,
+    not as a glitch.
+  - Two new role tokens. **`--ctrl-featured-fg`** (`var(--ACCENT-WARM, #F0A33E)`) for a chrome
+    control the slide *wants* pressed, and **`--ctrl-forbidden-fg`** (`var(--DANGER, #E5484D)`)
+    for one refusing and saying so. Both are distinct from `--ctrl-disabled-fg`, which recedes
+    — right for a control nobody should notice, wrong for these two, whose entire job is to be
+    read from the back of a room. `layout-mode.html`'s own prose reuses both tokens, so the
+    words on the slide and the buttons they describe are literally the same colour.
+  - Tests: `tests/layoutAccess.test.ts` (the pure precedence + both parsers, garbage included —
+    and the *only* place the built-ordinary-slide-is-OFF case can be pinned, since the DOM
+    project runs with `DEV=true`), `tests/SlideDeckSave.test.ts` (DOM — featured only on a
+    declaring slide; SAVE enabled and ordinary; click → `NOT ALLOWED` + the tooltip, with
+    `role="status"` so it's announced), and `tests/SlideDeckSaveSsr.ssr.test.ts` (**no authoring
+    chrome prerenders**, forced worst case — now that LAYOUT is *allowed* into a build, a stray
+    `NOT ALLOWED` baked into every static page is a live failure mode rather than an impossible
+    one).
+  - Note for the next person: rendering `SlideDeck` in a test needed
+    `__GEEKPRESENT_SITE_URL__` added to the `define` block of **both** vitest configs — it
+    pulls in `<Seo>`, which reads that build-time global. Nothing had rendered the deck shell
+    in a test before, which is why this only surfaced now.
 
 - [x] **`Block` z-index control** — author-controlled stacking order for overlapping `Block`s.
   - Problem: overlapping Blocks paint in DOM order, so a lower Block sits beneath a

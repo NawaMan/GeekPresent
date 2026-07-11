@@ -21,6 +21,10 @@
 	// Must be set here, not in SlideDeck: the slotted slides read THIS layout's
 	// context, not the shell's.
 	setPages(pages);
+
+	// NOTE: LAYOUT is off in this build by default, deck-wide. The slides that TEACH it
+	// opt in one by one, via `layout: true` on their own pages.ts entries — see
+	// layout-mode.html. Nothing here needs to change for that.
 </script>
 
 <svelte:head>

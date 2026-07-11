@@ -73,8 +73,13 @@ defaults. **Destructive steps confirm** unless `--yes` is set. Nothing is commit
   — read them to learn the components, but they are gitignored and not built.
 - **Place elements visually with LAYOUT mode.** To position things at exact canvas pixels, wrap
   them in `Block` / `ImageBlock` and toggle **LAYOUT mode** (an authoring aid, on in `pnpm dev`)
-  to drag/resize, then Copy the tag back into source. It saves nothing and is OFF on the deployed
-  site (a sticky `?layout` flag re-enables it there). Full playbook in `<dir>/AGENTS.md`.
+  to drag/resize, then **Copy** the tag back into source — or hit **SAVE**, which in `pnpm dev`
+  writes the moved `Block`s straight into the slide's `.svelte` file. SAVE goes through the vite
+  dev server, so on a static site it has no source tree to write to: there it refuses on click
+  (**NOT ALLOWED**, with a tooltip) and Copy is the way back. LAYOUT is OFF on the deployed site;
+  a sticky `?layout` flag re-enables it, and a slide that *teaches* layout can offer it in the
+  build with `layout: true` in its `pages.ts` entry (available, not active — the mode still
+  starts off). Full playbook in `<dir>/AGENTS.md`.
 - **Build locally** (no host toolchain needed if CodingBooth is present):
   ```bash
   cd <dir> && ./booth -- ./build-static.sh ./dist --zip   # or: pnpm install && ./build-static.sh ./dist
