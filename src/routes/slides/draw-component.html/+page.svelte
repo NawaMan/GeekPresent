@@ -13,6 +13,7 @@
 -->
 <script lang="ts">
 	import ContentPage from '$lib/templates/ContentPage.svelte';
+	import AnimationBar from '$lib/components/AnimationBar.svelte';
 	import QuickCode from '$lib/components/QuickCode.svelte';
 	import Label from '$lib/components/Label.svelte';
 	import Block from '$lib/components/Block.svelte';
@@ -36,6 +37,8 @@
 			line; nothing is saved behind your back. Moved several shapes?
 			<b>Copy changed (N)</b> grabs one OLD/NEW patch of all of them — paste it
 			to your AI assistant (or apply it by hand) to update the source in one go.
+			Each shape also carries a staggered <Label>draw</Label>/<Label>drawDelay</Label>,
+			so <b>ANIMATE</b> replays the whole diagram building itself on one timeline.
 		</p>
 		<QuickCode style="margin-top: 0.5em;" lang="svelte" code={`<Arc name="request" from={[510, 760]} to={[1410, 760]} bend={0.124} arrow="end" />
 <!-- LAYOUT → drag → Copy → paste that one line back -->`} />
@@ -57,16 +60,26 @@
      drag → Copy → paste-over shows up as a numbers-only diff. -->
 <Draw title="Request flow annotation" name="flow"
 	description="A labelled arc from the client box to the server box, a dashed response line back, a rounded frame around the server, a smooth polyline drawing itself on, and a curve arrow onto the word 'here', circled by an ellipse.">
-	<Arc name="request" from={[510, 760]} to={[1410, 760]} bend={0.124} arrow="end" thickness={6} label="request from client to server" labelText="request" />
-	<Line name="response" from={[845, 816]} to={[509, 820]} arrow="end" color="#00b356" dash label="response from server to client" labelText="response" labelOffset={28} />
-	<Rect name="frame" rounded={16} color="#2980b9" x={1395} y={675} width={370} height={190} />
-	<!-- Smooth Polyline (Catmull-Rom through every point) drawing itself in 2s. -->
-	<Polyline points={[[180, 1000], [400, 950], [620, 1020], [900, 1010]]} smooth draw={2} color="#f39c12" label="a smooth polyline drawing itself" />
-	<Curve name="hop" from={[847, 818]} to={[1143, 992]} c1={[991, 882]} arrow="end" color="#e74c3c" label="curve arrow onto the word 'here'" />
-	<Ellipse name="ring" color="#e74c3c" label="the word 'here', circled" x={1160} y={950} width={200} height={90} />
+	<!-- Each shape carries a staggered draw/drawDelay, so ANIMATE builds the whole
+	     diagram beat by beat on one timeline: request (0–1.2s), response
+	     (1.2–2.2), the frame (2.2–3.2), the polyline (3.2–4.4), the hop
+	     (4.4–5.4), then the ring closes it (5.4–6.2). Arrowheads and labels ride
+	     their own shape's timing. -->
+	<Arc name="request" from={[510, 760]} to={[1410, 760]} bend={0.124} arrow="end" thickness={6} label="request from client to server" labelText="request" draw={1.2} />
+	<Line name="response" from={[845, 816]} to={[509, 820]} arrow="end" color="#00b356" dash label="response from server to client" labelText="response" labelOffset={28} draw={1} drawDelay={1.2} />
+	<Rect name="frame" rounded={16} color="#2980b9" draw={1} drawDelay={2.2} x={1395} y={675} width={370} height={190} />
+	<!-- Smooth Polyline (Catmull-Rom through every point) drawing itself in. -->
+	<Polyline points={[[180, 1000], [400, 950], [620, 1020], [900, 1010]]} smooth color="#f39c12" label="a smooth polyline drawing itself" draw={1.2} drawDelay={3.2} />
+	<Curve name="hop" from={[847, 818]} to={[1143, 992]} c1={[991, 882]} arrow="end" color="#e74c3c" label="curve arrow onto the word 'here'" draw={1} drawDelay={4.4} />
+	<Ellipse name="ring" color="#e74c3c" label="the word 'here', circled" draw={0.8} drawDelay={5.4} x={1160} y={950} width={200} height={90} />
 	<!-- Raw SVG passes straight through (escape hatch). -->
 	<circle cx="960" cy="790" r="10" fill="currentColor" />
 </Draw>
+
+<!-- ANIMATE opens a scrub bar over the slide's finite animations — the shapes'
+     staggered draw/drawDelay reveals, one envelope. Pause, scrub or restart the
+     whole build-up like any slide animation. -->
+<AnimationBar />
 
 <ViewSource {source} {path} />
 

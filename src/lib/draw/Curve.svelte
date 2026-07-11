@@ -47,7 +47,8 @@
 		reverseShape,
 		round,
 		shortenShape,
-		snapToAngles
+		snapToAngles,
+		unwrapAngles
 	} from './drawCore';
 	import {
 		DRAW_CONTEXT_KEY,
@@ -255,22 +256,27 @@
 				.join(' ');
 			css += `@keyframes ${animName} { ${shaftFrames} }`;
 			if (atEnd) {
+				// Unwrap the tangent angles across stops so the head takes the SHORTEST
+				// rotation between keyframes — a curve's end tangent can jump the atan2
+				// branch cut between poses, otherwise spinning the head the long way.
+				const angles = unwrapAngles(geomStops.map((g) => angleAt(g.shape, 1)));
 				const frames = geomStops
-					.map((g) =>
+					.map((g, i) =>
 						frame(
 							g.pct,
-							`transform: translate(${round(g.shape.to[0])}px, ${round(g.shape.to[1])}px) rotate(${deg(angleAt(g.shape, 1))}deg);${tf(g.ease)}`
+							`transform: translate(${round(g.shape.to[0])}px, ${round(g.shape.to[1])}px) rotate(${deg(angles[i])}deg);${tf(g.ease)}`
 						)
 					)
 					.join(' ');
 				css += ` @keyframes ${animName}-end { ${frames} }`;
 			}
 			if (atStart) {
+				const angles = unwrapAngles(geomStops.map((g) => angleAt(g.shape, 0) + Math.PI));
 				const frames = geomStops
-					.map((g) =>
+					.map((g, i) =>
 						frame(
 							g.pct,
-							`transform: translate(${round(g.shape.from[0])}px, ${round(g.shape.from[1])}px) rotate(${deg(angleAt(g.shape, 0) + Math.PI)}deg);${tf(g.ease)}`
+							`transform: translate(${round(g.shape.from[0])}px, ${round(g.shape.from[1])}px) rotate(${deg(angles[i])}deg);${tf(g.ease)}`
 						)
 					)
 					.join(' ');

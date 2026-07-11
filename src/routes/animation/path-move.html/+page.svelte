@@ -38,14 +38,19 @@
 			travelling together. A lone Line/Curve/Arc tweens <code>d: path()</code>
 			exactly, but a chain's command structure varies across segments — so a Path
 			<b>samples</b> each pose into a fixed-count polyline that morphs smoothly.
-			Flip <b>LAYOUT</b> to drag any stop's handle or add keyframes from the panel;
-			press <b>ANIMATE</b> and <b>drag</b> the bar to park it anywhere.
+			A stop's <code>drawn</code> (0–1) is an <b>independent</b> track: here the
+			stroke is only <b>75%</b> drawn at the <code>50%</code> mark, so the line
+			paints in ahead of — then settles with — the morph. Flip <b>LAYOUT</b> to
+			drag any stop's handle or retime its <b>keyframes</b> (each row has a
+			<code>drawn</code> field); press <b>ANIMATE</b> and <b>drag</b> the bar to
+			park it anywhere.
 		</p>
 		<QuickCode style="margin-top: 0.5em;" lang="svelte" code={`<Path start={[260, 820]}
   segments={[{ to: [700, 820] }, { to: [1140, 820], c1: [920, 820] }, { to: [1580, 820], bend: 0 }]}
   stops={[
-    { pct: 0,   segments: [{ to: [700, 820] }, { to: [1140, 820], c1: [920, 820] }, { to: [1580, 820], bend: 0 }] },
-    { pct: 100, segments: [{ to: [700, 520] }, { to: [1140, 780], c1: [920, 320] }, { to: [1580, 540], bend: 0.55 }] }
+    { pct: 0,   segments: [{ to: [700, 820] }, …, { to: [1580, 820], bend: 0 }],    drawn: 0 },
+    { pct: 50,  drawn: 0.75 },  // ← 75% drawn at half-time, independent of the morph
+    { pct: 100, segments: [{ to: [700, 520] }, …, { to: [1580, 540], bend: 0.55 }], drawn: 1 }
   ]} animate={4} arrow="end" />`} />
 	</div>
 </ContentPage>
@@ -63,7 +68,7 @@
 
 <Draw title="A multi-segment route sweeping from a flat baseline up into a peak" name="route"
 	description="A single Path chaining a line, a curve and an arc, animating from a flat baseline at 0% up into a peaked profile at 100%; the arrowhead and the route label travel with the moving end.">
-	<Path name="route" start={[260, 820]} segments={[{ to: [700, 820] }, { to: [1140, 820], c1: [920, 820] }, { to: [1580, 820], bend: 0 }]} stops={[{ pct: 0, segments: [{ to: [700, 820] }, { to: [1140, 820], c1: [920, 820] }, { to: [1580, 820], bend: 0 }] }, { pct: 100, segments: [{ to: [700, 520] }, { to: [1140, 780], c1: [920, 320] }, { to: [1580, 540], bend: 0.55 }] }]} animate={4} arrow="end" color="#f39c12" thickness={6} label="a multi-segment route sweeping from a flat baseline up into a peaked profile" labelText="route" labelOffset={34} />
+	<Path name="route" start={[260, 820]} segments={[{ to: [700, 820] }, { to: [1140, 820], c1: [920, 820] }, { to: [1580, 820], bend: 0 }]} stops={[{ pct: 0, segments: [{ to: [700, 820] }, { to: [1140, 820], c1: [920, 820] }, { to: [1580, 820], bend: 0 }], drawn: 0 }, { pct: 50, drawn: 0.75 }, { pct: 100, segments: [{ to: [700, 520] }, { to: [1140, 780], c1: [920, 320] }, { to: [1580, 540], bend: 0.55 }], drawn: 1 }]} animate={4} arrow="end" color="#f39c12" thickness={6} label="a multi-segment route sweeping from a flat baseline up into a peaked profile" labelText="route" labelOffset={34} />
 </Draw>
 
 <!-- The ANIMATE control: opens into a bar whose playhead you drag — the Path's

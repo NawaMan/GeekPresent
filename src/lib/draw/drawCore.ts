@@ -621,6 +621,33 @@ export function labelPosMulti(shapes: PathShape[], at = 0.5, offset = 20): Point
 	return [round(x + Math.sin(a) * o), round(y - Math.cos(a) * o)];
 }
 
+/** Unwrap a sequence of angles (radians) so CONSECUTIVE values differ by at most
+ *  π — adding/subtracting 2π multiples so a rotation keyframe track takes the
+ *  SHORTEST path between stops instead of spinning the long way (or several full
+ *  turns) when a raw angle jumps the atan2 branch cut or, for an arc, comes back
+ *  un-normalized (its tangent is `a0 + delta ± π/2`, which can exceed 2π). The
+ *  first element is normalized to (-π, π]; each later one is shifted to sit
+ *  within π of its predecessor. Without this an arrowhead riding a Path's end
+ *  tangent whirls a full turn between keyframes. */
+export function unwrapAngles(angles: number[]): number[] {
+	if (!Array.isArray(angles) || angles.length === 0) return [];
+	const norm = (a: number) => {
+		let v = finite(a);
+		while (v > Math.PI) v -= TWO_PI;
+		while (v <= -Math.PI) v += TWO_PI;
+		return v;
+	};
+	const out = [norm(angles[0])];
+	for (let i = 1; i < angles.length; i++) {
+		let a = finite(angles[i]);
+		const prev = out[i - 1];
+		while (a - prev > Math.PI) a -= TWO_PI;
+		while (a - prev <= -Math.PI) a += TWO_PI;
+		out.push(a);
+	}
+	return out;
+}
+
 /** The whole chained path sampled into a fixed-count polyline `d` (M + `segments`
  *  L's), for ANIMATING a multi-segment Path. A keyframe morph tweens `d: path()`
  *  only when every keyframe's `d` shares one command structure — but a Path's
