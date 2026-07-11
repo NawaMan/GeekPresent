@@ -118,6 +118,44 @@ export function subscribeContinue(deckKey: string, cb: () => void): () => void {
 	return () => window.removeEventListener('storage', onStorage);
 }
 
+// HIGHLIGHT relay — the note-driven spotlight. A <Note> line covered in the console
+// publishes the target Block's `name` (or `null` to clear) here; the audience window
+// hears it (SlideDeck) and calls `setHighlight`, so <Spotlight> rings that box on the
+// live slide. A STATE channel (which box is lit), unlike CONTINUE's pulse — but it
+// still carries a fresh `ts` so re-lighting the same box after a clear re-fires the
+// `storage` event (which only fires when the stored VALUE changes).
+const highlightKeyFor = (deckKey: string) => `geekpresent:highlight:${deckKey}`;
+
+/** Publish the spotlight target (a Block `name`, or `null` to clear) to the OTHER
+    window for this deck. */
+export function publishHighlight(deckKey: string, name: string | null): void {
+	if (!browser) return;
+	try {
+		localStorage.setItem(highlightKeyFor(deckKey), JSON.stringify({ name: name ?? null, ts: Date.now() }));
+	} catch {
+		// best-effort
+	}
+}
+
+/** Subscribe to spotlight-target changes for this deck. `cb` gets the name or null.
+    Returns an unsubscribe. */
+export function subscribeHighlight(deckKey: string, cb: (name: string | null) => void): () => void {
+	if (!browser) return () => {};
+	const key = highlightKeyFor(deckKey);
+	const onStorage = (e: StorageEvent) => {
+		if (e.key !== key || !e.newValue) return;
+		try {
+			const { name } = JSON.parse(e.newValue) as { name: string | null };
+			cb(typeof name === 'string' && name ? name : null);
+		} catch {
+			// A malformed value clears rather than throws.
+			cb(null);
+		}
+	};
+	window.addEventListener('storage', onStorage);
+	return () => window.removeEventListener('storage', onStorage);
+}
+
 // Durable presenter timer — the elapsed clock must survive both Ctrl+R AND slide
 // navigation (which pages the console with a full document load). Persisting the
 // START time per deck makes the elapsed value reload-proof; only an explicit reset

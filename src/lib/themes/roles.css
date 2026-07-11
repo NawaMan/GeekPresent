@@ -82,6 +82,15 @@
 	--callout-warn-accent:   var(--ACCENT-WARM, #F0A33E);
 	--callout-danger-accent: var(--DANGER, #E5484D);
 
+	/* Spotlight — the note-driven highlight overlay. As the speaker covers a Note
+	   line, the named Block is ringed and the rest of the canvas dims. The ring reads
+	   in the warm accent (a "look here" colour, distinct from the blue --ACCENT the
+	   Connector arrows use) and glows in the same tone; the scrim is plain black,
+	   softened by the component's own opacity. Fallbacks are the dark default. */
+	--spotlight-ring:  var(--ACCENT-WARM, #F0A33E);
+	--spotlight-glow:  var(--ACCENT-WARM, #F0A33E);
+	--spotlight-scrim: var(--BACKDROP, #000000);
+
 	/* Stat / StatGroup — big-number KPI tiles. The figure reads in ink; the label
 	   and dividers derive from the same ink (dimmed in-component), so they stay
 	   legible in any theme. `accent` figures and trend chips pull the accent /
