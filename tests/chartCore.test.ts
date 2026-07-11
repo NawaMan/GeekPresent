@@ -8,6 +8,7 @@ import {
 	bubbleRadius,
 	countOf,
 	groupRows,
+	histogramBins,
 	isBlank,
 	linePath,
 	linearScale,
@@ -777,5 +778,71 @@ describe('arcPath', () => {
 		for (let k = 0; k <= 4; k++) {
 			expect(arcPath(100, 100, 50, 20, 0, (k * Math.PI) / 2 || 0.001)).not.toContain('NaN');
 		}
+	});
+});
+describe('histogramBins', () => {
+	const sum = (bins: { count: number }[]) => bins.reduce((s, b) => s + b.count, 0);
+
+	it('bins a sample into contiguous, ascending edges that count every value', () => {
+		const bins = histogramBins([1, 2, 2, 3, 5, 8, 9, 10]);
+		expect(bins.length).toBeGreaterThan(1);
+		// edges are contiguous: each bin's x1 is the next bin's x0
+		for (let i = 1; i < bins.length; i++) expect(bins[i].x0).toBe(bins[i - 1].x1);
+		// every value fell into some bin
+		expect(sum(bins)).toBe(8);
+	});
+
+	it('drops blanks and non-finite values (never counts them as 0)', () => {
+		const bins = histogramBins([1, 2, null, '', undefined, NaN, Infinity, 'x', 9] as unknown[]);
+		expect(sum(bins)).toBe(3); // only 1, 2, 9 are finite numbers
+	});
+
+	it('is half-open [x0, x1) with a CLOSED final bin (the max is never dropped)', () => {
+		// explicit edges make the boundary rule easy to read: [0,10) [10,20) [20,30]
+		const bins = histogramBins([0, 10, 20, 30], { edges: [0, 10, 20, 30] });
+		expect(bins.map((b) => b.count)).toEqual([1, 1, 2]); // 20 → 3rd bin, 30 → closed last
+		expect(sum(bins)).toBe(4);
+	});
+
+	it('honours an explicit bin count (snapped to round edges)', () => {
+		const values = Array.from({ length: 50 }, (_, i) => i); // 0..49
+		const bins = histogramBins(values, { bins: 5 });
+		expect(sum(bins)).toBe(50);
+		// nice edges over [0,49] with ~5 bins land on tens
+		expect(bins[0].x0).toBe(0);
+		expect(bins.every((b) => Number.isFinite(b.x0) && Number.isFinite(b.x1))).toBe(true);
+	});
+
+	it('sanitises explicit edges: unsorted, duplicated, and non-finite are cleaned', () => {
+		const bins = histogramBins([1, 2, 3], { edges: [3, 1, 2, 2, NaN, Infinity] });
+		expect(bins.map((b) => [b.x0, b.x1])).toEqual([
+			[1, 2],
+			[2, 3]
+		]);
+	});
+
+	it('clamps to an explicit domain, dropping values outside it', () => {
+		const bins = histogramBins([-5, 0, 3, 7, 20], { domain: [0, 10] });
+		expect(bins[0].x0).toBe(0);
+		expect(bins[bins.length - 1].x1).toBe(10);
+		expect(sum(bins)).toBe(3); // -5 and 20 dropped; 0, 3, 7 kept
+	});
+
+	it('gives a single distinct value a real, centred bin instead of a zero-width one', () => {
+		const bins = histogramBins([5, 5, 5]);
+		expect(bins.length).toBeGreaterThanOrEqual(1);
+		expect(sum(bins)).toBe(3);
+		expect(bins[0].x1).toBeGreaterThan(bins[0].x0);
+	});
+
+	it('returns [] when there is neither data nor a domain', () => {
+		expect(histogramBins([])).toEqual([]);
+		expect(histogramBins([null, '', NaN] as unknown[])).toEqual([]);
+	});
+
+	it('falls back to computed edges when explicit edges are unusable', () => {
+		const bins = histogramBins([1, 2, 3], { edges: [5] });
+		expect(bins.length).toBeGreaterThan(0);
+		expect(sum(bins)).toBe(3);
 	});
 });

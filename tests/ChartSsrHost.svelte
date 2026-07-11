@@ -6,6 +6,7 @@
 	import AreaChart from '../src/lib/chart/AreaChart.svelte';
 	import BarChart from '../src/lib/chart/BarChart.svelte';
 	import ComboChart from '../src/lib/chart/ComboChart.svelte';
+	import Histogram from '../src/lib/chart/Histogram.svelte';
 	import LineChart from '../src/lib/chart/LineChart.svelte';
 	import PieChart from '../src/lib/chart/PieChart.svelte';
 	import ScatterChart from '../src/lib/chart/ScatterChart.svelte';
@@ -38,6 +39,9 @@
 		{ weight: null, mpg: 18 }, // blank x → dropped
 		{ weight: 3.6, mpg: 16 }
 	];
+	// A sample to bin: explicit edges [0,10) [10,20) [20,30] so the counts (and
+	// the aria-labels) are predictable in the SSR assertion. The null is dropped.
+	const sample = [{ v: 2 }, { v: 5 }, { v: 12 }, { v: 24 }, { v: 30 }, { v: null }];
 </script>
 
 <BarChart
@@ -87,4 +91,11 @@
 	title="Latency area"
 	description="a filled region with a zero baseline; animate is a client-only enhancement"
 	animate
+/>
+<Histogram
+	data={sample}
+	value="v"
+	edges={[0, 10, 20, 30]}
+	title="Value distribution"
+	description="a sample binned into three fixed buckets; the blank is dropped"
 />

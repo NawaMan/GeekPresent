@@ -944,7 +944,43 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     **Text-artifact** benefit, not a slide one. What SSR-safety buys a slide is no mount-time
     flash, and a symbol that cannot differ between the server's idea of it and the browser's.
     Asserted against `svelte/server`, never against a built page.
-- [ ] **`StackedBarChart` / `Histogram`** (maybe **`Heatmap`**) — part-to-whole & distribution charts; fills chart-family gaps.
+- [~] **`StackedBarChart` / `Histogram`** (maybe **`Heatmap`**) — part-to-whole & distribution charts; fills chart-family gaps.
+  - **`StackedBarChart` was already covered** — a stacked bar is `<BarChart stacked>`
+    (Phase 2), the same call `Split`/`Arrow` made: a layout of an existing component is a
+    prop, not a second component. Shipping a `StackedBarChart` whose body was
+    `<BarChart stacked>` would have been a default wearing a component's name. Demoed on
+    `chart-bar.html` (grouped vs stacked side by side).
+  - [x] **`Histogram`** — the DISTRIBUTION chart, the real gap: a BarChart plots one bar
+    per *pre-made* category, so nothing in the family turned a flat column of raw numbers
+    into a *shape*. Done: `src/lib/chart/Histogram.svelte` over pure `histogramBins` in
+    `chartCore.ts` (the family's discipline — junk in yields `[]` or empty bins, never a
+    throw or a NaN edge).
+    - **The categories ARE the bins, computed from the data**, so the x scale is
+      **linear** (not band): bars are contiguous (a small `gap` only insets each rect so
+      neighbours read apart) and the axis ticks are round values, not one label per bar.
+      The counterpart decision to BarChart's band x.
+    - **Edges reuse `niceTicks`**, the axes' own machinery, so bins fall on human numbers
+      (…, 40, 60, 80, …) rather than 8.33-wide raw slices. Three authoring paths, one
+      `HistogramBin[]`: a `bins` count (snapped to nice edges; **Sturges' rule**
+      ⌈log₂n⌉+1 as the default), a `domain` clamp (values outside dropped), or explicit
+      `edges` (sanitised — sorted, de-duped, finite; an unusable set falls back to
+      computed). Intervals are half-open `[x0, x1)` with a **closed final bin**, so the
+      maximum value is never dropped off the end.
+    - **Blanks are dropped, not zeroed** (the family's blank rule): a missing measurement
+      is "no data point", not a 0-valued one, so it never invents a count. An empty bin
+      draws **no rect** (a gap), never a zero-height stub — BarChart's rule for a blank.
+    - **SSR-safe** exactly as the other charts: the full `<svg>` renders from props alone;
+      the hover tooltip (snaps to the nearest bin centre via `nearestIndex`, every bin
+      hoverable so a gap still reports its "0") and the `animate` clip-wipe are client-only
+      and never reach the prerender. `role="img"` + required `title`, one aria-label per
+      bar (`"40–60: 7"`). Reuses the whole `--chart-*` token family — no new tokens.
+    - Demo `histogram-component.html` (one latency sample: auto bins with `animate` vs a
+      fixed `bins={6}` with a tooltip; two dropped requests carry `null` and vanish),
+      unit tests in `tests/chartCore.test.ts` (binning/edges/boundary/blank/domain/degenerate),
+      SSR assertion + host in `tests/ChartSsr(.ssr).test.ts` (bins prerender with predictable
+      aria-labels), DOM smoke tests in `tests/Charts.test.ts` (bar count, labels, empty-bin
+      gap, zero baseline, no reveal clip by default).
+  - Still open: **`Heatmap`** (a 2-D distribution / matrix), the remaining chart-family gap.
 - [ ] **Multi-segment path** — one `Draw` shape whose geometry chains several segments
       (line + curve + arc) instead of composing separate `Line` / `Curve` / `Arc` elements.
   - Gives a single continuous stroke: one `draw`/`drawDelay` reveal, one arrowhead at the

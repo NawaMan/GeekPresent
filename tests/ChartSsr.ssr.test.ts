@@ -20,8 +20,9 @@ describe('Chart (SSR)', () => {
 		expect(body).toContain('<title>Net change by region</title>');
 		expect(body).toContain('<desc>bars with a zero baseline</desc>');
 		// three region bars: us-east, us-west, sa-east — eu-west is blank, no rect
-		// (single-series labels are "cat: value"; the ComboChart below uses "cat — series: value")
-		const regionBars = body.match(/aria-label="[^"—]*: -?[\d,]+"/g) ?? [];
+		// (single-series labels are "cat: value"; the ComboChart uses "cat — series:
+		// value" and the Histogram uses "x0–x1: count" — both excluded via the dashes)
+		const regionBars = body.match(/aria-label="[^"—–]*: -?[\d,]+"/g) ?? [];
 		expect(regionBars).toHaveLength(3);
 		expect(body).toContain('aria-label="us-east: 320"');
 		expect(body).toContain('aria-label="us-west: -140"'); // negative bar
@@ -71,6 +72,15 @@ describe('Chart (SSR)', () => {
 		expect(body).toMatch(/class="area[^"]*"[^>]*d="M /);
 		expect(body).toMatch(/class="edge[^"]*"[^>]*d="M /);
 		expect(body).toContain('zero-line'); // area measures magnitude up from zero
+	});
+
+	it('renders the Histogram bars server-side, binned with per-bar aria-labels', () => {
+		expect(body).toContain('<title>Value distribution</title>');
+		// edges [0,10) [10,20) [20,30]: counts 2 / 1 / 2 (the null is dropped)
+		expect(body).toContain('aria-label="0–10: 2"');
+		expect(body).toContain('aria-label="10–20: 1"');
+		expect(body).toContain('aria-label="20–30: 2"'); // 30 lands in the closed last bin
+		expect(body).toContain('zero-line'); // bars grow from a visible baseline
 	});
 
 	it('never emits NaN in any coordinate', () => {
