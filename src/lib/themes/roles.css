@@ -112,6 +112,18 @@
 	--timeline-body-fg:  var(--INK, #C0F1FF);          /* dimmed via opacity in-component */
 	--timeline-icon-fg:  var(--ON-ACCENT, #FFFFFF);    /* glyph on the accent-filled dot */
 
+	/* Tabs / Tab — switch between panels in one slide. The inactive tab labels read
+	   in ink (dimmed in-component via opacity, like Stat/Timeline — no fragile muted
+	   token); the active label is that same ink at full strength, underlined by the
+	   accent indicator. The strip's baseline rule and the hover wash derive from the
+	   ink, softened via color-mix so they read on any surface. Fallbacks mirror the
+	   dark default (light-on-dark). */
+	--tabs-fg:        var(--INK, #C0F1FF);            /* inactive tab label (dimmed in-component) */
+	--tabs-active-fg: var(--INK, #C0F1FF);            /* the selected tab's label */
+	--tabs-indicator: var(--ACCENT, #2980B9);         /* the active-tab underline */
+	--tabs-rule:      var(--INK, #C0F1FF);            /* strip baseline rule; softened in-component */
+	--tabs-hover-bg:  var(--INK, #C0F1FF);            /* hover wash; softened in-component */
+
 	/* Columns / Column — the gutter rule of a divided group. Derived from the ink and
 	   softened via color-mix in-component, like --stat-divider, so it reads as a
 	   hairline on any surface. The grid itself paints nothing else, except a
