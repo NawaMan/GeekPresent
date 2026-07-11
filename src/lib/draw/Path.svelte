@@ -68,7 +68,8 @@
 		round,
 		sampleMultiPath,
 		shortenShape,
-		snapToAngles
+		snapToAngles,
+		unwrapAngles
 	} from './drawCore';
 	import {
 		DRAW_CONTEXT_KEY,
@@ -248,23 +249,37 @@
 				.join(' ');
 			css += `@keyframes ${animName} { ${shaftFrames} }`;
 			if (atEnd) {
+				// Unwrap the tangent angles across stops so the head takes the SHORTEST
+				// rotation between keyframes — an arc's end tangent comes back
+				// un-normalized (can exceed 2π), which otherwise spins the head a full
+				// turn mid-morph.
+				const angles = unwrapAngles(
+					geomStops.map((g) => {
+						const last = g.shapes[g.shapes.length - 1];
+						return last ? angleAt(last, 1) : 0;
+					})
+				);
 				const frames = geomStops
-					.map((g) => {
+					.map((g, i) => {
 						const last = g.shapes[g.shapes.length - 1];
 						const p = last ? last.to : [0, 0];
-						const a = last ? angleAt(last, 1) : 0;
-						return frame(g.pct, `transform: translate(${round(p[0])}px, ${round(p[1])}px) rotate(${deg(a)}deg);${tf(g.ease)}`);
+						return frame(g.pct, `transform: translate(${round(p[0])}px, ${round(p[1])}px) rotate(${deg(angles[i])}deg);${tf(g.ease)}`);
 					})
 					.join(' ');
 				css += ` @keyframes ${animName}-end { ${frames} }`;
 			}
 			if (atStart) {
+				const angles = unwrapAngles(
+					geomStops.map((g) => {
+						const first = g.shapes[0];
+						return first ? angleAt(first, 0) + Math.PI : 0;
+					})
+				);
 				const frames = geomStops
-					.map((g) => {
+					.map((g, i) => {
 						const first = g.shapes[0];
 						const p = first ? first.from : [0, 0];
-						const a = first ? angleAt(first, 0) + Math.PI : 0;
-						return frame(g.pct, `transform: translate(${round(p[0])}px, ${round(p[1])}px) rotate(${deg(a)}deg);${tf(g.ease)}`);
+						return frame(g.pct, `transform: translate(${round(p[0])}px, ${round(p[1])}px) rotate(${deg(angles[i])}deg);${tf(g.ease)}`);
 					})
 					.join(' ');
 				css += ` @keyframes ${animName}-start { ${frames} }`;

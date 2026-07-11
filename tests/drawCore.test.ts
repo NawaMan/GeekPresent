@@ -18,6 +18,7 @@ import {
 	pointAtMulti,
 	angleAtMulti,
 	sampleMultiPath,
+	unwrapAngles,
 	polygonPoints,
 	polylinePath,
 	smoothPath,
@@ -656,5 +657,33 @@ describe('sampleMultiPath (animation morph)', () => {
 	it('is total: empty chain → empty string, never NaN', () => {
 		expect(sampleMultiPath([])).toBe('');
 		expect(sampleMultiPath(pathShapes([NaN, NaN] as Point, [{ to: [NaN, NaN] }]), 8)).not.toContain('NaN');
+	});
+});
+
+describe('unwrapAngles (shortest-path rotation keyframes)', () => {
+	const rad = (d: number) => (d * Math.PI) / 180;
+	const deg = (r: number) => (r * 180) / Math.PI;
+
+	it('takes an un-normalized arc tangent the SHORT way, not a full spin', () => {
+		// 426.84° (an arc end tangent that came back > 360°) → 66.84°, the
+		// equivalent direction reached without whirling the head around.
+		const u = unwrapAngles([0, rad(426.84)]);
+		expect(u[0]).toBe(0);
+		expect(deg(u[1])).toBeCloseTo(66.84, 1);
+	});
+
+	it('stays continuous across the atan2 branch cut (+170° → −170° is +20°)', () => {
+		const u = unwrapAngles([rad(170), rad(-170)]);
+		expect(deg(u[1] - u[0])).toBeCloseTo(20, 6); // the short way, not −340°
+	});
+
+	it('normalizes the first angle into (−π, π]', () => {
+		expect(unwrapAngles([3 * Math.PI])[0]).toBeCloseTo(Math.PI, 6);
+	});
+
+	it('is total on junk (empty / non-array / NaN)', () => {
+		expect(unwrapAngles([])).toEqual([]);
+		expect(unwrapAngles(undefined as unknown as number[])).toEqual([]);
+		expect(unwrapAngles([NaN, NaN]).every(Number.isFinite)).toBe(true);
 	});
 });

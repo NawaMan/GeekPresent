@@ -460,30 +460,79 @@ describe('Path geometry keyframes (stops + animate)', () => {
 	});
 
 	// The scrubbing demo (animation/path-move.html): a line+curve+arc chain whose
-	// whole pose morphs. Pin its exact props so the demo can't silently break.
-	it('morphs a line+curve+arc chain (the path-move demo) end-to-end', () => {
+	// whole pose morphs AND draws itself in non-linearly (a `drawn` track). Pin
+	// its exact props so the demo can't silently break.
+	it('morphs a line+curve+arc chain with a reveal track (the path-move demo)', () => {
 		const { container } = render(Path, {
 			start: [260, 820] as [number, number],
 			segments: [{ to: [700, 820] }, { to: [1140, 820], c1: [920, 820] }, { to: [1580, 820], bend: 0 }],
 			stops: [
-				{ pct: 0, segments: [{ to: [700, 820] }, { to: [1140, 820], c1: [920, 820] }, { to: [1580, 820], bend: 0 }] },
-				{ pct: 100, segments: [{ to: [700, 520] }, { to: [1140, 780], c1: [920, 320] }, { to: [1580, 540], bend: 0.55 }] }
+				{ pct: 0, segments: [{ to: [700, 820] }, { to: [1140, 820], c1: [920, 820] }, { to: [1580, 820], bend: 0 }], drawn: 0 },
+				{ pct: 50, drawn: 0.75 },
+				{ pct: 100, segments: [{ to: [700, 520] }, { to: [1140, 780], c1: [920, 320] }, { to: [1580, 540], bend: 0.55 }], drawn: 1 }
 			],
 			animate: 4,
 			arrow: 'end' as const,
 			labelText: 'route'
 		});
+		const shaft = container.querySelector('path.draw-path-shaft')!;
 		const style = container.querySelector('g style')!.textContent ?? '';
 		expect(style).toContain('@keyframes draw-move-');
 		expect(style).toContain('d: path("M 260 820 '); // both poses start at the pinned start
-		// The shaft is trimmed behind the end arrowhead, so the true end positions
-		// live in the head's transform keyframes, not the sampled shaft.
 		expect(style).toContain('translate(1580px, 820px)'); // arrowhead at the 0% (flat) end
 		expect(style).toContain('translate(1580px, 540px)'); // arrowhead at the 100% (peaked) end
-		expect(style).toContain('-label {'); // the label rides along
-		expect(container.querySelector('path.draw-path-shaft')?.getAttribute('style')).toMatch(
-			/animation: draw-move-\d+ 4s/
-		);
+		// The arc's end tangent comes back un-normalized (426.84°); the head must
+		// take the SHORT way (66.84°), never whirl a full turn.
+		expect(style).toContain('rotate(66.84deg)');
+		expect(style).not.toContain('426.84');
+		// The reveal track: at the 50% keyframe the line is 75% drawn
+		// (stroke-dashoffset 0.25), independent of the geometry morph.
+		expect(style).toContain('-reveal {');
+		expect(style).toContain('stroke-dashoffset: 0.25'); // 75% drawn at half-time
+		expect(shaft.getAttribute('pathLength')).toBe('1');
+		expect(shaft.getAttribute('style')).toMatch(/animation: draw-move-\d+ 4s ease-in-out both, draw-move-\d+-reveal 4s/);
+	});
+});
+
+describe('animated arrowhead rotation is unwrapped (shortest path)', () => {
+	// Without unwrapping, a rotation keyframe track interpolates the raw angle
+	// numbers — an arc's un-normalized tangent or a branch-cut crossing then
+	// whirls the head a full turn (or the long way) between stops. The head math
+	// is shared, so this is checked on Arc and Curve (Path is covered above).
+	it('Arc: an un-normalized arc tangent takes the short way, not a full spin', () => {
+		const { container } = render(Arc, {
+			from: [1140, 820] as [number, number],
+			to: [1580, 820] as [number, number],
+			bend: 0,
+			stops: [
+				{ pct: 0, from: [1140, 820] as [number, number], to: [1580, 820] as [number, number], bend: 0 },
+				{ pct: 100, from: [1140, 780] as [number, number], to: [1580, 540] as [number, number], bend: 0.55 }
+			],
+			animate: 4,
+			arrow: 'end' as const
+		});
+		const style = container.querySelector('g style')!.textContent ?? '';
+		expect(style).toContain('rotate(0deg)');
+		expect(style).toContain('rotate(66.84deg)'); // the short way
+		expect(style).not.toContain('426.84'); // never the full-turn spin
+	});
+
+	it('Curve: the end tangent stays continuous across the ±180° branch cut', () => {
+		const { container } = render(Curve, {
+			from: [900, 500] as [number, number],
+			to: [300, 500] as [number, number],
+			c1: [600, 502] as [number, number],
+			stops: [
+				{ pct: 0, to: [300, 500] as [number, number], c1: [600, 508] as [number, number] },
+				{ pct: 100, to: [300, 500] as [number, number], c1: [600, 492] as [number, number] }
+			],
+			animate: 4,
+			arrow: 'end' as const
+		});
+		const style = container.querySelector('g style')!.textContent ?? '';
+		expect(style).toContain('rotate(-178.47deg)');
+		expect(style).toContain('rotate(-181.53deg)'); // stays negative — the short way
+		expect(style).not.toContain('rotate(178.47deg)'); // NOT the +360° branch flip
 	});
 });
 

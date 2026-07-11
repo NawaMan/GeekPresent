@@ -17,6 +17,7 @@ export const pages = [
     { path: "datatable-server.html",  title: "DataTable — Server-Side Data" },
     { path: "draw-component.html",    title: "Draw — Shapes & Arrows" },
     { path: "path-component.html",    title: "Path — Multi-Segment Stroke" },
+    { path: "draw-sequence.html",     title: "Draw — Building a Diagram" },
     { path: "connector-component.html", title: "Connector — Arrows by Name" },
     { path: "chart-bar.html",         title: "Chart — Grouped & Stacked Bars" },
     { path: "chart-line.html",        title: "Chart — Dual-Axis Line + Time" },
