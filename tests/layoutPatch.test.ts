@@ -123,6 +123,40 @@ describe('patchSlideSource', () => {
 		expect(source).toContain('<Curve name="hop" from={[905, 1000]} to={[1143, 992]} c1={[874, 844]} />');
 	});
 
+	it('inserts z only when the new value is non-zero', () => {
+		const src = `<Block name="hero" x={100} y={200} width={300} height={400}></Block>`;
+		const { source } = patchSlideSource(src, [
+			change({ name: 'hero', after: { x: 111, y: 222, width: 333, height: 444, z: 3 } })
+		]);
+		expect(source).toContain('<Block name="hero" x={111} y={222} width={333} height={444} z={3}>');
+	});
+
+	it('never inserts z={0} — a default-layer Block stays clean', () => {
+		const src = `<Block name="hero" x={100} y={200} width={300} height={400}></Block>`;
+		const { source } = patchSlideSource(src, [
+			change({ name: 'hero', after: { x: 111, y: 222, width: 333, height: 444, z: 0 } })
+		]);
+		expect(source).toContain('<Block name="hero" x={111} y={222} width={333} height={444}>');
+		expect(source).not.toContain('z={');
+	});
+
+	it('rewrites an existing z in place — including back down to 0', () => {
+		const src = `<Block name="hero" x={100} y={200} width={300} height={400} z={5}></Block>`;
+		const { source } = patchSlideSource(src, [
+			change({ name: 'hero', before: { x: 100, y: 200, width: 300, height: 400, z: 5 }, after: { x: 100, y: 200, width: 300, height: 400, z: 0 } })
+		]);
+		expect(source).toContain('<Block name="hero" x={100} y={200} width={300} height={400} z={0}>');
+	});
+
+	it('leaves the source untouched when nothing (including z) changed', () => {
+		const src = `<Block name="hero" x={100} y={200} width={300} height={400} z={2}></Block>`;
+		const { source, patched } = patchSlideSource(src, [
+			change({ name: 'hero', before: { x: 100, y: 200, width: 300, height: 400, z: 2 }, after: { x: 100, y: 200, width: 300, height: 400, z: 2 } })
+		]);
+		expect(patched).toHaveLength(1); // matched, nothing to write
+		expect(source).toBe(src);
+	});
+
 	it('applies several changes across the file', () => {
 		const src =
 			`<Block name="a" x={100} y={200} width={300} height={400}></Block>\n` +
