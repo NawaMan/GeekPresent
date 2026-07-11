@@ -225,9 +225,18 @@
 		},
 		get anim() {
 			return animSecs ? animApi : null;
+		},
+		get chrome() {
+			return chrome;
 		}
 	};
 	const isSelected = $derived(ctx?.selected === editor);
+	// Selected → Draw renders our `chrome` snippet in its top layer instead, so
+	// we must not also render it inline (select-to-front; see DrawContext). The
+	// ghost BOXES stay home either way — like a path shape's hit stroke, they
+	// only compete with each other, and a selected sprite's box is a wide target
+	// that would swallow every shape drawn under it.
+	const isHoisted = $derived(ctx?.hoisted === editor);
 	const select = () => ctx?.select(editor);
 	$effect(() => {
 		if (!ctx?.registerShape) return;
@@ -515,35 +524,9 @@
 					y2={gripPoint(s)[1]}
 				/>
 				<text class="sprite-pct" x={s.x + 6} y={s.y + 22}>{s.pct}%</text>
-				{#if isSelected}
-					<DrawHandle
-						point={cxy}
-						{grid}
-						title={`move · ${s.pct}%`}
-						onselect={() => beginDrag(i)}
-						onmove={(p) => onMove(i, p)}
-						oncommit={() => endDrag(i)}
-					/>
-					<DrawHandle
-						point={corner(s)}
-						{grid}
-						kind="control"
-						title={`resize · ${s.pct}%`}
-						onselect={() => beginDrag(i)}
-						onmove={(p) => onResize(i, p)}
-						oncommit={() => endDrag(i)}
-					/>
-					<DrawHandle
-						point={gripPoint(s)}
-						kind="bend"
-						title={`rotate · ${s.pct}%`}
-						onselect={() => beginDrag(i)}
-						onmove={(p) => onRotate(i, p)}
-						oncommit={() => endDrag(i)}
-					/>
-				{/if}
 			</g>
 		{/each}
+		{#if !isHoisted}{@render chrome()}{/if}
 	{/if}
 
 	{#if entered && editPose}
@@ -560,6 +543,46 @@
 		<text class="iso-hint" x={editPose.x} y={editPose.y - 12}>▸ group isolated · Esc to exit</text>
 	{/if}
 </g>
+
+{#snippet chrome()}
+	<!-- The selected sprite's per-stop move / resize / rotate handles, wrapped so
+	     <Draw> can re-parent them whole into its top layer (select-to-front).
+	     They ride absolute canvas coordinates, so lifting them out of their ghost
+	     <g> moves nothing. Self-guarding: an UNSELECTED sprite has no handles at
+	     all, so this renders nothing while it merely holds the hoist through
+	     another shape's drag. -->
+	{#if isSelected && !entered}
+		<g class="draw-chrome" data-shape={name || 'Sprite'}>
+			{#each RS as s, i (i)}
+				<DrawHandle
+					point={center(s)}
+					{grid}
+					title={`move · ${s.pct}%`}
+					onselect={() => beginDrag(i)}
+					onmove={(p) => onMove(i, p)}
+					oncommit={() => endDrag(i)}
+				/>
+				<DrawHandle
+					point={corner(s)}
+					{grid}
+					kind="control"
+					title={`resize · ${s.pct}%`}
+					onselect={() => beginDrag(i)}
+					onmove={(p) => onResize(i, p)}
+					oncommit={() => endDrag(i)}
+				/>
+				<DrawHandle
+					point={gripPoint(s)}
+					kind="bend"
+					title={`rotate · ${s.pct}%`}
+					onselect={() => beginDrag(i)}
+					onmove={(p) => onRotate(i, p)}
+					oncommit={() => endDrag(i)}
+				/>
+			{/each}
+		</g>
+	{/if}
+{/snippet}
 
 <style>
 	.sprite-el {

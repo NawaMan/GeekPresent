@@ -326,9 +326,15 @@
 		},
 		get drawEdit() {
 			return drawSecs ? drawApi : null;
+		},
+		get chrome() {
+			return chrome;
 		}
 	};
 	const isSelected = $derived(ctx?.selected === editor);
+	// Selected → Draw renders our `chrome` snippet in its top layer instead, so
+	// we must not also render it inline (select-to-front; see DrawContext).
+	const isHoisted = $derived(ctx?.hoisted === editor);
 	const select = () => ctx?.select(editor);
 	$effect(() => {
 		if (!ctx?.registerShape) return;
@@ -545,10 +551,21 @@
 	{/if}
 
 	{#if editing}
-		<!-- Editing chrome only: a wide invisible hit stroke to select the shape,
-		     plus one handle per endpoint. Never rendered outside LAYOUT mode. -->
+		<!-- The hit stroke stays HOME even when the shape is selected: it is the
+		     only chrome that competes with other shapes' hit strokes, and raising
+		     it would seal off the band where two strokes cross — the very place a
+		     neighbour's stroke is the one you mean to click. -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<path class="draw-hit" d={linePath(F, T)} onpointerdown={select} />
+		{#if !isHoisted}{@render chrome()}{/if}
+	{/if}
+</g>
+
+{#snippet chrome()}
+	<!-- The handles, wrapped so <Draw> can re-parent them whole into its top
+	     layer once this shape is selected (select-to-front). Rendered inline in
+	     the shape's own <g> until then. Never outside LAYOUT mode. -->
+	<g class="draw-chrome" data-shape={name || 'Line'}>
 		{#if !fromAnimated}
 			<DrawHandle selected={isSelected}
 				point={F}
@@ -606,8 +623,8 @@
 				{/if}
 			{/each}
 		{/if}
-	{/if}
-</g>
+	</g>
+{/snippet}
 
 <style>
 	.draw-label {

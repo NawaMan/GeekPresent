@@ -3,6 +3,8 @@
 // and diffable (from/to/x/y) — raw SVG path syntax never crosses this API;
 // drawCore.ts owns the translation to `d` strings.
 
+import type { Snippet } from 'svelte';
+
 /** A point in canvas pixels, [x, y] — same coordinate space as Block x/y. */
 export type Point = [number, number];
 
@@ -242,6 +244,15 @@ export interface ShapeEditor {
 	/** Tag name, e.g. 'Line' — shown when the shape has no `name`. */
 	readonly kind: string;
 	readonly name: string;
+	/** This shape's LAYOUT editing chrome — guide lines + handles, wrapped in a
+	 *  `<g class="draw-chrome" data-shape="…">`. The shape renders it inline
+	 *  (inside its own `<g>`) while it is NOT the hoisted one; when it IS, <Draw>
+	 *  renders this very snippet last inside the surface instead, so the handles
+	 *  paint and hit-test above every other shape. SVG has no z-index — paint
+	 *  order IS document order — so re-parenting the chrome is the only way to
+	 *  raise it, and moving the chrome (rather than the shape's `<g>`) raises
+	 *  INTERACTION without disturbing the visible overlap the author drew. */
+	readonly chrome?: Snippet;
 	/** One-line live geometry summary for the toolbar. */
 	readonly readout: string;
 	/** The shape's current OPENING tag — what Copy emits. */
@@ -301,6 +312,21 @@ export interface DrawContext {
 	readonly selected: ShapeEditor | null;
 	/** Select a shape (click on stroke or handle); null clears. */
 	select(editor: ShapeEditor | null): void;
+	/** The shape whose `chrome` <Draw> is currently rendering in its top layer
+	 *  (select-to-front). Normally the selected shape; a shape renders its own
+	 *  chrome inline exactly while it is NOT this one, so the chrome exists in
+	 *  precisely one place at a time. */
+	readonly hoisted: ShapeEditor | null;
+	/** A handle drag has begun / ended. Between the two, <Draw> HOLDS the hoist
+	 *  where it is: re-parenting chrome destroys and re-creates its nodes, and a
+	 *  node that leaves the document loses the pointer capture trackPointer took
+	 *  — after which a pointerup outside the window is never delivered and the
+	 *  drag sticks to the cursor. A drag that begins by selecting an unselected
+	 *  shape would do exactly that, so the hoist waits for the gesture to finish.
+	 *  Nothing is lost by waiting: being in front only matters for GRABBING a
+	 *  handle, and the handle is already grabbed. */
+	beginGesture(): void;
+	endGesture(): void;
 	/** Path shapes register on mount so Draw can enumerate them (markup
 	 *  order) for the "Copy changed" patch. Returns the unregister. */
 	registerShape(editor: ShapeEditor): () => void;
