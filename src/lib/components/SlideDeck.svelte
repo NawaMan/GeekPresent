@@ -46,8 +46,10 @@
 	import { getViewTransitions } from '$lib/presentation';
 	import {
 		presenterMode, publishCurrentSlide, subscribeCurrentSlide, subscribeAnimCommand,
-		subscribeContinue, deckKeyFromPath, openPresenterWindow
+		subscribeContinue, subscribeHighlight, deckKeyFromPath, openPresenterWindow
 	} from '$lib/stores/presenter';
+	import Spotlight from '$lib/components/Spotlight.svelte';
+	import { setHighlight } from '$lib/stores/highlightTarget';
 	import { collectFinite, applyState } from '$lib/utils/slideAnim';
 	import { navigate } from '$lib/utils/deckNav';
 	import { documentTitle, getPageNavigation } from '$lib/utils/navigate';
@@ -351,6 +353,14 @@
 			? subscribeContinue(deckKey, () => window.dispatchEvent(new CustomEvent('gp:continue')))
 			: () => {};
 
+		// A relayed HIGHLIGHT from the console lights the named Block on this slide
+		// (see Spotlight / stores/highlightTarget). Top window only — an iframe preview
+		// must not react, exactly like the anim/continue relays above. `setHighlight`
+		// clears the store on `null`, so leaving a note line turns the spotlight off.
+		const stopHighlight = (window.self === window.top)
+			? subscribeHighlight(deckKey, (name) => setHighlight(name))
+			: () => {};
+
 		initialized = true;
 		apply(true);
 		return () => {
@@ -359,6 +369,8 @@
 			stopFollow();
 			stopAnim();
 			stopContinue();
+			stopHighlight();
+			setHighlight(null); // don't leave a stale spotlight across a deck swap
 			window.removeEventListener('resize', onResize);
 		};
 	});
@@ -426,6 +438,10 @@
 			</div>
 			{/if}
 			<slot />
+			<!-- Note-driven spotlight: a canvas-level singleton (like the minimap),
+			     inert until a <Note> line or a slide sets the highlightTarget store.
+			     Placed after the slot so it paints over the slide's own blocks. -->
+			<Spotlight canvasWidth={width} canvasHeight={height} />
 			<TableOfContent {pages} {article} {articleText} {articleHref} />
 			<Copyright />
 			{/if}

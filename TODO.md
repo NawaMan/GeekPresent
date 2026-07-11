@@ -37,19 +37,49 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
     for extras. Demo `steps-component.html`, DOM test `tests/Steps.test.ts` (Space
     build/peel + arrows left free), SSR test `tests/StepsSsr.ssr.test.ts`
     (prerender-visible markup). No new role tokens (reveal is pure opacity/transform).
-- [ ] **Note-driven highlight** — let a `Note` line call attention to a component on the
+- [x] **Note-driven highlight** — let a `Note` line call attention to a component on the
       slide as the speaker covers it.
   - A note line references an on-slide target by name (reuse `Block` `name`-matching + the
     `stores/blockAnchors.ts` live-box registry that `Connector` already resolves against),
     e.g. `<li data-highlight="db">Now the query hits the database</li>`.
-  - Activating the line spotlights the named component — a ring/glow/dim-the-rest overlay
-    positioned from the registered box, so it tracks the component even in LAYOUT mode.
-  - Tie the trigger into the existing presenter check-off: covering a line (or a dedicated
-    click/keystroke) fires the highlight; leaving it clears it. Reuse the `checklist`
-    action's per-line plumbing rather than a second line-scanning pass.
-  - Open question: is the highlight **audience-visible** (drawn on the live slide, like a
-    laser pointer) or **presenter-only** (an aid in the console preview)? Likely want both,
-    author-selectable — decide before building.
+  - Done: `src/lib/components/Spotlight.svelte` (the overlay) + `stores/highlightTarget.ts`
+    (the store) + geometry in `src/lib/draw/spotlightCore.ts` (pure, total —
+    `connectorCore`/`drawCore` discipline: a garbage box, a bad pad, or a box off the
+    canvas all yield a drawable rect, never `NaNpx` or an inside-out one).
+  - **The open question is settled: audience-visible, drawn on the live slide** — and that
+    gives presenter-only *for free*, because the console's preview is an iframe of the
+    audience deck, so a cue drawn there shows in the preview too. No second code path.
+  - **Spotlight is a canvas-level singleton**, mounted once by `SlideDeck` (like the
+    minimap), so no slide places it. It reads `highlightTarget` (which box) + `blockAnchors`
+    (where it is), dims the rest of the canvas with an SVG `<mask>` that punches out the
+    box, and rings it — **positioned from the registered anchor, so it tracks the box in
+    LAYOUT mode** exactly as a `Connector` does. It mirrors a standalone Connector's render:
+    one canvas-spanning `<svg>`, always `pointer-events: none` (inline), and it renders
+    **nothing** when no name is set or a name resolves to no anchor — so it is SSR-inert
+    (nothing is highlighted at prerender) and can't ship a stray box. `--spotlight-*` role
+    tokens (warm accent, distinct from Connector's blue); `dim=0` gives ring-only.
+  - **The trigger reuses the `checklist` per-line pass, not a second scan.** A `Note` line
+    carrying `data-highlight="db"` becomes a spotlight trigger *in the presenter console*:
+    hover to light (covering it), leave to clear — ephemeral by design, tracking the
+    speaker's attention rather than persisting like the done-check. It drives the LOCAL
+    store *and* relays to the audience window over the SAME localStorage channel as
+    `publishContinue` (`publishHighlight`/`subscribeHighlight`); the audience `SlideDeck`
+    (top window only, like the anim/continue relays — an iframe preview stays out of it)
+    calls `setHighlight`, and the box lights on the live slide. `setHighlight`/
+    `highlightTarget` are exported, so **a slide can drive the cue directly** (a button, a
+    Steps build) with no presenter at all — a general primitive, not presenter-only
+    plumbing. The demo does both.
+  - **The one gotcha:** the trigger is presenter-mode-only, because the `checklist` action
+    is (a plain deck has no note check-off UI). So the note→highlight path needs the
+    console open; the direct `setHighlight` path works in any single window (which is how
+    the demo shows the overlay live without a second screen).
+  - Demo `note-highlight-component.html` (hover a button to spotlight a box in-window, or
+    open PRESENT and hover a note line to light the audience slide), unit test
+    `tests/spotlightCore.test.ts`, DOM tests `tests/Spotlight.test.ts` (rings/tracks/clears,
+    unknown name renders nothing, `dim=0` drops the scrim) + `tests/Note.test.ts` (the
+    hover trigger lights/clears, plain lines are inert) with `tests/NoteHighlightHost.svelte`,
+    SSR test `tests/SpotlightSsr.ssr.test.ts` (inert with no target; geometry reaches the
+    markup once one resolves). New `--spotlight-*` role tokens.
 
 - [x] **`Connector` / `Arrow`** — auto-routed arrow between two named `Block`s.
   - Turns the `Block` system into a diagramming tool.

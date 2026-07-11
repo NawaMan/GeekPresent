@@ -17,8 +17,9 @@
 	import { page } from '$app/stores';
 	import { displayMode } from '$lib/stores/displayMode';
 	import {
-		presenterMode, deckKeyFromPath, loadChecks, saveChecks
+		presenterMode, deckKeyFromPath, loadChecks, saveChecks, publishHighlight
 	} from '$lib/stores/presenter';
+	import { setHighlight } from '$lib/stores/highlightTarget';
 	$: visible = $displayMode === 'SCALED' || $presenterMode;
 
 	// The deck + slide this note belongs to — the key its check states persist under.
@@ -55,6 +56,13 @@
 		// Console-initiated clear: the localStorage was already wiped (page or deck), so
 		// just visually uncheck the current lines.
 		const onClear = () => lines.forEach((l) => setChecked(l, false));
+		// Note-driven spotlight: a line carrying `data-highlight="db"` lights the Block
+		// named "db" while the speaker's pointer is over it — "covering the line" — and
+		// clears when it leaves. Drives the LOCAL store (this window) and RELAYS to the
+		// audience window (the console's slide is hidden, so the relay is what the
+		// audience actually sees; see Spotlight / stores/highlightTarget). Reuses this
+		// same per-line pass rather than a second scan of the note.
+		const light = (name: string | null) => { setHighlight(name); publishHighlight(ctx.deckKey, name); };
 		function setup() {
 			teardown();
 			if (!ctx.enabled) return;
@@ -72,6 +80,22 @@
 				const onDbl = (e: Event) => toggle(e as MouseEvent, i);
 				line.addEventListener('dblclick', onDbl);
 				cleanups.push(() => line.removeEventListener('dblclick', onDbl));
+				// A `data-highlight="name"` line becomes a spotlight trigger: hover to
+				// light the named Block, leave to clear. Ephemeral by design — the cue
+				// tracks the speaker's attention, it is not a persistent check.
+				const hl = line.getAttribute('data-highlight');
+				if (hl) {
+					line.classList.add('gp-hl-line');
+					const onEnter = () => light(hl);
+					const onLeave = () => light(null);
+					line.addEventListener('pointerenter', onEnter);
+					line.addEventListener('pointerleave', onLeave);
+					cleanups.push(() => {
+						line.classList.remove('gp-hl-line');
+						line.removeEventListener('pointerenter', onEnter);
+						line.removeEventListener('pointerleave', onLeave);
+					});
+				}
 				setChecked(line, !!saved[i]); // restore persisted state
 			});
 			window.addEventListener('gp:checks-clear', onClear);
@@ -80,6 +104,7 @@
 			window.removeEventListener('gp:checks-clear', onClear);
 			cleanups.forEach((fn) => fn());
 			cleanups = [];
+			light(null); // never leave a spotlight stuck when the note re-sets or unmounts
 			lines.forEach((line) => {
 				line.classList.remove('gp-note-line', 'gp-checked');
 				line.querySelector(':scope > .gp-check')?.remove();
@@ -158,6 +183,15 @@
    double-click would otherwise make (it's a check-off aid, not prose to select). */
 .note.presenter :global(.gp-note-line) {
 	user-select: none;
+}
+/* A spotlight-trigger line: hovering it lights a Block on the audience slide.
+   Advertise it as a target — a pointer cursor and a faint accent tint — so the
+   speaker knows which lines drive a highlight. */
+.note.presenter :global(.gp-hl-line) {
+	cursor: pointer;
+}
+.note.presenter :global(.gp-hl-line:hover) {
+	color: var(--spotlight-ring, #F0A33E);
 }
 .note.presenter :global(.gp-check) {
 	display: inline-block;
