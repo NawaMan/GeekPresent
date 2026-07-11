@@ -14,11 +14,9 @@
 <ContentPage title="Box Component" subtitle="Expandable overlay with animation">
 	<p>Click the button below to see a Box in action:</p>
 	<CtrlBtn text="Open Box" on:click={() => (showBox = true)} />
-	<QuickCode style="margin-top: 0.5em;">
-		&lt;Box expanded=&#123;showBox&#125; width=&#123;750&#125; height=&#123;450&#125;&gt;<br/>
-		&nbsp;&nbsp;&lt;img src="image.png" alt="demo" /&gt;<br/>
-		&lt;/Box&gt;
-	</QuickCode>
+	<QuickCode style="margin-top: 0.5em;" lang="svelte" code={`<Box expanded={showBox} width={750} height={450}>
+  <img src="image.png" alt="demo" />
+</Box>`} />
 </ContentPage>
 
 <Box bind:expanded={showBox} width={750} height={300}>

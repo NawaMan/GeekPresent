@@ -35,10 +35,14 @@ function getHighlighter(): Promise<HighlighterCore> {
 }
 
 // Heavier grammars (svelte pulls in ts/js) are loaded on demand, so the common
-// css-snippet path stays light and the svelte grammar only ships when the </> Source
-// viewer is actually opened. Each lang loads at most once.
+// css-snippet path stays light and each grammar only ships when a slide that uses
+// it actually renders. Each lang loads at most once.
 const langLoaders: Record<string, () => Promise<unknown>> = {
 	svelte: () => import('shiki/langs/svelte.mjs'),
+	javascript: () => import('shiki/langs/javascript.mjs'),
+	python: () => import('shiki/langs/python.mjs'),
+	go: () => import('shiki/langs/go.mjs'),
+	bash: () => import('shiki/langs/bash.mjs'),
 };
 const langLoaded: Record<string, Promise<void>> = {};
 

@@ -22,11 +22,9 @@
 			own accent, icon and default title, all themed from <code>roles.css</code>.
 		</p>
 
-		<QuickCode style="margin-top: 0.6em;">
-			&lt;Callout kind="warn" title="Gotcha"&gt;<br/>
-			&nbsp;&nbsp;Client-side nav blanks Monaco.<br/>
-			&lt;/Callout&gt;
-		</QuickCode>
+		<QuickCode style="margin-top: 0.6em;" lang="svelte" code={`<Callout kind="warn" title="Gotcha">
+  Client-side nav blanks Monaco.
+</Callout>`} />
 
 		<p style="margin-top: 0.7em; opacity: 0.8;">
 			Props: <code>kind</code>, <code>title</code> (omit for the default,

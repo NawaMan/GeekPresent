@@ -34,12 +34,10 @@
 			chapter list that <b>seeks</b>. Wrap it in a <code>Block</code> and it fills the box.
 		</p>
 
-		<QuickCode style="margin-top: 0.6em; font-size: 0.8em">
-			&lt;Video src={'{'}demo{'}'} bookmarks={'{'}[<br/>
-			&nbsp;&nbsp;{'{'} at: "0:03", tag: "HOST", label: "No toolchain." {'}'},<br/>
-			&nbsp;&nbsp;{'{'} at: "1:14", tag: "BOOTH", label: "It builds." {'}'},<br/>
-			]{'}'} /&gt;
-		</QuickCode>
+		<QuickCode style="margin-top: 0.6em; font-size: 0.8em" lang="svelte" code={`<Video src={demo} bookmarks={[
+  { at: "0:03", tag: "HOST", label: "No toolchain." },
+  { at: "1:14", tag: "BOOTH", label: "It builds." },
+]} />`} />
 
 		<p style="margin-top: 0.7em;">
 			<code>at</code> takes seconds or a clock string, in any order — they are parsed

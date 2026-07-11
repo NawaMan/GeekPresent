@@ -40,9 +40,7 @@
 			<b>move</b>, <b>resize</b>, <b>rotate</b> — then retime / add / ease the
 			keyframes in the panel and <b>Copy</b>.
 		</p>
-		<QuickCode style="margin-top: 0.4em;">
-			&lt;Sprite name="rocket" animate=&#123;2.5&#125; fontScale=&#123;0.84&#125; stops=&#123;[&#123; pct: 0, x: 0, y: 1025, w: 56, h: 55, rot: 20, ease: "ease-in" &#125;, …]&#125;&gt;🚀&lt;/Sprite&gt;
-		</QuickCode>
+		<QuickCode style="margin-top: 0.4em;" lang="svelte" code={`<Sprite name="rocket" animate={2.5} fontScale={0.84} stops={[{ pct: 0, x: 0, y: 1025, w: 56, h: 55, rot: 20, ease: "ease-in" }, …]}>🚀</Sprite>`} />
 	</div>
 </ContentPage>
 

@@ -32,12 +32,10 @@
 
 <!-- Usage sample, parked top-right so it clears the intro on the left. -->
 <Block name="usage" x={1080} y={250} width={760} height={220} grid={10} fill={false}>
-	<QuickCode>
-		&lt;Timeline side="alternate"&gt;<br/>
-		&nbsp;&nbsp;&lt;TimelineItem time="2019" title="Founded"&gt;…&lt;/TimelineItem&gt;<br/>
-		&nbsp;&nbsp;&lt;TimelineItem time="Today" title="Here" active /&gt;<br/>
-		&lt;/Timeline&gt;
-	</QuickCode>
+	<QuickCode lang="svelte" code={`<Timeline side="alternate">
+  <TimelineItem time="2019" title="Founded">…</TimelineItem>
+  <TimelineItem time="Today" title="Here" active />
+</Timeline>`} />
 </Block>
 
 <!-- Default: spine on the left, every event to its right. -->

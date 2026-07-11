@@ -25,17 +25,15 @@
 			slide. The <code>→</code>/<code>←</code> arrows always page, build or no build.
 		</p>
 
-		<QuickCode style="margin-top: 0.6em;">
-			&lt;Steps&gt;<br/>
-			&nbsp;&nbsp;&lt;p&gt;Shown right away.&lt;/p&gt;<br/>
-			&nbsp;&nbsp;&lt;Fragment tag="p"&gt;<br/>
-			&nbsp;&nbsp;&nbsp;&nbsp;Appears on Space<br/>
-			&nbsp;&nbsp;&lt;/Fragment&gt;<br/>
-			&nbsp;&nbsp;&lt;Fragment tag="p" transition="fly"&gt;<br/>
-			&nbsp;&nbsp;&nbsp;&nbsp;then this<br/>
-			&nbsp;&nbsp;&lt;/Fragment&gt;<br/>
-			&lt;/Steps&gt;
-		</QuickCode>
+		<QuickCode style="margin-top: 0.6em;" lang="svelte" code={`<Steps>
+  <p>Shown right away.</p>
+  <Fragment tag="p">
+    Appears on Space
+  </Fragment>
+  <Fragment tag="p" transition="fly">
+    then this
+  </Fragment>
+</Steps>`} />
 
 		<p style="margin-top: 0.7em; opacity: 0.8;">
 			Fragments reserve their space (no reflow) and inherit the <code>Steps</code>

@@ -45,9 +45,7 @@
 			<i>in</i>, the bank eases <i>out</i>), <b>+&nbsp;keyframe</b> to add one,
 			<b>✕</b> to remove. It's pure CSS <code>@keyframes</code>, so it prerenders:
 		</p>
-		<QuickCode style="margin-top: 0.5em;">
-			&lt;SpriteStudio name="fly" initialStops=&#123;stops&#125; duration=&#123;2.5&#125; fontScale=&#123;0.84&#125;&gt;🚀&lt;/SpriteStudio&gt;
-		</QuickCode>
+		<QuickCode style="margin-top: 0.5em;" lang="svelte" code={`<SpriteStudio name="fly" initialStops={stops} duration={2.5} fontScale={0.84}>🚀</SpriteStudio>`} />
 		<p style="margin-top: 0.6em; opacity: 0.8;">
 			The whole authoring loop is one <code>&lt;SpriteStudio/&gt;</code> &mdash; a
 			<b>Sprite</b> in a <b>Draw</b> on a bundled <b>AnimationBar</b> &mdash; so it

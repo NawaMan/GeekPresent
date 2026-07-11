@@ -34,13 +34,11 @@
 
 <!-- Usage sample, parked top-right so it clears the intro on the left. -->
 <Block name="usage" x={1000} y={250} width={820} height={230} grid={10} fill={false}>
-	<QuickCode>
-		&lt;Tabs&gt;<br/>
-		&nbsp;&nbsp;&lt;Tab label="JavaScript"&gt;…&lt;/Tab&gt;<br/>
-		&nbsp;&nbsp;&lt;Tab label="Python" icon="🐍"&gt;…&lt;/Tab&gt;<br/>
-		&nbsp;&nbsp;&lt;Tab label="Go"&gt;…&lt;/Tab&gt;<br/>
-		&lt;/Tabs&gt;
-	</QuickCode>
+	<QuickCode lang="svelte" code={`<Tabs>
+  <Tab label="JavaScript">…</Tab>
+  <Tab label="Python" icon="🐍">…</Tab>
+  <Tab label="Go">…</Tab>
+</Tabs>`} />
 </Block>
 
 <!-- The demo: one greeting in three languages. Parked in a Block so LAYOUT mode can
@@ -48,29 +46,23 @@
 <Block name="demo" x={120} y={560} width={1000} height={360} grid={10}>
 	<Tabs>
 		<Tab label="JavaScript">
-			<QuickCode style="margin: 0;">
-				const greet = (who) =&gt;<br/>
-				&nbsp;&nbsp;`Hello, ${'{who}'}!`;<br/>
-				<br/>
-				console.log(greet("world"));
-			</QuickCode>
+			<QuickCode style="margin: 0;" lang="javascript" code={`const greet = (who) =>
+  \`Hello, \${who}!\`;
+
+console.log(greet("world"));`} />
 		</Tab>
 		<Tab label="Python" icon="🐍">
-			<QuickCode style="margin: 0;">
-				def greet(who):<br/>
-				&nbsp;&nbsp;return f"Hello, {'{who}'}!"<br/>
-				<br/>
-				print(greet("world"))
-			</QuickCode>
+			<QuickCode style="margin: 0;" lang="python" code={`def greet(who):
+  return f"Hello, {who}!"
+
+print(greet("world"))`} />
 		</Tab>
 		<Tab label="Go" icon="🐹">
-			<QuickCode style="margin: 0;">
-				func greet(who string) string {'{'}<br/>
-				&nbsp;&nbsp;return "Hello, " + who + "!"<br/>
-				{'}'}<br/>
-				<br/>
-				fmt.Println(greet("world"))
-			</QuickCode>
+			<QuickCode style="margin: 0;" lang="go" code={`func greet(who string) string {
+  return "Hello, " + who + "!"
+}
+
+fmt.Println(greet("world"))`} />
 		</Tab>
 		<Tab label="Rust (soon)" disabled>
 			Coming soon.

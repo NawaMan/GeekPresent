@@ -32,14 +32,12 @@
 <!-- Usage sample, parked top-right so it clears the intro on the left. fill=false
      keeps QuickCode at its natural size instead of stretching to the box. -->
 <Block name="usage" x={900} y={250} width={920} height={300} grid={10} fill={false}>
-	<QuickCode>
-		&lt;StatGroup card&gt;<br/>
-		&nbsp;&nbsp;&lt;Stat value="99.9%" label="Uptime" trend="up" delta="+0.4%" /&gt;<br/>
-		&nbsp;&nbsp;&lt;Stat value="42ms" label="p95" trend="down" delta="−12%" /&gt;<br/>
-		&nbsp;&nbsp;&lt;Stat value="1.2M"  label="Requests / day" accent /&gt;<br/>
-		&nbsp;&nbsp;&lt;Stat value="3.1%"  label="Error rate"  trend="flat" delta="±0" /&gt;<br/>
-		&lt;/StatGroup&gt;
-	</QuickCode>
+	<QuickCode lang="svelte" code={`<StatGroup card>
+  <Stat value="99.9%" label="Uptime" trend="up" delta="+0.4%" />
+  <Stat value="42ms" label="p95" trend="down" delta="−12%" />
+  <Stat value="1.2M"  label="Requests / day" accent />
+  <Stat value="3.1%"  label="Error rate"  trend="flat" delta="±0" />
+</StatGroup>`} />
 </Block>
 
 <!-- The KPI row in a `card` panel so it lifts off the surface, in a full-width band

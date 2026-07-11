@@ -53,12 +53,10 @@
 <Block name="split" x={60} y={670} width={1800} height={300} grid={10}>
 	<Columns widths={[2, 3]} align="center" divider resizable gap="3em">
 		<Column>
-			<QuickCode>
-				&lt;Columns widths={'{[2, 3]}'} align="center" divider resizable&gt;<br/>
-				&nbsp;&nbsp;&lt;Column&gt;…&lt;/Column&gt;<br/>
-				&nbsp;&nbsp;&lt;Column span={'{2}'}&gt;…&lt;/Column&gt;<br/>
-				&lt;/Columns&gt;
-			</QuickCode>
+			<QuickCode lang="svelte" code={`<Columns widths={[2, 3]} align="center" divider resizable>
+  <Column>…</Column>
+  <Column span={2}>…</Column>
+</Columns>`} />
 		</Column>
 		<Column>
 			<p>

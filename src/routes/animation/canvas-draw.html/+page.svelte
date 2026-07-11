@@ -124,13 +124,11 @@
 			frame and a backward scrub retraces the path exactly. It's interactive
 			too: <b>click</b> the surface to drop a pin, <b>double-click</b> to clear.
 		</p>
-		<QuickCode style="margin-top: 0.5em;">
-			&lt;Canvas duration=&#123;5&#125; &#123;keyframes&#125; draw=&#123;(ctx, &#123; progress, values &#125;) =&gt; &#123;<br/>
-			&nbsp;&nbsp;ctx.beginPath();<br/>
-			&nbsp;&nbsp;ctx.arc(values.x, values.y, 20 + progress * 90, 0, 2 * Math.PI);<br/>
-			&nbsp;&nbsp;ctx.stroke();<br/>
-			&#125;&#125; /&gt;
-		</QuickCode>
+		<QuickCode style="margin-top: 0.5em;" lang="svelte" code={`<Canvas duration={5} {keyframes} draw={(ctx, { progress, values }) => {
+  ctx.beginPath();
+  ctx.arc(values.x, values.y, 20 + progress * 90, 0, 2 * Math.PI);
+  ctx.stroke();
+}} />`} />
 	</div>
 </ContentPage>
 

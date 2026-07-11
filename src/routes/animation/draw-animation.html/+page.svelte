@@ -32,12 +32,10 @@
 			CSS, so it plays in the prerendered page and the <b>ANIMATION</b> bar can
 			pause, scrub, and restart the whole build-up like any slide animation.
 		</p>
-		<QuickCode style="margin-top: 0.5em;">
-			&lt;Line from=&#123;…&#125; to=&#123;…&#125; arrow="end" draw=&#123;1&#125; /&gt;<br/>
-			&lt;Line from=&#123;…&#125; to=&#123;…&#125; arrow="end" draw=&#123;1&#125; drawDelay=&#123;1&#125; /&gt;<br/>
-			&lt;Arc&nbsp; from=&#123;…&#125; to=&#123;…&#125; bend=&#123;-0.15&#125; arrow="end" draw=&#123;1.2&#125; drawDelay=&#123;2&#125; /&gt;<br/>
-			&lt;Ellipse x=&#123;…&#125; … draw=&#123;0.8&#125; drawDelay=&#123;3.4&#125; /&gt;
-		</QuickCode>
+		<QuickCode style="margin-top: 0.5em;" lang="svelte" code={`<Line from={…} to={…} arrow="end" draw={1} />
+<Line from={…} to={…} arrow="end" draw={1} drawDelay={1} />
+<Arc  from={…} to={…} bend={-0.15} arrow="end" draw={1.2} drawDelay={2} />
+<Ellipse x={…} … draw={0.8} drawDelay={3.4} />`} />
 	</div>
 </ContentPage>
 

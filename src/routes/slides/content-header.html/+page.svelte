@@ -17,11 +17,9 @@
 		beneath them &mdash; and each is independently omittable. Whatever survives closes
 		the gap. This slide passes no subtitle, so the rule rode up under the title.
 	</p>
-	<QuickCode style="margin-top: 0.5em;">
-		&lt;ContentPage title="Centered" align="center"&gt;      &lt;!-- no subtitle --&gt;<br/>
-		&lt;ContentPage title="Just a title" rule=&#123;false&#125;&gt;   &lt;!-- no rule    --&gt;<br/>
-		&lt;ContentPage rule=&#123;false&#125;&gt;                       &lt;!-- no header   --&gt;
-	</QuickCode>
+	<QuickCode style="margin-top: 0.5em;" lang="svelte" code={`<ContentPage title="Centered" align="center">      <!-- no subtitle -->
+<ContentPage title="Just a title" rule={false}>   <!-- no rule    -->
+<ContentPage rule={false}>                       <!-- no header   -->`} />
 	<p style="margin-top: 0.6em;">
 		Props: <code>title</code>, <code>subtitle</code>, <code>rule</code> (default
 		<code>true</code>), <code>align</code> (<code>left</code> default, or <code>center</code>).

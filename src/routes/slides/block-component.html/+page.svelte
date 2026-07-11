@@ -23,11 +23,9 @@
 			canvas pixels &mdash; then flip <b>LAYOUT</b> on (top-right, next to the
 			display control) to drag and resize it by hand.
 		</p>
-		<QuickCode style="margin-top: 0.5em;">
-			&lt;Block x=&#123;180&#125; y=&#123;620&#125; width=&#123;520&#125; height=&#123;200&#125;&gt;<br/>
-			&nbsp;&nbsp;&lt;h2&gt;Pinned content&lt;/h2&gt;<br/>
-			&lt;/Block&gt;
-		</QuickCode>
+		<QuickCode style="margin-top: 0.5em;" lang="svelte" code={`<Block x={180} y={620} width={520} height={200}>
+  <h2>Pinned content</h2>
+</Block>`} />
 		<p style="margin-top: 0.6em; opacity: 0.8;">
 			Drag tracks the cursor 1:1 in both FITTED and SCALED modes. The cat is an
 			<Label>ImageBlock</Label> &mdash; it fills its panel and keeps its aspect
