@@ -21,8 +21,9 @@ describe('Chart (SSR)', () => {
 		expect(body).toContain('<desc>bars with a zero baseline</desc>');
 		// three region bars: us-east, us-west, sa-east — eu-west is blank, no rect
 		// (single-series labels are "cat: value"; the ComboChart uses "cat — series:
-		// value" and the Histogram uses "x0–x1: count" — both excluded via the dashes)
-		const regionBars = body.match(/aria-label="[^"—–]*: -?[\d,]+"/g) ?? [];
+		// value" and the Histogram uses "x0–x1: count" — both excluded via the dashes,
+		// and the Heatmap's "col × row: value" via the × )
+		const regionBars = body.match(/aria-label="[^"—–×]*: -?[\d,]+"/g) ?? [];
 		expect(regionBars).toHaveLength(3);
 		expect(body).toContain('aria-label="us-east: 320"');
 		expect(body).toContain('aria-label="us-west: -140"'); // negative bar
@@ -81,6 +82,19 @@ describe('Chart (SSR)', () => {
 		expect(body).toContain('aria-label="10–20: 1"');
 		expect(body).toContain('aria-label="20–30: 2"'); // 30 lands in the closed last bin
 		expect(body).toContain('zero-line'); // bars grow from a visible baseline
+	});
+
+	it('renders the Heatmap cells server-side, blanks drawn empty, colour from a ramp', () => {
+		expect(body).toContain('<title>Weekly load</title>');
+		// the full 2×2 grid: three measured cells + one blank ("no data")
+		expect(body).toContain('aria-label="Mon × AM: 2"');
+		expect(body).toContain('aria-label="Mon × PM: 8"');
+		expect(body).toContain('aria-label="Tue × AM: 5"');
+		expect(body).toContain('aria-label="Tue × PM: no data"'); // absent combo, drawn empty
+		// cell fills interpolate two theme tokens, not a raw palette hex
+		expect(body).toContain('color-mix(in oklab');
+		// the static colour-ramp legend renders server-side (scoped class base name)
+		expect(body).toContain('legend-end');
 	});
 
 	it('never emits NaN in any coordinate', () => {

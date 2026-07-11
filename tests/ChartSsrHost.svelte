@@ -6,6 +6,7 @@
 	import AreaChart from '../src/lib/chart/AreaChart.svelte';
 	import BarChart from '../src/lib/chart/BarChart.svelte';
 	import ComboChart from '../src/lib/chart/ComboChart.svelte';
+	import Heatmap from '../src/lib/chart/Heatmap.svelte';
 	import Histogram from '../src/lib/chart/Histogram.svelte';
 	import LineChart from '../src/lib/chart/LineChart.svelte';
 	import PieChart from '../src/lib/chart/PieChart.svelte';
@@ -42,6 +43,13 @@
 	// A sample to bin: explicit edges [0,10) [10,20) [20,30] so the counts (and
 	// the aria-labels) are predictable in the SSR assertion. The null is dropped.
 	const sample = [{ v: 2 }, { v: 5 }, { v: 12 }, { v: 24 }, { v: 30 }, { v: null }];
+	// A 2×2 matrix for the heatmap: Tue × PM is absent (a blank cell), so the full
+	// grid still emits four rects with predictable aria-labels.
+	const load = [
+		{ day: 'Mon', slot: 'AM', load: 2 },
+		{ day: 'Mon', slot: 'PM', load: 8 },
+		{ day: 'Tue', slot: 'AM', load: 5 }
+	];
 </script>
 
 <BarChart
@@ -98,4 +106,12 @@
 	edges={[0, 10, 20, 30]}
 	title="Value distribution"
 	description="a sample binned into three fixed buckets; the blank is dropped"
+/>
+<Heatmap
+	data={load}
+	x="day"
+	y="slot"
+	value="load"
+	title="Weekly load"
+	description="a 2×2 matrix; Tue × PM has no measurement and is drawn empty"
 />

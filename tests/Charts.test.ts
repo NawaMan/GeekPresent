@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import AreaChart from '../src/lib/chart/AreaChart.svelte';
 import BarChart from '../src/lib/chart/BarChart.svelte';
 import ComboChart from '../src/lib/chart/ComboChart.svelte';
+import Heatmap from '../src/lib/chart/Heatmap.svelte';
 import Histogram from '../src/lib/chart/Histogram.svelte';
 import LineChart from '../src/lib/chart/LineChart.svelte';
 import PieChart from '../src/lib/chart/PieChart.svelte';
@@ -945,6 +946,73 @@ describe('Histogram', () => {
 		const { container } = render(Histogram, {
 			props: { data: sample, value: 'v', title: 'Dist' }
 		});
+		expect(container.querySelector('clipPath')).toBeNull();
+		expect(container.querySelector('.wipe')).toBeNull();
+	});
+});
+
+describe('Heatmap', () => {
+	type Cell = { day: string; slot: string; load: number | null };
+	// 2×2 grid with Tue × PM absent → a blank cell in the full matrix.
+	const load: Cell[] = [
+		{ day: 'Mon', slot: 'AM', load: 2 },
+		{ day: 'Mon', slot: 'PM', load: 8 },
+		{ day: 'Tue', slot: 'AM', load: 5 }
+	];
+	const props = { data: load, x: 'day', y: 'slot', value: 'load', title: 'Load' };
+
+	it('draws one rect per cell of the full grid (blanks included)', () => {
+		const { container } = render(Heatmap, { props });
+		expect(container.querySelectorAll('.cells rect')).toHaveLength(4); // 2×2
+	});
+
+	it('labels every cell; the absent combo reads "no data"', () => {
+		const { container } = render(Heatmap, { props });
+		const labels = Array.from(container.querySelectorAll('.cells rect')).map((r) =>
+			r.getAttribute('aria-label')
+		);
+		expect(labels).toContain('Mon × AM: 2');
+		expect(labels).toContain('Mon × PM: 8');
+		expect(labels).toContain('Tue × AM: 5');
+		expect(labels).toContain('Tue × PM: no data');
+	});
+
+	it('marks a blank cell empty (its own class, no color-mix fill)', () => {
+		const { container } = render(Heatmap, { props });
+		const empties = container.querySelectorAll('.cells rect.empty');
+		expect(empties).toHaveLength(1); // only Tue × PM
+		expect(empties[0].getAttribute('fill')).not.toContain('color-mix');
+	});
+
+	it('tints measured cells along the ramp via color-mix', () => {
+		const { container } = render(Heatmap, { props });
+		const measured = Array.from(container.querySelectorAll('.cells rect:not(.empty)'));
+		expect(measured).toHaveLength(3);
+		expect(measured.every((r) => (r.getAttribute('fill') ?? '').includes('color-mix'))).toBe(true);
+	});
+
+	it('is an accessible image with a title and a colour-ramp legend', () => {
+		const { container } = render(Heatmap, {
+			props: { ...props, description: 'requests per slot' }
+		});
+		expect(container.querySelector('svg')!.getAttribute('role')).toBe('img');
+		expect(container.querySelector('title')?.textContent).toBe('Load');
+		expect(container.querySelector('desc')?.textContent).toBe('requests per slot');
+		// legend prints the scale ends (min 2 … max 8)
+		const ends = Array.from(container.querySelectorAll('.legend-end')).map((e) => e.textContent);
+		expect(ends).toEqual(['2', '8']);
+	});
+
+	it('prints per-cell values only when showValues is on', () => {
+		const off = render(Heatmap, { props });
+		expect(off.container.querySelectorAll('.cell-value')).toHaveLength(0);
+		const on = render(Heatmap, { props: { ...props, showValues: true } });
+		// one per MEASURED cell (blanks print nothing)
+		expect(on.container.querySelectorAll('.cell-value')).toHaveLength(3);
+	});
+
+	it('renders no reveal clip by default (animate off → static markup)', () => {
+		const { container } = render(Heatmap, { props });
 		expect(container.querySelector('clipPath')).toBeNull();
 		expect(container.querySelector('.wipe')).toBeNull();
 	});

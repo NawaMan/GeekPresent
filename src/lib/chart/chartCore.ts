@@ -523,6 +523,139 @@ export function histogramBins(
 	return out;
 }
 
+/**
+ * One cell of a heatmap: the column category `x`, the row category `y`, the
+ * cell's aggregated value (`null` when no finite measurement fell in the cell),
+ * and `t` — that value normalised to `[0, 1]` across the matrix's colour-scale
+ * domain, which the component maps to a colour. A blank cell has `value: null`
+ * and `t: NaN` (it is drawn empty, never as the low-end colour, exactly as a
+ * histogram drops a blank rather than counting it 0). `col`/`row` are the cell's
+ * indices into `xs`/`ys`.
+ */
+export interface HeatCell {
+	x: unknown;
+	y: unknown;
+	value: number | null;
+	t: number;
+	col: number;
+	row: number;
+}
+
+/**
+ * A binned 2-D distribution: the distinct column (`xs`) and row (`ys`) categories
+ * in first-seen order, one `HeatCell` per `xs × ys` combination (the FULL grid,
+ * row-major — so a missing combination is an explicit blank cell, never a hole in
+ * the matrix), and the colour-scale domain `[min, max]` the cells' `t` values are
+ * normalised against. `min`/`max` are `NaN` when the matrix holds no finite value.
+ */
+export interface HeatMatrix {
+	xs: unknown[];
+	ys: unknown[];
+	cells: HeatCell[];
+	min: number;
+	max: number;
+}
+
+/** Options for `heatmapMatrix`: the three accessors, plus an optional colour-scale
+ *  domain override (values still show; their `t` clamps to `[0, 1]`). */
+export interface HeatmapOptions<T> {
+	x: Accessor<T>;
+	y: Accessor<T>;
+	value: Accessor<T>;
+	/** Clamp the colour scale to `[lo, hi]` instead of the data's own extent — so
+	 *  several heatmaps can share one scale. A degenerate/non-finite pair is
+	 *  ignored (the data extent is used). */
+	domain?: [number, number];
+}
+
+/**
+ * Pivot table-shaped rows into a heatmap matrix — the 2-D distribution
+ * counterpart to `histogramBins` (1-D) and the categorical `bandScale`. Each row
+ * contributes its `value` to the `(x, y)` cell; **rows sharing a cell are averaged**
+ * (finite values only — blanks are excluded from both the sum and the divisor,
+ * the same discipline as `avgOf`, so a missing measurement never drags a cell's
+ * mean toward 0). A cell with no finite value is `null` (blank). Every value is
+ * then normalised to `t ∈ [0, 1]` across the colour-scale domain (a flat domain,
+ * every value equal, maps to `t = 0.5`). Pure and total — empty/all-blank input
+ * yields empty `xs`/`ys`/`cells` and `NaN` min/max, never a throw.
+ */
+export function heatmapMatrix<T>(rows: readonly T[], options: HeatmapOptions<T>): HeatMatrix {
+	const xs: unknown[] = [];
+	const ys: unknown[] = [];
+	const xIndex = new Map<string, number>();
+	const yIndex = new Map<string, number>();
+	// Per-cell running sum + count of finite values (keyed by x\0y), for the mean.
+	const acc = new Map<string, { sum: number; n: number }>();
+	const cellKey = (xk: string, yk: string): string => xk + ' ' + yk;
+
+	for (const row of rows) {
+		const x = valueOf(row, options.x);
+		const y = valueOf(row, options.y);
+		const xk = keyString(x);
+		const yk = keyString(y);
+		if (!xIndex.has(xk)) {
+			xIndex.set(xk, xs.length);
+			xs.push(x);
+		}
+		if (!yIndex.has(yk)) {
+			yIndex.set(yk, ys.length);
+			ys.push(y);
+		}
+		const k = cellKey(xk, yk);
+		let a = acc.get(k);
+		if (!a) {
+			a = { sum: 0, n: 0 };
+			acc.set(k, a);
+		}
+		const v = toNumber(valueOf(row, options.value));
+		if (Number.isFinite(v)) {
+			a.sum += v;
+			a.n += 1;
+		}
+	}
+
+	// Aggregate each cell to a mean (or null) and find the data extent.
+	const valueAt = new Map<string, number | null>();
+	let dataMin = Infinity;
+	let dataMax = -Infinity;
+	for (const [k, a] of acc) {
+		const v = a.n > 0 ? a.sum / a.n : null;
+		valueAt.set(k, v);
+		if (v !== null) {
+			if (v < dataMin) dataMin = v;
+			if (v > dataMax) dataMax = v;
+		}
+	}
+	let min = dataMin === Infinity ? NaN : dataMin;
+	let max = dataMax === -Infinity ? NaN : dataMax;
+
+	// A valid domain override wins for the colour scale (values still render).
+	const dom = options.domain;
+	if (dom && Number.isFinite(dom[0]) && Number.isFinite(dom[1]) && dom[0] !== dom[1]) {
+		min = Math.min(dom[0], dom[1]);
+		max = Math.max(dom[0], dom[1]);
+	}
+	const span = max - min;
+
+	// The full grid, row-major: every ys × xs combination, so a missing cell is an
+	// explicit blank rather than a gap the component would have to infer.
+	const cells: HeatCell[] = [];
+	for (let r = 0; r < ys.length; r++) {
+		const yk = keyString(ys[r]);
+		for (let c = 0; c < xs.length; c++) {
+			const v = valueAt.get(cellKey(keyString(xs[c]), yk)) ?? null;
+			let t = NaN;
+			if (v !== null && Number.isFinite(min) && Number.isFinite(max)) {
+				t = span > 0 ? (v - min) / span : 0.5;
+				t = t < 0 ? 0 : t > 1 ? 1 : t;
+			}
+			cells.push({ x: xs[c], y: ys[r], value: v, t, col: c, row: r });
+		}
+	}
+
+	return { xs, ys, cells, min, max };
+}
+
 /** Fallback hex palette behind the --chart-series-N custom properties, so a
  *  series still has a distinct color if the deck sets no theme vars. Mirrors the
  *  eight-swatch palette named in CHART-1's theming section. */
