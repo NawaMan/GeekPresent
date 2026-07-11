@@ -124,20 +124,19 @@
 
 <style>
 	.mode {
-		/* functional — anchored to the screen-fixed overlay's top-right, inset a
-		   little from the very edge so the button isn't jammed under the browser UI. */
+		/* DISPLAY is a WINDOW control: it lives in the screen-fixed overlay and pins to
+		   the VIEWPORT's top-right corner, a fixed inset from the window edge, so it is
+		   always in reach however the slide is scaled or panned. (It used to anchor to
+		   the slide FRAME's corner via --ctrl-top/--ctrl-right; SlideDeck no longer sets
+		   those, so a simple fixed inset is the whole story now.) */
 		position: absolute;
-		/* Anchored by SlideDeck to the frame's top-right corner (clamped to the
-		   viewport); see --ctrl-top/--ctrl-right there. Falls back to a fixed inset. */
-		top: var(--ctrl-top, 12px);
-		right: var(--ctrl-right, 16px);
+		top: 14px;
+		right: 16px;
 		margin-right: 0;
-		/* The overlay is screen-fixed and NOT scaled by the slide's fit transform, so
-		   scale this control's font by the current view scale (set on the overlay by
-		   SlideDeck). That makes DISPLAY read the same on-screen size as the in-content
-		   NAV / ANIMATION chrome, which the transform already shrinks by the same factor.
-		   1em here is the inherited --base-font; the anchor position is unaffected. */
-		font-size: calc(1em * var(--view-scale, 1));
+		/* Sized independently of the slide's fit transform (it's not on the slide), and
+		   a touch larger than the in-slide chrome so this always-present control reads
+		   clearly. 1em is the overlay's inherited --base-font. */
+		font-size: 1.2em;
 	}
 
 	.menu {

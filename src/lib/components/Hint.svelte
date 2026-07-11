@@ -85,6 +85,11 @@
 		padding-left: 0.5em;
 		padding-right: 0.5em;
 		bottom: 0px;
+		/* Paint ABOVE the bottom-right Copyright, which is a later DOM sibling in
+		   SlideDeck's `.content` and so would otherwise write over a wide, centred cue.
+		   A positive z-index beats the copyright's `auto`, so the cue stays legible and
+		   the copyright reads as sitting behind it. */
+		z-index: 2;
 		font-size: 1.5em;
 		font-weight: bold;
 		/* Rests semi-transparent (0.4), sharpens to full on hover/focus below.

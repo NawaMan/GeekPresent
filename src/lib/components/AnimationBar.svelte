@@ -94,7 +94,8 @@
 	let raf = 0;                     // the progress-sampling rAF handle (0 = idle)
 
 	// Horizontal placement. By default the collapsed ANIMATION button parks just to
-	// the RIGHT of the slide nav bar (…LAST PRESENT), and the expanded bar keeps that
+	// the RIGHT of the slide nav bar (…NEXT LAST — it takes the slot PRESENT used to
+	// hold, before PRESENT moved up to the slide's top-right chrome), and the expanded bar keeps that
 	// LEFT edge fixed and grows RIGHTWARD into the open space. We measure the nav's
 	// right edge at runtime rather than hard-code a pixel — the nav and this bar share
 	// the transformed canvas as their offsetParent, so offsetLeft/Width are clean
@@ -112,7 +113,7 @@
 		(positioned ? '' : 'visibility:hidden;');
 
 	// Measure the nav and anchor the bar's LEFT edge just past it, so the collapsed
-	// button sits after PRESENT and the expanded bar grows rightward. A bar that
+	// button sits after LAST and the expanded bar grows rightward. A bar that
 	// starts expanded (embedded/driven) has no nav to anchor to and stays centred.
 	function positionBar() {
 		if (!browser || !root || expanded) { positioned = true; return; }
@@ -374,7 +375,7 @@
 	}
 	.anim-bar.expanded {
 		/* Tuned so the tall icon row's vertical CENTRE lines up with the nav text.
-		   With the left edge fixed (just past PRESENT), this width grows the bar
+		   With the left edge fixed (just past LAST), this width grows the bar
 		   RIGHTWARD into the open space. */
 		bottom: 0.35em;
 		min-height: 0.8em;
