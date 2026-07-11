@@ -1,5 +1,5 @@
 ---
-name: pick-feature
+name: pick-todo
 description: Study the project and TODO.md, then propose a few open features worth building next — each with a one-sentence approach — and let the user choose. Use when the user asks "what should I work on / build next", "pick a feature", "what's next in the TODO", or otherwise wants options rather than a specific task. Stops at the proposal; does not implement.
 ---
 

@@ -66,7 +66,7 @@
 	<Line name="route" from={[840, 815]} to={[1030, 815]} arrow="end" thickness={6} label="route from the edge to the origin" labelText="route" draw={1} drawDelay={1} />
 	<Line name="query" from={[1310, 815]} to={[1500, 815]} arrow="end" thickness={6} label="query from the origin to the database" labelText="query" draw={1} drawDelay={2} />
 	<Arc name="response" from={[1640, 910]} to={[230, 910]} bend={0.064} arrow="end" color="#00b356" dash label="response from the database back to the browser" labelText="response" labelOffset={-32} draw={1.4} drawDelay={3} />
-	<Ellipse name="hot" color="#e74c3c" label="the origin, circled as the hot node" draw={0.8} drawDelay={4.4} x={1010} y={738} width={320} height={184} />
+	<Ellipse name="hot" color="#e74c3c" label="the origin, circled as the hot node" draw={0.8} drawDelay={4.4} x={977} y={724} width={392} height={217} />
 </Draw>
 
 <!-- The ANIMATE control, opened so the build is obvious: one envelope over the
