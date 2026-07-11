@@ -13,6 +13,9 @@ export interface Geometry {
 	y: number;
 	width: number;
 	height: number;
+	/** Persistent stacking order (Block `z` prop). Optional and 0 by default; the
+	    Save patcher only writes it when it is present and non-zero. */
+	z?: number;
 }
 
 export interface ChangedTagEntry {

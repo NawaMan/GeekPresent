@@ -31,6 +31,8 @@
 	import { nextChangeId, reportChange, withdrawChange } from '$lib/stores/layoutChanges';
 	import { selectedBlock, nextBlockId } from '$lib/stores/selectedBlock';
 	import { reportAnchor, withdrawAnchor } from '$lib/stores/blockAnchors';
+	import { reportBlockZ, withdrawBlockZ, otherZValues } from '$lib/stores/blockOrder';
+	import { frontZ, backZ } from '$lib/utils/stackingCore';
 	import { trackPointer } from '$lib/utils/drag';
 	import { browser } from '$app/environment';
 	import { onDestroy } from 'svelte';
@@ -42,8 +44,9 @@
 
 	// Selection: grabbing a Block selects it, which floats it to the top so it (and
 	// its grip) stays reachable when Blocks overlap. Transient — never written to
-	// source (that's the persisted `z` prop, TODO). One selection at a time, since
-	// every Block reads the same store.
+	// source (that's the persisted `z` prop below; the selection lift rides on top
+	// of the authored z while editing, see `displayZ`). One selection at a time,
+	// since every Block reads the same store.
 	const blockId = nextBlockId();
 	$: selected = editing && $selectedBlock === blockId;
 
@@ -69,6 +72,17 @@
 	export let height = 120;
 	/** Optional label, shown in edit mode and used in the copied snippet's comment. */
 	export let name = '';
+	/** Persistent stacking order for OVERLAPPING Blocks (CSS z-index in canvas
+	    space). Author it by hand or with the LAYOUT-mode Front / Back buttons, then
+	    Copy / Save writes it back to source alongside x/y/width/height. Default 0
+	    emits no z-index at all (Blocks keep painting in DOM order, `z-index: auto`,
+	    so a grip can still float across a neighbour in LAYOUT mode). The order shows
+	    live in LAYOUT too — the Block you're grabbing lifts to the top, every other
+	    sits at its authored z — so a reorder is visible as you make it (see
+	    `displayZ`). The Front/Back buttons keep z at or above 0 (a Block stays above
+	    the slide's in-flow content); a negative z is honoured when hand-authored, for
+	    a deliberate backdrop behind the text. */
+	export let z = 0;
 	/** Stretch the wrapped content to fill the box in both axes (the default), so a
 	    resize rubber-bands it. A Block is a sizing frame and virtually every use
 	    wants this — content that sets its own width/height still wins. Pass
@@ -192,6 +206,37 @@
 		});
 	}
 
+	// Bring-to-front / send-to-back: set `z` above/below every other Block on the
+	// slide (frontZ/backZ read the sibling z's from the blockOrder registry). The
+	// pure core is a no-op when this Block is already the extreme, so `setZ` only
+	// records an undo step when the value actually moves.
+	function setZ(next: number) {
+		if (next === z) return;
+		const before = z;
+		const after = next;
+		z = next;
+		record({
+			undo: () => { z = before; },
+			redo: () => { z = after; },
+		});
+	}
+	const bringToFront = () => setZ(frontZ(z, otherZValues(blockId)));
+	// Send-to-back is FLOORED at 0: a Block shares one stacking context with the
+	// slide's in-flow content (text, a code box), and a NEGATIVE z-index paints
+	// behind that flow — so "send to back" against default (z=0) Blocks would drop
+	// this one behind the slide's body, not just behind its sibling Blocks. Flooring
+	// keeps every Block at or above the content layer (a z=0 positioned Block already
+	// sits above in-flow content). A deliberate backdrop-behind-text is still one
+	// hand-authored `z={-1}` away — the button just won't produce that by surprise.
+	const sendToBack = () => setZ(Math.max(0, backZ(z, otherZValues(blockId))));
+
+	// Publish this Block's live z so its siblings' Front/Back can order against it.
+	// Browser-only: purely a LAYOUT-mode aid, and SSR must not touch module state
+	// that outlives one render (unlike blockAnchors, which a Connector needs on the
+	// server).
+	$: if (browser) reportBlockZ(blockId, z);
+	onDestroy(() => { if (browser) withdrawBlockZ(blockId); });
+
 	// When NOT editing, a bounds="none" element that bleeds past the canvas should
 	// look clipped to the canvas edge (the "stage"), not spill into the letterbox.
 	// Clip just THIS element to the canvas rectangle, computed in its own local
@@ -203,10 +248,50 @@
 			  ` ${Math.max(0, y + height - canvasHeight)}px ${Math.max(0, -x)}px)`
 			: 'none';
 
+	// The applied z-index folds the AUTHOR z and the transient editing lift into
+	// ONE inline value, so the author's stacking shows in real time while LAYOUT is
+	// on (dragging a Block over/under others reflects the order you're authoring)
+	// without an inline value fighting a stylesheet class on specificity.
+	//
+	//   * Presentation (not editing): the author z, or `auto` at z=0 — so untouched
+	//     Blocks keep painting in DOM order and create no stacking context.
+	//   * Editing: the Block you're touching floats to the top for grabbability —
+	//     dragging > selected > hovered, in a band just under the in-canvas chrome
+	//     (KeyframeStudio panel / ghosts sit at z 50). Every OTHER editing Block
+	//     shows its author z live, clamped below that lift band so the one you grab
+	//     always wins; z=0 stays `auto` (no stacking context), so a grip can still
+	//     float across a neighbour — the common all-default slide is unchanged.
+	let hovered = false;
+	// Lift band (all < 50, the KeyframeStudio panel/ghost layer). The author z shown
+	// for a non-grabbed Block is capped one below the lowest lift so a grabbed Block
+	// is always on top. Real Front/Back values are single digits, so the cap only
+	// ever bites a deliberately huge hand-authored z — and even then, only in LAYOUT.
+	const Z_HOVER = 44;
+	const Z_SELECTED = 46;
+	const Z_ACTIVE = 48;
+	const Z_AUTHOR_CAP = 42;
+	$: displayZ = editing
+		? dragging
+			? Z_ACTIVE
+			: selected
+				? Z_SELECTED
+				: hovered
+					? Z_HOVER
+					: z
+						? Math.min(Math.round(z), Z_AUTHOR_CAP)
+						: null
+		: z
+			? Math.round(z)
+			: null;
+	$: zStyle = displayZ == null ? '' : `z-index:${displayZ};`;
+
 	$: aspectAttr = typeof aspect === 'number' ? ` aspect={${aspect}}` : aspect === true ? ' aspect' : '';
+	// z is emitted only when non-zero: the default layer leaves no z-index in
+	// source, so unrelated Blocks stay `z-index: auto` and a copied tag stays clean.
+	$: zAttr = z ? ` z={${Math.round(z)}}` : '';
 	$: openTag =
 		`<${tag}${name ? ` name="${name}"` : ''}${attrs} x={${Math.round(x)}} y={${Math.round(y)}}` +
-		` width={${Math.round(width)}} height={${Math.round(height)}}${aspectAttr}`;
+		` width={${Math.round(width)}} height={${Math.round(height)}}${aspectAttr}${zAttr}`;
 	// COPY emits only the OPENING tag with the live geometry — that's the single
 	// line you paste over your element's existing open tag to update its position.
 	// (A self-closing wrapper like ImageBlock has no children, so it stays `<Tag … />`.)
@@ -217,10 +302,11 @@
 	// "Copy changed" OLD/NEW patch). Browser-only: SSR must not touch the
 	// module-level registry.
 	const changeId = nextChangeId();
-	const initial = { x, y, width, height };
+	const initial = { x, y, width, height, z };
+	$: initialZAttr = initial.z ? ` z={${Math.round(initial.z)}}` : '';
 	$: initialOpenTag =
 		`<${tag}${name ? ` name="${name}"` : ''}${attrs} x={${Math.round(initial.x)}} y={${Math.round(initial.y)}}` +
-		` width={${Math.round(initial.width)}} height={${Math.round(initial.height)}}${aspectAttr}`;
+		` width={${Math.round(initial.width)}} height={${Math.round(initial.height)}}${aspectAttr}${initialZAttr}`;
 	$: initialSnippet = selfClose ? `${initialOpenTag} />` : `${initialOpenTag}>`;
 	$: if (browser && track)
 		reportChange({
@@ -237,12 +323,14 @@
 				y: Math.round(initial.y),
 				width: Math.round(initial.width),
 				height: Math.round(initial.height),
+				z: Math.round(initial.z),
 			},
 			after: {
 				x: Math.round(x),
 				y: Math.round(y),
 				width: Math.round(width),
 				height: Math.round(height),
+				z: Math.round(z),
 			},
 		});
 	onDestroy(() => withdrawChange(changeId));
@@ -285,18 +373,31 @@
 	class:selected={selected}
 	class:active={dragging}
 	bind:this={el}
-	style="left:{x}px; top:{y}px; width:{width}px; height:{height}px; clip-path:{clipPath};"
+	style="left:{x}px; top:{y}px; width:{width}px; height:{height}px; clip-path:{clipPath}; {zStyle}"
 	on:pointerdown={(e) => startDrag('move', e)}
+	on:pointerenter={() => (hovered = true)}
+	on:pointerleave={() => (hovered = false)}
 >
 	<div class="fill-layer" class:loose={!fill}><slot /></div>
 
 	{#if editing}
 		<div class="readout">
-			{name ? name + ' · ' : ''}{Math.round(x)},{Math.round(y)} · {Math.round(width)}×{Math.round(height)}
+			{name ? name + ' · ' : ''}{Math.round(x)},{Math.round(y)} · {Math.round(width)}×{Math.round(height)}{z ? ' · z' + Math.round(z) : ''}
 		</div>
-		<button class="copy" type="button" on:pointerdown|stopPropagation on:click|stopPropagation={copy}>
-			{copied ? 'Copied!' : 'Copy'}
-		</button>
+		<!-- svelte-ignore a11y-no-static-element-interactions -->
+		<div class="toolbar" on:pointerdown|stopPropagation>
+			<button
+				class="zbtn" type="button" title="Send to back" aria-label="Send to back"
+				on:pointerdown|stopPropagation on:click|stopPropagation={sendToBack}
+			>⤓</button>
+			<button
+				class="zbtn" type="button" title="Bring to front" aria-label="Bring to front"
+				on:pointerdown|stopPropagation on:click|stopPropagation={bringToFront}
+			>⤒</button>
+			<button class="copy" type="button" on:pointerdown|stopPropagation on:click|stopPropagation={copy}>
+				{copied ? 'Copied!' : 'Copy'}
+			</button>
+		</div>
 		{#if drawEdit}
 			<!-- Draw-on reveal editor for a wrapped Draw shape (Rect/Ellipse):
 			     retime the self-draw + its delay. stopPropagation so editing the
@@ -364,28 +465,17 @@
 		outline-style: solid;
 	}
 
-	/* Editing-only stacking so overlapping Blocks stay grabbable (Blocks otherwise
-	   paint in DOM order, so a lower Block's grip/body can hide beneath a later one
-	   and become unselectable). The ladder, low → high: grips + Copy float above
-	   other blocks' bodies (so you can click to select even when overlapped); the
-	   pointed-at block lifts on hover; the SELECTED block stays on top until another
-	   is selected (or Escape); the one being dragged/resized tops everything. All
-	   kept below the KeyframeStudio panel (z 50) and Box modal (z 1000). Idle Blocks
-	   keep z-index:auto (no stacking context) so a grip can float across a
-	   neighbour. Author-controlled bring-to-front / send-to-back is the real fix —
-	   tracked in TODO.md. */
+	/* Grips + toolbar float above other Blocks' bodies (z 35), so you can click to
+	   select — or hit Front/Back — even when overlapped. This is the ONE stacking
+	   value still in CSS; the wrapper's own z-index (the author z plus the
+	   drag/select/hover lift) is computed inline (see `displayZ`), because it now
+	   carries the author's real-time stacking order and a class rule could not.
+	   All lift values sit below the in-canvas KeyframeStudio panel (z 50) and the
+	   Box modal (z 1000). An idle or z=0 Block keeps z-index:auto (no stacking
+	   context), so a grip can still float across a neighbour. */
 	.movable.editing .handle,
-	.movable.editing .copy {
+	.movable.editing .toolbar {
 		z-index: 35;
-	}
-	.movable.editing:hover {
-		z-index: 40;
-	}
-	.movable.selected {
-		z-index: 44;
-	}
-	.movable.active {
-		z-index: 46;
 	}
 
 	.movable .readout {
@@ -433,10 +523,16 @@
 		padding: 0.1em 0.3em;
 	}
 
-	.movable .copy {
+	/* Edit toolbar hanging above the box's top-right: Back / Front / Copy. */
+	.movable .toolbar {
 		position: absolute;
 		right: 0;
 		top: -1.7em;
+		display: inline-flex;
+		align-items: stretch;
+		gap: 3px;
+	}
+	.movable .copy {
 		font-size: 0.55em;
 		font-weight: bold;
 		cursor: pointer;
@@ -444,6 +540,19 @@
 		border: 0;
 		border-radius: 3px;
 		background: var(--ctrl-selected-bg, #00b356);
+		color: var(--on-accent, #ffffff);
+	}
+	/* Bring-to-front / send-to-back. Glyph buttons in the deck's control palette,
+	   reusing the --ctrl-* tokens the Copy button and resize grip already do (no
+	   new role tokens: this is dev-only LAYOUT chrome, not themeable slide surface). */
+	.movable .zbtn {
+		font-size: 0.7em;
+		line-height: 1;
+		cursor: pointer;
+		padding: 0 0.35em;
+		border: 0;
+		border-radius: 3px;
+		background: var(--ctrl-strong-bg, #2980b9);
 		color: var(--on-accent, #ffffff);
 	}
 

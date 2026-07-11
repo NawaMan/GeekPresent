@@ -12,10 +12,11 @@
 // bytes — so a whole-line string replace misses any tag written multi-line, with
 // reordered/extra attributes, or with expressions. So we DON'T match whole lines.
 // Instead we locate the target opening tag (by `name`, falling back to its old
-// x/y/width/height tuple) and rewrite ONLY the four numeric attributes in place,
-// preserving indentation, multi-line layout, and every other prop. Anything we
-// can't confidently place is returned as `unmatched` for the author to paste by
-// hand — never guessed.
+// x/y/width/height tuple) and rewrite ONLY the numeric geometry attributes in
+// place — x/y/width/height, plus `z` when the tag carries one or the new z is
+// non-zero — preserving indentation, multi-line layout, and every other prop.
+// Anything we can't confidently place is returned as `unmatched` for the author
+// to paste by hand — never guessed.
 //
 // Pure and browser-free so it unit-tests without a dev server (tests/layoutPatch.test.ts).
 
@@ -24,6 +25,10 @@ export interface Geometry {
 	y: number;
 	width: number;
 	height: number;
+	/** Persistent stacking order (Block `z`). Optional: only rewritten in place
+	    when the tag already carries a `z={…}`, or inserted when non-zero — so a
+	    plain x/y drag never litters the source with `z={0}`. */
+	z?: number;
 }
 
 export interface LayoutChange {
@@ -161,7 +166,12 @@ function chooseTarget(spans: TagSpan[], change: LayoutChange): TagSpan | null {
 	return byGeom.length === 1 ? byGeom[0] : null;
 }
 
-/** Rewrite the four geometry attributes in a single opening tag's text. */
+/** Rewrite the four geometry attributes in a single opening tag's text, plus the
+    optional `z` (stacking order) — but z, unlike x/y/width/height, is never
+    inserted just to write a 0: a Block defaults to `z-index: auto`, so a tag with
+    no z is CORRECT at z 0 and must stay clean. z is therefore written only when
+    the tag already carries a `z={…}` (rewrite it — including down to 0) or the new
+    value is non-zero (insert it). */
 function applyGeometry(tagText: string, after: Geometry): string {
 	let out = tagText;
 	for (const attr of GEOM_ATTRS) {
@@ -173,6 +183,15 @@ function applyGeometry(tagText: string, after: Geometry): string {
 			// Attr missing on the tag — insert it just before the tag close.
 			const insert = ` ${attr}={${val}}`;
 			out = out.replace(/\s*\/?>$/, (close) => insert + close);
+		}
+	}
+	if (after.z != null) {
+		const val = Math.round(after.z);
+		const zre = /(\bz=\{)[^}]*(\})/;
+		if (zre.test(out)) {
+			out = out.replace(zre, `$1${val}$2`);
+		} else if (val !== 0) {
+			out = out.replace(/\s*\/?>$/, (close) => ` z={${val}}` + close);
 		}
 	}
 	return out;

@@ -1095,16 +1095,56 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
 
 ## Authoring / LAYOUT mode
 
-- [ ] **`Block` z-index control** — author-controlled stacking order for overlapping `Block`s.
-  - Problem: overlapping Blocks paint in DOM order, so in LAYOUT mode a lower Block's
-    resize grip/body can sit beneath another Block and become unselectable.
-  - Add a `z` prop (emitted by Copy + persisted via the LAYOUT Save path, like x/y/w/h),
-    plus bring-to-front / send-to-back affordances in the edit toolbar.
-  - Stopgap already in place (`Block.svelte` editing-only stacking, `selectedBlock` store):
-    grips + Copy float above other blocks' bodies, and **selecting** a Block (grabbing it)
-    floats it to the top temporarily (transient, not persisted; Escape deselects). This
-    keeps overlapping Blocks grabbable, but true author-controlled *persistent* ordering
-    (`z` prop + front/back) is still the fix.
+- [x] **`Block` z-index control** — author-controlled stacking order for overlapping `Block`s.
+  - Problem: overlapping Blocks paint in DOM order, so a lower Block sits beneath a
+    later one with no way to say otherwise (and in LAYOUT mode its grip/body can hide).
+  - Done: a `z` prop on `Block.svelte` (default 0), with the ordering math in
+    `src/lib/utils/stackingCore.ts` (pure, total — `drawCore`/`connectorCore`
+    discipline: junk siblings and a NaN self are ignored, and a Block that is already
+    the extreme is left where it is, so Front/Back never churn the source or the undo
+    history). Bring-to-front / send-to-back buttons (**⤒ / ⤓**) sit in the edit toolbar
+    beside **Copy**; each reads its siblings' live z's from a new
+    `stores/blockOrder.ts` registry (module-level, like `selectedBlock`/`blockAnchors`
+    — the Blocks it orders are siblings, so no context bridges them) and sets `z` one
+    past the highest/lowest. A move is `record`ed for global undo/redo, exactly like a
+    drag.
+  - **The order shows LIVE in LAYOUT.** A first cut applied `z` only in presentation
+    (so an inline value couldn't fight the class-based selection stopgap on
+    specificity) — but then a reorder was invisible until you left LAYOUT, which was
+    confusing. Fixed by folding the author z and the transient editing lift into ONE
+    computed inline z-index (`displayZ`): the Block you're touching floats to the top
+    (dragging > selected > hovered, a band under the in-canvas KeyframeStudio panel at
+    z 50), and every OTHER editing Block sits at its authored z — clamped just below
+    that lift band so the grabbed Block always wins. `z=0` stays `z-index: auto` (no
+    stacking context), so a grip can still float across a neighbour and the common
+    all-default slide is byte-for-byte unchanged. The only stacking value left in CSS
+    is the grip/toolbar layer (z 35).
+  - **Send-to-back is floored at 0.** A Block shares one stacking context with the
+    slide's in-flow content (text, a code box), so a *negative* z-index paints it
+    behind that content, not just behind sibling Blocks — sending a Block "to back"
+    against the default z=0 Blocks would otherwise drop it behind the slide body
+    (found in testing: the demo's card vanished under the code box). The button
+    floors at 0 (a z=0 positioned Block already sits above in-flow content); a
+    deliberate backdrop-behind-text is still one hand-authored `z={-1}` away, which
+    the applied z-index honours.
+  - **Persisted both ways, like x/y/w/h.** Copy emits ` z={n}` in the opening tag
+    (only when non-zero — a default-layer Block stays clean), and the dev **Save** path
+    writes it through `patchSource.ts`: z is rewritten in place when the tag already
+    carries one (including back down to 0) and inserted only when the new value is
+    non-zero, so a plain x/y drag never litters the source with `z={0}`. The structured
+    `before`/`after` geometry (`layoutChanges.ts` `Geometry`) grew an optional `z`.
+  - No new role tokens — the two glyph buttons reuse the `--ctrl-*` family the Copy
+    button and resize grip already do (dev-only LAYOUT chrome, not themeable surface).
+  - Demo: `block-component.html` now parks an overlapping pair where `front` comes
+    FIRST in the markup yet sits on top via `z={1}` (z overriding DOM order — the whole
+    point), reorderable with ⤒ / ⤓. Unit test `tests/stackingCore.test.ts` (front/back
+    math, the no-op/tie/empty/non-finite cases), DOM test `tests/BlockZ.test.ts` +
+    `BlockZHost.svelte` (z-index applied in presentation AND live in LAYOUT, the
+    selected-Block lift over a huge authored z, the z=0-stays-auto case, negative,
+    the registry, and Front/Back ordering a Block against its sibling), SSR test
+    `tests/BlockZSsr.ssr.test.ts` (a non-zero z prerenders as `z-index`, z=0 stays
+    clean), and four new `tests/layoutPatch.test.ts` cases pinning the insert-only-when-
+    non-zero / rewrite-in-place / never-`z={0}` Save contract.
 
 - [ ] **Select-to-front for Draw path shapes** — extend the Block "select → float to top"
       to `Line` / `Arc` / `Curve` / `Sprite`.
