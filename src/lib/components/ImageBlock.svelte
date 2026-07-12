@@ -41,6 +41,16 @@
 	export let canvasHeight = 1080;
 	export let minSize = 24;
 	export let bounds: 'canvas' | 'none' = 'canvas';
+
+	/** Inline style for the root element, applied last so it wins. */
+	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 </script>
 
 <script context="module" lang="ts">
@@ -53,6 +63,7 @@
 
 <Block
 	{x} {y} {width} {height} {name} {grid} {aspect} {canvasWidth} {canvasHeight} {minSize} {bounds}
+	{style} {id} class={klass}
 	tag="ImageBlock"
 	attrs={snippetAttrs(alt, fit)}
 	selfClose

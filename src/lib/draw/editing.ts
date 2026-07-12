@@ -129,6 +129,21 @@ export interface SharedShapeAttrs {
 	draw?: number;
 	drawDelay?: number;
 	grid?: number;
+	/** The author's own pass-through props. They carry NO meaning for LAYOUT — it
+	    neither reads nor edits them — but they must survive the round-trip, because
+	    LAYOUT replaces the whole opening tag. Anything this function forgets to emit
+	    is DELETED from the author's source the moment they drag the shape. */
+	id?: string;
+	class?: string;
+	style?: string;
+}
+
+/** Quote an attribute value without ever producing a broken tag: a value carrying a
+ *  double quote (`style='content: "x"'`) is emitted in single quotes instead. Total,
+ *  like the rest of this module — the emitted line is pasted straight into source, so
+ *  it has to parse whatever the author wrote. */
+function attr(name: string, value: string): string {
+	return value.includes('"') ? ` ${name}='${value}'` : ` ${name}="${value}"`;
 }
 
 /** The non-geometry attributes of a copied opening tag, in a stable order,
@@ -149,5 +164,10 @@ export function sharedAttrs(a: SharedShapeAttrs): string {
 	if (a.draw) out += ` draw={${fmtNum(a.draw)}}`;
 	if (a.draw && a.drawDelay) out += ` drawDelay={${fmtNum(a.drawDelay)}}`;
 	if (a.grid && a.grid > 1) out += ` grid={${fmtNum(a.grid)}}`;
+	// Last, and only when the author set them — so an untouched shape's tag is byte
+	// for byte what it always was, and a decorated one keeps its decoration.
+	if (a.id) out += attr('id', a.id);
+	if (a.class) out += attr('class', a.class);
+	if (a.style) out += attr('style', a.style);
 	return out;
 }

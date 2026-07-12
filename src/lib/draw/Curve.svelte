@@ -89,6 +89,14 @@
 		name?: string;
 		/** Snap step (canvas px) while dragging handles. 1 = freeform. */
 		grid?: number;
+		/** Inline style for the root element, applied last so it wins. */
+		style?: string;
+		/** DOM id for the root element. */
+		id?: string;
+		/** Extra class(es) for the root element. NOTE: a slide's own scoped styles
+		 *  will NOT match — use global CSS (global.css / roles.css / a :global(...)
+		 *  block) or a utility class. See AGENTS.md. */
+		class?: string;
 	}
 
 	let {
@@ -110,7 +118,10 @@
 		stops,
 		animate,
 		name = '',
-		grid = 1
+		grid = 1,
+		style = '',
+		id = '',
+		class: klass = ''
 	}: Props = $props();
 
 	// LAYOUT-mode editing overrides (finder state — reset on reload; Copy →
@@ -338,7 +349,7 @@
 		` c1={${fmtPoint(a)}}${b ? ` c2={${fmtPoint(b)}}` : ''}` +
 		stopsAttrFor(list) +
 		(list && list.length && animate ? ` animate={${finite(animate)}}` : '') +
-		sharedAttrs({ arrow, arrowSize, color, thickness, dash, label, labelText, labelAt, labelOffset, draw: dr, drawDelay: dd, grid }) +
+		sharedAttrs({ arrow, arrowSize, color, thickness, dash, label, labelText, labelAt, labelOffset, draw: dr, drawDelay: dd, grid, id, class: klass, style }) +
 		' />';
 	const snippet = $derived(tagFor(F, T, C1, C2, S, drawVal, drawDelayVal));
 	const sourceSnippet = $derived(tagFor(from, to, c1, c2, stops, draw, drawDelay));
@@ -529,7 +540,13 @@
 	};
 </script>
 
-<g class="draw-curve" aria-label={label} role={label ? 'img' : undefined}>
+<g
+	id={id || undefined}
+	class="draw-curve {klass}"
+	style={style || undefined}
+	aria-label={label}
+	role={label ? 'img' : undefined}
+>
 	{#if isSelected}
 		<path class="draw-selglow" d={baseD} />
 	{/if}

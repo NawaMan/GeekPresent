@@ -33,13 +33,22 @@
 	/** Recede into the frame like the other chrome controls (MODE / nav). Default
 	    on; pass `chrome={false}` for the prominent accent-blue look. */
 	export let chrome: boolean = true;
+	/** Inline style for the root element, applied last so it wins. */
+	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 
 	let expanded = false;
 </script>
 
 <!-- `gp-chrome` enrols this in the deck's fadeChrome behaviour with the nav bar and
      the ToC; `expanded` pins it lit while its own CodeBox is up. -->
-<div class="view-source gp-chrome" class:expanded>
+<div class="view-source gp-chrome {klass}" class:expanded id={id || undefined} style={style || undefined}>
 	<CtrlBtn {chrome} {text} hoverText="View source" isSelected={expanded} on:click={() => (expanded = true)} />
 </div>
 

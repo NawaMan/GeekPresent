@@ -24,6 +24,8 @@
                   default 0.4 — faint enough to read as a cue, legible in full on
                   hover. Raise it (dim=0.85) for a slide that wants the cue louder.
     dismissible — show the (X) close button (default true). `false` hides it.
+    style       — inline style for the pill, applied last so it wins: e.g.
+                  `style="font-size: 0.8em"` for a quieter cue on a busy slide.
 
   Events:
     close       — fired when the viewer dismisses it via (X). Dismissal is also
@@ -42,6 +44,20 @@
 	export let dim: number | null = null;
 	/** Show the (X) close button. */
 	export let dismissible = true;
+	/** Inline style for the pill — the same escape hatch Callout and QuickCode offer.
+	    Appended LAST, so it beats both the component's own rules (a plain declaration
+	    on the element outranks any class selector) and `dim`'s custom property: a slide
+	    that wants a smaller or narrower cue writes `style="font-size: 0.8em"` and gets
+	    it. Without this prop the attribute was silently dropped — a Svelte component
+	    forwards nothing it has not declared. */
+	export let style = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 
 	const dispatch = createEventDispatcher<{ close: void }>();
 	// Own dismissal, so a bare <Hint/> closes without any binding. ANDed with the
@@ -62,7 +78,7 @@
 	}
 </script>
 
-<div class="text" class:hidden={!isVisible || !open} class:boxed style={dimVar}>
+<div class="text {klass}" class:hidden={!isVisible || !open} class:boxed id={id || undefined} style="{dimVar}{style}">
 	<span class="label">{text}</span>
 	{#if dismissible}
 		<button class="close" type="button" aria-label="Dismiss hint" on:click={close}>

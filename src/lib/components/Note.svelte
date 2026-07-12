@@ -20,6 +20,17 @@
 		presenterMode, deckKeyFromPath, loadChecks, saveChecks, publishHighlight
 	} from '$lib/stores/presenter';
 	import { setHighlight } from '$lib/stores/highlightTarget';
+
+	/** Inline style for the root element, applied last so it wins. */
+	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
+
 	$: visible = $displayMode === 'SCALED' || $presenterMode;
 
 	// The deck + slide this note belongs to — the key its check states persist under.
@@ -120,7 +131,7 @@
 </script>
 
 {#if visible}
-<div class="note no-print" class:presenter={$presenterMode} use:checklist={{ enabled: $presenterMode, deckKey, slidePath }}>
+<div class="note no-print {klass}" class:presenter={$presenterMode} id={id || undefined} style={style || undefined} use:checklist={{ enabled: $presenterMode, deckKey, slidePath }}>
 	<slot></slot>
 </div>
 {/if}

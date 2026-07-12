@@ -60,6 +60,13 @@
 	export let then: string = 'then';
 	/** Extra inline CSS appended to the root. */
 	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 
 	// `auto` can only be answered by a browser, and answering it wrong on the
 	// server would bake a Mac's ⌘ into a PC's prerendered page. So the server (and
@@ -86,7 +93,7 @@
 </script>
 
 {#if chords.length}
-	<span class="kbd" {style} aria-label={glyphs ? spoken : undefined}>
+	<span class="kbd {klass}" id={id || undefined} {style} aria-label={glyphs ? spoken : undefined}>
 		{#each chords as chord, i}
 			{#if i > 0 && then}<span class="then" aria-hidden="true">{then}</span>{/if}
 			<!-- Nested <kbd> is the HTML spec's own way to spell a chord: an outer kbd
@@ -101,7 +108,7 @@
 	</span>
 {:else if $$slots.default}
 	<!-- No spec: the slot is one cap, rendered exactly as the author wrote it. -->
-	<span class="kbd" {style}>
+	<span class="kbd {klass}" id={id || undefined} {style}>
 		<kbd class="chord"><kbd class="cap"><slot /></kbd></kbd>
 	</span>
 {/if}

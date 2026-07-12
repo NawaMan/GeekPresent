@@ -15,6 +15,16 @@
 		mode: Writable<'fade' | 'slide' | 'none'>;
 	};
 
+	/** Inline style for the root element, applied last so it wins. */
+	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
+
 	const { register, current, mode } = getContext<CarouselCtx>('carousel');
 
 	// Runs during init, so items get sequential indices matching DOM order.
@@ -23,10 +33,12 @@
 </script>
 
 <div
-	class="carousel-item mode-{$mode}"
+	class="carousel-item mode-{$mode} {klass}"
 	class:active
+	id={id || undefined}
 	aria-hidden={!active}
 	inert={!active || undefined}
+	style={style || undefined}
 >
 	<slot />
 </div>

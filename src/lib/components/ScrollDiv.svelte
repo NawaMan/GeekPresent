@@ -54,10 +54,15 @@
 	// transform-pan has no native scrollbar; see the header note.)
 	export let scrollbar: boolean = false;
 
-	// Pull a caller-supplied `style` out of the passthrough props and APPEND it,
-	// rather than spread it after our own `style` (which would clobber the
-	// viewport's width/height). Everything else still passes through verbatim.
-	$: ({ style: extraStyle = '', ...rest } = $$restProps);
+	/** Inline style for the root element, applied last so it wins. */
+	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 
 	let scrollX = startX;
 	let scrollY = startY;
@@ -163,10 +168,11 @@
   can read the same vars to move at a ratio of the scroll in pure CSS, e.g.
       <div slot="foreground" style="left: calc(var(--prog-x) * 100%)"> … </div>
 -->
-<div class="outer"
+<div class="outer {klass}"
+     id={id || undefined}
      on:wheel={handleScroll}
-     style="width: {outerWidth}px; height: {outerHeight}px; --scroll-x: {scrollX}; --scroll-y: {scrollY}; --prog-x: {progX}; --prog-y: {progY}; {extraStyle}"
-     {...rest}>
+     style="width: {outerWidth}px; height: {outerHeight}px; --scroll-x: {scrollX}; --scroll-y: {scrollY}; --prog-x: {progX}; --prog-y: {progY}; {style}"
+     {...$$restProps}>
 	<div
 		class="inner"
 		style="width: {innerW}px; height: {innerH}px;">

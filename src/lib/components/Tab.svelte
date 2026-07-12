@@ -37,6 +37,13 @@
 	export let disabled: boolean = false;
 	/** Extra inline CSS appended to the panel. */
 	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 
 	const ctx = getContext<TabsCtx>(TABS_CONTEXT);
 
@@ -57,7 +64,7 @@
 
 {#if ctx && ctx.textMode}
 	<!-- text: in flow, label as a heading, always visible. -->
-	<section class="panel text" style={style}>
+	<section class="panel text {klass}" id={id || undefined} style={style}>
 		{#if resolvedLabel}
 			<div class="panel-label">
 				{#if icon}<span class="panel-icon">{icon}</span>{/if}{resolvedLabel}
@@ -72,8 +79,9 @@
 	     tabpanel is a region, not a focus stop — the tabs are the interactive parts. -->
 	<!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
 	<section
-		class="panel"
+		class="panel {klass}"
 		class:active
+		id={id || undefined}
 		role="tabpanel"
 		aria-label={resolvedLabel}
 		aria-hidden={!active}

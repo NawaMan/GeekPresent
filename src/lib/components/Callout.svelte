@@ -41,6 +41,13 @@
 	export let icon: string | null = null;
 	/** Extra inline CSS appended to the box. */
 	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 
 	const KINDS: Record<Kind, { label: string; glyph: string; accent: string }> = {
 		info:   { label: 'Info',    glyph: 'i', accent: 'var(--callout-info-accent, #2980B9)'   },
@@ -54,7 +61,7 @@
 	$: displayIcon  = icon  === null ? k.glyph : icon;
 </script>
 
-<div class="callout" style="--callout-accent: {k.accent}; {style}">
+<div class="callout {klass}" id={id || undefined} style="--callout-accent: {k.accent}; {style}">
 	<div class="badge" aria-hidden="true">{displayIcon}</div>
 	<div class="body">
 		{#if displayTitle}

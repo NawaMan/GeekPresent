@@ -61,6 +61,14 @@
 		 *  KeyframeStudio's `name`), so two Draws on a page don't collide. */
 		name?: string;
 		children?: Snippet;
+		/** Inline style for the root element, applied last so it wins. */
+		style?: string;
+		/** DOM id for the root element. */
+		id?: string;
+		/** Extra class(es) for the root element. NOTE: a slide's own scoped styles
+		 *  will NOT match — use global CSS (global.css / roles.css / a :global(...)
+		 *  block) or a utility class. See AGENTS.md. */
+		class?: string;
 	}
 
 	let {
@@ -70,7 +78,10 @@
 		description,
 		decorative = false,
 		name = '',
-		children
+		children,
+		style = '',
+		id = '',
+		class: klass = ''
 	}: Props = $props();
 
 	// LAYOUT-mode editing (Phase 3): shapes read this gate + selection surface
@@ -333,10 +344,11 @@
 
 <svg
 	bind:this={svgEl}
-	class="draw"
+	id={id || undefined}
+	class="draw {klass}"
 	class:raised={editing}
 	viewBox="0 0 {width} {height}"
-	style="width:{width}px; height:{height}px; pointer-events:none;"
+	style="width:{width}px; height:{height}px; pointer-events:none;{style}"
 	role={decorative ? undefined : 'img'}
 	aria-hidden={decorative ? 'true' : undefined}
 >

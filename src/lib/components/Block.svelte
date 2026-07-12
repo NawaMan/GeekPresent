@@ -123,6 +123,16 @@
 	    shape's self-draw. Plain Blocks leave it null. */
 	export let drawEdit: import('$lib/draw/types').DrawOnEditor | null = null;
 
+	/** Inline style for the root element, applied last so it wins. */
+	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
+
 	let el: HTMLElement;
 	let copied = false;
 
@@ -289,8 +299,20 @@
 	// z is emitted only when non-zero: the default layer leaves no z-index in
 	// source, so unrelated Blocks stay `z-index: auto` and a copied tag stays clean.
 	$: zAttr = z ? ` z={${Math.round(z)}}` : '';
+
+	// The author's own pass-through props. LAYOUT neither reads nor edits them — but
+	// Copy/Save replaces the WHOLE opening tag, so anything not emitted here is DELETED
+	// from the author's source the moment they drag the Block. They are echoed back
+	// verbatim, and a value carrying a double quote is single-quoted so the line still
+	// parses when it is pasted in.
+	// (A HOSTED Block — the editing wrapper a Draw shape mounts, `tag="Rect"` — receives
+	// none of these: the shape emits its own via draw/editing.ts's sharedAttrs, into
+	// `attrs`. So the two paths never double-emit.)
+	const quoted = (n: string, v: string) => (v.includes('"') ? ` ${n}='${v}'` : ` ${n}="${v}"`);
+	$: passAttrs =
+		(id ? quoted('id', id) : '') + (klass ? quoted('class', klass) : '') + (style ? quoted('style', style) : '');
 	$: openTag =
-		`<${tag}${name ? ` name="${name}"` : ''}${attrs} x={${Math.round(x)}} y={${Math.round(y)}}` +
+		`<${tag}${name ? ` name="${name}"` : ''}${attrs}${passAttrs} x={${Math.round(x)}} y={${Math.round(y)}}` +
 		` width={${Math.round(width)}} height={${Math.round(height)}}${aspectAttr}${zAttr}`;
 	// COPY emits only the OPENING tag with the live geometry — that's the single
 	// line you paste over your element's existing open tag to update its position.
@@ -305,7 +327,7 @@
 	const initial = { x, y, width, height, z };
 	$: initialZAttr = initial.z ? ` z={${Math.round(initial.z)}}` : '';
 	$: initialOpenTag =
-		`<${tag}${name ? ` name="${name}"` : ''}${attrs} x={${Math.round(initial.x)}} y={${Math.round(initial.y)}}` +
+		`<${tag}${name ? ` name="${name}"` : ''}${attrs}${passAttrs} x={${Math.round(initial.x)}} y={${Math.round(initial.y)}}` +
 		` width={${Math.round(initial.width)}} height={${Math.round(initial.height)}}${aspectAttr}${initialZAttr}`;
 	$: initialSnippet = selfClose ? `${initialOpenTag} />` : `${initialOpenTag}>`;
 	$: if (browser && track)
@@ -368,12 +390,13 @@
 
 <!-- svelte-ignore a11y-no-static-element-interactions a11y-no-noninteractive-element-interactions -->
 <div
-	class="movable"
+	class="movable {klass}"
 	class:editing={editing}
 	class:selected={selected}
 	class:active={dragging}
+	id={id || undefined}
 	bind:this={el}
-	style="left:{x}px; top:{y}px; width:{width}px; height:{height}px; clip-path:{clipPath}; {zStyle}"
+	style="left:{x}px; top:{y}px; width:{width}px; height:{height}px; clip-path:{clipPath}; {zStyle} {style}"
 	on:pointerdown={(e) => startDrag('move', e)}
 	on:pointerenter={() => (hovered = true)}
 	on:pointerleave={() => (hovered = false)}

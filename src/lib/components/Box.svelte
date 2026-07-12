@@ -18,6 +18,16 @@
 	export let shadowOpacity: number              = 0.8;
 	export let onClick      : (() => void) | null = null;
 
+	/** Inline style for the root element, applied last so it wins. */
+	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
+
 	// The visible box. Clicks inside it are left alone (select / copy / drag);
 	// the box only closes on CLOSE, Escape, or a click outside it.
 	let boxEl: HTMLElement;
@@ -70,8 +80,9 @@
 </script>
 
 <div
-	class="parent {expanded ? 'expanded' : ''}"
-	style="--custom-top: {top}; --custom-left: {left}; --custom-bottom: {bottom}; --custom-right: {right}; --shadow-opacity: {shadowOpacity}; --scrollable: {scrollable ? 'scroll' : 'hidden'};"
+	class="parent {expanded ? 'expanded' : ''} {klass}"
+	id={id || undefined}
+	style="--custom-top: {top}; --custom-left: {left}; --custom-bottom: {bottom}; --custom-right: {right}; --shadow-opacity: {shadowOpacity}; --scrollable: {scrollable ? 'scroll' : 'hidden'}; {style}"
 >
 	<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
 	<div

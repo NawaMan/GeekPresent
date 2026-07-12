@@ -64,6 +64,15 @@
 	export let nav: boolean = true;
 	/** Text mode only: how tall the embed renders where there is no canvas. */
 	export let height: string = '640px';
+	/** Inline style for the root element, applied last so it wins. */
+	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 
 	const isText = getMode() === 'text';
 	const pages = getPages();
@@ -72,7 +81,7 @@
 	$: navigation = getPageNavigation(pages, $page.url.pathname.split('/').pop() || '', './');
 </script>
 
-<div class="webpage" class:text-mode={isText}>
+<div class="webpage {klass}" class:text-mode={isText} id={id || undefined} style={style || undefined}>
 	<WebSite
 		{src}
 		{title}

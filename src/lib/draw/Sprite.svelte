@@ -80,6 +80,14 @@
 		 *  so a plain glyph sprite keeps its simple select-and-fly behavior. */
 		group?: boolean;
 		children?: Snippet;
+		/** Inline style for the root element, applied last so it wins. */
+		style?: string;
+		/** DOM id for the root element. */
+		id?: string;
+		/** Extra class(es) for the root element. NOTE: a slide's own scoped styles
+		 *  will NOT match — use global CSS (global.css / roles.css / a :global(...)
+		 *  block) or a utility class. See AGENTS.md. */
+		class?: string;
 	}
 
 	let {
@@ -90,7 +98,10 @@
 		name = '',
 		grid = 1,
 		group = false,
-		children
+		children,
+		style = '',
+		id = '',
+		class: klass = ''
 	}: Props = $props();
 
 	// LAYOUT-mode editing overrides: the editor is a coordinate FINDER — drags
@@ -463,7 +474,7 @@
 	};
 </script>
 
-<g class="draw-sprite">
+<g id={id || undefined} class="draw-sprite {klass}" style={style || undefined}>
 	{#if animSecs}
 		<!-- Generated keyframes — a real <style>, so it prerenders and scrubs. -->
 		{@html `<style>${keyframesCss}</style>`}

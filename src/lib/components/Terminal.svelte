@@ -146,6 +146,13 @@
 	export let outMs: number = 180;
 	/** Extra inline CSS appended to the console (e.g. spacing tweaks per slide). */
 	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 
 	// A `text` artifact is read at the reader's pace, not the presenter's: there is no
 	// slide to hold, nothing to scrub, and a line that types itself as you scroll past
@@ -402,7 +409,7 @@
 
 <!-- NOTE: command rows are `white-space: pre`, so the markup below is packed tight —
      a newline between the prompt and the typed span would render as a space. -->
-<div class="terminal" class:anim={animating} {style}>
+<div class="terminal {klass}" class:anim={animating} id={id || undefined} {style}>
 	{#if chrome}
 		<div class="bar">
 			<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>

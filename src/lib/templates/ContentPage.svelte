@@ -72,6 +72,16 @@
 	    an appendix is a normal slide that is left in a different way. */
 	export let nav = true;
 
+	/** Inline style for the page root, applied last so it wins. */
+	export let style: string = '';
+	/** DOM id for the page root. */
+	export let id: string = '';
+	/** Extra class(es) for the page root. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
+
 	const pages = getPages();
 	let currentPath: string | null = null;
 	let navigation: PageNavigation;
@@ -90,7 +100,7 @@
 	}
 </script>
 
-<div class="page">
+<div class="page {klass}" id={id || undefined} style={style || undefined}>
     {#if hasHeader}
         <header class="header" class:centered>
             {#if title}<h1>{title}</h1>{/if}

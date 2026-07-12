@@ -59,6 +59,13 @@
 	export let align: 'center' | 'start' | null = null;
 	/** Extra inline CSS appended to the tile. */
 	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 
 	// A StatGroup shares its alignment default over context; standalone falls to center.
 	const groupAlign = getContext<'center' | 'start' | undefined>('statGroupAlign');
@@ -75,7 +82,8 @@
 </script>
 
 <div
-	class="stat align-{resolvedAlign}"
+	class="stat align-{resolvedAlign} {klass}"
+	id={id || undefined}
 	style={style}
 >
 	<div class="figure-row">
