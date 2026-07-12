@@ -3,6 +3,7 @@ import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import SlideDeck from '$lib/components/SlideDeck.svelte';
 import { layoutMode, canLayout, canSave } from '$lib/stores/layoutMode';
+import { reportChange, withdrawChange } from '$lib/stores/layoutChanges';
 
 // The LAYOUT chrome across the dev/build boundary: which slides OFFER the control,
 // how loudly the button announces itself, and what SAVE does where it cannot write.
@@ -148,5 +149,101 @@ describe('SAVE follows the mode', () => {
 		const container = await mount(teaches);
 		expect(container.querySelector('.save-btn')).toBeNull();
 		expect(byLabel(container, 'NOT ALLOWED')).toBeUndefined();
+	});
+});
+
+// A PARTIAL write is the outcome that can cost an author work. The server places
+// what it can and reports the rest as `unmatched` — never guessing, which is the
+// whole design of patchSource.ts. What it must NOT do is then flash SAVED at the
+// author: the drags that didn't land are gone on the next reload, and the only
+// evidence was a console.warn nobody had reason to open. (Lived, not theorised: a
+// demo slide whose <QuickCode> sample was a byte-for-byte twin of its real Block —
+// same name AND geometry — made the tag ambiguous, so one of two boxes silently
+// failed to save while the button said SAVED. See tests/layoutPatch.test.ts.)
+describe('SAVE that only half-lands', () => {
+	const CHANGE_ID = 9001;
+	let realFetch: typeof globalThis.fetch;
+
+	/** onSave awaits saveLayout(), which awaits fetch() and then res.json() — two
+	    microtask hops past the click. A bare tick() lands between them and reads the
+	    button mid-flight, still saying SAVE. Flush the queue, THEN let Svelte render. */
+	const settle = async () => {
+		await new Promise((r) => setTimeout(r, 0));
+		await tick();
+	};
+
+	/** The dev endpoint's verdict, whatever the real one would have said. */
+	const serverSays = (patched: number, unmatched: string[]) => {
+		globalThis.fetch = (() =>
+			Promise.resolve(
+				new Response(JSON.stringify({ patched, unmatched }), {
+					status: 200,
+					headers: { 'content-type': 'application/json' }
+				})
+			)) as typeof globalThis.fetch;
+	};
+
+	beforeEach(() => {
+		realFetch = globalThis.fetch;
+		// One dirty tag in the page registry — without it saveLayout() short-circuits
+		// to NONE and never reaches the endpoint at all.
+		reportChange({
+			id: CHANGE_ID,
+			kind: 'Block',
+			name: 'pinned',
+			dirty: true,
+			oldTag: '<Block name="pinned" x={140} y={620} width={300} height={150}>',
+			newTag: '<Block name="pinned" x={460} y={838} width={300} height={150}>',
+			before: { x: 140, y: 620, width: 300, height: 150, z: 0 },
+			after: { x: 460, y: 838, width: 300, height: 150, z: 0 }
+		});
+	});
+	afterEach(() => {
+		globalThis.fetch = realFetch;
+		withdrawChange(CHANGE_ID);
+	});
+
+	it('counts what landed instead of claiming SAVED', async () => {
+		serverSays(1, ['<Block name="pinned" x={460} y={838} width={300} height={150}>']);
+		const container = await mount(teaches);
+		await fireEvent.click(byLabel(container, 'SAVE')!);
+		await settle();
+
+		expect(byLabel(container, '1 OF 2')).toBeTruthy();
+		expect(byLabel(container, 'SAVED')).toBeUndefined();
+	});
+
+	it('wears the refusal styling and says what did not land, out loud', async () => {
+		serverSays(1, ['<Block name="pinned" x={460} y={838} width={300} height={150}>']);
+		const container = await mount(teaches);
+		await fireEvent.click(byLabel(container, 'SAVE')!);
+		await settle();
+
+		expect(container.querySelector('.save-btn.refused')).toBeTruthy();
+		const tip = container.querySelector('.save-tip');
+		expect(tip?.getAttribute('role')).toBe('status'); // announced, not merely drawn
+		expect(tip?.textContent).toContain('1 tag not written');
+		expect(tip?.textContent).not.toContain('Save not allowed'); // the OTHER refusal
+	});
+
+	it('pluralises the count, because "1 tags not written" reads as a bug', async () => {
+		serverSays(1, ['<Block name="a" …>', '<Block name="b" …>']);
+		const container = await mount(teaches);
+		await fireEvent.click(byLabel(container, 'SAVE')!);
+		await settle();
+
+		expect(byLabel(container, '1 OF 3')).toBeTruthy();
+		expect(container.querySelector('.save-tip')?.textContent).toContain('2 tags not written');
+	});
+
+	it('still says SAVED — plainly — when every tag landed', async () => {
+		serverSays(1, []);
+		const container = await mount(teaches);
+		await fireEvent.click(byLabel(container, 'SAVE')!);
+		await settle();
+
+		expect(byLabel(container, 'SAVED')).toBeTruthy();
+		expect(container.querySelector('.save-btn.refused')).toBeNull();
+		expect(container.querySelector('.save-tip')).toBeNull();
 	});
 });

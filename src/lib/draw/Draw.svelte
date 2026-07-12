@@ -387,6 +387,7 @@
 			canvasHeight={height}
 			track={false}
 			drawEdit={b.drawEdit}
+			hostStyle={b.style ?? ''}
 			bind:x={b.x}
 			bind:y={b.y}
 			bind:width={b.width}

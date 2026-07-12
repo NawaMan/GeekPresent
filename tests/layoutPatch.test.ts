@@ -55,6 +55,39 @@ describe('patchSlideSource', () => {
 		expect(source).toContain('<Block name="a" x={111} y={222} width={333} height={444}>');
 	});
 
+	it('refuses a tag whose twin is a code sample of ITSELF — name and geometry both match', () => {
+		// A slide that documents a Block often shows the tag in a <QuickCode> sample
+		// living in the SAME file. patchSlideSource scans the raw source, so a sample
+		// that spells out name AND x/y/width/height is indistinguishable from the real
+		// tag: two candidates, both perfect. Guessing would rewrite the SAMPLE (and
+		// silently lose the author's drag), so the change comes back unmatched instead.
+		// This is why every Block sample in the deck elides its geometry with `…`.
+		const src = [
+			'<QuickCode lang="svelte" code={`',
+			'<Block name="pinned" x={100} y={200} width={300} height={400} />`} />',
+			'',
+			'<Block name="pinned" x={100} y={200} width={300} height={400}>real</Block>'
+		].join('\n');
+		const { source, patched, unmatched } = patchSlideSource(src, [change({ name: 'pinned' })]);
+		expect(patched).toHaveLength(0);
+		expect(unmatched).toHaveLength(1);
+		expect(source).toBe(src); // nothing written — and above all, the SAMPLE is untouched
+	});
+
+	it('places the real tag when the code sample elides its geometry (the house convention)', () => {
+		const src = [
+			'<QuickCode lang="svelte" code={`',
+			'<Block name="pinned" … style="left: 40px" />`} />',
+			'',
+			'<Block name="pinned" x={100} y={200} width={300} height={400}>real</Block>'
+		].join('\n');
+		const { source, patched, unmatched } = patchSlideSource(src, [change({ name: 'pinned' })]);
+		expect(unmatched).toHaveLength(0);
+		expect(patched).toHaveLength(1);
+		expect(source).toContain('<Block name="pinned" x={111} y={222} width={333} height={444}>real</Block>');
+		expect(source).toContain('<Block name="pinned" … style="left: 40px" />'); // sample untouched
+	});
+
 	it('reports unmatched changes instead of guessing', () => {
 		const src = `<Block name="hero" x={100} y={200} width={300} height={400}></Block>`;
 		const { unmatched, patched } = patchSlideSource(src, [change({ name: 'ghost' })]);

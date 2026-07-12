@@ -10,16 +10,55 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
 
 ## Tier 1 — closes clear gaps
 
-- [ ] **A geometry-setting `style` on a LAYOUT-draggable shape fights the drag** — decide the rule.
-  - Every component now takes `style` / `id` / `class`, appended last on the root so the author's
-    declaration outranks the component's own rules. On a *draggable* shape that creates one genuinely
-    undecided case: a hand-written `style="left: 40px"` (or `top`, `width`, `height`) **wins over the
-    geometry LAYOUT is dragging**. The patch dutifully rewrites `x`/`y` in source, the shape does not
-    move on screen, and LAYOUT looks broken while behaving exactly as specified.
-  - Options: refuse to drag a shape whose `style` sets a geometry property; warn in the chrome; or
-    fold the offending declaration into the patched props. Nobody has chosen.
-  - **Not** a data-loss bug (that part is fixed, see below) — just an authoring footgun with no
-    guardrail.
+- [x] **A geometry-setting `style` on a LAYOUT-draggable shape fights the drag** — rule decided:
+      **the props own the geometry.**
+  - Every component takes `style` / `id` / `class`, appended last on the root so the author's
+    declaration outranks the component's own rules. On a *draggable* shape that created one genuinely
+    undecided case: a hand-written `style="left: 40px"` (or `top`, `width`, `height`) **won over the
+    geometry LAYOUT is dragging**. Both land in the SAME inline declaration block, where the last one
+    simply wins — the DOM kept one `left`, and it was the author's, so `x={200}` never reached the
+    page at all. The patch dutifully rewrote `x`/`y` in source, the shape did not move on screen, and
+    LAYOUT looked broken while behaving exactly as specified.
+  - The rule: `style` is for **cosmetics** (stroke, dash, colour, a decorative `rotate()`); the
+    properties a draggable writes itself are **reserved** and are *stripped* from `style` before it is
+    applied. So what you see always matches `x`/`y`/`width`/`height`, and the drag is honest. The three
+    options in the original entry were all rejected: refusing to drag punishes a typo, and folding the
+    declaration into the props would edit inside the author's own attribute — which `patchSource.ts`
+    exists precisely not to do ("anything we can't confidently place … never guessed").
+  - Reserving changes what RENDERS, never what the author WROTE. Copy/Save still echo the source
+    `style` back byte-for-byte, so a drag can never silently delete it; the now-inert declaration
+    survives in source, and the LAYOUT badge tells the author to delete it. SAVE's blast radius is
+    unchanged — it still rewrites only the four numeric geometry attributes.
+  - Done: `src/lib/layout/styleGuardCore.ts` (pure, total — `guardStyle()` returns the `safe` style,
+    the `reserved` properties it stripped, and any `offsets`). Reserved: `left`, `top`, `width`,
+    `height`, `position`, `inset*`, plus the CSS geometry `x`/`y` that outrank an SVG `<rect>`'s
+    presentation attributes. Deliberately NOT reserved, each with a legitimate use that reserving
+    would break: `right`/`bottom` (CSS already ignores them against `left`+`width`), `margin`
+    (`margin: 0` is common and harmless), `transform`/`translate` (`rotate()`/`scale()` are real
+    authoring) and `rx` (corner rounding on `Rect`, a radius on `Ellipse` — one name, two meanings).
+    A false warning is worse than the bug.
+  - A translate-bearing `transform` is the *other* failure mode, and gets the other treatment: it does
+    not override the geometry, it displaces the painted box away from it — so the drag works, but
+    every `Connector`/`Spotlight` anchored to that Block (they resolve against the PROPS, via
+    `stores/blockAnchors.ts`) points at empty space. Reported in the badge, not confiscated.
+  - Wired into `Block.svelte` (which `ImageBlock` and Draw's hosted `Rect`/`Ellipse` all mount
+    through, so one guard covers every box draggable) + `draw/Rect.svelte` / `draw/Ellipse.svelte`
+    (an inline CSS `width` outranks an SVG presentation attribute the same way), with the shape's
+    style routed to its editing Block via a new `style` field on `BlockShapeRegistration`
+    (`draw/types.ts`, `Draw.svelte`) so the badge lands on the box you actually grab. New
+    `--layout-warn-bg` / `--layout-warn-fg` role tokens in `themes/roles.css`; the badge is
+    LAYOUT-only, so it can never reach a published deck.
+  - Demo: `src/routes/slides/layout-style-guard.html/` — the slide IS the demo, and its left-hand box
+    really does carry `style="left: 40px"`; flip LAYOUT and drag it. Tests: `tests/styleGuardCore.test.ts`
+    (25 unit cases against the core, incl. the semicolon-in-`url()` splitter and the garbage inputs),
+    `tests/StyleGuard.test.ts` (12 DOM cases — the box renders at `x`, a drag moves it, cosmetics
+    survive, Copy emits the style verbatim, no badge on a clean style), `tests/StyleGuardSsr.ssr.test.ts`
+    (prerender shows the props' box, keeps the cosmetics, ships no chrome). Rule written into
+    `AGENTS.md` beside the `style`/`id`/`class` convention it amends.
+  - Not covered, deliberately: the path shapes (`Line`/`Curve`/`Arc`/`Path`/`Polyline`). They have no
+    box geometry to fight — `patchSource.ts` says so — and are dragged by point knobs, not a Block. A
+    `transform` on their wrapping `<g>` would desync those knobs; nobody has hit it, and it is a
+    different mechanism from this one.
 
 - [x] **`Steps` / `Fragment`** — accumulating ←/→ reveal within a slide.
   - Biggest gap; the classic reveal.js/Slidev bullet-reveal, which the deck lacks.
@@ -138,18 +177,65 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
     previously an unlisted path fell out of `findIndex` as `-1` and was handed the deck's FIRST
     slide as its "next", which read as working navigation on a slide that has none.
 
-- [ ] **State demo slide** — a worked example of how a deck carries state: query parameters,
+- [x] **State demo slide** — a worked example of how a deck carries state: query parameters,
       `localStorage`, and the deck's own stores.
-  - Motivation: the mechanisms are all in the codebase already but scattered and implicit —
+  - Motivation: the mechanisms were all in the codebase already but scattered and implicit —
     `presenter` persists check-offs to `localStorage`, `displayMode` is a store, `?present`
-    is a query param, and `AppendixPage` (above) will thread a return address through the
-    URL. Nothing *shows an author* how to reach for any of it.
-  - Make the demo slide itself stateful (a counter that survives reload, a `?…=` param that
-    changes what renders), so the slide **is** the documentation — the same trick
-    `content-header.html` and `videopage-component.html` already play.
-  - Spell out the boundary: what is safe during **SSR/prerender** (no `window`, no
-    `localStorage` — guard with `browser`) versus what must wait for the client. That is the
-    part authors get wrong, and it fails the build rather than degrading at runtime.
+    is a query param, and `AppendixPage` threads a return address through the URL. Nothing
+    *showed an author* how to reach for any of it.
+  - Writing the demo turned up the reason it was worth writing: the three stores that persist
+    (`displayMode`, `layoutMode`, `diagramScroll`) each hand-rolled the same four steps, and
+    each got a different subset right. `diagramScroll` reads its key with a bare `parseInt`,
+    so one corrupt byte makes the store **`NaN`** and the diagram lays out at `NaNpx`. A demo
+    that only *described* the pattern would have been documenting three different patterns,
+    so the pattern got a name first, and the slide documents that.
+  - The rule the slide teaches: **a stored string is untrusted input.** The URL and
+    `localStorage` are both strings from outside — another tab, an older version of the deck,
+    a hand-typed param — so every read is a parse that can fail, and the parse belongs in a
+    pure core rather than in each store.
+  - Done: `src/lib/utils/stateCore.ts` (pure, total — `parseNumber`/`parseText`/`clamp` plus a
+    `Codec` pair per type; junk in, a usable value out, **never `NaN`**. It uses `Number()`
+    rather than `parseInt`, because `parseInt('12px')` is `12` — a corrupted key read back as
+    a plausible value. A `Codec.read` returns `null` for "not mine", kept distinct from a
+    falsy value, since a persisted `0` that reads back as the default is its own bug) and
+    `src/lib/stores/persisted.ts` (the store factory: `browser`-guarded read, garbage-tolerant
+    parse, a `setItem` in a **try/catch** because it throws in private mode and on a full
+    quota, and a `storage` listener so a second window — the presenter console — stays in
+    sync). `reset()` deliberately does not `removeItem`: the store's own subscriber would
+    write the key straight back, so it means what a visitor means by RESET — back to the
+    default.
+  - **The SSR contract**, which is the half authors get wrong and which fails the *build*
+    rather than degrading at runtime: on the server `persisted` is an ordinary
+    `writable(initial)` and nothing else — no `window`, no `localStorage`, no listener. So the
+    prerendered HTML always shows the DEFAULT, which is the only correct answer, since the
+    prerender happens once at build time and is served to every visitor; a remembered value
+    baked in there would be wrong for everyone but the person who built it. The value arrives
+    on hydration, one tick after paint.
+  - Demo: `src/routes/slides/state-demo.html/` — the slide IS the demo. Its counter really is
+    persisted (press **+**, reload, it is still there), its greeting really is read from its
+    own `?name=`, and the third box states the SSR boundary beside the two mechanisms it
+    constrains. Registered in `pages.ts` after `speaker-notes.html`.
+  - Tests: `tests/stateCore.test.ts` (28 unit cases against the core — the `parseInt('12px')`
+    trap, `'NaN'`/`'Infinity'`/`1e999`, a persisted zero, control characters and a 5 000-char
+    `?name=`), `tests/Persisted.test.ts` (14 DOM cases — survives a "reload" as a fresh store
+    over the same key, tolerates a corrupt key, clamps a hand-edited one, survives a throwing
+    `setItem`/`getItem`, and the four `storage`-event cases incl. a removal, which falls back
+    to `initial` rather than to `null`), `tests/StateDemoSsr.ssr.test.ts` + `StateSsrHost.svelte`
+    (6 SSR cases — renders with no `window` in existence, shows the defaults, emits no `NaN`).
+  - Not done, deliberately: the three existing stores were **not** migrated onto `persisted`.
+    That is a behaviour-preserving refactor with its own blast radius (`diagramScroll`'s `NaN`
+    is load-bearing for nobody, but proving that is a separate change), and folding it into a
+    demo slide would have buried it. See the follow-up below.
+
+- [ ] **Migrate the hand-rolled persisted stores onto `persisted()`** — `displayMode`,
+      `layoutMode` and `diagramScroll` predate the factory and each re-implement it.
+  - `diagramScroll.ts` is the one with a live bug: `parseInt(localStorage.getItem(...))` with
+    no finite-check, so a corrupt key yields `NaN` and the diagram lays out at `NaNpx`.
+    `persisted(key, -500, { codec: numberCodec() })` is the whole fix.
+  - `displayMode.ts` additionally migrates a legacy `scaleMode` boolean; that migration has to
+    survive the move, so it wants a custom `Codec` rather than a straight swap.
+  - Behaviour-preserving, so it is a *test-first* change: pin each store's current behaviour
+    (including the legacy migration) before touching it.
 
 - [x] **Note-driven highlight** — let a `Note` line call attention to a component on the
       slide as the speaker covers it.

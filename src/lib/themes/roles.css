@@ -100,6 +100,16 @@
 	--spotlight-glow:  var(--ACCENT-WARM, #F0A33E);
 	--spotlight-scrim: var(--BACKDROP, #000000);
 
+	/* LAYOUT-mode style/geometry collision badge — the note a Block shows when the
+	   author's `style` tried to set a property the x/y/width/height props own (see
+	   layout/styleGuardCore.ts). Warm, like every other "look here" cue, and set
+	   apart from the blue readout pill next to it so a caution never reads as a
+	   status line. AUTHOR-FACING ONLY: LAYOUT chrome never ships in a published
+	   deck, so these are tuned for the editing surface, not the audience's screen.
+	   Dark ink, because the warm accent is a light surface. */
+	--layout-warn-bg:  var(--ACCENT-WARM, #F0A33E);
+	--layout-warn-fg:  var(--ON-ACCENT-WARM, #1A1A1A);
+
 	/* Stat / StatGroup — big-number KPI tiles. The figure reads in ink; the label
 	   and dividers derive from the same ink (dimmed in-component), so they stay
 	   legible in any theme. `accent` figures and trend chips pull the accent /
