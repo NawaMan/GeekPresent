@@ -463,11 +463,24 @@ prerender there is no `window` and no `localStorage`. Guard every reach for eith
 The prerendered HTML therefore shows the **default** — correct, since it is built once and served to
 everyone — and the remembered value arrives on hydration, one tick after paint.
 
-**Three stores predate the factory and still hand-roll all of the above — do not copy them.**
-`displayMode.ts`, `layoutMode.ts` and `diagramScroll.ts` each re-implement the pattern and each get a
-different subset right; `diagramScroll` reads its key with a bare `parseInt`, so a corrupt value makes
-the store `NaN` and the diagram lays out at `NaNpx`. Migrating them onto `persisted()` is an open
-TODO. Until then they are history, not the example.
+**Pick the codec, don't write the parse.** `$lib/utils/stateCore` ships `numberCodec(bounds?)`,
+`textCodec()`, `booleanCodec()` and `jsonCodec<T>()`. Reach for `booleanCodec` and **not**
+`jsonCodec<boolean>` for a flag: `JSON.parse('{"x":1}')` returns a truthy *object*, so a corrupt key
+would arm a flag nobody set — a flag has to fail closed. A codec's `read` returns `null` for "this
+string is not mine", which is deliberately distinct from a falsy value that *is* mine; conflating the
+two is how a persisted `0` or `false` springs back to its default on reload.
+
+**Cross-tab sync is a decision, not a default you inherit.** `persisted()` mirrors other tabs unless
+you pass `sync: false`. The presenter console is a second window onto the *same deck*, so sync means
+the speaker zooming in to inspect a slide also zooms the **audience's** screen. `displayMode`,
+`layoutMode` and `diagramScroll` all opt out for exactly that reason; a genuinely shared value (the
+current slide, say) wants it on. Choose per store.
+
+`displayMode.ts`, `layoutMode.ts` and `diagramScroll.ts` are the worked examples — all three now sit
+on the factory. `displayMode` is the one to read if you need to migrate a *legacy* key: its old
+`scaleMode` boolean is honoured as the store's **initial value** rather than inside its codec, since
+a `Codec` only ever sees its own key's string, and "what should this deck believe when it has no
+opinion of its own stored?" is precisely what an initial value answers.
 
 ### "Add a reusable component"
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	MAX_TEXT,
+	booleanCodec,
 	clamp,
 	jsonCodec,
 	numberCodec,
@@ -173,5 +174,37 @@ describe('codecs — null means "not mine", not "falsy"', () => {
 	it('jsonCodec reports a throw as null instead of exploding at module init', () => {
 		expect(jsonCodec().read('{ not json')).toBeNull();
 		expect(jsonCodec().read('null')).toBeNull();
+	});
+});
+
+describe('booleanCodec — a flag fails closed', () => {
+	it('round-trips both booleans', () => {
+		expect(booleanCodec().write(true)).toBe('true');
+		expect(booleanCodec().write(false)).toBe('false');
+		expect(booleanCodec().read('true')).toBe(true);
+		expect(booleanCodec().read('false')).toBe(false);
+	});
+
+	it('keeps a stored FALSE rather than reporting it as "nothing stored"', () => {
+		// The `null` vs falsy distinction, in the case where it bites: `false` is a real
+		// value a user chose, not an absent key.
+		expect(booleanCodec().read('false')).not.toBeNull();
+	});
+
+	it('tolerates surrounding whitespace', () => {
+		expect(booleanCodec().read('  true  ')).toBe(true);
+	});
+
+	it('refuses a JSON object, which jsonCodec would hand back as TRUTHY', () => {
+		// The reason this codec exists rather than jsonCodec<boolean>(). A corrupt key must
+		// not arm a flag: `Boolean({})` is `true`, and that would switch on authoring chrome.
+		expect(jsonCodec().read('{"not":"a boolean"}')).toEqual({ not: 'a boolean' }); // the trap
+		expect(booleanCodec().read('{"not":"a boolean"}')).toBeNull(); // the fix
+	});
+
+	it('refuses everything that is not exactly true or false', () => {
+		for (const raw of ['1', '0', 'yes', 'TRUE', 'True', '', 'null', 'undefined', '[]']) {
+			expect(booleanCodec().read(raw)).toBeNull();
+		}
 	});
 });

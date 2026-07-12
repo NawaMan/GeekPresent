@@ -227,15 +227,55 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
     is load-bearing for nobody, but proving that is a separate change), and folding it into a
     demo slide would have buried it. See the follow-up below.
 
-- [ ] **Migrate the hand-rolled persisted stores onto `persisted()`** — `displayMode`,
-      `layoutMode` and `diagramScroll` predate the factory and each re-implement it.
-  - `diagramScroll.ts` is the one with a live bug: `parseInt(localStorage.getItem(...))` with
-    no finite-check, so a corrupt key yields `NaN` and the diagram lays out at `NaNpx`.
-    `persisted(key, -500, { codec: numberCodec() })` is the whole fix.
-  - `displayMode.ts` additionally migrates a legacy `scaleMode` boolean; that migration has to
-    survive the move, so it wants a custom `Codec` rather than a straight swap.
-  - Behaviour-preserving, so it is a *test-first* change: pin each store's current behaviour
-    (including the legacy migration) before touching it.
+- [x] **Migrate the hand-rolled persisted stores onto `persisted()`** — `displayMode`,
+      `layoutMode` and `diagramScroll` predated the factory and each re-implemented it.
+  - Done test-first, as the entry demanded, and that ordering did real work: `tests/PersistedStores.test.ts`
+    pins all three stores against the **unmigrated** code first — 29 cases, of which 28 went green
+    immediately and exactly one went red. The red one was the bug. Then the migration turned it green
+    without moving any of the other 28. That is the proof the change is behaviour-preserving; "it still
+    seems to work" is not.
+  - The reload is the test's hard part, and the trick is worth copying: each store reads `localStorage`
+    exactly **once, at module init**, so "what a visitor sees tomorrow" is not reachable through any
+    method call. `vi.resetModules()` + a dynamic `import()` **is** the reload, which is why every case
+    re-imports rather than sharing a store.
+  - `diagramScroll.ts` — 21 lines to 4. `persisted('diagramScroll', -500, { codec: numberCodec() })`
+    was indeed the whole fix. **But the bug was not live**, and the original entry was wrong to say so:
+    the store is imported by *nothing* in the repo. The `NaNpx` was real but unreachable, so this is a
+    trap disarmed before someone wires the store up, not a rescue. Kept rather than deleted (it is 4
+    lines and an adopted project may well have its own consumer) — but if it is still unused next time
+    someone passes through, **delete it**.
+  - `displayMode.ts` — the legacy `scaleMode` migration does **not** want a custom `Codec`, which is
+    what the entry guessed. A `Codec` is a pure translation of *one key's* string, and the migration
+    reads a *different* key. It belongs in the store's **initial value**, which is the honest shape:
+    "what should this deck believe when it has no opinion of its own stored?" is exactly the question
+    an initial value answers. It also lands the precedence for free — `persisted()` consults `initial`
+    only when the real key is absent *or unreadable*, so a live `displayMode` outranks the legacy key
+    and a **garbage** `displayMode` still falls through to it. Both cases are pinned.
+  - `displayFactor` gets a codec that **resets rather than clamps** a non-positive value. `numberCodec({
+    min: MIN_FACTOR, max: MAX_FACTOR })` alone would clamp a corrupt `0` or `-3` to the 10% floor, and
+    a deck that comes back at 10% looks *broken* where one that comes back at 100% just looks *fresh*.
+    Out-of-range still clamps (a hand-edited `4000` → `MAX_FACTOR`); corrupt resets.
+  - New `booleanCodec()` in `utils/stateCore.ts`, because `layoutMode` needed one and
+    `jsonCodec<boolean>` is a trap: `JSON.parse('{"x":1}')` returns a truthy **object**, so a corrupt
+    key would arm the authoring chrome. A flag fails closed. Unit-tested in `tests/stateCore.test.ts`,
+    including the trap itself.
+  - Only `layoutMode`'s **boolean half** moved. `canLayout` is *derived* (DEV + the sticky `?layout`
+    flag + the slide's own declaration) and `canSave` is a capability of the environment — neither is a
+    `localStorage` mirror, so neither is a `persisted` store. Pinned, so nobody "finishes the job" later.
+  - **`sync: false` on all three, deliberately.** `persisted()` defaults cross-tab sync ON, and adopting
+    that silently would have been a feature smuggled inside a refactor — the presenter console is a
+    second window onto the same deck, so syncing means the speaker zooming in to inspect a slide also
+    zooms the **audience's** screen. Turning it on for any of these is a separate decision, on purpose.
+  - What the migration buys beyond the NaN: none of the three wrapped `setItem` in `try/catch`, and it
+    **throws** in Safari private mode and on a full quota — an uncaught throw in a store subscriber took
+    the slide down. A deck that dies because it could not save a zoom level has its priorities backwards.
+  - Done: `stores/diagramScroll.ts`, `stores/displayMode.ts`, `stores/layoutMode.ts` (migrated),
+    `utils/stateCore.ts` (`booleanCodec`). Tests: `tests/PersistedStores.test.ts` (29 DOM cases — the
+    pin), `tests/PersistedStoresSsr.ssr.test.ts` (7 cases: every store prerenders at its default and
+    **never touches storage** — asserted with a spy where `localStorage` would be, since in real SSR a
+    dropped `browser` guard does not degrade, it throws at import and fails the *build*),
+    `tests/stateCore.test.ts` (+6 for `booleanCodec`). `AGENTS.md`'s state playbook no longer calls the
+    three stores "history, not the example" — they are the example now.
 
 - [x] **Note-driven highlight** — let a `Note` line call attention to a component on the
       slide as the speaker covers it.
