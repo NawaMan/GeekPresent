@@ -14,6 +14,7 @@
 	import { getContext, untrack } from 'svelte';
 	import { boxTag, fmtNum, newEditorId, sharedAttrs } from './editing';
 	import { finite } from './drawCore';
+	import { guardStyle } from '$lib/layout/styleGuardCore';
 	import {
 		DRAW_CONTEXT_KEY,
 		type DrawContext,
@@ -102,6 +103,14 @@
 	const fillValue = $derived(fill ?? 'var(--draw-fill, none)');
 	const dasharray = $derived(dash === true ? '12 8' : dash === false ? undefined : dash);
 
+	// x/y/width/height reach the <rect> as PRESENTATION attributes, which any css —
+	// an inline style included — outranks. So an author's `style="width: 50px"`
+	// would silently cancel the geometry this shape is drawing, and the LAYOUT Block
+	// hosting it would drag a box that never moves. Same rule as Block: the props own
+	// the geometry, cosmetics pass through. (`rx` is NOT reserved — here it means
+	// corner rounding, not a radius.) See layout/styleGuardCore.ts.
+	const guard = $derived(guardStyle(style));
+
 	// --- LAYOUT-mode editing: register the box with Draw, which hosts the
 	// editing <Block tag="Rect"> (registered post-render via $effect so a
 	// child never mutates the parent's state mid-render).
@@ -148,6 +157,9 @@
 			tag: 'Rect',
 			get name() {
 				return name;
+			},
+			get style() {
+				return style;
 			},
 			get grid() {
 				return grid;
@@ -214,7 +226,7 @@
 	pathLength={drawSecs ? 1 : undefined}
 	style="stroke:{stroke}; stroke-width:{strokeWidth}; fill:{fillValue};{drawSecs
 		? ` animation-duration:${drawSecs}s;${delaySecs ? ` animation-delay:${delaySecs}s;` : ''}`
-		: ''}{style}"
+		: ''}{guard.safe}"
 	stroke-dasharray={drawSecs ? undefined : dasharray}
 	aria-label={label}
 	role={label ? 'img' : undefined}

@@ -293,6 +293,11 @@ export interface BlockShapeRegistration {
 	/** Draw-on reveal editor when the box is drawing itself on; Block shows
 	 *  time/delay fields in its toolbar. Null/absent otherwise. */
 	readonly drawEdit?: DrawOnEditor | null;
+	/** The shape's author `style`, forwarded so the editing Block can badge a
+	 *  geometry collision on the box you actually grab. The shape applies (and
+	 *  guards) this style itself, on its own SVG element — the Block never renders
+	 *  or emits it. See layout/styleGuardCore.ts. */
+	readonly style?: string;
 	/** Live box geometry, get/set — Block binds to these. */
 	x: number;
 	y: number;

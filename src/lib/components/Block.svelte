@@ -34,6 +34,7 @@
 	import { reportBlockZ, withdrawBlockZ, otherZValues } from '$lib/stores/blockOrder';
 	import { frontZ, backZ } from '$lib/utils/stackingCore';
 	import { trackPointer } from '$lib/utils/drag';
+	import { guardStyle } from '$lib/layout/styleGuardCore';
 	import { browser } from '$app/environment';
 	import { onDestroy } from 'svelte';
 
@@ -123,8 +124,20 @@
 	    shape's self-draw. Plain Blocks leave it null. */
 	export let drawEdit: import('$lib/draw/types').DrawOnEditor | null = null;
 
-	/** Inline style for the root element, applied last so it wins. */
+	/** Inline style for the root element, applied last so it wins — EXCEPT for the
+	    properties this Block writes itself (left/top/width/height/inset/position),
+	    which are reserved: the x/y/width/height props own the box. A geometry
+	    declaration here is stripped before the style is applied, so what you see
+	    always matches the props and a LAYOUT drag actually moves the box. Your
+	    source is left alone; the dead declaration is just called out in the LAYOUT
+	    chrome. See layout/styleGuardCore.ts. */
 	export let style: string = '';
+	/** The `style` of the shape a HOSTED Block is editing (a Draw Rect/Ellipse).
+	    That style is applied — and guarded — by the shape itself, on its own SVG
+	    element; this Block never renders or emits it. It is passed here for ONE
+	    reason: the badge belongs on the box you actually drag. Plain Blocks leave
+	    it empty and guard their own `style` instead. */
+	export let hostStyle: string = '';
 	/** DOM id for the root element. */
 	export let id: string = '';
 	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
@@ -309,8 +322,26 @@
 	// none of these: the shape emits its own via draw/editing.ts's sharedAttrs, into
 	// `attrs`. So the two paths never double-emit.)
 	const quoted = (n: string, v: string) => (v.includes('"') ? ` ${n}='${v}'` : ` ${n}="${v}"`);
+	// NOTE: the ORIGINAL `style` is echoed, not the guarded one. Reserving a
+	// property changes what RENDERS, never what the author wrote — Copy/Save hand
+	// the source string back byte-for-byte, and a stray `left: 40px` survives in
+	// source as an inert declaration for the author to delete. LAYOUT never edits
+	// inside an author's attribute value.
 	$: passAttrs =
 		(id ? quoted('id', id) : '') + (klass ? quoted('class', klass) : '') + (style ? quoted('style', style) : '');
+
+	// The props own the geometry: strip any left/top/width/height/inset/position the
+	// author's `style` declares, so it cannot cancel the box this Block is drawing.
+	// Without this, the two land in ONE inline declaration block and the author's
+	// wins — LAYOUT then drags a box that cannot move (see layout/styleGuardCore.ts).
+	// Cosmetics (stroke, dash, colour, a decorative rotate) pass through untouched
+	// and still win, exactly as before.
+	$: guard = guardStyle(style);
+	// A hosted Block (Draw's Rect/Ellipse) doesn't render the shape's style — the
+	// shape does — but the badge belongs here, on the box you grab.
+	$: hostGuard = guardStyle(hostStyle);
+	$: ignoredGeometry = [...guard.reserved, ...hostGuard.reserved];
+	$: displacedBy = [...guard.offsets, ...hostGuard.offsets];
 	$: openTag =
 		`<${tag}${name ? ` name="${name}"` : ''}${attrs}${passAttrs} x={${Math.round(x)}} y={${Math.round(y)}}` +
 		` width={${Math.round(width)}} height={${Math.round(height)}}${aspectAttr}${zAttr}`;
@@ -396,7 +427,7 @@
 	class:active={dragging}
 	id={id || undefined}
 	bind:this={el}
-	style="left:{x}px; top:{y}px; width:{width}px; height:{height}px; clip-path:{clipPath}; {zStyle} {style}"
+	style="left:{x}px; top:{y}px; width:{width}px; height:{height}px; clip-path:{clipPath}; {zStyle} {guard.safe}"
 	on:pointerdown={(e) => startDrag('move', e)}
 	on:pointerenter={() => (hovered = true)}
 	on:pointerleave={() => (hovered = false)}
@@ -407,6 +438,21 @@
 		<div class="readout">
 			{name ? name + ' · ' : ''}{Math.round(x)},{Math.round(y)} · {Math.round(width)}×{Math.round(height)}{z ? ' · z' + Math.round(z) : ''}
 		</div>
+		{#if ignoredGeometry.length || displacedBy.length}
+			<!-- The style/geometry collision, said out loud — LAYOUT-mode only, so it
+			     can never reach a published deck. Not a blocker: the drag works fine
+			     (that is the point of reserving the properties). This exists so an
+			     author who wrote `style="left: 40px"` learns why it does nothing,
+			     instead of concluding LAYOUT is broken. -->
+			<div class="style-warn" role="status">
+				{#if ignoredGeometry.length}
+					<span>⚠ <code>style</code> sets {ignoredGeometry.join(', ')} — ignored, the {ignoredGeometry.length > 1 ? 'props win' : 'prop wins'}</span>
+				{/if}
+				{#if displacedBy.length}
+					<span>⚠ <code>{displacedBy.join(', ')}</code> shifts this away from its x/y — anchors point at the box, not the pixels</span>
+				{/if}
+			</div>
+		{/if}
 		<!-- svelte-ignore a11y-no-static-element-interactions -->
 		<div class="toolbar" on:pointerdown|stopPropagation>
 			<button
@@ -513,6 +559,45 @@
 		color: var(--on-accent, #ffffff);
 		border-radius: 3px;
 		pointer-events: none;
+	}
+
+	/* The style/geometry collision badge — the TOP row of the chrome above the box:
+	   badge, then toolbar, then readout, then the box itself.
+	   Two things this has to get right, both learned the hard way:
+	   1. UNIT BASIS. The offset is in the BLOCK's font-size, not the badge's, because
+	      that is the basis `.toolbar` uses (the toolbar row sets no font-size — only
+	      its buttons shrink), so its `top: -1.7em` rides far higher than the 0.55em
+	      readout's. Sizing this row at 0.55em and then offsetting it by `1.7em` would
+	      measure the gap in units ~3x smaller and land the badge straight under the
+	      toolbar. The pills carry the font-size instead, so the two rows can't drift.
+	   2. STACKING. Above the toolbar/handle band (35), so a caution is never buried by
+	      the buttons it sits beside — still well under the KeyframeStudio panel (50).
+	   Bottom-anchored, so a second line grows upward rather than down into the toolbar.
+	   Warm, not blue: a caution, not a status. pointer-events:none so it can never eat
+	   a drag that starts near the top edge of the box. */
+	.movable .style-warn {
+		position: absolute;
+		left: 0;
+		bottom: calc(100% + 1.9em);
+		z-index: 36;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 2px;
+		pointer-events: none;
+	}
+	.movable .style-warn span {
+		font-size: 0.55em;
+		font-family: 'Fira Code', monospace;
+		white-space: nowrap;
+		padding: 0 0.4em;
+		background: var(--layout-warn-bg, #f0a33e);
+		color: var(--layout-warn-fg, #1a1a1a);
+		border-radius: 3px;
+	}
+	.movable .style-warn code {
+		font-family: inherit;
+		font-weight: 700;
 	}
 
 	/* Draw-on reveal editor (only present for wrapped Draw Rect/Ellipse):

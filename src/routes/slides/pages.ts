@@ -31,6 +31,7 @@ export const pages = [
     { path: "box-component.html",     title: "Box Component" },
     { path: "block-component.html",   title: "Block Component", layout: true },
     { path: "layout-mode.html",       title: "LAYOUT Mode", layout: true },
+    { path: "layout-style-guard.html", title: "style vs. LAYOUT", layout: true },
     { path: "highlight-component.html", title: "Highlight Component" },
     { path: "carousel-component.html", title: "Carousel Component" },
     { path: "steps-component.html",   title: "Steps & Fragment" },
@@ -74,6 +75,7 @@ export const pages = [
     { path: "codediff-component.html", title: "CodeDiff", layout: true },
     { path: "terminal-component.html", title: "Terminal" },
     { path: "speaker-notes.html",     title: "Speaker Notes" },
+    { path: "state-demo.html",        title: "State — URL, localStorage, Stores" },
     // The listed appendix (see the note beside the hidden pair above): no `hidden`, so
     // it IS in the running order and IS in the TOC — back matter, at the back.
     { path: "appendix-listed.html",   title: "Appendix — Listed, not hidden" },

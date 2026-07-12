@@ -14,6 +14,7 @@
 	import { getContext, untrack } from 'svelte';
 	import { boxTag, newEditorId, sharedAttrs } from './editing';
 	import { finite, round } from './drawCore';
+	import { guardStyle } from '$lib/layout/styleGuardCore';
 	import {
 		DRAW_CONTEXT_KEY,
 		type DrawContext,
@@ -102,6 +103,13 @@
 	const fillValue = $derived(fill ?? 'var(--draw-fill, none)');
 	const dasharray = $derived(dash === true ? '12 8' : dash === false ? undefined : dash);
 
+	// The props own the geometry — an author's `style="width: 50px"` must not cancel
+	// the box the hosting LAYOUT Block drags. (An <ellipse> is driven by cx/cy/rx/ry,
+	// so the reserved box properties are inert here; guarding anyway keeps ONE rule
+	// across every draggable, and the badge still tells the truth.) See
+	// layout/styleGuardCore.ts.
+	const guard = $derived(guardStyle(style));
+
 	// --- LAYOUT-mode editing: register the box with Draw, which hosts the
 	// editing <Block tag="Ellipse"> (see Rect.svelte).
 	const ctx = getContext<DrawContext | undefined>(DRAW_CONTEXT_KEY);
@@ -144,6 +152,9 @@
 			tag: 'Ellipse',
 			get name() {
 				return name;
+			},
+			get style() {
+				return style;
 			},
 			get grid() {
 				return grid;
@@ -209,7 +220,7 @@
 	pathLength={drawSecs ? 1 : undefined}
 	style="stroke:{stroke}; stroke-width:{strokeWidth}; fill:{fillValue};{drawSecs
 		? ` animation-duration:${drawSecs}s;${delaySecs ? ` animation-delay:${delaySecs}s;` : ''}`
-		: ''}{style}"
+		: ''}{guard.safe}"
 	stroke-dasharray={drawSecs ? undefined : dasharray}
 	aria-label={label}
 	role={label ? 'img' : undefined}

@@ -233,7 +233,19 @@
 	// didn't land, any error) goes to the console.
 	let saveLabel = 'SAVE';
 	let saveRefused = false;
+	/** How many tags SAVE could not place, when the write landed only partly. 0 =
+	    not a partial save. Drives the tooltip's wording; `saveRefused` drives the
+	    look, since both outcomes are "read this before you carry on". */
+	let savePartial = 0;
 	let saveTimer: ReturnType<typeof setTimeout> | undefined;
+
+	// The two refusals share one tooltip. A partial write names its count, because
+	// "some tags didn't save" sends an author hunting through a file to find which.
+	$: saveTip = savePartial
+		? `${savePartial === 1 ? '1 tag' : `${savePartial} tags`} not written — see the console. ` +
+			'A tag whose name AND geometry match another (a code sample of itself, say) is ' +
+			'ambiguous, so it is never guessed at — Copy that one by hand.'
+		: 'Save not allowed in this setup.';
 
 	function flashSave(label: string, ms: number) {
 		saveLabel = label;
@@ -241,6 +253,7 @@
 		saveTimer = setTimeout(() => {
 			saveLabel = 'SAVE';
 			saveRefused = false;
+			savePartial = 0;
 		}, ms);
 	}
 
@@ -258,10 +271,19 @@
 			console.error('[layout save] failed:', r.error);
 		} else if (r.patched === 0 && r.unmatched.length === 0) {
 			flashSave('NONE', 1600);
+		} else if (r.unmatched.length) {
+			// A PARTIAL save is the dangerous outcome: some tags landed, some didn't,
+			// and the author has no reason to suspect it. Saying "SAVED" here (which is
+			// what this used to do, with the detail buried in a console.warn) means a
+			// drag you made is quietly gone the next time the file reloads. Held long,
+			// like the refusal, because there is a tooltip to read — and it names the
+			// count, so "1 of 2" is legible without opening devtools.
+			saveRefused = true;
+			savePartial = r.unmatched.length;
+			flashSave(`${r.patched} OF ${r.patched + r.unmatched.length}`, 2600);
+			console.warn('[layout save] not written — Copy these by hand:', r.unmatched);
 		} else {
 			flashSave('SAVED', 1600);
-			if (r.unmatched.length)
-				console.warn('[layout save] not written — Copy these by hand:', r.unmatched);
 		}
 	}
 	// Open (or focus) the presenter console at the current slide. Moved here from the
@@ -499,8 +521,12 @@
 					<span class="save-btn" class:refused={saveRefused}>
 						<CtrlBtn chrome text={saveLabel} hoverText={saveLabel} on:click={onSave} />
 						{#if saveRefused}
-							<!-- aria-live so the refusal is announced, not just drawn. -->
-							<span class="save-tip" role="status">Save not allowed in this setup.</span>
+							<!-- aria-live so the refusal is announced, not just drawn. One
+							     interpolation, not a run of them: text split across lines in the
+							     template carries the SOURCE's newlines and indentation into
+							     textContent, so "1 tag" would read "1\n\t\t\ttag" to a screen
+							     reader and to a test. -->
+							<span class="save-tip" role="status">{saveTip}</span>
 						{/if}
 					</span>
 				{/if}

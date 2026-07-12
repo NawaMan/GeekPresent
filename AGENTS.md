@@ -317,6 +317,21 @@ invites the audience to assume the feature is missing or broken; a button that a
 when pressed teaches them saving is *forbidden here*, and why. **Copy** is the
 write-back path that works everywhere.
 
+**SAVE can also land only PARTLY, and says so.** The patcher never guesses (see
+`layout/patchSource.ts`): a tag it cannot confidently place comes back as `unmatched`
+rather than risking a rewrite of the wrong one. The button therefore has a fourth
+outcome beside `SAVED` / `NONE` / `NOT ALLOWED` — it reports the tally, **`1 OF 2`**,
+with a tooltip naming what didn't land. This matters more than it sounds: a partial
+write that *claimed* `SAVED` would quietly lose the author's drag on the next reload,
+with the only evidence in a `console.warn` nobody had reason to open.
+
+The usual cause is a tag with a **twin**. A slide that documents a component often
+shows the tag in a `<QuickCode>` sample living in the *same file*, and the patcher
+scans raw source — so a sample that spells out both `name` and `x/y/width/height` is
+indistinguishable from the real tag, and neither can be placed. **Elide the geometry in
+code samples** (`<Block name="api" …>`), the way every sample in this deck already
+does, and the ambiguity never arises.
+
 1. In the slide's `+page.svelte`, wrap the element:
    ```svelte
    <script>
@@ -427,6 +442,33 @@ presentations are themed independently; **`demo/+layout.svelte` is a worked exam
 Shared base styles are in `src/lib/styles/`. (Note: `src/app.html` still points at a non-existent
 `static/favicon.png` as the global default — a per-presentation `<svelte:head>` icon overrides it.)
 
+### "Remember something across a reload (state)"
+
+Three places, and they are not interchangeable: the **URL** (shareable — the only one you can read
+aloud to an audience), **`localStorage`** (private to one browser), and a **store** (fast, forgets on
+reload). The worked example is the `state-demo.html` slide, which is itself stateful.
+
+- **Persist a value** — `persisted(key, initial, { codec })` from `$lib/stores/persisted`. Do **not**
+  hand-roll `localStorage` in a store: the factory already does the `browser` guard, the
+  garbage-tolerant parse, the `try/catch` around `setItem` (it **throws** in private mode and on a
+  full quota) and the `storage` listener that keeps the presenter window in sync.
+- **Read a query param** — `readTextParam` / `readNumberParam` from `$lib/utils/stateCore`, never
+  `location.search`. The house form is `$: v = browser && readTextParam($page.url.searchParams, 'name', '')`.
+- **Parse anything from outside** — a stored string and a URL param are **untrusted input**: another
+  tab, an older deck, a hand-typed URL. `stateCore` is pure and total, so junk yields a usable value
+  and never `NaN`. (`parseInt('12px')` is `12` — which is why it uses `Number()` and demands finite.)
+
+**The SSR boundary is the part that bites**, and it fails the *build*, not the runtime: during
+prerender there is no `window` and no `localStorage`. Guard every reach for either with `browser`.
+The prerendered HTML therefore shows the **default** — correct, since it is built once and served to
+everyone — and the remembered value arrives on hydration, one tick after paint.
+
+**Three stores predate the factory and still hand-roll all of the above — do not copy them.**
+`displayMode.ts`, `layoutMode.ts` and `diagramScroll.ts` each re-implement the pattern and each get a
+different subset right; `diagramScroll` reads its key with a bare `parseInt`, so a corrupt value makes
+the store `NaN` and the diagram lays out at `NaNpx`. Migrating them onto `persisted()` is an open
+TODO. Until then they are history, not the example.
+
 ### "Add a reusable component"
 
 Add it to `src/lib/components/`, import with `$lib/components/<Name>.svelte`. Follow the existing
@@ -460,6 +502,17 @@ vanishes). The convention, on the component's root element:
   child's element doesn't carry the hash (you'll get an "unused CSS selector" warning). `class` is
   for **global** CSS (`global.css`, `roles.css`, a `:global(...)` block) or as a hook for scripts and
   tests. For one-off visual tweaks from a slide, reach for `style`, which has no such catch.
+- **On a draggable, the props own the geometry — `style` does not.** The one exception to "style wins".
+  A `Block` (and Draw's `Rect`/`Ellipse`) writes its own box, so `left`, `top`, `width`, `height`,
+  `inset*` and `position` are **reserved**: a declaration for one of them in `style` is *stripped*
+  before the style is applied. Otherwise it would land in the same declaration block as the box's own
+  geometry, where the last declaration simply wins — and `style="left: 40px"` would cancel `x={200}`
+  outright, leaving LAYOUT dragging a box that cannot move. `style` is for **cosmetics** (stroke, dash,
+  colour, a decorative `rotate()`); those still pass through and still win, untouched. Reserving
+  changes what *renders*, never what you *wrote*: your source `style` is echoed back verbatim by
+  Copy/Save, and LAYOUT-mode chrome badges the dead declaration so you know to delete it. The rule
+  lives in `src/lib/layout/styleGuardCore.ts` (pure, unit-tested); a new draggable reuses `guardStyle()`
+  rather than re-deriving the list.
 
 ---
 
@@ -480,6 +533,14 @@ vanishes). The convention, on the component's root element:
   `src/lib/seo/routes.ts`.
 - **`name` ending in `.html` is intentional.** Route folders are literally `title.html/`, so the URL is
   `/slides/title.html`. Don't "fix" it.
+- **`.note` is a RESERVED class name — do not use it on a slide.** `src/lib/styles/note.css` is
+  **global** (it styles speaker `Note`s), and it reaches into *any* element classed `.note` with
+  `.note *:nth-child(even) { background-color: #e8e8e8 }`. So an innocent
+  `<p class="note">Press <b>+</b>, then <b>reload</b>.</p>` on a dark slide silently paints a light-grey
+  box behind the **second** `<b>` — and only the second, which is what makes it so confusing to
+  diagnose. Svelte's scoped styles do **not** protect you: scoping adds a hash class, it does not stop
+  a global selector from matching the class you wrote. Pick any other name (`.cue`, `.caption`); the
+  `state-demo.html` slide uses `.cue` for exactly this reason.
 - **LAYOUT mode's `?layout` opt-in is sticky and global, not per-deck.** Once `?layout`
   is seen on a built site, it's saved to `localStorage` and the LAYOUT control then
   shows on **every deck on that origin** until `?layout=off`; the on/off toggle state
