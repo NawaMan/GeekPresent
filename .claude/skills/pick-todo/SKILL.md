@@ -1,14 +1,20 @@
 ---
 name: pick-todo
-description: Study the project and TODO.md, then propose a few open features worth building next — each with a one-sentence approach — and let the user choose. Use when the user asks "what should I work on / build next", "pick a feature", "what's next in the TODO", or otherwise wants options rather than a specific task. Stops at the proposal; does not implement.
+description: Study the project and TODO.md, propose a few open features worth building next — each with a one-sentence approach — let the user choose, then build the one they pick. Use when the user asks "what should I work on / build next", "pick a feature", "what's next in the TODO", or otherwise wants options rather than a specific task.
 ---
 
 # Pick a feature to implement
 
-Propose a short menu of open `TODO.md` features, each with a credible one-sentence approach, and
-let the user pick. **The deliverable is the menu, not the code.** Do not start implementing, do not
-edit source, and do not mark anything `[x]` — even if one candidate looks trivial. The user chooses;
-a fresh request implements.
+Propose a short menu of open `TODO.md` features, each with a credible one-sentence approach, let the
+user pick, and then **build the one they picked** — all in this one invocation.
+
+**The menu comes first, and nothing precedes it.** Until the user has chosen, do not edit source, do
+not scaffold, do not mark anything `[x]` — even if one candidate looks trivial and even if you are
+confident which one they will take. Research and read all you like; just don't write. The point of
+the skill is that the user chooses what gets built, so choosing must come before building.
+
+Once they choose, the ambiguity is gone: go implement it. Don't stop to ask for confirmation, don't
+hand back a plan, don't wait for a fresh request.
 
 ## 1. Orient (skip what you already know)
 
@@ -82,4 +88,18 @@ Then call `AskUserQuestion` with the candidates as options so the pick is one cl
 size in each option's description. If a candidate's real choice is a *design question* (per step 2),
 make that the question instead — deciding it is more valuable than a vague yes.
 
-End your turn there. Wait for the choice.
+## 5. Build the pick
+
+The answer to that question is the go-ahead. Implement the chosen item now, in this same turn, to the
+definition of done in step 3 — component, demo slide, DOM test, SSR test — following the approach you
+pitched. If the pitch named a default for an open design question, that default is what the user
+agreed to; build it that way rather than re-opening the question.
+
+Two things the menu phase deliberately withheld, now due:
+- **Check the box.** Mark the item `[x]` in `TODO.md` and rewrite its entry into the house style of a
+  completed entry — a `Done:` bullet naming the files that landed — the way every other finished item
+  reads.
+- **Verify.** Build and run the tests; a feature is not done because the diff exists.
+
+If the user picked *Other* and typed something outside the menu, that is still a pick — build it,
+scouting further first if the item was one you had not researched.
