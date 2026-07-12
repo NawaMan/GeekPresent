@@ -18,9 +18,10 @@
   every input may be junk — an absent param, a NaN, a value another tab
   corrupted, a 4 MB string — and each has exactly one defined answer. Nothing
   here throws, and nothing here returns NaN. That matters more than it sounds:
-  `stores/diagramScroll.ts` reads its key with a bare `parseInt`, so a corrupt
-  value makes the store NaN and the diagram is laid out at `NaNpx`. A parse that
-  cannot fail is the fix, and it belongs here rather than in each store.
+  `stores/diagramScroll.ts` used to read its key with a bare `parseInt`, so a
+  corrupt value made the store NaN and the diagram was laid out at `NaNpx`. A
+  parse that cannot fail is the fix, and it belongs here rather than in each
+  store — which is where all three persisted stores now get it.
 
   Note what is deliberately NOT here: `browser` guards. This module never
   touches `window` or `localStorage` — it only interprets values that someone
@@ -149,6 +150,25 @@ export function textCodec(): Codec<string> {
 	return {
 		read: (raw: string) => (typeof raw === 'string' ? parseText(raw) : null),
 		write: (value: string) => (typeof value === 'string' ? value : '')
+	};
+}
+
+/** A strict boolean codec — the two strings this codec writes, and nothing else.
+
+    `jsonCodec<boolean>()` would very nearly do, and that is the trap: `JSON.parse` happily
+    returns an OBJECT for `{"not":"a boolean"}`, which is truthy, so a corrupt key would
+    read back as "true enough" and arm a flag nobody set. A flag guarding authoring chrome
+    has to fail CLOSED, so anything that is not exactly `true`/`false` is `null` — the
+    caller's initial value. */
+export function booleanCodec(): Codec<boolean> {
+	return {
+		read(raw: string): boolean | null {
+			const trimmed = typeof raw === 'string' ? raw.trim() : '';
+			if (trimmed === 'true') return true;
+			if (trimmed === 'false') return false;
+			return null;
+		},
+		write: (value: boolean) => (value ? 'true' : 'false')
 	};
 }
 

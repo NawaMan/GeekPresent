@@ -1,5 +1,7 @@
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
+import { persisted } from './persisted';
+import { booleanCodec } from '$lib/utils/stateCore';
 import { readSticky, readLayoutParam, resolveCanLayout } from '$lib/layout/layoutAccessCore';
 
 // LAYOUT mode — an AUTHORING aid, not a viewer feature. When on, <Block> wrappers
@@ -46,11 +48,6 @@ export const canSave = writable<boolean>(import.meta.env.DEV);
 // Re-set on every slide change — this is per-slide state, not a one-shot deck setting.
 let declared = false;
 
-function initialMode(): boolean {
-	if (!browser) return false;
-	return localStorage.getItem(MODE_KEY) === 'true';
-}
-
 function sticky() {
 	return browser ? readSticky(localStorage.getItem(CAN_KEY)) : null;
 }
@@ -59,12 +56,24 @@ function recompute(): void {
 	canLayout.set(resolveCanLayout(import.meta.env.DEV, sticky(), declared));
 }
 
-export const layoutMode = writable<boolean>(initialMode());
-export const canLayout = writable<boolean>(resolveCanLayout(import.meta.env.DEV, sticky(), declared));
+// Is the mode currently ON? The only one of the three that is a plain localStorage mirror,
+// so it is the only one that moves onto persisted(). `booleanCodec` and not
+// `jsonCodec<boolean>` on purpose: a corrupt key must read as OFF, and JSON would hand
+// back a truthy object for `{"x":1}` — arming the authoring chrome nobody asked for.
+//
+// `sync: false` keeps today's behaviour: two windows on the same deck each hold their own
+// LAYOUT state, so flipping the mode in the presenter console does not arm drag handles on
+// the audience's screen.
+export const layoutMode = persisted<boolean>(MODE_KEY, false, {
+	codec: booleanCodec(),
+	sync: false
+});
 
-if (browser) {
-	layoutMode.subscribe((v) => localStorage.setItem(MODE_KEY, String(v)));
-}
+// NOT persisted stores, and deliberately left hand-rolled:
+//   - canLayout is DERIVED (DEV + the sticky ?layout flag + the slide's own declaration),
+//     recomputed on every slide change. It reads CAN_KEY but never mirrors itself to it.
+//   - canSave is a capability of the environment, not a remembered preference.
+export const canLayout = writable<boolean>(resolveCanLayout(import.meta.env.DEV, sticky(), declared));
 
 /** Declare whether the CURRENT slide offers the LAYOUT control — its `layout` flag in
     pages.ts (or, deck-wide, SlideDeck's `layout` prop). SlideDeck calls this on every

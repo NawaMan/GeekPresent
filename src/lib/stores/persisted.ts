@@ -6,16 +6,18 @@ import { type Codec, jsonCodec } from '$lib/utils/stateCore';
   persisted() — a Svelte store that remembers, across a reload and across tabs.
 
   Every persisted store in this deck used to hand-roll the same four steps, and
-  each one got a slightly different subset right (see displayMode.ts,
-  diagramScroll.ts, layoutMode.ts):
+  each one got a slightly different subset right. displayMode.ts,
+  diagramScroll.ts and layoutMode.ts have since moved onto this factory, and are
+  now the worked examples rather than the cautionary tale — but the four steps
+  are why it exists:
 
     1. Read the key — but ONLY in the browser. During prerender there is no
        `localStorage`, and touching it is not a degraded render, it is a build
        that fails.
     2. Distrust what you read. The value was written by another tab, or by an
        older version of this deck, or by half a write that a crash interrupted.
-       `diagramScroll.ts` does `parseInt(stored)` with no guard, so one corrupt
-       byte makes the store `NaN` and the diagram lays out at `NaNpx`.
+       `diagramScroll.ts` used to do `parseInt(stored)` with no guard, so one
+       corrupt byte made the store `NaN` and the diagram laid out at `NaNpx`.
     3. Write on change — inside a try/catch. `setItem` THROWS in Safari's private
        mode and when the quota is full. An uncaught throw in a store subscriber
        takes the slide down, and a deck that dies because it could not save a
