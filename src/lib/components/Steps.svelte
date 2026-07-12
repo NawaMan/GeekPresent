@@ -64,6 +64,16 @@
 	/** Also advance when the presenter console relays a CONTINUE pulse (gp:continue). */
 	export let continueKey = true;
 
+	/** Inline style for the root element, applied last so it wins. */
+	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
+
 	// A document artifact has no notion of a "current step": show everything, and
 	// never touch the keyboard (it pages nothing).
 	const isText = getMode() === 'text';
@@ -169,4 +179,4 @@
 
 <!-- display:contents → Steps adds no box of its own; Fragments lay out exactly
      where they sit in the parent's flow. -->
-<div class="steps" style="display: contents;"><slot /></div>
+<div class="steps {klass}" id={id || undefined} style="display: contents; {style}"><slot /></div>

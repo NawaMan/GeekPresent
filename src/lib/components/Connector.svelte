@@ -103,6 +103,16 @@
 		/** The coordinate space when self-hosting an <svg> (ignored inside Draw). */
 		canvasWidth?: number;
 		canvasHeight?: number;
+		/** Inline style for the root element, applied last so it wins. Lands on the
+		 *  connector's own <g>, which is the one element present in BOTH render
+		 *  modes (standalone overlay and nested inside a Draw surface). */
+		style?: string;
+		/** DOM id for the root element. */
+		id?: string;
+		/** Extra class(es) for the root element. NOTE: a slide's own scoped styles
+		 *  will NOT match — use global CSS (global.css / roles.css / a :global(...)
+		 *  block) or a utility class. See AGENTS.md. */
+		class?: string;
 	}
 
 	let {
@@ -125,7 +135,10 @@
 		drawDelay,
 		ariaLabel,
 		canvasWidth = 1920,
-		canvasHeight = 1080
+		canvasHeight = 1080,
+		style = '',
+		id = '',
+		class: klass = ''
 	}: Props = $props();
 
 	// Nested in a <Draw>? Then render into ITS svg rather than opening another.
@@ -189,7 +202,13 @@
 </script>
 
 {#snippet shaft(g: NonNullable<typeof geo>)}
-	<g class="connector" role={name ? 'img' : undefined} aria-label={name}>
+	<g
+		id={id || undefined}
+		class="connector {klass}"
+		style={style || undefined}
+		role={name ? 'img' : undefined}
+		aria-label={name}
+	>
 		<path
 			d={g.d}
 			fill="none"

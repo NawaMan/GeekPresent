@@ -46,8 +46,9 @@
   control reads DECK — an appendix must never strand you, since it is off the linear
   order and the browser's Back button would otherwise be the only way out.
 
-  Props: title / subtitle / rule / align pass straight through to ContentPage — an
-  appendix is an ordinary slide, laid out normally. Only its NAVIGATION differs.
+  Props: title / subtitle / rule / align — and style / id / class — pass straight through
+  to ContentPage — an appendix is an ordinary slide, laid out normally. Only its
+  NAVIGATION differs.
 
     returnText — label for the return control (default 'RETURN').
     deckText   — label when there is no return address (default 'DECK').
@@ -97,6 +98,16 @@
 	export let returnText = 'RETURN';
 	export let deckText   = 'DECK';
 	export let transition = false;
+
+	/** Inline style for the page root, applied last so it wins. */
+	export let style: string = '';
+	/** DOM id for the page root. */
+	export let id: string = '';
+	/** Extra class(es) for the page root. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 
 	const pages = getPages();
 
@@ -203,7 +214,9 @@
 	});
 </script>
 
-<ContentPage {title} {subtitle} {rule} {align} nav={false}>
+<!-- The page root IS the ContentPage, so the three pass-throughs go through it — an
+     appendix's own root would be a second box. -->
+<ContentPage {title} {subtitle} {rule} {align} {style} {id} class={klass} nav={false}>
 	<slot />
 </ContentPage>
 

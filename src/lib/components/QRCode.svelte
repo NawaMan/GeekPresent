@@ -89,6 +89,13 @@
 	export let plate: boolean = true;
 	/** Extra inline CSS appended to the root. */
 	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 
 	// A QR is scanned, not clicked — but a deck is also read as a page (and built into
 	// a Text artifact), where a link is what a reader can actually use. Only schemes
@@ -109,7 +116,7 @@
 <!-- An unencodable value renders NO element, rather than an empty square the audience
      would point a phone at. Connector's rule: nothing at all beats something broken. -->
 {#if matrix}
-	<figure class="qr" {style}>
+	<figure class="qr {klass}" id={id || undefined} {style}>
 		<svelte:element
 			this={target ? 'a' : 'div'}
 			class="frame"

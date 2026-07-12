@@ -38,6 +38,14 @@
 		aspect?: number | boolean | null;
 		/** Block's drag bounds: keep inside the canvas, or roam free. */
 		bounds?: 'canvas' | 'none';
+		/** Inline style for the root element, applied last so it wins. */
+		style?: string;
+		/** DOM id for the root element. */
+		id?: string;
+		/** Extra class(es) for the root element. NOTE: a slide's own scoped styles
+		 *  will NOT match — use global CSS (global.css / roles.css / a :global(...)
+		 *  block) or a utility class. See AGENTS.md. */
+		class?: string;
 	}
 
 	let {
@@ -55,7 +63,10 @@
 		name = '',
 		grid = 1,
 		aspect = null,
-		bounds = 'canvas'
+		bounds = 'canvas',
+		style = '',
+		id = '',
+		class: klass = ''
 	}: Props = $props();
 
 	// Draw-on (the classic circle-that-word beat): pathLength=1 works on
@@ -97,7 +108,7 @@
 
 	const attrsWith = (dr: number | undefined, dd: number | undefined) =>
 		(fill ? ` fill="${fill}"` : '') +
-		sharedAttrs({ color, thickness, dash, label, draw: dr, drawDelay: dd, grid });
+		sharedAttrs({ color, thickness, dash, label, draw: dr, drawDelay: dd, grid, id, class: klass, style });
 	const extraAttrs = $derived(attrsWith(drawVal, drawDelayVal));
 	const sourceAttrs = $derived(attrsWith(draw, drawDelay));
 
@@ -188,7 +199,8 @@
 </script>
 
 <ellipse
-	class="draw-ellipse"
+	id={id || undefined}
+	class="draw-ellipse {klass}"
 	class:draw-anim={drawSecs}
 	{cx}
 	{cy}
@@ -197,7 +209,7 @@
 	pathLength={drawSecs ? 1 : undefined}
 	style="stroke:{stroke}; stroke-width:{strokeWidth}; fill:{fillValue};{drawSecs
 		? ` animation-duration:${drawSecs}s;${delaySecs ? ` animation-delay:${delaySecs}s;` : ''}`
-		: ''}"
+		: ''}{style}"
 	stroke-dasharray={drawSecs ? undefined : dasharray}
 	aria-label={label}
 	role={label ? 'img' : undefined}

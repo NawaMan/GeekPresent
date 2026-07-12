@@ -70,4 +70,21 @@ describe('Hint (SSR)', () => {
 		const { body } = render(Hint, { props: { text: 'cue' } });
 		expect(body).not.toContain('--hint-dim');
 	});
+
+	// A Svelte component forwards nothing it has not declared, so `style` has to be a
+	// real prop — without it the attribute a slide writes is silently dropped, which
+	// reads as "the style does not work" rather than "the style went nowhere".
+	it('style reaches the pill, so a slide can quieten its own cue', () => {
+		const { body } = render(Hint, { props: { text: 'cue', style: 'font-size: 0.8em' } });
+		expect(body).toContain('font-size: 0.8em');
+	});
+
+	// Last wins: an inline declaration outranks any class selector, so a slide's
+	// font-size beats the component's own — and it must not trample `dim` either.
+	it('style is applied after dim, so both survive', () => {
+		const { body } = render(Hint, { props: { text: 'cue', dim: 0.5, style: 'font-size: 0.8em' } });
+		expect(body).toContain('--hint-dim:0.5');
+		expect(body).toContain('font-size: 0.8em');
+		expect(body.indexOf('--hint-dim')).toBeLessThan(body.indexOf('font-size: 0.8em'));
+	});
 });

@@ -79,6 +79,16 @@
 	/** Accessible label announced for the arrow when it is clickable. */
 	export let label = 'Highlight';
 
+	/** Inline style for the root element, applied last so it wins. */
+	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
+
 	// Imperative show/hide for a parent holding `bind:this`. `show` is also a
 	// bindable prop, so `bind:show` works too — these just save a round-trip.
 	/** Flip the cue on/off. */
@@ -208,9 +218,10 @@
 	<!-- REMOTE: glow is on the real element; this 0×0 anchor only hosts the arrow,
 	     positioned over the measured target rect (in canvas px). -->
 	<span
-		class="hl hl-remote"
+		class="hl hl-remote {klass}"
+		id={id || undefined}
 		bind:this={rootEl}
-		style="--hl-color:{color}; --hl-gap:{gap}px; --hl-arrow:{arrowSize}px; --hl-dur:{duration}s;"
+		style="--hl-color:{color}; --hl-gap:{gap}px; --hl-arrow:{arrowSize}px; --hl-dur:{duration}s; {style}"
 	>
 		{#if show && arrow && measured}
 			<span
@@ -242,8 +253,9 @@
 {:else}
 	<!-- WRAP: glow hugs the slotted content's real shape via drop-shadow. -->
 	<span
-		class="hl"
-		style="--hl-color:{color}; --hl-opacity:{opacity}; --hl-glow:{glow}px; --hl-gap:{gap}px; --hl-arrow:{arrowSize}px; --hl-dur:{duration}s;"
+		class="hl {klass}"
+		id={id || undefined}
+		style="--hl-color:{color}; --hl-opacity:{opacity}; --hl-glow:{glow}px; --hl-gap:{gap}px; --hl-arrow:{arrowSize}px; --hl-dur:{duration}s; {style}"
 	>
 		<span class="target" class:gp-hl-glow={show} class:gp-hl-pulse={show && pulse}>
 			<slot />

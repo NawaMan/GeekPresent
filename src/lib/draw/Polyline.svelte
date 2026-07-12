@@ -19,6 +19,14 @@
 		close?: boolean;
 		/** Catmull-Rom smoothing through every point. */
 		smooth?: boolean;
+		/** Inline style for the root element, applied last so it wins. */
+		style?: string;
+		/** DOM id for the root element. */
+		id?: string;
+		/** Extra class(es) for the root element. NOTE: a slide's own scoped styles
+		 *  will NOT match — use global CSS (global.css / roles.css / a :global(...)
+		 *  block) or a utility class. See AGENTS.md. */
+		class?: string;
 	}
 
 	let {
@@ -30,7 +38,10 @@
 		dash = false,
 		label,
 		draw,
-		drawDelay
+		drawDelay,
+		style = '',
+		id = '',
+		class: klass = ''
 	}: Props = $props();
 
 	// Draw-on: pathLength=1 normalizes any path so the dash trick needs no
@@ -50,14 +61,15 @@
 
 {#if d}
 	<path
-		class="draw-polyline"
+		id={id || undefined}
+		class="draw-polyline {klass}"
 		class:draw-anim={drawSecs}
 		{d}
 		fill="none"
 		pathLength={drawSecs ? 1 : undefined}
 		style="stroke:{stroke}; stroke-width:{strokeWidth};{drawSecs
 			? ` animation-duration:${drawSecs}s;${delaySecs ? ` animation-delay:${delaySecs}s;` : ''}`
-			: ''}"
+			: ''}{style}"
 		stroke-dasharray={drawSecs ? undefined : dasharray}
 		stroke-linejoin="round"
 		aria-label={label}

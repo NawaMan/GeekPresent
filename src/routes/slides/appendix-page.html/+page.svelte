@@ -86,14 +86,6 @@
 				matter you can page into, as a book lets you. Called from here, it still returns
 				here.
 			</p>
-
-			<Callout kind="tip" style="margin-top: 0.8em; font-size: 0.65em">
-				Watch the motion: <code>transition</code> takes you <i>down</i> to the appendix and
-				back <i>up</i> out of it, so the vertical axis means "we stepped out of the talk" —
-				while paging <i>within</i> it stays sideways, because that is just reading. The
-				return address rides in the URL (<code>?return=appendix-page.html</code>) and every
-				link inside re-stamps it, so going deeper never loses the way home.
-			</Callout>
 		</Column>
 
 		<Column style="font-size: 0.8em" >
@@ -112,6 +104,13 @@
 </AppendixPage>`} />
 		</Column>
 	</Columns>
+	<Callout kind="tip" style="margin-top: 0.8em; font-size: 0.65em">
+		Watch the motion: <code>transition</code> takes you <i>down</i> to the appendix and
+		back <i>up</i> out of it, so the vertical axis means "we stepped out of the talk" —
+		while paging <i>within</i> it stays sideways, because that is just reading. The
+		return address rides in the URL (<code>?return=appendix-page.html</code>) and every
+		link inside re-stamps it, so going deeper never loses the way home.
+	</Callout>
 </ContentPage>
 
 <!-- Both sit OUTSIDE ContentPage, as every other slide has them: a Hint's flow parent
@@ -119,5 +118,5 @@
      lever). Nested inside ContentPage it inherits the larger content font — rendering
      half again too big — and takes its static position from the prose, so it lands
      left instead of centred. -->
-<Hint text="An appendix is a prerendered, linkable slide like any other — it just isn't part of the march" />
+<Hint text="An appendix is a prerendered, linkable slide like any other — it just isn't part of the march" style="font-size: 0.8em" />
 <SourceView {source} {path} />

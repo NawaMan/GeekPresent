@@ -174,4 +174,31 @@ describe('patchSlideSource', () => {
 		expect(source).toContain('<Block name="a" x={111} y={222} width={333} height={444}>');
 		expect(source).toContain('<ImageBlock name="pic" x={50} y={60} width={70} height={80} />');
 	});
+
+	// Every component now takes `style` / `id` / `class`, and LAYOUT knows nothing about
+	// them — which is precisely why they are worth pinning here. SAVE is a surgical
+	// rewrite of the geometry attributes ONLY, so a decorated tag must come out the far
+	// side still decorated. (COPY is the other, blunter path: it emits a whole tag, which
+	// is why draw/editing.ts has to emit these too — see drawEditingTag.test.ts.)
+	it('leaves the author’s style, id and class untouched while moving the box', () => {
+		const src = `<Block name="hero" id="hero-box" class="hot" style="opacity: 0.4" x={100} y={200} width={300} height={400}>\n</Block>`;
+		const { source, unmatched } = patchSlideSource(src, [change({ name: 'hero' })]);
+
+		expect(unmatched).toHaveLength(0);
+		expect(source).toContain('id="hero-box"');
+		expect(source).toContain('class="hot"');
+		expect(source).toContain('style="opacity: 0.4"');
+		expect(source).toContain('x={111} y={222} width={333} height={444}');
+	});
+
+	// A style can carry the very characters the patcher scans for — braces. It must not
+	// mistake `style="--f: {x}"` for a geometry expression, nor corrupt it.
+	it('is not confused by braces inside a style value', () => {
+		const src = `<Rect name="api" style="width: calc(100% - 4px)" x={100} y={200} width={300} height={400} />`;
+		const { source, unmatched } = patchSlideSource(src, [change({ kind: 'Rect', name: 'api' })]);
+
+		expect(unmatched).toHaveLength(0);
+		expect(source).toContain('style="width: calc(100% - 4px)"');
+		expect(source).toContain('x={111} y={222} width={333} height={444}');
+	});
 });

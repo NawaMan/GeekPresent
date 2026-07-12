@@ -68,6 +68,13 @@
 	export let background: string = '';
 	/** Extra inline CSS appended to the figure. */
 	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 
 	// Unknown align falls back to left rather than emitting a class that matches
 	// nothing — the same discipline ContentPage's `align` follows.
@@ -94,10 +101,11 @@
 </script>
 
 <figure
-	class="quote align-{resolvedAlign}"
+	class="quote align-{resolvedAlign} {klass}"
 	class:has-rule={rule}
 	class:framed
 	class:bordered={border}
+	id={id || undefined}
 	style="{frameVars} {style}"
 >
 	{#if mark}

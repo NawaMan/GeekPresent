@@ -63,6 +63,16 @@
 	/** aria-label for the region. */
 	export let label = 'Carousel';
 
+	/** Inline style for the root element, applied last so it wins. */
+	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
+
 	// total: item count, kept reactive so the dot row tracks registrations.
 	// current: the active index; items subscribe to know when they're showing.
 	// mode: the transition mode, shared so each item can style itself.
@@ -165,13 +175,14 @@
      active widget; region is the right role, hence the a11y overrides. -->
 <!-- svelte-ignore a11y-no-noninteractive-tabindex a11y-no-noninteractive-element-interactions -->
 <div
-	class="carousel mode-{transition}"
+	class="carousel mode-{transition} {klass}"
 	class:focusable={keys === 'focus'}
+	id={id || undefined}
 	role="region"
 	aria-roledescription="carousel"
 	aria-label={label}
 	tabindex={keys === 'focus' ? 0 : undefined}
-	style="--carousel-dur: {duration}s; width: {width}; height: {height};"
+	style="--carousel-dur: {duration}s; width: {width}; height: {height}; {style}"
 	on:keydown={keys === 'focus' ? onKeys : undefined}
 	on:wheel|nonpassive={onWheel}
 >

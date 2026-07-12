@@ -70,6 +70,13 @@
 	export let label = 'Tabs';
 	/** Extra inline CSS appended to the group. */
 	export let style = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 
 	// A Text artifact has no canvas and nothing to click: show every panel in flow.
 	const textMode = getMode() === 'text';
@@ -146,8 +153,9 @@
 </script>
 
 <div
-	class="tabs align-{alignCls}"
+	class="tabs align-{alignCls} {klass}"
 	class:text={textMode}
+	id={id || undefined}
 	style="{durVar} {style}"
 >
 	<!-- Panels come FIRST in the DOM so the strip's {#each $tabs} below reads a

@@ -83,9 +83,13 @@
 		background?: string;
 		/** Backing-store scale; defaults to devicePixelRatio for crisp output. */
 		pixelRatio?: number;
-		/** Extra classes / inline style for the wrapper. */
+		/** Extra classes / inline style for the wrapper. NOTE: a slide's own scoped
+		 *  styles will NOT match a class named here — use global CSS (global.css /
+		 *  roles.css / a :global(...) block) or a utility class. See AGENTS.md. */
 		class?: string;
 		style?: string;
+		/** DOM id for the root element. */
+		id?: string;
 
 		// --- Interaction. Any handler here makes the surface pointer-interactive
 		// (otherwise the canvas is pointer-events:none, so it never blocks clicks
@@ -118,6 +122,7 @@
 		pixelRatio,
 		class: klass = '',
 		style = '',
+		id = '',
 		onpointerdown,
 		onpointermove,
 		onpointerup,
@@ -317,7 +322,7 @@
 	});
 </script>
 
-<div class="gp-canvas {klass}" bind:this={wrapper} {style}>
+<div id={id || undefined} class="gp-canvas {klass}" bind:this={wrapper} {style}>
 	<canvas
 		bind:this={canvasEl}
 		class="gp-canvas-surface"

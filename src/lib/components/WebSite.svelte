@@ -123,6 +123,13 @@
 	export let allow: string = '';
 	/** Extra inline CSS appended to the outer box. */
 	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 
 	// A text artifact is one long, scrollable document: shielding an embed there
 	// would be noise. A presentation slide is driven by the keyboard, so it shields.
@@ -252,10 +259,11 @@
 </script>
 
 <div
-	class="website"
+	class="website {klass}"
 	class:text-mode={isText}
 	class:armed={live && !interactive}
 	bind:this={root}
+	id={id || undefined}
 	style="width: {width}; height: {height}; {style}"
 >
 	{#if chrome}

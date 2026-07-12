@@ -432,6 +432,35 @@ Shared base styles are in `src/lib/styles/`. (Note: `src/app.html` still points 
 Add it to `src/lib/components/`, import with `$lib/components/<Name>.svelte`. Follow the existing
 componentization style. If it wraps Monaco (`Code`/`JavaCode`), remember Monaco loads from a CDN.
 
+**Give it `style`, `id` and `class`** — every author-facing component takes all three, and a new one
+that doesn't will look broken the first time a slide reaches for one (a Svelte component forwards
+*nothing* it hasn't declared, so the attribute is silently dropped — it doesn't error, it just
+vanishes). The convention, on the component's root element:
+
+```svelte
+<script lang="ts">
+	/** Inline style for the root element, applied last so it wins. */
+	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. */
+	let klass: string = '';
+	export { klass as class };   // `class` is a reserved word, hence the rename
+</script>
+
+<div class="thing {klass}" id={id || undefined} style="width: {width}px; {style}">
+```
+
+- **`style` goes LAST** in the style attribute. That is the whole point: a plain declaration on the
+  element outranks any class selector, so the author's `style` beats the component's own rules
+  without an `!important` anywhere.
+- **`id={id || undefined}`** so an unset id emits no attribute at all.
+- **`class` has a catch worth knowing.** A slide's own `<style>` is *scoped*, so a class you define
+  there will **not** match an element inside a child component — Svelte hashes the selector, and the
+  child's element doesn't carry the hash (you'll get an "unused CSS selector" warning). `class` is
+  for **global** CSS (`global.css`, `roles.css`, a `:global(...)` block) or as a hook for scripts and
+  tests. For one-off visual tweaks from a slide, reach for `style`, which has no such catch.
+
 ---
 
 ## Gotchas

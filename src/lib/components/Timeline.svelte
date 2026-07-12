@@ -76,6 +76,13 @@
 	export let itemWidth: string = '12em';
 	/** Extra inline CSS appended to the list. */
 	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 
 	$: resolvedOrientation = orientation === 'horizontal' ? 'horizontal' : 'vertical';
 
@@ -101,7 +108,8 @@
 </script>
 
 <ol
-	class="timeline orient-{resolvedOrientation} side-{resolvedSide}"
+	class="timeline orient-{resolvedOrientation} side-{resolvedSide} {klass}"
+	id={id || undefined}
 	style="--timeline-gap: {gap}; --tl-band: {band}; --tl-item: {itemWidth}; {style}"
 >
 	<slot />

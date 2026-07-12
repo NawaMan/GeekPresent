@@ -50,15 +50,23 @@
 	export let card: boolean = false;
 	/** Extra inline CSS appended to the group. */
 	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 
 	setContext('statGroupAlign', align);
 </script>
 
 <div
-	class="stat-group"
+	class="stat-group {klass}"
 	class:dividers
 	class:card
 	class:grid={columns != null}
+	id={id || undefined}
 	style="--stat-gap: {gap};{columns != null ? ` --stat-cols: ${columns};` : ''} {style}"
 >
 	<slot />

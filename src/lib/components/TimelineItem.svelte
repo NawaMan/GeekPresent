@@ -50,6 +50,13 @@
 	export let active: boolean = false;
 	/** Extra inline CSS appended to the item. */
 	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 
 	// The Timeline shares orientation + side over context; standalone falls to a
 	// vertical spine on the left ('right'). A store, since the parent's props are
@@ -62,9 +69,10 @@
 </script>
 
 <li
-	class="item orient-{orientation} side-{side}"
+	class="item orient-{orientation} side-{side} {klass}"
 	class:active
 	class:has-icon={icon}
+	id={id || undefined}
 	style="{colorVar} {style}"
 >
 	<div class="marker" aria-hidden="true">

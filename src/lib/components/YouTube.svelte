@@ -16,10 +16,20 @@
     /** @type {string | null} */
     export let qr = null;
 
+    /** Inline style for the root element, applied last so it wins. */
+    export let style = '';
+    /** DOM id for the root element. */
+    export let id = '';
+    /** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+        class defined there will NOT match — use global CSS (global.css / roles.css / a
+        :global(...) block) or a utility class. See AGENTS.md. */
+    let klass = '';
+    export { klass as class };
+
     $: videoUrl = `https://www.youtube.com/watch?v=${youtubeId}`;
 </script>
 
-<a href={videoUrl} target="_blank" style="--width: {width}">
+<a href={videoUrl} target="_blank" class={klass || undefined} id={id || undefined} style="--width: {width}; {style}">
     <div class="youtube">
         <img class="thumbnail" src={thumbnail} alt={alt} />
         <div class="qr-block">

@@ -10,6 +10,17 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
 
 ## Tier 1 — closes clear gaps
 
+- [ ] **A geometry-setting `style` on a LAYOUT-draggable shape fights the drag** — decide the rule.
+  - Every component now takes `style` / `id` / `class`, appended last on the root so the author's
+    declaration outranks the component's own rules. On a *draggable* shape that creates one genuinely
+    undecided case: a hand-written `style="left: 40px"` (or `top`, `width`, `height`) **wins over the
+    geometry LAYOUT is dragging**. The patch dutifully rewrites `x`/`y` in source, the shape does not
+    move on screen, and LAYOUT looks broken while behaving exactly as specified.
+  - Options: refuse to drag a shape whose `style` sets a geometry property; warn in the chrome; or
+    fold the offending declaration into the patched props. Nobody has chosen.
+  - **Not** a data-loss bug (that part is fixed, see below) — just an authoring footgun with no
+    guardrail.
+
 - [x] **`Steps` / `Fragment`** — accumulating ←/→ reveal within a slide.
   - Biggest gap; the classic reveal.js/Slidev bullet-reveal, which the deck lacks.
   - Reuse `Carousel`'s keyboard stepping (note: `Carousel` *replaces* content; `Steps` *builds up*).

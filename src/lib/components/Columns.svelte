@@ -123,6 +123,13 @@
 	export let minTrack: number = 40;
 	/** Extra inline CSS appended to the group. */
 	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 
 	// A Text artifact is fluid; a presentation is a transform-scaled fixed canvas.
 	// Only the former may honour a width media query — see the header.
@@ -274,7 +281,7 @@
 	}
 </script>
 
-<div class="columns" class:text={isText} class:grabbable={showHandles} bind:this={el} style="{vars} {style}">
+<div class="columns {klass}" class:text={isText} class:grabbable={showHandles} id={id || undefined} bind:this={el} style="{vars} {style}">
 	<slot />
 
 	{#each centers as center, i (i)}

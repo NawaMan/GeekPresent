@@ -34,6 +34,15 @@
 	export let path: string = '';
 	/** Recede into the frame like the other chrome controls. Default on. */
 	export let chrome: boolean = true;
+	/** Inline style for the root element, applied last so it wins. */
+	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 
 	let expanded = false;
 	let html = '';
@@ -49,7 +58,7 @@
 	}
 </script>
 
-<div class="view-source no-print">
+<div class="view-source no-print {klass}" id={id || undefined} style={style || undefined}>
 	<CtrlBtn {chrome} text="</> Source" hoverText="View this slide's source" isSelected={expanded} on:click={() => (expanded = true)} />
 </div>
 

@@ -125,6 +125,13 @@
 	export let height: string = '100%';
 	/** Extra inline CSS appended to the outer box. */
 	export let style: string = '';
+	/** DOM id for the root element. */
+	export let id: string = '';
+	/** Extra class(es) for the root element. NOTE: a slide's own style block is scoped, so a
+	    class defined there will NOT match — use global CSS (global.css / roles.css / a
+	    :global(...) block) or a utility class. See AGENTS.md. */
+	let klass: string = '';
+	export { klass as class };
 
 	const isText = getMode() === 'text';
 
@@ -247,7 +254,7 @@
 	});
 </script>
 
-<div class="video" class:text-mode={isText} style="width: {width}; height: {height}; {style}">
+<div class="video {klass}" class:text-mode={isText} id={id || undefined} style="width: {width}; height: {height}; {style}">
 	<div class="stage">
 		<!-- svelte-ignore a11y-media-has-caption (captions belong to the video the
 		     author supplies; a <track> can be slotted in by wrapping this component) -->
