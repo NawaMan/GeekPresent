@@ -4,7 +4,7 @@
 -->
 <script>
 	import TitlePage  from '$lib/templates/TitlePage.svelte';
-	import SourceView from '../SourceView.svelte';
+	import SourceView from '$lib/components/SourceView.svelte';
 	import source     from './+page.svelte?raw';
 </script>
 

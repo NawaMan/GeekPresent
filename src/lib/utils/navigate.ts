@@ -31,6 +31,17 @@ export interface Page {
         control everywhere regardless, and a speaker's sticky `?layout=off` still
         outranks this. See lib/layout/layoutAccessCore.ts for the precedence. */
     layout?: boolean;
+    /** Keep this slide OUT of the deck's linear order and its Table of Contents.
+
+        The appendix flag. A hidden slide is still a real, prerendered, linkable
+        route — it is simply not part of the forward march: →/Space never wander
+        into it, PREV/NEXT step straight over it, and the TOC does not list it. So
+        a straight run-through of the deck cannot stumble into the backup demo.
+
+        You reach one by jumping in from a slide that links to it (AppendixLink),
+        and you leave by RETURNing to whoever called you (AppendixPage, which reads
+        the return address out of `?return=`). See utils/appendixCore.ts. */
+    hidden?: boolean;
     /** Optional leave-transition for a View-Transition deck (see setViewTransitions).
         Names the animation used when paging AWAY from this slide — so a slide can be
         animated with the very transition it discusses. NavigationBar exposes it as
@@ -74,14 +85,31 @@ export interface PageNavigation {
     next:  string | undefined;
 }
 
+/** The deck's LINEAR ORDER: the slides →/Space page through and the Table of
+    Contents lists. Hidden slides (appendices) are real routes, but they are not
+    part of the march — this is the one place that decides that, so paging, the
+    TOC and the presenter console's next-slide preview all agree. */
+export function visiblePages(pages: Array<Page>): Array<Page> {
+    return pages.filter((page) => !page.hidden);
+}
+
 export function getPageNavigation(pages: Array<Page>, currentPath: string, prefix: string = ""): PageNavigation {
-    const index = pages.findIndex((page) => page.path === currentPath);
+    const deck  = visiblePages(pages);
+    const index = deck.findIndex((page) => page.path === currentPath);
     function addPrefix(path: string | null): string | undefined { return path ? prefix + path : undefined; }
 
+    // Not in the linear order at all — a hidden appendix, or a route missing from
+    // pages.ts. Either way it has no neighbours to offer: an appendix is left by
+    // RETURNing to the slide that called it, not by paging on to whatever happens
+    // to sit at index 0. (Before `hidden` existed, an unlisted path fell out of
+    // findIndex as -1 and was handed the FIRST slide as its "next", which read as
+    // working navigation on a slide that has none.)
+    if (index < 0) return { first: undefined, last: undefined, prev: undefined, next: undefined };
+
     return {
-        first: addPrefix(index > 0                ? pages[0]?.path : null),
-        last:  addPrefix(index < pages.length - 1 ? pages[pages.length - 1]?.path : null),
-        prev:  addPrefix(index > 0                ? pages[index - 1]?.path : null),
-        next:  addPrefix(index < pages.length - 1 ? pages[index + 1]?.path : null),
+        first: addPrefix(index > 0               ? deck[0]?.path : null),
+        last:  addPrefix(index < deck.length - 1 ? deck[deck.length - 1]?.path : null),
+        prev:  addPrefix(index > 0               ? deck[index - 1]?.path : null),
+        next:  addPrefix(index < deck.length - 1 ? deck[index + 1]?.path : null),
     };
 }

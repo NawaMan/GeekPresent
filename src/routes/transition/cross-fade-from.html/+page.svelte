@@ -1,6 +1,6 @@
 <script>
 	import TransitionFrom from '../TransitionFrom.svelte';
-	import SourceView     from '../SourceView.svelte';
+	import SourceView     from '$lib/components/SourceView.svelte';
 	import EffectDemo     from '../EffectDemo.svelte';
 	import source         from './+page.svelte?raw';
 

@@ -15,6 +15,17 @@
 	export let nextLink  = '';
 	export let lastLink  = '';
 	export let onContinue: (() => void) | null = null;
+	/** Override the view transition used when paging FORWARD (NEXT / → / Space) and
+	    BACKWARD (PREV / ←) from this slide.
+
+	    Normally the effect comes from the LEAVING slide's own pages.ts entry, which is
+	    right when a slide always leaves the same way. An AppendixPage is the exception:
+	    the same NEXT is a step *within* the appendix on one slide and the appendix
+	    *closing* on the next, and only the appendix knows which — a leaving slide
+	    cannot see that the slide it leaves to lies outside the run. Unset (null) keeps
+	    the pages.ts behaviour. */
+	export let nextKind: string | null = null;
+	export let prevKind: string | null = null;
 
 	// In a Text artifact there are no slides to page through; the bar collapses
 	// to a single TOP control that jumps back up the document.
@@ -36,6 +47,8 @@
 	type Dir = 'forward' | 'back';
 
 	function kindFor(direction: Dir): string {
+		const override = direction === 'back' ? prevKind : nextKind;
+		if (override) return override;
 		return (direction === 'back' ? currentPage?.transitionBack : currentPage?.transition) ?? 'slide';
 	}
 
@@ -156,5 +169,9 @@
 	<CtrlBtn chrome text="CONTINUE" on:click={doContinue} isDisabled={!canContinue} />
 	<CtrlBtn chrome text="NEXT"     on:click={onNext}     isDisabled={!nextLink} />
 	<CtrlBtn chrome text="LAST"     on:click={onLast}     isDisabled={!lastLink}/>
+	<!-- A slide with an EXTRA way to move gets to put its control here rather than
+	     inventing a second bar somewhere else on the canvas: an AppendixPage's RETURN
+	     sits at the end of this row, in the same padding, on the same baseline. -->
+	<slot />
 </div>
 {/if}

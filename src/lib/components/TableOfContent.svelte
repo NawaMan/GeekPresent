@@ -6,10 +6,17 @@
 	import { onDestroy } from 'svelte';
 	import { writable }  from 'svelte/store';
 
-	import type { PageNavigation } from '$lib/utils/navigate';
+	import { visiblePages } from '$lib/utils/navigate';
+	import type { Page } from '$lib/utils/navigate';
 
 
-    export let pages: Array<{path: string, title: string}> = [];
+    export let pages: Array<Page> = [];
+
+	// Appendices (`hidden: true`) are reachable slides but not deck entries — the
+	// TOC lists the linear order, the same one →/Space walks. Filtering here rather
+	// than at the call site keeps every deck's TOC honest without each one
+	// remembering to do it.
+	$: listed = visiblePages(pages);
 
 	/** Show the extra link above the slide list. Off by default — only decks that
 	    want it (e.g. a text.html article view, or a "back to home" link) enable it. */
@@ -65,7 +72,7 @@
 		<div id="article"><a href={articleHref}>{articleText}</a></div>
 		{/if}
         <ol>
-            {#each pages as { path, title }}
+            {#each listed as { path, title }}
                 <li><a href={`./${path}`}>{title}</a></li>
             {/each}
         </ol>

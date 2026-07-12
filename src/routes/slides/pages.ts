@@ -11,6 +11,22 @@ export const pages = [
     { path: "content-page.html",      title: "Using ContentPage" },
     { path: "content-header.html",    title: "The ContentPage Header" },
     { path: "navigation.html",        title: "Navigation" },
+    { path: "appendix-page.html",     title: "AppendixPage" },
+    // `hidden: true` — an APPENDIX: real, prerendered, linkable slides that are NOT in
+    // the deck's linear order. →/Space step over them and the Table of Contents doesn't
+    // list them; you arrive by <AppendixLink> from a slide that calls one, and leave by
+    // paging off the end of the run (or with RETURN). CONTIGUOUS hidden entries are ONE
+    // appendix chapter — these two page to each other, and the second's NEXT goes back
+    // to the caller. Kept beside their caller for readability; their position in this
+    // list matters only relative to each other. See lib/utils/appendixCore.ts.
+    { path: "appendix-detail.html",   title: "Appendix — How the GC marks",  hidden: true },
+    { path: "appendix-detail-2.html", title: "Appendix — Write barriers",    hidden: true },
+    // And the counterpart, to show that `hidden` is OPTIONAL: an appendix with no
+    // `hidden` is ordinary back matter — listed in the TOC, paged into by →/Space,
+    // and still returnable-from when a slide calls it. It sits at the BACK of the
+    // deck (below), where a book's appendix lives, precisely because it IS in the
+    // march. `hidden` does not make an appendix; it only decides whether the deck's
+    // forward march can find one.
     { path: "components.html",        title: "Components" },
     { path: "box-component.html",     title: "Box Component" },
     { path: "block-component.html",   title: "Block Component", layout: true },
@@ -58,5 +74,8 @@ export const pages = [
     { path: "codediff-component.html", title: "CodeDiff", layout: true },
     { path: "terminal-component.html", title: "Terminal" },
     { path: "speaker-notes.html",     title: "Speaker Notes" },
+    // The listed appendix (see the note beside the hidden pair above): no `hidden`, so
+    // it IS in the running order and IS in the TOC — back matter, at the back.
+    { path: "appendix-listed.html",   title: "Appendix — Listed, not hidden" },
     { path: "thank-you.html",         title: "Thank You" },
 ];
