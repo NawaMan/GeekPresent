@@ -37,22 +37,95 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
     for extras. Demo `steps-component.html`, DOM test `tests/Steps.test.ts` (Space
     build/peel + arrows left free), SSR test `tests/StepsSsr.ssr.test.ts`
     (prerender-visible markup). No new role tokens (reveal is pure opacity/transform).
-- [ ] **`AppendixPage`** — a side page any slide can jump *into* and then return *from*,
+- [x] **`AppendixPage`** — a side page any slide can jump *into* and then return *from*,
       landing back where it was called. A slide as a **function call**, not a destination.
   - Use case: the deep-dive a talk only sometimes needs — a proof, a full API table, a
-    backup demo. Today linking to one strands you: the deck's forward march resumes from
+    backup demo. Linking to one used to strand you: the deck's forward march resumed from
     the appendix, not from the slide that asked the question.
-  - The return address rides in a **query parameter**
-    (`/slides/appendix-gc?return=heap-layout`), so it survives reload and needs no store —
-    the page reads it and renders a RETURN affordance (plus a key binding) back to the
-    caller. Degrade gracefully when the param is absent (direct link, TOC entry): no return
-    affordance, or fall back to the deck index.
-  - Open questions: should an appendix sit **outside the deck's linear order** (skipped by
-    →/Space, hidden from the TOC) so a straight run-through never wanders into it? Does the
-    caller's build state (`Steps` fragments already revealed) need restoring on return, or
-    is landing on the slide enough? Can an appendix call an appendix (nesting)?
-  - Nothing new to depend on; the appendix's own route dir still needs its `+layout.js` with
-    `trailingSlash: 'never'`, same as any slide.
+  - Done: `src/lib/templates/AppendixPage.svelte` (the appendix) +
+    `src/lib/components/AppendixLink.svelte` (the call site) + `src/lib/utils/appendixCore.ts`
+    (pure, total — `drawCore`/`layoutAccessCore` discipline). Demo:
+    `slides/appendix-page.html` (the caller, which is the documentation) calling the two-slide
+    appendix `slides/appendix-detail.html` → `appendix-detail-2.html`. Tests:
+    `tests/appendixCore.test.ts`, `tests/pageNavigation.test.ts`, `tests/AppendixPage.test.ts`,
+    `tests/AppendixPageSsr.ssr.test.ts` (60 cases).
+  - **The model is a real book's appendix, and that is what settles the open questions.**
+    An appendix is a **chapter, not a slide**: contiguous `hidden` entries in `pages.ts` are one
+    run, and PREV/NEXT page through it exactly as they page through the body (FIRST/LAST bound to
+    the run's own ends — inside a chapter, "last" means its last page, not the deck's).
+  - **The ordinary forward march is what returns from it.** The run's last NEXT *is* the way out,
+    so →/Space page back to the caller with no gesture of their own; paging back off the front
+    leaves the same way you came in. RETURN (and `Backspace`) is therefore a **shortcut** — for
+    leaving from the middle of a long appendix once the question is answered — not the mechanism.
+    It rides in the `NavigationBar`'s own slot, so it sits in the deck's bar with the deck's
+    padding and baseline, and it is deliberately **not** `chrome`: the muted look is for
+    machinery the speaker knows is there, and this is the one control that must be findable at a
+    glance, mid-talk.
+  - *Outside the linear order* — **yes, but optional.** `hidden?: boolean` on the `Page` type,
+    filtered by `visiblePages()` in `utils/navigate.ts`, which `getPageNavigation` and
+    `TableOfContent` both read — so paging, the TOC and the presenter console's next-slide preview
+    all agree that →/Space step over an appendix and a straight run-through never wanders into the
+    backup demo. Leave `hidden` off and the *same* component is back matter sitting in the deck's
+    normal flow: listed in the TOC, paged into by →/Space, still returning to a caller that jumped
+    in — though its NEXT marches on into the deck rather than out, since it *is* in the march; only
+    a hidden run has ends that lead out, because it has nowhere else for them to lead. **`hidden`
+    does not make an appendix; it only decides whether the forward march can find one** — which is
+    why the demo ships one of each (`appendix-detail{,-2}.html` hidden, `appendix-listed.html`
+    listed). Either way it is a real, prerendered route (every static route is a prerender entry,
+    so it is built whether or not anything links to it).
+  - *Restoring the caller's `Steps` build on return* — **no**: landing on the slide is enough, and
+    the return is a navigation like any other. *Nesting* — **not advertised**; an appendix linking
+    to an appendix works (they are ordinary slides), but only the innermost return address
+    survives, so the chain is one deep.
+  - **The return address rides in the URL** — `?return=heap-layout.html`, stamped by the
+    `AppendixLink` that called it — not in a store: it survives a reload, and a speaker can
+    *see* where RETURN goes by reading the address bar. The author never types it, because it
+    is the slide the link is *on* (read from `$page`), which is what makes the same appendix
+    return to whichever of three slides called it. **Every link inside the appendix re-stamps
+    it** (`carryReturn`), since the address lives in the URL and not in memory — paging deeper
+    into a chapter must not lose the way home.
+  - Which makes it **untrusted input**, and `appendixCore` the place that says so. The two
+    directions are not symmetric: `to` (which appendix) is *author* input and passes through;
+    `?return=` is *URL* input and is validated to a plain in-deck slide name — no slashes, no
+    scheme, no `../` — and then checked for membership in this deck's `pages`. A refused
+    address is indistinguishable from an absent one, so there is exactly one degraded path.
+  - **It never strands you.** With no usable return address (a direct link, a bookmark, a
+    hostile one) the way out becomes the first *visible* slide and the control reads **DECK** —
+    because a hidden appendix is off the linear order, so without it the only escape would be the
+    browser's Back button. The run's edges lead there too, so even a bookmarked appendix pages out
+    of itself. Every way out goes through the same `deckNav` helper the `NavigationBar` uses (so a
+    View-Transition deck animates out of an appendix exactly as it animates between slides) and
+    carries `?present` over, so the presenter console stays the console. The key binding is
+    `Backspace`, **not** `Escape`: Escape already closes the TOC, deselects a `Block` and leaves
+    `Draw`'s isolation, and a key that both dismisses a menu and navigates away will eventually
+    navigate away when someone meant to dismiss a menu.
+  - **The motion says "we stepped out of the talk"** — `transition` (opt-in, on both `AppendixLink`
+    and `AppendixPage`): you travel *down* to the appendix and back *up* out of it. As when scrolling
+    down a page, travelling down moves the content up — the deck rises out of view and the appendix
+    comes up from below — and every way out is the mirror: RETURN, Backspace, PREV off the front,
+    NEXT off the end, all of them, because they are one gesture and must not look like four. Paging
+    *within* the appendix stays sideways, so the vertical axis means exactly one thing. Keyframes in
+    `lib/styles/appendix-transition.css` (a plain global sheet — `::view-transition` pseudo-elements
+    belong to the document); `appendixKinds()` decides which edge is a step and which is an exit,
+    since the `NavigationBar` picks its effect from the *leaving* slide and cannot see that the slide
+    it leaves to lies outside the run (hence its new `nextKind`/`prevKind` overrides).
+  - **Why it is opt-in and not the default:** an animated navigation must be a CLIENT-SIDE one (the
+    View Transitions API cannot cross a document), and **Monaco does not survive one** — so an
+    animated appendix must use `SourceView`/`QuickCode`, never `ViewSource`/`Code`/`CodeBox` (memory
+    `monaco-breaks-on-spa-nav`). Defaulting it on would have silently blanked the code boxes of any
+    deck that adopted an appendix. The demo therefore moved `SourceView` (the Shiki-based, SPA-safe
+    `</> Source`) out of the Transition deck and into `$lib/components/`, which is where it belonged
+    once a second deck needed it. For the same reason `transition` arms the *pager* only inside a
+    **hidden** run, whose links all stay in the appendix or return to its caller: an in-flow
+    appendix's NEXT leads into the surrounding deck, and animating that would drag slides that know
+    nothing about any of this — and may well render a Monaco `CodeBox` — into client-side paging.
+    There, only the way *out* animates.
+  - Also: `ContentPage` gained `nav={false}` (the seam an appendix uses to supply its own bar),
+    `NavigationBar` gained a trailing slot (so an extra control joins the row instead of inventing
+    a second bar on the canvas),
+    and `getPageNavigation` now returns *no* navigation for a path outside the linear order —
+    previously an unlisted path fell out of `findIndex` as `-1` and was handed the deck's FIRST
+    slide as its "next", which read as working navigation on a slide that has none.
 
 - [ ] **State demo slide** — a worked example of how a deck carries state: query parameters,
       `localStorage`, and the deck's own stores.

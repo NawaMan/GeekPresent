@@ -1,18 +1,23 @@
 <!--
-  SourceView — a Monaco-free "</> Source" control for this deck.
+  SourceView — the Monaco-free "</> Source" control.
 
-  Pops the page source into a Box, syntax-highlighted by Shiki (svelte grammar) —
-  not a Monaco CodeBox, whose CDN AMD loader does not re-initialise across this
-  deck's client-side (goto) navigations and so renders blank on the second slide
-  onward. See the project memory "monaco-breaks-on-spa-nav". Shiki is plain ESM via
-  a shared singleton highlighter ($lib/utils/highlight), so it survives navigation.
-  Highlighting is lazy — done the first time the viewer is opened.
+  Use this INSTEAD OF ViewSource on any slide reached by a CLIENT-SIDE navigation:
+  a View-Transition deck (setViewTransitions), or an AppendixPage/AppendixLink with
+  `transition`. ViewSource pops a Monaco CodeBox, and Monaco's CDN AMD loader does
+  not re-initialise across a `goto`, so it renders blank on every slide after the
+  first one. (See the project memory "monaco-breaks-on-spa-nav".) Everything else —
+  a deck that pages with full loads — can keep using ViewSource.
+
+  Same control, same corner, same Box: only the highlighter differs. Shiki is plain
+  ESM behind a shared singleton highlighter ($lib/utils/highlight), so it survives
+  navigation. Highlighting is lazy — done the first time the viewer is opened, with
+  the plain source showing until (and if) it resolves.
 
   Each page passes its own source via Vite's ?raw import; the file path shown in the
-  title bar is derived from the current route.
+  title bar is derived from the current route unless `path` overrides it.
 
     <script>
-      import SourceView from '../SourceView.svelte';
+      import SourceView from '$lib/components/SourceView.svelte';
       import source     from './+page.svelte?raw';
     </script>
     <SourceView {source} />

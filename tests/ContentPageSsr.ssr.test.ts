@@ -69,3 +69,24 @@ describe('ContentPage header (SSR)', () => {
 		expect(center.body).toContain('centered');
 	});
 });
+
+// The pager is part of the template — a slide should not have to remember to add one.
+// The exception is a slide with no neighbours to page to, which supplies its own way
+// out instead: an AppendixPage builds on ContentPage and drops the bar to do exactly
+// that (see templates/AppendixPage.svelte). Without this seam it would have had to
+// reimplement the page, or ship two nav bars.
+describe('ContentPage nav (SSR)', () => {
+	it('carries the pager by default', () => {
+		const { body } = render(ContentPage, { props: { title: 'T' } });
+		expect(body).toContain('>NEXT<');
+		expect(body).toContain('>PREV<');
+	});
+
+	it('nav={false} drops it, keeping the page itself intact', () => {
+		const { body } = render(ContentPage, { props: { title: 'T', nav: false } });
+		expect(body).not.toContain('>NEXT<');
+		expect(body).not.toContain('>PREV<');
+		expect(body).toContain('>T</h1>');
+		expect(body).toContain('class="content');
+	});
+});

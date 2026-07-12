@@ -27,6 +27,9 @@
                header at all and the content starts at the top.
     align    — 'left' (default) | 'center'. Centers the title and subtitle; the
                rule spans the header either way, so it needs no alignment.
+    nav      — the FIRST/PREV/CONTINUE/NEXT/LAST pager (default true).
+               `nav={false}` for a slide outside the deck's linear order, which
+               brings its own way out — see templates/AppendixPage.svelte.
 
   The content area keeps its own styling (justified, slightly smaller than the
   header) regardless of `align` — `align` is the HEADER's alignment.
@@ -60,6 +63,14 @@
 	export let rule = true;
 	/** Header alignment: 'left' (default) or 'center'. */
 	export let align: 'left' | 'center' = 'left';
+	/** Render the FIRST/PREV/CONTINUE/NEXT/LAST pager (default true).
+
+	    `nav={false}` is for a slide that is not part of the deck's linear order and
+	    so has no neighbours to page to — an appendix, which supplies its own RETURN
+	    control instead (templates/AppendixPage.svelte). Everything else about the
+	    page — header, content box, styling — is unchanged, which is the point:
+	    an appendix is a normal slide that is left in a different way. */
+	export let nav = true;
 
 	const pages = getPages();
 	let currentPath: string | null = null;
@@ -92,12 +103,14 @@
     </div>
 </div>
 
+{#if nav}
 <NavigationBar
 	firstLink={navigation.first}
 	prevLink={navigation.prev}
 	nextLink={navigation.next}
 	lastLink={navigation.last}
 />
+{/if}
 
 <style>
     .page {

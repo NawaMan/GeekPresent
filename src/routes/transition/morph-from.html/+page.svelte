@@ -6,7 +6,7 @@
 <script>
 	import ContentPage from '$lib/templates/ContentPage.svelte';
 	import CssSnippet  from '$lib/components/CssSnippet.svelte';
-	import SourceView  from '../SourceView.svelte';
+	import SourceView  from '$lib/components/SourceView.svelte';
 	import EffectDemo  from '../EffectDemo.svelte';
 	import source      from './+page.svelte?raw';
 

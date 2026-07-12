@@ -4,7 +4,7 @@
 -->
 <script>
 	import ContentPage from '$lib/templates/ContentPage.svelte';
-	import SourceView  from '../SourceView.svelte';
+	import SourceView  from '$lib/components/SourceView.svelte';
 	import source      from './+page.svelte?raw';
 
 	// SAME-document View Transitions (what this deck uses: goto + startViewTransition).

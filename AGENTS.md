@@ -25,8 +25,40 @@ Read the `README.md` first for the user-facing overview. This file is the *opera
   `setPages(pages)` (from `$lib/presentation`); `TitlePage` / `ContentPage` read it via `getPages()`.
   So navigation and the Table of Contents are **scoped per presentation** — multiple presentations coexist,
   each with its own list. (Nothing imports a single global `pages.ts` anymore.)
+  An entry may carry **`hidden: true`** to make it an **appendix**: still a real, prerendered,
+  linkable slide, but out of the deck's linear order — →/Space step over it and the TOC doesn't
+  list it. **Contiguous** hidden entries are ONE appendix (a chapter you page through). You jump
+  in with `AppendixLink` and leave by paging off the end of it; see the templates below and
+  `slides/appendix-page.html`.
 - **Templates** (`src/lib/templates/`): `TitlePage` (named slots `title` / `subtitle` / `subsubtitle`)
-  and `ContentPage` (`title` + `subtitle` props + default slot). Both auto-insert the nav bar.
+  and `ContentPage` (`title` + `subtitle` props + default slot). Both auto-insert the nav bar
+  (`ContentPage` takes `nav={false}` to drop it). Third: `AppendixPage` — a slide you jump *into*
+  and return *from*, a **function call rather than a destination**. It works like a real book's
+  appendix:
+  - **A chapter, not a slide.** Contiguous `hidden` entries are one run, and PREV/NEXT page
+    through it as through the body of the deck (FIRST/LAST are the run's own ends).
+  - **The forward march is the return.** The run's last NEXT — and so → and `Space` — goes back
+    to the slide that called the appendix; paging back off the front does too. **RETURN** (or
+    `Backspace`) is the shortcut for leaving from the middle, and it rides in the nav bar's slot.
+  - The caller is read from `?return=…`, which the calling `AppendixLink` stamps with its *own*
+    slide name — so the same appendix returns to whichever slide asked — and every link inside
+    re-stamps it. With no usable address (a direct link, a bookmark, or one refused as unsafe by
+    `utils/appendixCore.ts`) the way out becomes the first slide and the control reads **DECK**:
+    an appendix must never strand you.
+  - **`hidden` is optional — it does not make an appendix.** It only decides whether the deck's
+    forward march can *find* one. Leave it off and the same component is back matter in the normal
+    flow: listed in the TOC, paged into by →/Space, still returning to a caller that jumped in (but
+    its NEXT marches on into the deck, since it *is* in the march — only a hidden run has ends that
+    lead out). The demo deck ships one of each: `appendix-detail{,-2}.html` (hidden) and
+    `appendix-listed.html` (listed).
+  - **`transition`** (opt-in, set it on *both* the link and the page) animates the detour: you travel
+    **down** to the appendix (the deck rises out of view, the appendix comes up from below) and back
+    **up** out of it, whichever control leaves; paging within the appendix stays sideways. On an
+    in-flow (non-hidden) appendix it animates only the way *out* — arming the pager there would drag
+    the surrounding deck into client-side navigation, and those slides may render Monaco. It
+    requires client-side navigation, and **Monaco cannot survive that** — so an animated appendix
+    must use `SourceView`/`QuickCode`, never `ViewSource`/`Code`/`CodeBox`. Same rule as a
+    View-Transition deck; see `SourceView` below.
 - **The slides layout** (`src/routes/slides/+layout.svelte`) auto-adds the Table of Contents, the
   display-mode control, and the Copyright notice, and does all the scaling. Slides are authored on a
   fixed **1920×1080** canvas; FITTED mode transforms it to fit the window, SCALED shows it at an exact
@@ -43,7 +75,10 @@ Read the `README.md` first for the user-facing overview. This file is the *opera
   `<AnimationBar />` on a Terminal slide — both would drive the same clock; pass
   `controls={false}` if you want the bar to own it),
   `ViewSource` (corner `</> Source` button that shows a page's
-  own `?raw` source in a `CodeBox`), `Block` / `ImageBlock` (absolutely-positioned
+  own `?raw` source in a `CodeBox`) and `SourceView` (the same control, Shiki instead of Monaco —
+  use it on any slide reached by a CLIENT-SIDE navigation, i.e. a View-Transition deck or an
+  appendix with `transition`, because Monaco's CDN loader renders blank after a `goto`),
+  `Block` / `ImageBlock` (absolutely-positioned
   wrappers you place at exact canvas pixels — drag/resize them in **LAYOUT mode**,
   see that playbook), `Connector` (an arrow auto-routed between two *named* `Block`s —
   see the diagram playbook), `Video` (a `<video>` with themeable chrome and *time
@@ -58,6 +93,8 @@ Read the `README.md` first for the user-facing overview. This file is the *opera
   text, not fetched, and drawn as SVG so it survives the canvas transform. `value` is
   all it needs; an `http`/`mailto`/`tel` value links itself. Prefer it over committing
   a `-QR.png`, and note `YouTube`'s `qr` prop is now optional for exactly that reason),
+  `AppendixLink` (the call *into* an appendix — `<AppendixLink to="appendix-gc.html">how the GC
+  marks</AppendixLink>`; it stamps the current slide as the return address, so you never type one),
   plus framework-internal `Copyright`, `CtrlBtn`,
   `NavigationBar`, `TableOfContent`, `SizeMode`, `Seo` (renders SEO/social metadata
   into `<svelte:head>` — see the SEO note under *Gotchas*).

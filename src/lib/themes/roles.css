@@ -161,6 +161,13 @@
 	--columns-divider: var(--INK, #C0F1FF);
 	--columns-handle:  var(--ACCENT, #2980B9);
 
+	/* AppendixLink — the call into a hidden side slide. It reads as the deck's own
+	   accent (it is a move within the talk, not a link off it), but underlined
+	   DASHED: a detour you will be brought back from, unlike ordinary prose links.
+	   The hover brightening is mixed from this in-component, so a theme moves one
+	   token and both states follow. */
+	--appendix-link-fg: var(--ACCENT-WARM, #F0A33E);
+
 	/* Hint — the faint bottom cue. It floats over whatever the slide put behind it
 	   (an image, a chart, someone else's website), so it can't rely on contrast with
 	   the deck surface: it carries its own translucent backdrop and rule, both mixed
