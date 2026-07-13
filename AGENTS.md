@@ -6,6 +6,22 @@ framework. The user will usually ask in plain language ("help me add a YouTube l
 
 Read the `README.md` first for the user-facing overview. This file is the *operator's manual*.
 
+## Skills — the executable half of this file
+
+The recurring jobs are also shipped as **skills** in `.claude/skills/`, each a checklist that ends in a
+working, tested artifact. Prefer the skill when one matches; come back here for the prose and the
+background.
+
+| skill | use it when |
+|---|---|
+| `new-slide` | authoring a slide — route folder, `+layout.js`, the `pages.ts` entry, templates |
+| `new-component` | adding a component — the `style`/`id`/`class` contract, a pure `*Core.ts`, role tokens |
+| `layout-mode` | placing things at exact canvas pixels, `Connector` diagrams, SAVE, the style guard |
+| `deck-tests` | the test contract — the `dom` / `ssr` projects, and why prerender needs `svelte/server` |
+
+`tests/skills.test.ts` pins every repo path those skills cite, so a moved file fails the suite rather
+than misleading the next agent.
+
 ---
 
 ## What this project is (orient yourself in 30 seconds)

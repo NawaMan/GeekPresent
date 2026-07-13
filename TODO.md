@@ -321,6 +321,67 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
     SSR test `tests/SpotlightSsr.ssr.test.ts` (inert with no target; geometry reaches the
     markup once one resolves). New `--spotlight-*` role tokens.
 
+- [ ] **Annotation tools** — let the speaker draw on the live slide and swipe a highlighter
+      over text, mid-talk, with the ink landing on the audience screen.
+  - Every other presentation tool has this and GeekPresent has none. `Spotlight` can already
+    ring a *named* `Block`, but only what the author anticipated and named; annotation is for
+    the thing the speaker decides to point at while answering a question — circle the term,
+    underline the line of code, cross out the wrong branch of the diagram.
+  - Approach: an **annotation mode**, modelled on `layoutMode` — a store + a chrome button, a
+    canvas-spanning `<svg>` overlay mounted once by `SlideDeck` (a singleton like `Spotlight`
+    and the minimap, so no slide places it), which flips to `pointer-events: auto` only while
+    the mode is on. Freehand ink is already solved in `draw/drawCore.ts`: sample pointer
+    positions into a `Point[]` and hand them to **`smoothPath(points)`**, which is the same
+    smoothing `Polyline`/`Curve` render through, so a stroke is an ordinary `PathShape` and
+    inherits the NaN-safe, total discipline. Highlighter is the same stroke with a fat, low
+    opacity, `multiply`-blended band — text highlighting means *swiping over* the words, not
+    selecting DOM ranges, which keeps it working over code, images and diagrams alike, and
+    keeps it out of Monaco's way. Colours/thicknesses as `--annot-*` role tokens in
+    `src/lib/themes/roles.css` (dark-default fallbacks). No new dependencies — this is a
+    `pointerdown`/`pointermove` listener and an `<svg>`.
+  - Ink must reach the audience: reuse the **presenter localStorage channel** the way
+    `publishHighlight`/`subscribeHighlight` already do (`stores/presenter.ts`), top-window
+    only so the console's preview iframe doesn't double-draw. A stroke publishes on
+    `pointerup` (whole shapes, not per-move — the channel is JSON-over-`storage`, not a
+    firehose).
+  - **Decided: ink clears on slide change.** Annotation is a laser-pointer trail, not a
+    saved artifact — ephemeral like `Spotlight`'s hover cue, and for the same reason: it
+    tracks where the speaker is *pointing right now*. What that buys is most of the design
+    disappearing — strokes are a flat list in one store, not a map keyed by slide path;
+    nothing is persisted, so there is no storage to grow, no reconciliation when a slide's
+    content changes under saved ink, no question about whether a recording keeps it, and the
+    overlay is SSR-inert for free because it always starts empty. The clear hangs off the
+    navigation the deck already fires.
+  - **What that costs:** paging away destroys the drawing with no way back, so an
+    accidental → during a long annotated answer is unrecoverable. That is the price of not
+    persisting, and it is the thing to watch in the demo — it may argue for making page-away
+    *while ink is on screen* deliberate rather than instant, which folds into the eating-keys
+    question below.
+  - **Decided: the flag is deck-wide and sticky, not per-slide.** Annotation is a *speaker*
+    tool, so "which slide declared it" — the axis `layout: true` uses — is the wrong one:
+    the speaker decides to annotate, and the slide they happen to be on has no opinion. So
+    the `layoutAccessCore.ts` precedence is reused **minus its slide tier**:
+    dev > the speaker's sticky `?annotate` > a deck-wide prop on `SlideDeck` > off, in a pure
+    total core beside it (a corrupt sticky value falls through rather than vetoing, exactly
+    as `readSticky` already does).
+  - **What that costs:** no featured-pill treatment. The warm pulsing LAYOUT button works
+    because a *slide* can say "press this" — a deck-wide tool can't, so the button stays
+    chrome-grey and the demo slide has to teach the flag rather than light it up. Worth
+    re-checking against `fadeChrome` decks, where chrome sits at `opacity: 0.12` until
+    pointed at.
+  - Open questions:
+    - **The eating-keys problem.** In annotation mode the overlay swallows pointer events —
+      what still pages? `Draw`'s LAYOUT isolation and the appendix `Escape` note both flag
+      that a key which both dismisses a tool and navigates away is a trap. Sharpened by the
+      clear-on-nav decision: the paging keys now also *destroy* the ink.
+    - **Undo, and how a stroke dies.** Per-stroke undo (`layoutHistory.ts` is the local
+      precedent) plus a clear-all, and whether an eraser is worth it or a shift-drag
+      scrub-to-delete covers it.
+  - Done = the overlay component + a demo slide that *is* the docs (annotate it live, as
+    `layout-mode.html` does for LAYOUT) + a `*Core.test.ts` for the stroke geometry + DOM
+    tests (draws, publishes, clears; inert with the mode off) + an SSR test proving no ink
+    and no listener prerenders.
+
 - [x] **`Connector` / `Arrow`** — auto-routed arrow between two named `Block`s.
   - Turns the `Block` system into a diagramming tool.
   - Reuse `Block` `name`-matching (same mechanism as LAYOUT-mode save) + `Draw` Line/Arc.
@@ -1592,9 +1653,28 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
       components after adoption, rather than copying the whole tree once.
   - Open questions: registry format, per-component version pinning, upgrade/diff story for
     components a project has locally edited.
-- [ ] **AGENT skills** — ship skills (à la `.claude/skills/`) that teach an agent the GeekPresent
+- [x] **AGENT skills** — ship skills (à la `.claude/skills/`) that teach an agent the GeekPresent
       conventions: authoring a slide, adding a component, LAYOUT mode, the SSR/test contract.
-  - Complements `AGENT.md`/`AGENTS.md`, which are prose-only today.
+  - Complements `AGENT.md`/`AGENTS.md`, which were prose-only.
+  - Done: four skills, one per convention the entry named —
+    `.claude/skills/new-slide/SKILL.md` (route folder, the two-line `+layout.js`, the `pages.ts`
+    entry and its `hidden`/`layout` flags, templates, the reserved `.note` class, the Monaco/SPA
+    rule), `.claude/skills/new-component/SKILL.md` (the `style`/`id`/`class` contract with `style`
+    last, a pure total `*Core.ts`, `--thing-*` role tokens whose `var()` fallbacks ARE the dark
+    theme, no new deps, and the four-part definition of done), `.claude/skills/layout-mode/SKILL.md`
+    (`Block`/`ImageBlock`, the three-way LAYOUT precedence in `layoutAccessCore.ts`, SAVE's four
+    outcomes incl. the `1 OF 2` partial write and the twin-tag trap, `Connector` ordering via
+    `blockAnchors.ts`, `guardStyle()`), and `.claude/skills/deck-tests/SKILL.md` (the `dom`/`ssr`
+    vitest projects, why prerender is proven through `svelte/server` and not by grepping `docs/` or
+    screenshotting headless Chrome, the `*Host`/`*Core`/`*Ssr` naming).
+  - The skills are *checklists that end in a tested artifact*; `AGENTS.md` keeps the prose and now
+    opens with a table pointing at them.
+  - **Skills rot silently** — nothing imports a `SKILL.md`, so a moved file leaves the prose
+    confidently pointing at nothing and the next agent follows it. Found live: `pick-todo` and
+    `todo` both still said `lib/styles/roles.css` long after `roles.css` moved to `src/lib/themes/`.
+    Both fixed, and `tests/skills.test.ts` now pins it — it extracts every backticked repo-relative
+    path from every skill (skipping globs, `<placeholders>` and non-paths) and asserts it exists,
+    plus that each skill's frontmatter `name` matches its directory (a mismatch is not invocable).
 
 ## Deliberately excluded
 
