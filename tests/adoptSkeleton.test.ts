@@ -37,7 +37,7 @@ function adopt(...flags: string[]): string {
 	mkdirSync(host, { recursive: true });
 	fixtureSource(source);
 
-	execFileSync('bash', [SCRIPT, source, '--dir', 'gp', '--no-ci', '--no-build', '--yes', ...flags], {
+	execFileSync('bash', [SCRIPT, source, '--dir', 'gp', '--no-ci', '--yes', ...flags], {
 		cwd: host, // the script adopts into $PWD/<dir>
 		stdio: 'pipe'
 	});
@@ -208,6 +208,85 @@ describe('adopt-geekpresent.sh --mode minimal (unchanged by the skeleton work)',
 	});
 });
 
+// The docs. A clone carries GeekPresent's own — and in an adopted repo most of them describe the
+// wrong project. The generated README is the only thing in the tree that tells a human "this is
+// yours, here is YOUR build command"; before it, that existed only in terminal output that scrolls
+// away. Everything upstream is MOVED, not deleted: GeekPresent's README stays readable as the
+// framework's introduction and reference, it just stops pretending to be the adopter's README.
+describe('adopt-geekpresent.sh — docs', () => {
+	const gp = adopt('--mode', 'skeleton', '--kind', 'deck', '--name', 'talks');
+	const read = (p: string) => readFileSync(join(gp, p), 'utf8');
+
+	// The footgun. /pick-todo says "propose features from TODO.md, then build the one they pick" —
+	// and the TODO.md that ships is GeekPresent's FRAMEWORK backlog. Left in place, an adopter's
+	// agent will offer to implement the framework's roadmap into their slide deck.
+	it('disarms the TODO skills — they aim an agent at the framework backlog', () => {
+		expect(existsSync(join(gp, '.claude/skills/pick-todo'))).toBe(false);
+		expect(existsSync(join(gp, '.claude/skills/todo'))).toBe(false);
+		expect(existsSync(join(gp, 'TODO.md'))).toBe(false);
+		// Moved, not deleted — the rule the sample decks already follow.
+		expect(existsSync(join(gp, '.samples-ref/claude-skills/pick-todo'))).toBe(true);
+		expect(existsSync(join(gp, '.samples-ref/TODO.md'))).toBe(true);
+	});
+
+	it('keeps the skills that are actually about authoring', () => {
+		expect(existsSync(join(gp, '.claude/skills/new-slide'))).toBe(true);
+	});
+
+	// AGENTS.md is the AUTHORING manual — the one document an adopter's agent most needs. AGENT.md
+	// is the ADOPTION manual, and by the time you can read it there, that job is done.
+	it('keeps AGENTS.md, retires AGENT.md', () => {
+		expect(existsSync(join(gp, 'AGENTS.md'))).toBe(true);
+		expect(existsSync(join(gp, 'AGENT.md'))).toBe(false);
+		expect(existsSync(join(gp, '.samples-ref/AGENT.md'))).toBe(true);
+	});
+
+	it("preserves GeekPresent's own README — still the framework's introduction, just not yours", () => {
+		expect(read('.samples-ref/GeekPresent-README.md')).toContain('# GeekPresent');
+	});
+
+	// The point of generating it rather than shipping a static one: it can name the deck you chose
+	// and the command that actually works for the environment and output folder you picked.
+	it('writes a README about YOUR project, with YOUR build command', () => {
+		const readme = read('README.md');
+		expect(readme).not.toContain('__DIR__');
+		expect(readme).not.toContain('__NAME__');
+		expect(readme).toContain('src/routes/talks/'); // the deck they named
+		expect(readme).toContain('./booth -- ./build-static.sh dist'); // booth kept, output inside
+		expect(readme).toContain('gp/dist/'); // where the site lands
+		expect(readme).toContain('.samples-ref/GeekPresent-README.md'); // the way back to the framework docs
+	});
+
+	// '&' means "the whole match" to sed, and the host build command is full of '&&'.
+	it('does not mangle && in the build command it bakes in', () => {
+		const host = adopt('--mode', 'skeleton', '--no-booth');
+		expect(readFileSync(join(host, 'README.md'), 'utf8')).toContain(
+			'pnpm install && ./build-static.sh dist'
+		);
+	});
+
+	it('matches the advice to what was scaffolded', () => {
+		const text = adopt('--mode', 'skeleton', '--kind', 'text', '--name', 'guide.html');
+		expect(readFileSync(join(text, 'README.md'), 'utf8')).toContain('TEXT_ROUTES');
+
+		const none = adopt('--mode', 'skeleton', '--kind', 'none');
+		expect(readFileSync(join(none, 'README.md'), 'utf8')).toContain("trailingSlash = 'always'");
+	});
+});
+
+// Full means full: the upstream docs stay, because that adopter asked for everything. But the TODO
+// skills are a live hazard, so the script says so out loud rather than leaving it to be discovered.
+describe('adopt-geekpresent.sh --mode full — docs', () => {
+	const gp = adopt('--mode', 'full');
+
+	it('keeps the upstream docs — full means full, and it warns rather than prunes', () => {
+		expect(existsSync(join(gp, 'TODO.md'))).toBe(true);
+		expect(existsSync(join(gp, 'README.md'))).toBe(true);
+		expect(existsSync(join(gp, '.claude/skills/pick-todo'))).toBe(true);
+		expect(existsSync(join(gp, '.samples-ref'))).toBe(false);
+	});
+});
+
 // The build environment. GeekPresent tracks its own CodingBooth (`booth` + `.booth/`), so a
 // clone carries a working container along with it — the script's job is to make that a
 // decision rather than a stowaway. Flags here; the prompt is pinned in adoptPrompt.test.ts.
@@ -261,18 +340,18 @@ describe('adopt-geekpresent.sh --dist', () => {
 		expect(workflow(gp)).toContain('path: gp/dist');
 	});
 
-	// '../site' is relative to the SUBFOLDER (that is where build-static.sh and CI's
-	// working-directory both stand), but upload-pages-artifact needs it from the REPO ROOT.
-	// Same folder, two spellings — emit the wrong one and CI deploys an empty directory.
-	it("resolves '../site' per consumer: ../site to the builder, site/ to the uploader", () => {
-		const gp = adopt('--mode', 'skeleton', '--dist', '../site', '--ci');
+	// You answer from the repo root ('site'), but the two consumers stand in different places:
+	// the builder runs INSIDE gp/ (so '../site'), while upload-pages-artifact names it from the
+	// root ('site'). Same folder, two spellings — emit the wrong one and CI deploys an empty
+	// directory, which is the kind of failure that looks like a success.
+	it("translates 'site' per consumer: ../site to the builder, site/ to the uploader", () => {
+		const gp = adopt('--mode', 'skeleton', '--dist', 'site', '--ci');
 		expect(workflow(gp)).toContain('GEEKPRESENT_OUT: "../site"');
 		expect(workflow(gp)).toContain('path: site');
-		expect(workflow(gp)).not.toContain('gp/../site');
 	});
 
 	it('refuses an output that resolves to the repo root — that is not a folder, that is your repo', () => {
-		expect(() => adopt('--mode', 'skeleton', '--dist', '..')).toThrow(/repo root/i);
+		expect(() => adopt('--mode', 'skeleton', '--dist', '.')).toThrow(/repo root/i);
 	});
 });
 

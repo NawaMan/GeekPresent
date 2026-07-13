@@ -12,8 +12,12 @@ vite.config.ts.timestamp-*
 # Local pnpm store (created by the booth)
 .pnpm-store/
 
-# CodingBooth runtime
+# CodingBooth runtime.
+# Kept here, not in .booth/.gitignore, which the booth tooling rewrites.
+# .booth/cache/ mirrors the container's ~/.claude — credentials and transcripts.
 .booth/startups/
+.booth/cache/
+.booth/.tmp/
 
 # Environment variables
 .env

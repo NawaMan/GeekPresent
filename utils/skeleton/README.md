@@ -10,6 +10,17 @@ one of these in its place. `--kind` picks which:
 | `text` | `text/` | a long-form Text page — one page that scrolls |
 | `none` | — | nothing; the landing page carries the recipe instead |
 
+`readme/<kind>.md` is the **project README** written into the adopted folder, with `__DIR__`,
+`__NAME__`, `__OUT__` and `__BUILD__` substituted — so it names the deck they chose and the build
+command that actually works for the environment and output folder they picked. It replaces
+GeekPresent's own README, which is *moved* to `.samples-ref/GeekPresent-README.md` and stays what it
+always was: the framework's introduction and full reference. It just isn't the adopter's README.
+
+Alongside it, the script retires the upstream docs that describe the wrong project (`AGENT.md` is
+the *adoption* manual; `TODO.md` is the framework's backlog) and the two skills that read them —
+`/todo` and `/pick-todo` would otherwise offer an adopter's agent a menu of GeekPresent features to
+go build. `AGENTS.md` stays: it is the *authoring* manual, which is exactly what they need.
+
 `home/<kind>/+page.svelte` is the landing page that ships with each: a **getting-started page, not
 a stub**. The script substitutes `__NAME__` for the deck/page name on the way in. The adopt script
 prints the same guidance to the terminal, but that scrolls away — this is the copy still there a

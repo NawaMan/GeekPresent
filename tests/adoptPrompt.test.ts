@@ -25,7 +25,7 @@ afterAll(() => workspaces.forEach((w) => rmSync(w, { recursive: true, force: tru
 type Prompt = 'dir' | 'mode' | 'kind' | 'name' | 'base' | 'dist' | 'env' | 'proceed';
 type Keys = Partial<Record<Prompt, string>>;
 
-/** The questions asked, in order, for `SOURCE --dir gp --no-ci --no-build` — which depends
+/** The questions asked, in order, for `SOURCE --dir gp --no-ci` — which depends
  *  on the answers, because the script BRANCHES: skeleton asks what to scaffold and (unless
  *  that is 'none') what to call it, minimal asks only which deck to keep, full asks neither.
  *
@@ -67,7 +67,7 @@ function typeAtPrompts(keys: Keys, raw?: string[]) {
 	const tty = join(work, 'keystrokes');
 	writeFileSync(tty, lines.map((l) => `${l}\n`).join(''));
 
-	const run = spawnSync('bash', [SCRIPT, source, '--dir', 'gp', '--no-ci', '--no-build'], {
+	const run = spawnSync('bash', [SCRIPT, source, '--dir', 'gp', '--no-ci'], {
 		cwd: host,
 		encoding: 'utf8',
 		env: { ...process.env, GP_TTY: tty }
@@ -116,14 +116,20 @@ describe('the samples prompt — [Msf]', () => {
 		expect(existsSync(join(dir, '.samples-ref/animation'))).toBe(true); // the rest, moved
 	});
 
-	// A one-letter prompt invites a mistyped letter. Six questions in, dying on it would mean
-	// answering the other five again — so it re-asks, and the run survives. Raw keystrokes:
-	// the whole point is that the rejected 'x' consumes a line and the RE-ASK consumes the
-	// next, which is precisely the shift promptOrder() cannot model.
 	// A prompt you don't understand is worse than no prompt: you either guess, or you quit and
 	// go read the README. '?' is the third option, and it costs one keystroke.
 	it("'?' explains the question and then asks it again", () => {
-		const { stderr, status } = typeAtPrompts({ mode: '?' }, ['', '?', 's', '', '', '', '', '', '']);
+		const { stderr, status } = typeAtPrompts({}, [
+			'', // dir
+			'?', // mode — help, which must NOT count as an answer...
+			's', // ...so the question comes back, and this is the real one
+			'', // kind, name, base, dist, env, proceed
+			'',
+			'',
+			'',
+			'',
+			''
+		]);
 		expect(stderr).toContain('demo slides'); // the help actually printed...
 		expect(stderr.match(/Samples —/g)?.length).toBe(2); // ...and the question came back
 		expect(status).toBe(0);
@@ -136,6 +142,10 @@ describe('the samples prompt — [Msf]', () => {
 		expect(existsSync(join(dir, 'booth'))).toBe(false);
 	});
 
+	// A one-letter prompt invites a mistyped letter. Several questions in, dying on it would
+	// mean answering the earlier ones again — so it re-asks, and the run survives. Raw
+	// keystrokes: the rejected 'x' consumes a line and the RE-ASK consumes the next, which is
+	// precisely the shift promptOrder() cannot model.
 	it('re-asks on an answer it does not know, rather than aborting the run', () => {
 		const { dir, stderr, status } = typeAtPrompts({}, [
 			'', // dir
@@ -144,6 +154,7 @@ describe('the samples prompt — [Msf]', () => {
 			'', // kind  -> deck
 			'', // name  -> slides
 			'', // base
+			'', // dist  -> gp/dist
 			'', // env   -> booth
 			'' //  proceed
 		]);
@@ -193,19 +204,20 @@ describe('the build-output prompt', () => {
 		expect(stderr).toMatch(/output\s+: gp\/dist\//);
 	});
 
-	// '../site' is relative to the SUBFOLDER, but the plan (and CI) must name it from the repo
-	// ROOT — those are different strings for the same folder, and printing the wrong one is how
-	// you get someone deploying an empty directory.
-	it("resolves '../site' to the repo root, not gp/../site", () => {
-		const { stderr } = typeAtPrompts({ dist: '../site' });
+	// You type paths from where you STAND, so a site/ beside gp/ is just 'site'. The builder
+	// runs inside gp/ and needs to hear '../site' for the same folder — one of those two
+	// spellings is always wrong for whoever is asking, and printing the wrong one is how you
+	// get someone deploying an empty directory.
+	it("takes 'site' as beside the subfolder, not inside it", () => {
+		const { stderr } = typeAtPrompts({ dist: 'site' });
 		expect(stderr).toMatch(/output\s+: site\//);
-		expect(stderr).not.toContain('gp/../site');
+		expect(stderr).not.toContain('gp/site');
 	});
 
-	// The booth mounts ONLY the subfolder, so a build inside it cannot write to ../site — the
-	// path is not there. Warning beats a "successful" build that produced nothing on the host.
+	// The booth mounts ONLY the subfolder, so a build inside it cannot write to a site/ beside
+	// it — the path is not there. Warning beats a "successful" build that produced nothing.
 	it('warns that the booth cannot reach an output outside the subfolder', () => {
-		const { stderr } = typeAtPrompts({ dist: '../site' }); // env defaults to booth
+		const { stderr } = typeAtPrompts({ dist: 'site' }); // env defaults to booth
 		expect(stderr).toMatch(/booth only sees/i);
 	});
 
