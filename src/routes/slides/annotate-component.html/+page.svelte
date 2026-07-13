@@ -104,11 +104,16 @@
 		border: 2px solid #d98a2b;
 		color: #f3e3cf;
 	}
-	/* Quieter: a footnote, not a third toy. */
+	/* Quieter: a footnote, not a third toy. A footnote is a SENTENCE, so it lays out as one
+	   — the flex column above stacks each inline child on its own line, which turned this
+	   into a ransom note. */
 	.demo.c {
+		display: block;
 		background: #23262b;
 		border: 1px solid #3a3f47;
 		color: #cfd6de;
-		font-size: 1.05em;
+		font-size: 1em;
+		line-height: 1.5;
+		padding: 0.6em 1em;
 	}
 </style>
