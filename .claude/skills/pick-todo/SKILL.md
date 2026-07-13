@@ -68,7 +68,7 @@ patterns worth pointing at:
   LAYOUT-mode drags. Anything that points *at* a component reuses this rather than reading the DOM.
 - **Reveals/animations are opt-in and SSR-inert.** They render nothing at prerender and light up on
   the client; `Canvas` and the chart `animate` prop ride the `AnimationBar`'s CSS-keyframe clock.
-- **Colours and metrics are role tokens** in `lib/styles/roles.css`. A new visual gets `--thing-*`
+- **Colours and metrics are role tokens** in `src/lib/themes/roles.css`. A new visual gets `--thing-*`
   tokens whose `var()` fallbacks are the main deck's actual (dark) theme — the fallbacks *are* the
   theme, since the `slides` deck sets no theme class.
 - **No new dependencies.** Charts and diagrams are own-math Svelte, deliberately. A proposal whose

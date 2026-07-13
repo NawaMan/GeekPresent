@@ -39,7 +39,7 @@ Pick the section by kind, not by excitement: **Tier 1** (closes a clear gap) · 
 Keep the approach **grounded in this repo**, not generic: geometry goes in a pure, NaN-safe `*Core`
 module (`draw/drawCore.ts`, `connectorCore.ts`, `spotlightCore.ts`); anything pointing *at* a
 component resolves through `stores/blockAnchors.ts` (as `Connector` and `Spotlight` do); reveals are
-opt-in and SSR-inert; colours/metrics are `--thing-*` role tokens in `lib/styles/roles.css`;
+opt-in and SSR-inert; colours/metrics are `--thing-*` role tokens in `src/lib/themes/roles.css`;
 **no new dependencies**; done = component + a demo slide that *is* the docs + a DOM test + an SSR
 test. A proposal reading "pull in library Y" is the wrong proposal.
 
