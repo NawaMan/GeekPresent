@@ -1790,12 +1790,66 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
 
 ## Adoption / distribution
 
-- [ ] **Skeleton project** — publish an empty GeekPresent starter (no example deck) so a new
+- [x] **Skeleton project** — publish an empty GeekPresent starter (no example deck) so a new
       project can begin from a clean slate instead of deleting the demo slides.
-  - Today `adopt-geekpresent.sh` bootstraps GeekPresent into an existing host project; the
-    skeleton is the greenfield counterpart.
-  - Decide what the skeleton keeps (theme, `roles.css`, nav/deck shell, build scripts) vs.
-    what it drops (`*-component.html` demo slides, sample content, narration assets).
+  - Shipped as a **third mode of the adopt script**, not a second repo. `--mode skeleton` moves
+    *every* sample deck to the gitignored `.samples-ref/` and scaffolds an **empty starting point**
+    in its place. The greenfield counterpart is the same machinery as adoption, so there is no
+    second tree to keep in sync — a separate starter repo would rot the moment a component landed
+    here.
+  - `minimal` was already close but kept ONE deck *whole*: with the default `--keep slides` that
+    is ~60 `*-component.html` demo slides still to delete. Skeleton keeps none.
+  - **`--kind deck | text | none`** (prompted; default `deck`) chooses what the clean slate *is*:
+    - `deck` — an empty slide deck, one title slide.
+    - `text` — a long-form **Text** page instead. GeekPresent builds two artifacts, and a deck is
+      dead weight for someone adopting it as a docs site rather than a talk. The catch this had to
+      handle: a deck is *discovered* by the sitemap (it globs `pages.ts`), a Text is **not** — it
+      is indexed only via `TEXT_ROUTES` in `src/lib/seo/routes.ts`, so the script registers it.
+      Miss that and the page builds and is silently never indexed.
+    - `none` — nothing at all. Verified it builds (the `pages.ts` glob matching nothing is fine;
+      the site is just the landing page). It is *not* the default, because it trades deleting six
+      files for hand-writing those same six — and they are the fiddly ones. Its landing page
+      therefore carries the whole recipe, including both `trailingSlash` values.
+  - Done: `utils/skeleton/deck/` — the clean slate as **real source, not heredocs in bash**:
+    `+layout.js` (deck-level, `trailingSlash "always"`), `+layout.svelte` (the `<SlideDeck>`
+    shell + `setPages`), `+page.svelte` (redirect to the first slide), `pages.ts` (one entry),
+    `title.html/+layout.js` (slide-level, `trailingSlash "never"`) and `title.html/+page.svelte`
+    (a `<TitlePage>`). Real files are type-checked, formatted, and — the point —
+    *renderable*: `tests/SkeletonSsr.ssr.test.ts` puts the title slide through `svelte/server`,
+    so a rename in `$lib/templates` can't silently rot the one deck an adopter sees first.
+  - Done: `utils/skeleton/text/` — the `--kind text` scaffold (`+layout.js`, a `<TextPage>`
+    `+layout.svelte`, and prose), and `utils/skeleton/home/{deck,text,none}/+page.svelte` — the
+    skeleton's landing page is a **getting-started page, not a stub** (`minimal` keeps the two-line
+    stub, which is the right advice for someone handed a working deck). One per kind, because the
+    advice has to match what was scaffolded: `none` has no deck to link to and must instead name
+    the files to write. The script substitutes `__NAME__`. The rationale is that the "next steps"
+    the script prints are true exactly once, until the terminal scrolls; the landing page is the
+    surface a new adopter is certain to open, and it is scaffolding they delete anyway — so it may
+    as well explain itself.
+  - Done: `adopt-geekpresent.sh` — `minimal` and `skeleton` now share one relocation path; skeleton
+    then `cp -a`s `utils/skeleton/$KIND` over `src/routes/$NAME/`. `--kind` and `--name` are
+    prompted, not flag-only (`--keep` still names the kept deck in minimal). The dangling-href
+    safety net had to learn that skeleton usually *reuses* the moved deck's name, so `/slides/*` is
+    live again rather than dangling — the landing page it writes is itself such a link — but that
+    reprieve must NOT apply under `--kind none`, where nothing was scaffolded and the link is dead.
+  - **The keep/drop question resolved to "decks only."** `specs/` and `TODO.md` looked droppable,
+    but shipped source comments cite `specs/DRAW-1.md` and the `pick-todo`/`todo` skills operate
+    on `TODO.md` — removing them would manufacture exactly the dangling-reference rot
+    `tests/skills.test.ts` exists to catch. The framework (`src/lib`, themes, build scripts,
+    `tests/`) is kept whole.
+  - **Found live: an adopted project's test suite was already red.** `tests/PathDemoSource.ssr.test.ts`
+    reads the `<Path>` *demos* out of `src/routes/{slides,animation}` — and `minimal` has always
+    moved `animation/` away, so `pnpm test` failed on first run in any adopted project. It now
+    travels to `.samples-ref/tests/` with the demos it guards. Two skills likewise cite demo slides
+    (`connector-component.html`, `callout-component.html`), so `skills.test.ts` resolves a cited
+    `src/routes/…` path through `.samples-ref/` as a fallback — still strict here, where no
+    `.samples-ref/` exists, and honest there, where the sample is merely relocated.
+  - Verified end-to-end, not just by diff: adopting into a scratch project and running `vite build`
+    for **each kind** — `deck` prerenders `/slides/title.html`, `text` prerenders `/guide.html` *and
+    lands in the sitemap*, `none` yields a one-page site — and the whole `ssr` project (32 files,
+    265 tests) passes inside the adopted tree. `tests/adoptSkeleton.test.ts` pins every mode and
+    kind by running the real script against a fixture tree (non-git, so it exercises the `cp -a`
+    path; hermetic, ~60ms), including the press-Enter defaults and rejection of a bad `--kind`.
 - [ ] **Versioning** — give GeekPresent itself a version so an adopted project can say which
       release it is on and what upgrading means.
 - [ ] **Component versioning, installation, and repository** — a way to fetch/update individual

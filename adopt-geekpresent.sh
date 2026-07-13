@@ -11,6 +11,11 @@
 #        minimal  — keep ONE deck as your starting template, move the rest to a
 #                   gitignored .samples-ref/ (kept locally for AI/agent reference),
 #                   and rewrite the landing page so the build stays green.
+#        skeleton — keep NO sample deck: move them all to .samples-ref/ and
+#                   scaffold an EMPTY starting point in their place (--kind):
+#                   an empty deck, a long-form Text page, or nothing at all.
+#                   The clean slate — you start by writing, not by deleting.
+#      All three keep the framework itself (src/lib, themes, build scripts, tests).
 #   4. Optional GitHub-Pages base path (for project sites served at /<repo>/).
 #   5. Scaffold a GitHub Actions workflow that builds the subfolder and deploys.
 #   6. Optional verification build (via CodingBooth if present, else pnpm).
@@ -31,11 +36,21 @@
 #   curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh | bash
 #   # non-interactive (pass flags after `bash -s --`):
 #   curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh | bash -s -- --dir docs-site --mode minimal --keep slides --yes
+#   # start from a clean slate instead (empty deck, no demo slides to delete):
+#   curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh | bash -s -- --mode skeleton --kind deck --name slides --yes
+#   # a docs site, not a talk — scaffold a long-form Text page instead of a deck:
+#   curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh | bash -s -- --mode skeleton --kind text --name guide.html --yes
 #
 # Options:
 #   --dir <name>        subfolder to create        (default: geekpresent)
-#   --mode full|minimal sample handling            (prompted; default: minimal)
-#   --keep <deck>       deck to keep in minimal     (prompted; default: slides)
+#   --mode <mode>       full | minimal | skeleton  (prompted; default: minimal)
+#   --keep <deck>       deck to keep in minimal    (prompted; default: slides)
+#   --kind <kind>       what skeleton scaffolds    (prompted; default: deck)
+#                         deck — an empty slide deck (one title slide)
+#                         text — a long-form Text page (one page that scrolls)
+#                         none — nothing at all; the framework and an empty tree
+#   --name <name>       name of the deck/page scaffolded in skeleton mode
+#                       (prompted; default: slides for a deck, guide.html for a text)
 #   --base </path>      GitHub Pages base path      (prompted; default: none)
 #   --ci / --no-ci      scaffold the Actions workflow
 #   --build / --no-build  run a verification build at the end
@@ -52,8 +67,12 @@ set -euo pipefail
 SOURCE_DEFAULT="https://github.com/NawaMan/GeekPresent.git"
 SOURCE=""
 DIR="geekpresent"
-MODE=""          # full | minimal   (resolved via prompt if empty)
-KEEP_DECK="slides"
+MODE=""          # full | minimal | skeleton   (resolved via prompt if empty)
+KIND=""          # deck | text | none          (skeleton only; prompted if empty)
+# What you end up editing. In minimal it names the sample deck KEPT; in skeleton it
+# names the deck or Text page SCAFFOLDED. Empty until resolved, because the default
+# depends on --kind (a deck is 'slides'; a Text is 'guide.html').
+NAME=""
 BASE=""          # e.g. /my-repo    (empty = served at domain root)
 DO_CI=""         # yes | no         (resolved via prompt if empty)
 DO_BUILD=""      # yes | no
@@ -108,7 +127,10 @@ while [ $# -gt 0 ]; do
 	case "$1" in
 		--dir)    DIR="${2:?--dir needs a value}"; shift 2;;
 		--mode)   MODE="${2:?--mode needs a value}"; shift 2;;
-		--keep)   KEEP_DECK="${2:?--keep needs a value}"; shift 2;;
+		--keep)   NAME="${2:?--keep needs a value}"; shift 2;;
+		--name)   NAME="${2:?--name needs a value}"; shift 2;;
+		--deck)   NAME="${2:?--deck needs a value}"; KIND="deck"; shift 2;;
+		--kind)   KIND="${2:?--kind needs a value}"; shift 2;;
 		--base)   BASE="${2:?--base needs a value}"; shift 2;;
 		--ci)     DO_CI="yes"; shift;;
 		--no-ci)  DO_CI="no"; shift;;
@@ -121,18 +143,30 @@ while [ $# -gt 0 ]; do
 	esac
 done
 
-case "$MODE" in ""|full|minimal) ;; *) die "--mode must be 'full' or 'minimal'";; esac
+case "$MODE" in ""|full|minimal|skeleton) ;; *) die "--mode must be 'full', 'minimal' or 'skeleton'";; esac
+case "$KIND" in ""|deck|text|none) ;; *) die "--kind must be 'deck', 'text' or 'none'";; esac
 
 # -----------------------------------------------------------------------------
 # Resolve configuration (flags win; otherwise prompt; otherwise default)
 # -----------------------------------------------------------------------------
 [ -n "$SOURCE" ] || SOURCE="$(ask "GeekPresent source (git URL or local path)" "$SOURCE_DEFAULT")"
 DIR="$(ask "Subfolder to create in this project" "$DIR")"
-[ -n "$MODE" ] || MODE="$(ask "Sample handling — 'minimal' (1 deck + .samples-ref) or 'full' (keep all)" "minimal")"
-case "$MODE" in full|minimal) ;; *) die "mode must be 'full' or 'minimal'";; esac
+[ -n "$MODE" ] || MODE="$(ask "Samples — 'minimal' (1 deck), 'skeleton' (empty deck) or 'full' (keep all)" "minimal")"
+case "$MODE" in full|minimal|skeleton) ;; *) die "mode must be 'full', 'minimal' or 'skeleton'";; esac
 if [ "$MODE" = "minimal" ]; then
-	KEEP_DECK="$(ask "Deck to keep as your starting template" "$KEEP_DECK")"
+	[ -n "$NAME" ] || NAME="$(ask "Deck to keep as your starting template" "slides")"
+elif [ "$MODE" = "skeleton" ]; then
+	# What to start from. 'none' is for someone who wants the framework and an empty
+	# tree — it builds (the site is just the landing page), but they then hand-write
+	# the six files 'deck' would have written for them, so it is not the default.
+	[ -n "$KIND" ] || KIND="$(ask "Scaffold what — 'deck' (slides), 'text' (one long page) or 'none'" "deck")"
+	case "$KIND" in deck|text|none) ;; *) die "kind must be 'deck', 'text' or 'none'";; esac
+	case "$KIND" in
+		deck) [ -n "$NAME" ] || NAME="$(ask "Name for your new (empty) deck" "slides")";;
+		text) [ -n "$NAME" ] || NAME="$(ask "Name for your new Text page (a route, so .html)" "guide.html")";;
+	esac
 fi
+[ -n "$NAME" ] || NAME="slides"
 BASE="$(ask "GitHub Pages base path for a project site, e.g. /my-repo (blank = domain root)" "$BASE")"
 [ -n "$DO_CI" ]    || { confirm "Scaffold a GitHub Actions deploy workflow?" && DO_CI="yes" || DO_CI="no"; }
 [ -n "$DO_BUILD" ] || { confirm "Run a verification build at the end? (slower; needs deps)" && DO_BUILD="yes" || DO_BUILD="no"; }
@@ -147,7 +181,16 @@ TARGET="$PWD/$DIR"
 	echo "${B}Plan${RST}"
 	echo "  source     : $SOURCE"
 	echo "  into       : $TARGET"
-	echo "  samples    : $MODE${MODE:+$( [ "$MODE" = minimal ] && echo " (keep: $KEEP_DECK)" )}"
+	case "$MODE" in
+		minimal)  echo "  samples    : minimal (keep: $NAME)";;
+		skeleton)
+			case "$KIND" in
+				deck) echo "  samples    : skeleton — no samples kept; empty deck '$NAME'";;
+				text) echo "  samples    : skeleton — no samples kept; Text page '$NAME'";;
+				none) echo "  samples    : skeleton — no samples kept; NOTHING scaffolded";;
+			esac;;
+		*)        echo "  samples    : full";;
+	esac
 	echo "  base path  : ${BASE:-<none>}"
 	echo "  workflow   : $DO_CI"
 	echo "  test build : $DO_BUILD"
@@ -189,18 +232,24 @@ ROUTES="$TARGET/src/routes"
 # -----------------------------------------------------------------------------
 # Step 3 — samples
 # -----------------------------------------------------------------------------
-if [ "$MODE" = "minimal" ]; then
-	[ -f "$ROUTES/$KEEP_DECK/pages.ts" ] || die "deck '$KEEP_DECK' not found under src/routes — pick one with --keep"
+if [ "$MODE" = "minimal" ] || [ "$MODE" = "skeleton" ]; then
+	[ "$MODE" != "minimal" ] || [ -f "$ROUTES/$NAME/pages.ts" ] \
+		|| die "deck '$NAME' not found under src/routes — pick one with --keep"
 	REF="$TARGET/.samples-ref"
 	mkdir -p "$REF"
-	info "Minimal mode: keeping '$KEEP_DECK', moving other samples to .samples-ref/ ..."
+	if [ "$MODE" = "minimal" ]; then
+		info "Minimal mode: keeping '$NAME', moving other samples to .samples-ref/ ..."
+	else
+		info "Skeleton mode: moving every sample to .samples-ref/ ..."
+	fi
 
 	MOVED=()
-	# Decks = any route dir containing pages.ts (the kept one stays).
+	# Decks = any route dir containing pages.ts. minimal keeps one as the starting
+	# template; skeleton keeps NONE (it scaffolds a fresh start below instead).
 	for d in "$ROUTES"/*/; do
 		name="$(basename "$d")"
-		[ "$name" = "$KEEP_DECK" ] && continue
 		[ "$name" = "(home)" ] && continue
+		if [ "$MODE" = "minimal" ] && [ "$name" = "$NAME" ]; then continue; fi
 		if [ -f "$d/pages.ts" ]; then mv "$d" "$REF/"; MOVED+=("$name"); fi
 	done
 	# Standalone sample/demo routes (text.html, seo.html) cross-link to the decks
@@ -210,17 +259,67 @@ if [ "$MODE" = "minimal" ]; then
 		[ -e "$ROUTES/$r" ] && { mv "$ROUTES/$r" "$REF/"; MOVED+=("$r"); }
 	done
 
-	# Keep the sitemap's hardcoded standalone-route list in sync with what's left.
-	SEO_ROUTES="$TARGET/src/lib/seo/routes.ts"
-	if [ -f "$SEO_ROUTES" ] && grep -q 'TEXT_ROUTES' "$SEO_ROUTES"; then
-		sed -i "s|^const TEXT_ROUTES =.*|const TEXT_ROUTES = ['/'];|" "$SEO_ROUTES"
-		ok "Trimmed sitemap's standalone-route list to just '/'"
+	# One shipped test is about the SAMPLE SLIDES, not the framework: it reads the
+	# <Path> demos out of src/routes/{slides,animation} to prove their tags stay on
+	# one line so LAYOUT's Save can patch them. Both modes move at least one of those
+	# decks, so the test would fail on `pnpm test` in a freshly adopted project.
+	# It travels with the samples it guards.
+	DEMO_TEST="tests/PathDemoSource.ssr.test.ts"
+	if [ -f "$TARGET/$DEMO_TEST" ]; then
+		mkdir -p "$REF/tests"
+		mv "$TARGET/$DEMO_TEST" "$REF/tests/"
+		ok "Moved $DEMO_TEST to .samples-ref/ (it asserts things about the demo slides)"
 	fi
 
-	# The landing page hardcodes links to the sample decks; rewrite it minimally
-	# so prerender doesn't crawl into removed routes. Original is preserved.
+	# Skeleton: nothing is left to edit, so write the clean slate. The templates ship as
+	# real files (utils/skeleton/{deck,text}), not heredocs here, so they are type-checked
+	# and SSR-tested like any other source. 'none' scaffolds nothing — the site is then
+	# just the landing page, which builds fine (the sitemap's pages.ts glob matches
+	# nothing) but leaves the six deck files to write by hand.
+	if [ "$MODE" = "skeleton" ] && [ "$KIND" != "none" ]; then
+		SKEL="$TARGET/utils/skeleton/$KIND"
+		[ -d "$SKEL" ] || die "skeleton template missing at utils/skeleton/$KIND — is $SOURCE really GeekPresent?"
+		mkdir -p "$ROUTES/$NAME"
+		cp -a "$SKEL/." "$ROUTES/$NAME/"
+		if [ "$KIND" = "deck" ]; then
+			ok "Scaffolded an empty deck at src/routes/$NAME/ (one title slide)"
+		else
+			ok "Scaffolded a Text page at src/routes/$NAME/ (one long page that scrolls)"
+		fi
+	elif [ "$MODE" = "skeleton" ]; then
+		ok "Scaffolded nothing (--kind none) — src/routes holds only the landing page"
+	fi
+
+	# Keep the sitemap's hardcoded standalone-route list in sync with what's left. Decks
+	# are globbed from their pages.ts, but a Text is NOT discovered — it reaches the
+	# sitemap only by being listed here, so a scaffolded Text has to be registered or it
+	# builds and is never indexed.
+	SEO_ROUTES="$TARGET/src/lib/seo/routes.ts"
+	TEXT_LIST="['/']"
+	[ "$MODE" = "skeleton" ] && [ "$KIND" = "text" ] && TEXT_LIST="['/', '/$NAME']"
+	if [ -f "$SEO_ROUTES" ] && grep -q 'TEXT_ROUTES' "$SEO_ROUTES"; then
+		sed -i "s|^const TEXT_ROUTES =.*|const TEXT_ROUTES = $TEXT_LIST;|" "$SEO_ROUTES"
+		ok "Set sitemap's standalone-route list to $TEXT_LIST"
+	fi
+
+	# The landing page hardcodes links to the sample decks; rewrite it so prerender
+	# doesn't crawl into removed routes. Original is preserved either way.
+	#
+	# Skeleton gets a REAL getting-started page rather than the stub: everything the
+	# "next steps" below say is true only until the terminal scrolls, and the landing
+	# page is the one surface a new adopter is certain to open. It is scaffolding that
+	# explains itself and is then deleted — which is exactly what the stub is too, so
+	# this costs nothing and is read a week later, when the terminal is long gone.
+	# There is one landing page per --kind, because the getting-started text has to match
+	# what was actually scaffolded: 'none' has no deck to link to and must instead spell
+	# out the files to write, and 'text' points at a page, not a slide.
 	HOME_PAGE="$ROUTES/(home)/+page.svelte"
-	if [ -f "$HOME_PAGE" ]; then
+	HOME_SKEL="$TARGET/utils/skeleton/home/$KIND/+page.svelte"
+	if [ -f "$HOME_PAGE" ] && [ "$MODE" = "skeleton" ] && [ -f "$HOME_SKEL" ]; then
+		cp "$HOME_PAGE" "$REF/home-+page.svelte.orig"
+		sed "s|__NAME__|$NAME|g" "$HOME_SKEL" > "$HOME_PAGE"
+		ok "Wrote a getting-started landing page (--kind $KIND)"
+	elif [ -f "$HOME_PAGE" ]; then
 		cp "$HOME_PAGE" "$REF/home-+page.svelte.orig"
 		cat > "$HOME_PAGE" <<EOF
 <!-- Minimal landing page generated by adopt-geekpresent.sh.
@@ -233,9 +332,9 @@ if [ "$MODE" = "minimal" ]; then
 
 <h1>Documentation</h1>
 <p>Replace this page with your own. Your starting deck is
-   <a href="{base}/$KEEP_DECK/title.html">here</a>.</p>
+   <a href="{base}/$NAME/title.html">here</a>.</p>
 EOF
-		ok "Rewrote landing page (links to /$KEEP_DECK/title.html)"
+		ok "Rewrote landing page (links to /$NAME/title.html)"
 	fi
 
 	# Make sure the reference copies don't get committed or built.
@@ -247,8 +346,18 @@ EOF
 	# Safety net: a kept page may still link (in prose) to a removed route. We
 	# can't guess the right replacement, so report it loudly rather than ship a
 	# build that fails prerender. (For keep=slides this finds nothing.)
-	if [ ${#MOVED[@]} -gt 0 ]; then
-		pat="$(printf '%s|' "${MOVED[@]}")"; pat="(${pat%|})"
+	#
+	# Skeleton usually REUSES the moved deck's name for what it scaffolds ('slides'),
+	# so /$NAME/* resolves again — those links are live, not dangling, and must not be
+	# flagged (the landing page we just wrote is itself one). With --kind none nothing
+	# is scaffolded, so that reprieve does NOT apply: a link to /$NAME/ really is dead.
+	GONE=()
+	for name in ${MOVED[@]+"${MOVED[@]}"}; do
+		[ "$MODE" = "skeleton" ] && [ "$KIND" != "none" ] && [ "$name" = "$NAME" ] && continue
+		GONE+=("$name")
+	done
+	if [ ${#GONE[@]} -gt 0 ]; then
+		pat="$(printf '%s|' "${GONE[@]}")"; pat="(${pat%|})"
 		DANG="$(grep -rnE "href=\"[^\"#]*${pat}" "$ROUTES" --include='*.svelte' 2>/dev/null || true)"
 		if [ -n "$DANG" ]; then
 			warn "Kept pages still link to removed samples — fix these, or use --mode full:"
@@ -371,7 +480,24 @@ fi
 	echo "${B}Next steps${RST}"
 	echo "  • Local build (no host deps): ${DIM}cd $DIR && ./booth -- ./build-static.sh ./dist --zip${RST}"
 	echo "  • Or native:                  ${DIM}cd $DIR && pnpm install && ./build-static.sh ./dist${RST}"
-	[ "$MODE" = "minimal" ] && echo "  • Edit your deck:            ${DIM}$DIR/src/routes/$KEEP_DECK/${RST}  (samples: $DIR/.samples-ref/)"
+	[ "$MODE" = "minimal" ] && echo "  • Edit your deck:            ${DIM}$DIR/src/routes/$NAME/${RST}  (samples: $DIR/.samples-ref/)"
+	if [ "$MODE" = "skeleton" ]; then
+		case "$KIND" in
+			deck)
+				echo "  • Write your first slide:    ${DIM}$DIR/src/routes/$NAME/title.html/+page.svelte${RST}"
+				echo "  • Add slide 2:               new dir + ${DIM}+layout.js${RST}, then a line in ${DIM}$NAME/pages.ts${RST}"
+				;;
+			text)
+				echo "  • Write your page:           ${DIM}$DIR/src/routes/$NAME/+page.svelte${RST}"
+				echo "  • Add another Text:          copy that folder, then list it in ${DIM}src/lib/seo/routes.ts${RST}"
+				;;
+			none)
+				echo "  • Nothing was scaffolded.    The landing page tells you what to write."
+				echo "  • Or re-run with            ${DIM}--mode skeleton --kind deck${RST} (or ${DIM}--kind text${RST}) to have it written for you"
+				;;
+		esac
+		echo "  • Every component, by example: ${DIM}$DIR/.samples-ref/${RST} (gitignored, yours to crib from)"
+	fi
 	[ "$DO_CI" = "yes" ] && echo "  • Push, then enable Pages:    Settings -> Pages -> Source: GitHub Actions"
 	echo "  • Nothing is committed — ${DIM}git add${RST} what you want to keep."
 	echo

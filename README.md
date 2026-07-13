@@ -80,17 +80,48 @@ curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geek
 # non-interactive — pass flags after `bash -s --`:
 curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh \
   | bash -s -- --dir docs-site --mode minimal --keep slides --yes
+
+# clean slate — an empty deck instead of sixty demo slides to delete:
+curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh \
+  | bash -s -- --mode skeleton --kind deck --name slides --yes
+
+# a docs site, not a talk — a long-form Text page instead of a deck:
+curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh \
+  | bash -s -- --mode skeleton --kind text --name guide.html --yes
 ```
 
 It clones GeekPresent into a subfolder, removes its `.git` (so it becomes part of *your* repo),
 optionally trims the sample decks, and can scaffold a GitHub Actions workflow that builds the
 subfolder and deploys it. **Nothing is committed** — review, then `git add` what you want.
 
+Three ways to handle the samples — they differ only in what you start editing:
+
+- **`skeleton`** — the clean slate. Every sample deck moves to `.samples-ref/`, and an **empty
+  starting point** is scaffolded in its place. You begin by writing, not by deleting.
+- **`minimal`** — keep one sample deck as your starting template, move the rest.
+- **`full`** — keep everything; trim it yourself later.
+
+`minimal` and `skeleton` both **move** the samples rather than delete them: `.samples-ref/` is
+gitignored but stays on disk, so you (and your coding agent) can still read every component demo.
+
+Skeleton then asks what to start you off with (`--kind`):
+
+- **`deck`** *(default)* — an empty slide deck: one title slide, ready to present.
+- **`text`** — a long-form **Text** page instead. GeekPresent builds two kinds of artifact, and a
+  deck is dead weight if you adopted it for a docs site rather than a talk.
+- **`none`** — nothing at all. The framework, an empty tree, and a landing page that spells out the
+  files to write by hand. For people who want to shape it entirely themselves.
+
+Either way the landing page becomes a short getting-started page, matched to what was scaffolded —
+which you then delete along with the rest of the scaffolding.
+
 | Flag | What it does | Default |
 | --- | --- | --- |
 | `--dir <name>` | subfolder to create | `geekpresent` |
-| `--mode minimal\|full` | `minimal`: keep one deck, move the rest to a gitignored `.samples-ref/`; `full`: keep everything | `minimal` |
+| `--mode <mode>` | `skeleton` \| `minimal` \| `full` — see above | `minimal` |
 | `--keep <deck>` | which deck to keep in minimal mode | `slides` |
+| `--kind <kind>` | what skeleton scaffolds: `deck` \| `text` \| `none` | `deck` |
+| `--name <name>` | what to call the scaffolded deck/page | `slides` / `guide.html` |
 | `--base </path>` | GitHub Pages base path for a project site | none |
 | `--ci` / `--no-ci` | scaffold the deploy workflow | prompted |
 | `--yes`, `-y` | accept defaults, skip prompts (for CI / `curl … \| bash`) | off |
