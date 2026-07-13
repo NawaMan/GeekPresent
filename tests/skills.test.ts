@@ -61,11 +61,21 @@ describe('agent skills', () => {
 		expect(description.length).toBeGreaterThan(40);
 	});
 
+	// This test ships to adopted projects too, and `adopt-geekpresent.sh` (minimal /
+	// skeleton) moves the sample decks to a gitignored `.samples-ref/` — kept on disk
+	// precisely so agents can still read them. A skill citing `src/routes/slides/…`
+	// is therefore still telling the truth there, at the relocated path. So: a cited
+	// path must exist in the tree, OR in the samples reference. In THIS repo there is
+	// no `.samples-ref/`, so the fallback never fires and the rot-check stays strict.
+	const onDisk = (p: string) => {
+		const path = p.replace(/\/$/, ''); // a dir is cited with a trailing slash
+		if (existsSync(`${REPO}${path}`)) return true;
+		const relocated = path.replace(/^src\/routes\//, '.samples-ref/');
+		return relocated !== path && existsSync(`${REPO}${relocated}`);
+	};
+
 	it.each(skillNames)('%s: every repo path it cites exists', (name) => {
-		const missing = citedPaths(skillBody(name)).filter(
-			// A directory is cited with a trailing slash; existsSync takes either.
-			(p) => !existsSync(`${REPO}${p.replace(/\/$/, '')}`)
-		);
+		const missing = citedPaths(skillBody(name)).filter((p) => !onDisk(p));
 		expect(missing).toEqual([]);
 	});
 
