@@ -576,6 +576,51 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
   - Wrapping in a `Block` sizes it (resize rubber-bands both axes): `Block` now
     fills its content by default (`fill={false}` to opt out), so no per-component
     fill prop is needed. Demo parks a `<Block><Callout/></Block>` and flips LAYOUT.
+- [ ] **Deck overview — the all-slides grid** — an overlay showing every slide at once, click one
+      to jump. The "press O" move reveal.js and the slide-sorter both have.
+  - Nothing in the deck shows more than one slide. The two things that *sound* like it are not it:
+    `SlideMap.svelte` is a contentless pan rectangle for a zoomed slide (it says so in its own
+    header comment — it renders NO slide content), and both TOCs (`TableOfContent.svelte:74`, the
+    console's at `PresenterView.svelte:337`) are plain text `<a>`/button lists. So finding slide 23
+    means paging to it or reading a list of titles.
+  - Approach: reuse the mechanism `PresenterView.svelte:288-315` already proves — a live `<iframe>`
+    of the prerendered slide at `?clean`, scaled to fit its panel. The console renders two of these
+    (current + next); the grid renders all of them off `pages.ts` (`visiblePages()`, so `hidden`
+    appendices stay out, exactly as the TOC filters today). Click → the same `jump(p.path)` the
+    console's TOC already calls. No capture step, no new data.
+  - **Do NOT reach for the OG social cards as thumbnails.** It looks tempting — `utils/wire-og.mjs`
+    writes `image:` into `pages.ts` and the `Page` type has carried `image?`/`imageAlt?` since
+    `navigate.ts:15` — but `grep "image:" src/routes/*/pages.ts` is **zero hits** in every committed
+    deck, `static/og/` is gitignored and only regenerated in CI, and the field's one consumer is SEO
+    meta. A grid built on it would be empty in `pnpm dev` and empty on a fresh clone.
+  - Open questions: the key to open it (`o`? `Escape`? both?) — the global keydown surface is
+    deliberately tiny today (`NavigationBar.svelte:94-117` owns arrows + Space, nothing else), so
+    adding one is a real decision, not a freebie. Does it lazily mount iframes (65 slides = 65
+    documents) or render a cheap title card until scrolled into view?
+- [ ] **Handout — the whole deck as one printable document / PDF** — one page per slide, notes
+      optional, so `Ctrl+P → Save as PDF` exports the talk.
+  - Today there is no deck export at all. The *entire* print story is four lines
+    (`src/lib/styles/global.css:88`: `@media print { .no-print { display: none } }`) — repo-wide
+    there are zero hits for `@page`, `page-break`, `break-inside` or `window.print()`. Since each
+    slide is its own SvelteKit document, Ctrl+P prints **exactly one slide**, which is what
+    `README.md:433` actually promises. `utils/capture-slides.sh` emits PNG only (no
+    `--print-to-pdf`). Wanted for: leave-behinds, reviewers who want the deck in one file, and
+    conferences that ask for a PDF.
+  - **`text.html` is not this and must not be mistaken for it.** It imports `Label`,
+    `AnimationScene` and a local SVG — never `pages.ts`, never a slide route. Its own body says "A
+    Text is not a stack of slides glued together — it is a document." It is a second, *hand-authored*
+    artifact; `capture-slides.sh:99` even excludes it from the slide list.
+  - Approach: a `handout` route that `import.meta.glob`s `/src/routes/<deck>/*/+page.svelte` (the
+    globbing precedent is `src/lib/seo/routes.ts:11`, which globs `pages.ts` for the sitemap — this
+    is the same move one level down, at the *component*), stacks each inside a 1920×1080 box under
+    the deck's own `setPages` context, and adds the `@page` + `page-break-after: always` rules that
+    don't exist yet. The existing `.no-print` rule already strips the chrome for free, and ink
+    already prints (the annotation surface deliberately does not wear `.no-print`). The browser is
+    the PDF engine — no dependency, in the grain of the project.
+  - Open questions: notes below each slide or a `?notes` flag (a handout and a speaker's notes-page
+    are different artifacts). Slides that self-mount under `{#if initialized}` and iframe-bearing
+    slides (`WebSite`/`WebPage`/`YouTube`) will print blank or hollow — does the handout *refuse and
+    name them* the way CAPTURE does (`captureCore.ts`), which is the established house bargain?
 
 ## Web & video embeds (requested)
 
@@ -816,6 +861,42 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     the bottom of the canvas and `ContentPage`'s header sits at the top. They never meet.
 
 ## Tier 2 — on-brand tech-talk polish
+
+- [ ] **Full-deck search** — a filter box that searches every slide's text and jumps to the hit.
+  - There is no search anywhere in the deck. Every `search` hit in the repo is something else:
+    `DataTable`'s `SearchBox` (scoped to one table's rows), `URLSearchParams` plumbing, or SEO prose
+    about search *engines*. Neither TOC has a filter input. So "which slide mentioned backpressure?"
+    is answered by paging. The pain grows with the deck — this project's own is ~65 slides.
+  - Approach: build the index at build time from the slide *sources*, via an `import.meta.glob` with
+    `?raw` — the same trick `ViewSource` already uses, and the reason it uses it applies here too:
+    a raw import of the real file **cannot drift** from what's on screen, whereas a hand-kept index
+    would. Strip tags/script blocks to text, key by the `pages.ts` path, and let the existing TOC
+    overlay grow a filter input (it already owns `Escape`-to-close, `TableOfContent.svelte:39`).
+  - Index at build time, not runtime: it must survive prerender, and a static site has no server to
+    ask. No dependency — this is a `.filter()` over a few dozen strings, not a search engine.
+  - Open questions: does it search the `<Note>` speaker text too (findable by the speaker, invisible
+    to the audience — probably yes, and probably worth flagging in the result), and does a hit
+    highlight the term on arrival or merely land you on the slide?
+- [ ] **Presenter pacing — are you ahead or behind?** — a per-slide time budget, so the console can
+      say "3 minutes behind" instead of just showing a clock.
+  - The two halves already exist and *never talk to each other*: a durable elapsed timer with
+    pause/resume/set (`PresenterView.svelte:411-434`, persisted per deck across reloads AND the full
+    document load every slide navigation causes — `stores/presenter.ts:166-211`) and an `n / N`
+    position meter (`:406`). They sit side by side on the same bar. What's missing is the third
+    number — where you *should* be — so nothing tells a speaker they're overrunning until the room
+    does. Nothing in the repo mentions pacing/target/budget; grep confirms.
+  - Approach: an optional `minutes` (or `budget`) field on the `pages.ts` entry — the same
+    per-slide-metadata channel that already carries `title`, `hidden`, `layout` and `image`, so it
+    costs no new machinery and a deck that says nothing is unchanged. Sum the budgets to an expected
+    elapsed-at-this-slide; compare against the timer that's already ticking; colour the delta with
+    the existing `--ctrl-*` / `--DANGER` role tokens rather than inventing colours. Pure arithmetic
+    → a total, NaN-safe `pacingCore.ts` (the `drawCore`/`captureCore` discipline), unit-tested
+    directly, so a deck with budgets on *some* slides degrades to a sensible answer rather than
+    `NaN`.
+  - Console-only, by construction: `displayMode` is already deliberately `sync: false` so the
+    speaker's view doesn't leak to the audience — pacing is the same kind of secret.
+  - Open questions: partial budgets (most decks will annotate a few key slides, not all 65) — treat
+    an unbudgeted slide as zero, or spread the remaining time evenly across them?
 
 - [x] **`Terminal`** — fake console: typed command + output, riding the `AnimationBar` keyframe clock.
   - Done: `src/lib/components/Terminal.svelte`, with the schedule in
@@ -1146,6 +1227,27 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
       metric.
 
 ## Tier 3 — nice to have
+
+- [ ] **Kiosk / auto-advance** — a deck that plays itself: dwell on each slide, then page, and loop
+      at the end. For a booth screen, a lobby loop, or an unattended demo.
+  - Nothing in the deck self-runs — no autoplay, no loop, no dwell (grep for
+    autoplay/auto-advance/kiosk/loop in `SlideDeck`/`NavigationBar` is empty). Every advance today
+    is a human pressing → or Space. A conference-booth screen therefore needs a person standing at
+    it, which is exactly the case the `booth`/CodingBooth side of this project cares about.
+  - Approach: a sticky `?kiosk` URL flag, shaped like the two render flags `SlideDeck` already
+    owns (`?shot` at `:225`, and `?layout`) — same parse, same stickiness across navigation, so no
+    new concept enters the deck. Dwell per slide from `pages.ts` (the same metadata channel the
+    pacing item would use for `minutes` — worth landing them in one shape rather than two).
+  - The interesting half is *when it's allowed to page*, and both answers already exist in the repo:
+    a running `<Steps>` build must finish first — `utils/stepKeys.ts`'s `spaceIntent()` is already
+    the single arbiter of exactly this question ("reveal, or page?"), so kiosk consults it rather
+    than re-deciding — and a slide with a finite animation should let its `AnimationBar` clock run
+    out (`utils/slideAnim.ts` already knows the duration and ignores infinite loops).
+  - Pairs with View Transitions (`setViewTransitions(true)`): a kiosk loop is precisely where a
+    cross-slide morph earns its keep, and it's client-side `goto`, so no white flash between slides.
+  - Open questions: does it hide the chrome (a booth screen wants no nav bar — `.gp-chrome` /
+    `fadeChrome` already give the hook), and does any keypress or pointer move break out of kiosk
+    back to manual control, or does it need the flag removed?
 
 - [x] **`Quote`** — blockquote + attribution/avatar.
   - Done: `src/lib/components/Quote.svelte`, the Tier-3 companion to `Stat`/`Callout`
