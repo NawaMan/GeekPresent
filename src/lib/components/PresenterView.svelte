@@ -28,6 +28,7 @@
 		presenterTimerStart, resetPresenterTimer, loadPresenterPause, savePresenterPause,
 		loadPresenterSplit, savePresenterSplit, clearSlideChecks, clearDeckChecks
 	} from '$lib/stores/presenter';
+	import { canAnnotate, strokes, resetSlideInk, resetAllInk } from '$lib/stores/annotation';
 	import type { Page } from '$lib/utils/navigate';
 	import type { AnimState } from '$lib/utils/slideAnim';
 
@@ -104,9 +105,26 @@
 		if (browser) window.dispatchEvent(new CustomEvent('gp:checks-clear'));
 	}
 
+	// Ink reset menu. The console has no canvas of its own, so it cannot draw — but it CAN
+	// clear, and that is exactly the control a speaker wants here: they see stale marks on
+	// the CURRENT preview and want them gone without hunting for the pen on the other screen.
+	// Both windows follow, because the ink is a persisted(sync: true) store and localStorage
+	// is the channel — no relay to keep in step.
+	let inkOpen = false;
+	let inkRef: HTMLElement;
+	function resetSlideInkHere() {
+		inkOpen = false;
+		resetSlideInk();
+	}
+	function resetAllInkHere() {
+		inkOpen = false;
+		resetAllInk();
+	}
+
 	function onDocClick(e: MouseEvent) {
 		if (tocRef && !tocRef.contains(e.target as Node)) tocOpen = false;
 		if (checksRef && !checksRef.contains(e.target as Node)) checksOpen = false;
+		if (inkRef && !inkRef.contains(e.target as Node)) inkOpen = false;
 		if (timerRef && !timerRef.contains(e.target as Node)) timerMenuOpen = false;
 	}
 	function onKeydown(e: KeyboardEvent) {
@@ -329,8 +347,17 @@
 			{/if}
 		</div>
 		&nbsp;
-		<div class="toc checks" class:open={checksOpen} bind:this={checksRef}>
-			<CtrlBtn text={checksOpen ? '☑ ▾' : '☑ ▴'} hoverText="Reset checks" isSelected={checksOpen} on:click={() => (checksOpen = !checksOpen)} />
+		<div class="toc checks" class:open={checksOpen} bind:this={checksRef} title="Reset checks">
+			<!-- hoverText is the ICON, not a label — see the ✎ button below. CtrlBtn SWAPS the two
+			     on hover, so a wordy hoverText makes the button jump wider under the pointer, and
+			     this bar is a fixed row a speaker aims at without looking. The wrapper's `title`
+			     says what it does; the menu names both actions in full. -->
+			<CtrlBtn
+				text={checksOpen ? '☑ ▾' : '☑ ▴'}
+				hoverText={checksOpen ? '☑ ▾' : '☑ ▴'}
+				isSelected={checksOpen}
+				on:click={() => (checksOpen = !checksOpen)}
+			/>
 			{#if checksOpen}
 			<div class="toc-menu checks-menu">
 				<button type="button" on:click={resetPageChecks}>Reset this page</button>
@@ -339,6 +366,32 @@
 			{/if}
 		</div>
 		&nbsp;
+		<!-- Reset the speaker's ink. Shown only where the pen is offered, and it reports how
+		     much ink is on the current slide so "reset" is never a shot in the dark. -->
+		{#if $canAnnotate}
+		<div class="toc checks" class:open={inkOpen} bind:this={inkRef} title="Reset annotations">
+			<!-- hoverText is the ICON again, not a label: CtrlBtn SWAPS the two on hover, so a
+			     wordy hoverText makes the button jump wider under the pointer. The console's bar is
+			     a fixed row of controls a speaker aims at without looking, and one of them growing
+			     mid-reach is worse than it being unlabelled. The wrapper's `title` still says what
+			     it does, and the menu it opens names both actions in full. -->
+			<CtrlBtn
+				text={inkOpen ? '✎ ▾' : '✎ ▴'}
+				hoverText={inkOpen ? '✎ ▾' : '✎ ▴'}
+				isSelected={inkOpen}
+				on:click={() => (inkOpen = !inkOpen)}
+			/>
+			{#if inkOpen}
+			<div class="toc-menu checks-menu">
+				<button type="button" on:click={resetSlideInkHere} disabled={$strokes.length === 0}>
+					Reset this slide{$strokes.length ? ` (${$strokes.length})` : ''}
+				</button>
+				<button type="button" on:click={resetAllInkHere}>Reset ALL annotations</button>
+			</div>
+			{/if}
+		</div>
+		&nbsp;
+		{/if}
 		<div class="nav">
 			<CtrlBtn text="FIRST" on:click={() => go(nav.first, 'back')} isDisabled={!nav.first} />
 			<CtrlBtn text="◀ PREV" on:click={() => go(nav.prev, 'back')} isDisabled={!nav.prev} />

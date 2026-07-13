@@ -25,6 +25,12 @@
 	// NOTE: LAYOUT is off in this build by default, deck-wide. The slides that TEACH it
 	// opt in one by one, via `layout: true` on their own pages.ts entries — see
 	// layout-mode.html. Nothing here needs to change for that.
+	//
+	// ANNOTATE, by contrast, is deck-WIDE (`annotate` below) and has no per-slide flag —
+	// the pen is a SPEAKER tool, so the slide they happen to be on has no say in whether
+	// they may circle a word on it. This deck ships it on: it is the docs deck, so the
+	// control it documents should be in reach on every slide, exactly as it would be in a
+	// real talk. Available, not active — the mode still starts off. See annotate-component.html.
 </script>
 
 <svelte:head>
@@ -42,6 +48,7 @@
 	articleText="← Back to home"
 	articleHref="../"
 	fadeChrome
+	annotate
 >
 	<slot />
 </SlideDeck>

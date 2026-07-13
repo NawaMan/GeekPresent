@@ -111,6 +111,11 @@ than misleading the next agent.
   a `-QR.png`, and note `YouTube`'s `qr` prop is now optional for exactly that reason),
   `AppendixLink` (the call *into* an appendix — `<AppendixLink to="appendix-gc.html">how the GC
   marks</AppendixLink>`; it stamps the current slide as the return address, so you never type one),
+  plus two canvas-level **singletons** `SlideDeck` mounts for you — no slide places them:
+  `Spotlight` (dims the canvas and rings a *named* `Block`, driven by a `<Note>` line the
+  speaker covers in the console) and `Annotate` (the speaker's **pen** — freehand ink on the
+  live slide, persisted per slide; see its playbook, and note the deck must pass `annotate`
+  to offer it),
   plus framework-internal `Copyright`, `CtrlBtn`,
   `NavigationBar`, `TableOfContent`, `SizeMode`, `Seo` (renders SEO/social metadata
   into `<svelte:head>` — see the SEO note under *Gotchas*).
@@ -378,6 +383,59 @@ does, and the ambiguity never arises.
 > (`true`/number/`false`), `bounds` (`'canvas'` clamps inside, `'none'` lets it
 > bleed off-stage), `minSize`. Match `canvasWidth`/`canvasHeight` to the deck if it
 > isn't the 1920×1080 default.
+
+### "Let the speaker draw on the slide (ANNOTATE)"
+
+The pen. A canvas-spanning ink surface the speaker arms mid-talk to circle a term,
+underline a line of code or cross out the wrong branch — the thing they decide to point at
+while answering a question. (`Spotlight` also points, but only at a `Block` the *author*
+named in advance; see the diagram playbook.)
+
+Nothing to place: `SlideDeck` mounts `<Annotate>` once, like `Spotlight`. One prop offers it.
+
+```svelte
+<SlideDeck {pages} annotate />
+```
+
+- **The flag is DECK-wide, and there is deliberately no per-slide `annotate:`** to match
+  `layout: true`. That is the one thing to understand here. LAYOUT is an *authoring* aid, so
+  the slide being authored has a real opinion about whether you should be dragging on it.
+  The pen is a *speaker* tool — the slide you happen to be standing on when someone asks a
+  question has no opinion about whether you may circle a word on it, and paging must not take
+  the pen out of your hand mid-answer. So the precedence is LAYOUT's **minus its slide tier**:
+  `pnpm dev` > sticky `?annotate` / `?annotate=off` > the deck's `annotate` prop > off. It
+  lives in `src/lib/annotate/annotateAccessCore.ts` (pure, unit-tested). Offered is not
+  active — the mode still starts **off**.
+- **Ink PERSISTS, per slide, across reloads** (`src/lib/stores/annotation.ts` → `inkBook`,
+  keyed by full pathname). Mark a deck up while preparing and it is still marked up on stage.
+  Two things follow. It can go **stale**, so a slide whose ink is older than `inkStaleAfter`
+  (hours, default 24) says so on arrival and offers to clear it — today's marks never nag,
+  last week's always do. And there must be a way out: **RESET** (this slide) / **RESET ALL**
+  live on the pen's bar *and* in the presenter console under **✎**.
+- **`localStorage` is the cross-window channel.** The ink book is a `persisted(sync: true)`
+  store, so the audience window mirrors the speaker's strokes through the `storage` event
+  with no relay to keep in step — and the console, which has no canvas of its own, can RESET
+  by writing to the same store. Don't add a `publishInk`-style channel to `stores/presenter.ts`;
+  there was one, and persisting the ink made it redundant.
+- **The pen eats the POINTER, never the KEYBOARD.** ←/→/Space keep paging while armed. A
+  speaker who cannot advance is worse off than one with a stray scribble. `Esc` puts the pen
+  down *without* navigating, which is what makes it safe for `Esc` to exist here at all.
+- **A highlighter is not a pen.** A swipe is *levelled* — pinned to the y you pressed at and
+  reduced to its horizontal extent (`levelPoints`), so the band sits on the row you swiped
+  instead of sloping with your wrist. Anchored, not averaged: a mean y shifts as samples
+  arrive and the band slides around under the cursor mid-swipe. `levelHighlight={false}` opts
+  out.
+- **Anything clickable must out-rank the ink surface** (z-index 40). While armed it owns every
+  pointer on the canvas — which is why the ✎ ANNOTATE toggle and the pen's bar live *inside*
+  `Annotate` at 42/41, not in the deck's chrome cluster. Put a control under the surface and
+  the speaker can arm the pen but never put it down.
+
+> Other props: `inkColors` (the swatches; `null` is the theme's own colour, so un-picked ink
+> follows a re-theme instead of freezing a hex), `penWidth` / `highlighterWidth`. Colours and
+> the bar's resting opacity are `--annot-*` role tokens. The bar drags by its `⠿` grip and
+> remembers where it was put; double-click the grip to send it home.
+>
+> Demo: `annotate-component.html` → `annotate-persistence.html` → `annotate-setup.html`.
 
 ### "Draw a diagram / connect these boxes with arrows"
 
