@@ -117,18 +117,38 @@ which you then delete along with the rest of the scaffolding.
 
 ### Where the built site lands
 
-`--dist` (prompted) says where the static build is written, relative to the subfolder:
+`--dist` (prompted) says where the static build is written, **relative to where you run the
+script** — the same frame as `--dir`:
 
-- **`dist`** *(default)* — `<dir>/dist`, already gitignored. The usual answer.
-- **`../site`** — a `site/` at your **repo root**, next to `<dir>`. This is the answer when the
-  built site is what you publish and commit — say, an existing hand-written `site/` that you're
-  adding a deck to.
+- **`<dir>/dist`** *(default)* — inside the adopted folder, already gitignored. The usual answer.
+- **`site`** — a `site/` at your **repo root**, beside `<dir>`. This is the answer when the built
+  site is what you publish and commit — say, an existing hand-written `site/` that you're adding a
+  deck to.
 
-One answer settles all three consumers: the local build, the verification build, and what CI
-uploads. Nothing gets clobbered — the build refuses to overwrite a non-empty folder it didn't
-create, so pointing it at a real `site/` stops and tells you rather than deleting your files.
-(Worth knowing: the booth mounts only the subfolder, so it can't write to a `../site` outside it —
-the script says so and builds that one on the host.)
+One answer settles both consumers: the build you run, and what CI uploads. Nothing gets clobbered —
+the build refuses to overwrite a non-empty folder it didn't create, so pointing it at a real `site/`
+stops and tells you rather than deleting your files. (Worth knowing: the booth mounts only the
+subfolder, so it can't write to a `site/` outside it — the script says so, and that build runs on
+the host.)
+
+The script **never builds for you.** Adopting is a file operation; the build command is the first
+thing it prints when it's done, for you to run when you're ready.
+
+### The docs you end up with
+
+`minimal` and `skeleton` also sort out the documentation, because a clone carries *GeekPresent's*
+docs — and in your repo, most of them are about the wrong project:
+
+- **A generated `README.md`** lands in the adopted folder: what this folder is, where your deck
+  lives, and the exact build command for the answers you gave.
+- **`AGENTS.md` stays.** It's the *authoring* manual — the one thing an AI agent most needs.
+- **This README, `AGENT.md` and `TODO.md` move** to `.samples-ref/`. This file remains GeekPresent's
+  introduction and full reference, readable at `.samples-ref/GeekPresent-README.md` — it just isn't
+  *your* project's README.
+- **The `/todo` and `/pick-todo` skills move too.** They read `TODO.md` — *this* project's backlog —
+  so left in place they'd offer your agent a menu of GeekPresent features to go implement.
+
+`full` keeps all of it (full means full) and warns you about those two skills instead.
 
 ### The build environment: bring the booth, or use your own toolchain
 
@@ -154,7 +174,7 @@ may already have at its root.
 | `--kind <kind>` | what skeleton scaffolds: `deck` \| `text` \| `none` | `deck` |
 | `--name <name>` | what to call the scaffolded deck/page | `slides` / `guide.html` |
 | `--booth` / `--no-booth` | keep the CodingBooth, or remove it and build on the host | `--booth` |
-| `--dist <path>` | where the built site lands, relative to `<dir>` — e.g. `../site` | `dist` |
+| `--dist <path>` | where the built site lands, relative to **here** — e.g. `site` | `<dir>/dist` |
 | `--base </path>` | GitHub Pages base path for a project site | none |
 | `--ci` / `--no-ci` | scaffold the deploy workflow | prompted |
 | `--yes`, `-y` | accept defaults, skip prompts (for CI / `curl … \| bash`) | off |

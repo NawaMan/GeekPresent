@@ -33,6 +33,16 @@ export function fixtureSource(root: string) {
 	write(join(root, 'tests/PathDemoSource.ssr.test.ts'), '// reads the demo slides\n');
 	write(join(root, 'tests/Other.test.ts'), '// a framework test — must survive\n');
 	write(join(root, '.gitignore'), '/docs/\n');
+	// GeekPresent's own docs, which travel with the clone. In an adopted repo most of them are
+	// about the wrong project — and the two TODO skills read TODO.md, i.e. the FRAMEWORK's
+	// backlog, so they would happily aim an adopter's agent at building GeekPresent.
+	write(join(root, 'README.md'), '# GeekPresent\n\nA copy-and-own deck framework.\n');
+	write(join(root, 'AGENT.md'), '# AGENT.md — Adopting GeekPresent into a project\n');
+	write(join(root, 'AGENTS.md'), '# AGENTS.md — authoring guide\n'); // the one that must SURVIVE
+	write(join(root, 'TODO.md'), '# TODO\n\n- [ ] a GeekPresent framework feature\n');
+	for (const skill of ['todo', 'pick-todo', 'new-slide']) {
+		write(join(root, `.claude/skills/${skill}/SKILL.md`), `---\nname: ${skill}\n---\n`);
+	}
 	// GeekPresent tracks its CodingBooth, so a clone hands one to the adopter whether they
 	// asked or not — which is exactly why the script now asks. Executable, because that is
 	// how the script decides a booth is really there.

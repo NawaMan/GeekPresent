@@ -20,9 +20,11 @@
 #      with no host deps — see codingbooth.io), and the clone brings it along.
 #        booth — keep it: `cd <dir> && ./booth` builds/runs, host needs only Docker.
 #        host  — remove it: you build with your own node + pnpm.
-#   5. Optional GitHub-Pages base path (for project sites served at /<repo>/).
+#   5. Where the built site lands (--dist), and an optional GitHub-Pages base path.
 #   6. Scaffold a GitHub Actions workflow that builds the subfolder and deploys.
-#   7. Optional verification build (in the booth if kept, else on the host).
+#
+# It never builds. Adopting is a file operation; the build command is printed at the
+# end for you to run when you are ready.
 #
 # Interactive by default: missing options are PROMPTED, with the default in
 # brackets. A multiple-choice question takes one letter — "[Msf]" means minimal,
@@ -59,13 +61,13 @@
 #   --name <name>       name of the deck/page scaffolded in skeleton mode
 #                       (prompted; default: slides for a deck, guide.html for a text)
 #   --base </path>      GitHub Pages base path      (prompted; default: none)
-#   --dist <path>       build output folder, relative to <dir>  (prompted; default: dist)
-#                       e.g. ../site to publish into a site/ at your repo root
+#   --dist <path>       build output folder, relative to WHERE YOU RUN THIS
+#                       (prompted; default: <dir>/dist). e.g. 'site' to publish
+#                       into a site/ at your repo root, beside <dir>.
 #   --env <env>         booth | host               (prompted; default: booth)
 #   --booth             keep the CodingBooth       (same as --env booth)
 #   --no-booth          remove it; build on the host (same as --env host)
 #   --ci / --no-ci      scaffold the Actions workflow
-#   --build / --no-build  run a verification build at the end
 #   --yes, -y           accept all defaults, skip confirmations (non-interactive)
 #   -h, --help          show this help and exit
 #
@@ -92,12 +94,11 @@ BASE=""          # e.g. /my-repo    (empty = served at domain root)
 # in the subfolder is self-contained and cannot collide with a booth the host repo may
 # already have at its root.
 ENV_KIND=""      # booth | host     (resolved via prompt if empty)
-# Where the built site lands, relative to the subfolder. Feeds GEEKPRESENT_OUT, which is what
-# svelte.config.js hands adapter-static — so this one answer settles the local build, the
-# verification build AND what CI uploads, which until now disagreed (CI hardcoded docs/).
-DIST="dist"
+# Where the built site lands, given relative to WHERE YOU RUN THIS (your repo root) — the same
+# frame as --dir, so 'site' means the site/ you can see, not one hop up from somewhere else.
+# Empty until DIR is known, because the default is <dir>/dist.
+DIST=""
 DO_CI=""         # yes | no         (resolved via prompt if empty)
-DO_BUILD=""      # yes | no
 ASSUME_YES=0
 
 # Prompts read from the terminal, NOT stdin — stdin is the script itself when you run
@@ -219,8 +220,6 @@ confirm() {
 usage() { sed -n '2,/^set -euo/p' "$0" | sed 's/^# \{0,1\}//; s/^#$//' | sed '$d'; }
 
 # Collapse a/b/../c to a/c, textually — the path may not exist yet, so realpath is out.
-# Needed because the output folder is given relative to the SUBFOLDER ("../site"), while
-# the CI workflow has to name it relative to the REPO ROOT ("site").
 norm_path() {
 	local seg out=()
 	local IFS='/'
@@ -232,6 +231,18 @@ norm_path() {
 		esac
 	done
 	printf '%s\n' "${out[*]}"
+}
+
+# rel_from <from> <to> — both relative to the repo root; express <to> as seen from <from>.
+# The output folder is given from the repo root ("site"), but build-static.sh runs INSIDE the
+# subfolder, where that same folder is "../site". One of these two spellings is always wrong
+# for whoever is asking, so translate rather than guess.
+rel_from() {
+	local from="$1" to="$2" up="" seg
+	case "$to/" in "$from"/*) printf '%s\n' "${to#"$from"/}"; return;; esac
+	local IFS='/'
+	for seg in $from; do up="../$up"; done
+	printf '%s\n' "$up$to"
 }
 
 # -----------------------------------------------------------------------------
@@ -252,8 +263,6 @@ while [ $# -gt 0 ]; do
 		--no-booth) ENV_KIND="host"; shift;;
 		--ci)     DO_CI="yes"; shift;;
 		--no-ci)  DO_CI="no"; shift;;
-		--build)    DO_BUILD="yes"; shift;;
-		--no-build) DO_BUILD="no"; shift;;
 		-y|--yes) ASSUME_YES=1; shift;;
 		-h|--help) usage; exit 0;;
 		-*) die "unknown option: $1 (try --help)";;
@@ -338,20 +347,21 @@ what GeekPresent is built for, and the path that actually works today: a base pa
 currently breaks prerender, because the SEO wiring emits a root-absolute
 /sitemap.xml. The script will warn you again if you set one.")"
 
-# Where the built site lands. One answer, three consumers (local build, verification build,
-# CI upload) — before this they disagreed, with CI quietly writing somewhere else.
-DIST="$(ask "Build output folder (relative to $DIR)" "$DIST" \
-"Where the built static site is written. Relative to the $DIR folder, so:
+# Where the built site lands. One answer, two consumers (the build you run, and what CI
+# uploads) — before this they disagreed, with CI quietly writing somewhere else.
+DIST="$(ask "Build output folder (relative to here)" "${DIST:-$DIR/dist}" \
+"Where the built static site is written. Paths are relative to the folder you are
+standing in — the same place $DIR/ is about to appear:
 
-  dist      -> $DIR/dist          (default; already gitignored)
-  ../site   -> site/ at your repo ROOT, next to $DIR — for when the built site is
-              what you publish and commit, e.g. an existing hand-written site/
-              that you are adding a deck to.
+  $DIR/dist   the default; inside the adopted folder, already gitignored.
+  site           a site/ right here at your repo root, beside $DIR/ — for when the
+                 built site is what you publish and commit, e.g. an existing
+                 hand-written site/ that you are adding a deck to.
 
-This drives the local build, the verification build, and what CI uploads, so they
-all agree. Nothing is clobbered: the build refuses to overwrite a non-empty folder
-it did not create, so pointing it at an existing site/ is safe — it will stop and
-tell you rather than delete your files.")"
+This drives both the build you run and what CI uploads, so the two agree. Nothing is
+clobbered: the build refuses to overwrite a non-empty folder it did not create, so
+pointing it at an existing site/ is safe — it stops and tells you rather than
+deleting your files.")"
 
 # Booth is the default because it is the environment GeekPresent is itself developed in —
 # the Boothfile pins the Node it wants and pre-installs the deck's dependencies into the
@@ -364,7 +374,7 @@ tell you rather than delete your files.")"
 carrying the whole toolchain — and the copy you just cloned brings a working one
 along. So this is not 'install a container', it is 'keep the one that came with it':
 
-  booth  keep it. 'cd $DIR && ./booth -- ./build-static.sh ./$DIST' builds with
+  booth  keep it. 'cd $DIR && ./booth -- ./build-static.sh <out>' builds with
          NOTHING installed on this machine but Docker or Podman. No Node, no pnpm,
          no version drift. './booth' alone opens VS Code in the browser.
   host   remove it — deletes $DIR/booth and $DIR/.booth/ — and build with your
@@ -383,49 +393,51 @@ an existing one, and nothing runs until you enable Pages in the repo settings
 (Settings -> Pages -> Source: 'GitHub Actions')." \
 	&& DO_CI="yes" || DO_CI="no"; }
 
-[ -n "$DO_BUILD" ] || { confirm "Run a verification build at the end? (slower; needs deps)" \
-"Builds the site once, right now, so you find out here rather than three commits
-later that something is wrong. Costs a few minutes: it installs dependencies and
-runs a full prerender.
-
-Say no if you are offline, or in a hurry, or just want to look at the files first —
-you can always run the build yourself afterwards; the last thing this script prints
-is the command." \
-	&& DO_BUILD="yes" || DO_BUILD="no"; }
 
 TARGET="$PWD/$DIR"
 
-# The same folder, said two ways. DIST is relative to the SUBFOLDER — that is what
-# build-static.sh takes and what GEEKPRESENT_OUT means, since CI runs with working-directory
-# $DIR. CI_PATH is the same place relative to the REPO ROOT, which is what upload-pages-artifact
-# needs. They differ the moment someone answers '../site', which is the whole reason to ask.
-CI_OUT="$DIST"
+# One folder, said three ways, because three different things stand in three different places.
+#
+#   DIST      what you typed, relative to HERE (the repo root)          -> "site"
+#   CI_PATH   the same, normalised — what upload-pages-artifact wants   -> "site"
+#   OUT_REL   the same, seen from INSIDE $DIR — what build-static.sh
+#             takes, and what GEEKPRESENT_OUT means in CI (whose
+#             working-directory is $DIR)                                -> "../site"
+#
+# Getting these confused is how you deploy an empty directory, so they are computed once here
+# rather than re-derived at each use.
 case "$DIST" in
 	/*)
-		# Fine locally; GitHub can only upload from inside the checkout.
-		CI_OUT="dist"; CI_PATH="$DIR/dist"
+		# Fine for a local build; GitHub can only upload from inside the checkout.
+		OUT_REL="$DIST"; CI_PATH="$DIR/dist"
 		warn "Output '$DIST' is absolute — CI cannot upload from outside the checkout,"
 		warn "  so the workflow will build to $DIR/dist instead."
 		;;
 	*)
-		CI_PATH="$(norm_path "$DIR/$DIST")"
-		[ -n "$CI_PATH" ] || die "output folder '$DIST' resolves to the repo root — pick a folder, not '..'"
+		CI_PATH="$(norm_path "$DIST")"
+		[ -n "$CI_PATH" ] || die "output folder '$DIST' resolves to the repo root — pick a folder, not '.'"
+		OUT_REL="$(rel_from "$DIR" "$CI_PATH")"
 		;;
 esac
 
-# Does the output land OUTSIDE the subfolder ('../site')? That is a legitimate answer — it is
-# how you publish into an existing hand-written site at the repo root — but the booth mounts
-# ONLY the subfolder, so a build inside the container cannot write there: the path simply does
-# not exist in it. CI is unaffected (it is not a container with one mount). Catch it here
-# rather than let the booth build "succeed" and write the site into thin air.
+# Does the output land OUTSIDE the subfolder ('site' at the root)? A legitimate answer — it is
+# how you publish into an existing hand-written site — but the booth mounts ONLY the subfolder,
+# so a build inside the container cannot write there: the path is not in it. CI is unaffected
+# (not a container with one mount). Catch it here rather than let a booth build "succeed" and
+# write the site into thin air.
 DIST_ESCAPES=0
-case "$DIST" in
-	/*) DIST_ESCAPES=1;;
-	*)  case "$(norm_path "$DIR/$DIST")/" in "$DIR"/*) ;; *) DIST_ESCAPES=1;; esac;;
-esac
+case "$OUT_REL" in /*|../*) DIST_ESCAPES=1;; esac
 if [ "$DIST_ESCAPES" = "1" ] && [ "$ENV_KIND" = "booth" ]; then
-	warn "The booth only sees $DIR/, so it cannot write to '$DIST' (outside it)."
-	warn "  Builds to $CI_PATH/ will run on the host; the booth still works for everything else."
+	warn "The booth only sees $DIR/, so it cannot write to '$CI_PATH/' (outside it)."
+	warn "  Build that on the host; the booth still works for everything else."
+fi
+
+# THE build command, for these answers, run from inside $DIR. Computed once so the README we
+# generate and the Next-steps we print cannot drift into telling you two different things.
+if [ "$ENV_KIND" = "booth" ] && [ "$DIST_ESCAPES" = "0" ]; then
+	BUILD_CMD="./booth -- ./build-static.sh $OUT_REL"
+else
+	BUILD_CMD="pnpm install && ./build-static.sh $OUT_REL"
 fi
 
 # -----------------------------------------------------------------------------
@@ -447,13 +459,12 @@ fi
 		*)        echo "  samples    : full";;
 	esac
 	echo "  base path  : ${BASE:-<none>}"
-	echo "  output     : $CI_PATH/  ${DIM}(built site; '$DIST' relative to $DIR)${RST}"
+	echo "  output     : $CI_PATH/  ${DIM}(the built site)${RST}"
 	case "$ENV_KIND" in
 		booth) echo "  build env  : CodingBooth — keep $DIR/booth + $DIR/.booth/ (container; no host deps)";;
 		host)  echo "  build env  : host toolchain — REMOVE $DIR/booth + $DIR/.booth/ (you supply node + pnpm)";;
 	esac
 	echo "  workflow   : $DO_CI"
-	echo "  test build : $DO_BUILD"
 	echo
 } >&2
 confirm "Proceed?" \
@@ -657,8 +668,51 @@ EOF
 			printf '%s\n' "$DANG" | sed "s|$TARGET/|    |" >&2
 		fi
 	fi
+	# -------------------------------------------------------------------------
+	# Docs: the upstream project's, out; yours, in.
+	# -------------------------------------------------------------------------
+	# GeekPresent's own docs travel with the clone, and in an adopted repo most of them are
+	# about the wrong project. Worst is the pair of TODO skills: they read TODO.md, which is
+	# GeekPresent's FRAMEWORK BACKLOG — so an adopter who runs /pick-todo gets a menu of
+	# framework features and an instruction to go build one. That is not a stale doc, it is a
+	# loaded footgun pointed at someone else's repo.
+	#
+	# Moved, never deleted — same rule as the sample decks. GeekPresent's README in particular
+	# remains the framework's introduction and full reference; it just isn't YOUR README.
+	for doc in TODO.md AGENT.md; do
+		[ -f "$TARGET/$doc" ] && mv "$TARGET/$doc" "$REF/$doc"
+	done
+	[ -f "$TARGET/README.md" ] && mv "$TARGET/README.md" "$REF/GeekPresent-README.md"
+	mkdir -p "$REF/claude-skills"
+	for skill in todo pick-todo; do
+		[ -d "$TARGET/.claude/skills/$skill" ] && mv "$TARGET/.claude/skills/$skill" "$REF/claude-skills/"
+	done
+	ok "Moved GeekPresent's own README/AGENT/TODO + the TODO skills to .samples-ref/"
+	# AGENTS.md stays: it is the AUTHORING manual, which is exactly what an adopter's agent needs.
+
+	# The README an adopter actually wants: what this folder is, and the build command for the
+	# answers they just gave. Per kind, because the advice has to match what was scaffolded.
+	README_KIND="$KIND"
+	[ "$MODE" = "minimal" ] && README_KIND="deck" # a kept sample deck is still a deck
+	README_SKEL="$TARGET/utils/skeleton/readme/$README_KIND.md"
+	# Loudly, not quietly: we have just MOVED the only README this folder had. Skipping the
+	# replacement because a template went missing would leave the adopter with no README at all
+	# and no hint that anything went wrong.
+	[ -f "$README_SKEL" ] || die "readme template missing at utils/skeleton/readme/$README_KIND.md — is $SOURCE really GeekPresent?"
+	# '&' is 'the whole match' to sed, and the build command is full of '&&' — unescaped,
+	# 'pnpm install && ./build-static.sh' would come out as gibberish in the README.
+	BUILD_SED="${BUILD_CMD//&/\\&}"
+	sed -e "s|__DIR__|$DIR|g" -e "s|__NAME__|$NAME|g" -e "s|__OUT__|$CI_PATH|g" \
+		-e "s|__BUILD__|$BUILD_SED|g" "$README_SKEL" > "$TARGET/README.md"
+	ok "Wrote $DIR/README.md — your project, your build command"
 else
 	ok "Full mode: all sample decks kept verbatim (build works out of the box)"
+	# Full means full: the upstream docs stay too. But say the quiet part out loud, because
+	# the TODO skills read GeekPresent's own backlog and will happily aim an agent at it.
+	if [ -d "$TARGET/.claude/skills/pick-todo" ]; then
+		warn "Kept GeekPresent's TODO.md and its /todo + /pick-todo skills. Those skills read"
+		warn "  the FRAMEWORK's backlog — delete them unless you want an agent building it."
+	fi
 fi
 
 # -----------------------------------------------------------------------------
@@ -736,7 +790,7 @@ jobs:
       - name: Build
         run: pnpm install && pnpm build
         env:
-          GEEKPRESENT_OUT: "$CI_OUT"
+          GEEKPRESENT_OUT: "$OUT_REL"
 $( [ -n "$BASE" ] && printf '          BASE_PATH: "%s"\n' "$BASE" )
       # One-time: repo Settings -> Pages -> Source: GitHub Actions
       - uses: actions/configure-pages@v5
@@ -752,49 +806,26 @@ EOF
 fi
 
 # -----------------------------------------------------------------------------
-# Step 6 — verification build
-# -----------------------------------------------------------------------------
-build_on_host() {
-	( cd "$TARGET" && pnpm install && ./build-static.sh "$DIST" ) \
-		&& ok "Built $CI_PATH/" || warn "Build failed — check node + pnpm are installed"
-}
-
-if [ "$DO_BUILD" = "yes" ]; then
-	info "Verification build ..."
-	if [ "$ENV_KIND" = "booth" ] && [ -x "$TARGET/booth" ] && [ "$DIST_ESCAPES" = "0" ]; then
-		# The booth needs Docker or Podman running, which is exactly the host assumption it
-		# exists to avoid making. If it can't start, say so and use the toolchain we already
-		# know how to drive — a failed verification build shouldn't look like a failed adopt.
-		if ( cd "$TARGET" && ./booth -- bash -lc "pnpm install && ./build-static.sh '$DIST'" ); then
-			ok "Built $CI_PATH/ via CodingBooth"
-		else
-			warn "Booth build failed (is Docker/Podman running?) — falling back to the host toolchain"
-			build_on_host
-		fi
-	else
-		build_on_host
-	fi
-fi
-
-# -----------------------------------------------------------------------------
 # Done — next steps
 # -----------------------------------------------------------------------------
+# No build runs here. Adopting is a file operation; building is a choice, and it costs minutes
+# and a dependency install. The command is the first thing printed below — run it when ready.
 {
 	echo
 	echo "${GRN}${B}GeekPresent adopted into $DIR/${RST}"
 	echo
 	echo "${B}Next steps${RST}"
 	if [ "$ENV_KIND" = "booth" ] && [ "$DIST_ESCAPES" = "0" ]; then
-		echo "  • Local build (no host deps): ${DIM}cd $DIR && ./booth -- ./build-static.sh $DIST --zip${RST}"
+		echo "  • Local build (no host deps): ${DIM}cd $DIR && ./booth -- ./build-static.sh $OUT_REL --zip${RST}"
 		echo "  • Or work inside it:          ${DIM}cd $DIR && ./booth${RST}  (VS Code in the browser, Node preinstalled)"
-		echo "  • Or native:                  ${DIM}cd $DIR && pnpm install && ./build-static.sh $DIST${RST}"
+		echo "  • Or native:                  ${DIM}cd $DIR && pnpm install && ./build-static.sh $OUT_REL${RST}"
 	elif [ "$ENV_KIND" = "booth" ]; then
 		# The booth is still there and still useful — it just can't reach $DIST from inside.
 		echo "  • Build (on the host — the booth cannot write outside $DIR/):"
-		echo "                                ${DIM}cd $DIR && pnpm install && ./build-static.sh $DIST${RST}"
+		echo "                                ${DIM}cd $DIR && pnpm install && ./build-static.sh $OUT_REL${RST}"
 		echo "  • Work inside the booth:      ${DIM}cd $DIR && ./booth${RST}  (VS Code in the browser, Node preinstalled)"
 	else
-		echo "  • Build:                      ${DIM}cd $DIR && pnpm install && ./build-static.sh $DIST${RST}"
+		echo "  • Build:                      ${DIM}cd $DIR && pnpm install && ./build-static.sh $OUT_REL${RST}"
 	fi
 	echo "  • Built site lands in:        ${DIM}$CI_PATH/${RST}"
 	[ "$MODE" = "minimal" ] && echo "  • Edit your deck:            ${DIM}$DIR/src/routes/$NAME/${RST}  (samples: $DIR/.samples-ref/)"
