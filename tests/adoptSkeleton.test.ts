@@ -13,44 +13,19 @@
 // The invariant under test is the same for both trimming modes: the samples are MOVED,
 // never deleted (`.samples-ref/` is gitignored but kept on disk — an agent reads it), and
 // what remains must still build. Skeleton adds one thing: an empty deck in their place.
+//
+// This runs the script with --yes, so it takes every default. The prompts a human answers
+// on the way there are pinned separately, in adoptPrompt.test.ts.
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 
-const REPO = process.cwd();
-const SCRIPT = join(REPO, 'adopt-geekpresent.sh');
+import { fixtureSource, SCRIPT } from './helpers/adoptFixture';
 
 const workspaces: string[] = [];
 afterAll(() => workspaces.forEach((w) => rmSync(w, { recursive: true, force: true })));
-
-const write = (path: string, body: string) => {
-	mkdirSync(join(path, '..'), { recursive: true });
-	writeFileSync(path, body);
-};
-
-/** A tree with the handful of things the script actually reaches for: two decks (a deck
- *  IS a dir with a pages.ts), the standalone sample routes, the SEO route list, the
- *  landing page, the demo-coupled test — and the real skeleton template it copies. */
-function fixtureSource(root: string) {
-	const routes = join(root, 'src/routes');
-	for (const deck of ['slides', 'animation']) {
-		write(join(routes, deck, 'pages.ts'), `export const pages = [{ path: "demo.html" }];\n`);
-		write(join(routes, deck, 'demo.html/+page.svelte'), `<h1>${deck} demo slide</h1>\n`);
-	}
-	write(join(routes, 'text.html/+page.svelte'), '<h1>text</h1>\n');
-	write(join(routes, 'seo.html/+page.svelte'), '<h1>seo</h1>\n');
-	write(join(routes, 'robots.txt/+server.ts'), 'export const GET = () => new Response("");\n');
-	write(join(routes, '(home)/+page.svelte'), '<a href="/slides/demo.html">slides</a>\n');
-	write(join(root, 'src/lib/seo/routes.ts'), `const TEXT_ROUTES = ['/', '/text.html'];\nexport { TEXT_ROUTES };\n`);
-	write(join(root, 'tests/PathDemoSource.ssr.test.ts'), '// reads the demo slides\n');
-	write(join(root, 'tests/Other.test.ts'), '// a framework test — must survive\n');
-	write(join(root, '.gitignore'), '/docs/\n');
-	// The skeleton the script copies is real source in this repo, not a heredoc — so the
-	// fixture gets the genuine article, and this test fails if it ever goes missing.
-	cpSync(join(REPO, 'utils/skeleton'), join(root, 'utils/skeleton'), { recursive: true });
-}
 
 /** Run the real script into a fresh host project; returns the adopted dir. */
 function adopt(...flags: string[]): string {
@@ -230,6 +205,74 @@ describe('adopt-geekpresent.sh --mode minimal (unchanged by the skeleton work)',
 		const home = readFileSync(join(gp, 'src/routes/(home)/+page.svelte'), 'utf8');
 		expect(home).toContain('{base}/slides/title.html');
 		expect(home).not.toContain('Your deck is live');
+	});
+});
+
+// The build environment. GeekPresent tracks its own CodingBooth (`booth` + `.booth/`), so a
+// clone carries a working container along with it — the script's job is to make that a
+// decision rather than a stowaway. Flags here; the prompt is pinned in adoptPrompt.test.ts.
+describe('adopt-geekpresent.sh --no-booth', () => {
+	const gp = adopt('--mode', 'skeleton', '--no-booth');
+
+	it('removes the wrapper AND its config — a half-removed booth is a broken one', () => {
+		expect(existsSync(join(gp, 'booth'))).toBe(false);
+		expect(existsSync(join(gp, '.booth'))).toBe(false);
+	});
+
+	// Removing the booth is a two-path delete and nothing more: it is not a licence to go
+	// tidying up after it. Whatever else the adopter gets, they get for reasons unrelated
+	// to the container they declined.
+	it('deletes those two paths and nothing else', () => {
+		const kept = adopt('--mode', 'skeleton'); // the same run, booth and all
+		const diff = (dir: string) =>
+			execFileSync('find', ['.', '-not', '-path', './node_modules/*'], { cwd: dir, encoding: 'utf8' })
+				.split('\n')
+				.filter(Boolean)
+				.sort();
+		const removed = diff(kept).filter((p) => !diff(gp).includes(p));
+		expect(removed.filter((p) => !p.startsWith('./.booth') && p !== './booth')).toEqual([]);
+	});
+
+	it('leaves the framework alone — this is a choice about environment, not content', () => {
+		expect(existsSync(join(gp, 'src/routes/slides/title.html/+page.svelte'))).toBe(true);
+	});
+});
+
+describe('adopt-geekpresent.sh (booth is the default)', () => {
+	const gp = adopt('--mode', 'skeleton');
+
+	// Used as it comes: the same wrapper and the same pinned config GeekPresent builds with.
+	// The script's only jobs are to keep it and to say so.
+	it('keeps the booth the clone brought, byte for byte', () => {
+		expect(readFileSync(join(gp, '.booth/Boothfile'), 'utf8')).toContain('setup nodejs 22');
+		expect(existsSync(join(gp, 'booth'))).toBe(true);
+	});
+});
+
+// The output folder. One answer has to satisfy three consumers — the local build, the
+// verification build and the CI upload — and before it was asked, they disagreed: CI
+// hardcoded $DIR/docs while build-static.sh wrote wherever you pointed it.
+describe('adopt-geekpresent.sh --dist', () => {
+	const workflow = (gp: string) => readFileSync(join(gp, '../.github/workflows/deploy-gp.yml'), 'utf8');
+
+	it('teaches CI to build where you said, instead of its own hardcoded folder', () => {
+		const gp = adopt('--mode', 'skeleton', '--ci');
+		expect(workflow(gp)).toContain('GEEKPRESENT_OUT: "dist"');
+		expect(workflow(gp)).toContain('path: gp/dist');
+	});
+
+	// '../site' is relative to the SUBFOLDER (that is where build-static.sh and CI's
+	// working-directory both stand), but upload-pages-artifact needs it from the REPO ROOT.
+	// Same folder, two spellings — emit the wrong one and CI deploys an empty directory.
+	it("resolves '../site' per consumer: ../site to the builder, site/ to the uploader", () => {
+		const gp = adopt('--mode', 'skeleton', '--dist', '../site', '--ci');
+		expect(workflow(gp)).toContain('GEEKPRESENT_OUT: "../site"');
+		expect(workflow(gp)).toContain('path: site');
+		expect(workflow(gp)).not.toContain('gp/../site');
+	});
+
+	it('refuses an output that resolves to the repo root — that is not a folder, that is your repo', () => {
+		expect(() => adopt('--mode', 'skeleton', '--dist', '..')).toThrow(/repo root/i);
 	});
 });
 

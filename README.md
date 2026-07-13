@@ -115,6 +115,37 @@ Skeleton then asks what to start you off with (`--kind`):
 Either way the landing page becomes a short getting-started page, matched to what was scaffolded —
 which you then delete along with the rest of the scaffolding.
 
+### Where the built site lands
+
+`--dist` (prompted) says where the static build is written, relative to the subfolder:
+
+- **`dist`** *(default)* — `<dir>/dist`, already gitignored. The usual answer.
+- **`../site`** — a `site/` at your **repo root**, next to `<dir>`. This is the answer when the
+  built site is what you publish and commit — say, an existing hand-written `site/` that you're
+  adding a deck to.
+
+One answer settles all three consumers: the local build, the verification build, and what CI
+uploads. Nothing gets clobbered — the build refuses to overwrite a non-empty folder it didn't
+create, so pointing it at a real `site/` stops and tells you rather than deleting your files.
+(Worth knowing: the booth mounts only the subfolder, so it can't write to a `../site` outside it —
+the script says so and builds that one on the host.)
+
+### The build environment: bring the booth, or use your own toolchain
+
+GeekPresent develops itself inside a [CodingBooth](https://codingbooth.io/) — a container that
+carries the whole toolchain — and both the `booth` wrapper and `.booth/` are tracked, so the clone
+hands you a working one. The script asks whether to keep it:
+
+- **`booth`** *(default)* — keep it. `cd <dir> && ./booth -- ./build-static.sh ./dist` builds your
+  deck with **nothing installed on the host but Docker or Podman** — no Node, no pnpm, no version
+  drift. `./booth` on its own opens VS Code in the browser with the toolchain already in place.
+- **`host`** — remove `booth` and `.booth/`, and build with your own `node` + `pnpm`.
+
+The booth is used as it comes — the script never reconfigures or re-pins it, because being *the same
+environment GeekPresent is built in* is the entire point. The wrapper finds its `.booth/` next to
+itself, so the copy in your subfolder is self-contained and won't collide with a booth your own repo
+may already have at its root.
+
 | Flag | What it does | Default |
 | --- | --- | --- |
 | `--dir <name>` | subfolder to create | `geekpresent` |
@@ -122,6 +153,8 @@ which you then delete along with the rest of the scaffolding.
 | `--keep <deck>` | which deck to keep in minimal mode | `slides` |
 | `--kind <kind>` | what skeleton scaffolds: `deck` \| `text` \| `none` | `deck` |
 | `--name <name>` | what to call the scaffolded deck/page | `slides` / `guide.html` |
+| `--booth` / `--no-booth` | keep the CodingBooth, or remove it and build on the host | `--booth` |
+| `--dist <path>` | where the built site lands, relative to `<dir>` — e.g. `../site` | `dist` |
 | `--base </path>` | GitHub Pages base path for a project site | none |
 | `--ci` / `--no-ci` | scaffold the deploy workflow | prompted |
 | `--yes`, `-y` | accept defaults, skip prompts (for CI / `curl … \| bash`) | off |

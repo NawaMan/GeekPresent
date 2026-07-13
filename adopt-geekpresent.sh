@@ -16,14 +16,21 @@
 #                   an empty deck, a long-form Text page, or nothing at all.
 #                   The clean slate — you start by writing, not by deleting.
 #      All three keep the framework itself (src/lib, themes, build scripts, tests).
-#   4. Optional GitHub-Pages base path (for project sites served at /<repo>/).
-#   5. Scaffold a GitHub Actions workflow that builds the subfolder and deploys.
-#   6. Optional verification build (via CodingBooth if present, else pnpm).
+#   4. Build environment: GeekPresent ships a CodingBooth (a container that builds it
+#      with no host deps — see codingbooth.io), and the clone brings it along.
+#        booth — keep it: `cd <dir> && ./booth` builds/runs, host needs only Docker.
+#        host  — remove it: you build with your own node + pnpm.
+#   5. Optional GitHub-Pages base path (for project sites served at /<repo>/).
+#   6. Scaffold a GitHub Actions workflow that builds the subfolder and deploys.
+#   7. Optional verification build (in the booth if kept, else on the host).
 #
-# Interactive by default: missing options are PROMPTED (with defaults in
-# brackets). Pass flags to skip prompts; pass --yes (or run without a TTY, e.g.
-# piped) to take every default non-interactively. Destructive steps still ask
-# unless --yes is given.
+# Interactive by default: missing options are PROMPTED, with the default in
+# brackets. A multiple-choice question takes one letter — "[Msf]" means minimal,
+# skeleton or full, and the capital is what Enter gives you (the whole word works
+# too). Answer '?' at ANY prompt to see what the question means, then answer it.
+# Pass flags to skip prompts; pass --yes (or run without a TTY, e.g. piped) to
+# take every default non-interactively. Destructive steps still ask unless --yes
+# is given.
 #
 # Usage:
 #   adopt-geekpresent.sh [SOURCE] [options]
@@ -52,6 +59,11 @@
 #   --name <name>       name of the deck/page scaffolded in skeleton mode
 #                       (prompted; default: slides for a deck, guide.html for a text)
 #   --base </path>      GitHub Pages base path      (prompted; default: none)
+#   --dist <path>       build output folder, relative to <dir>  (prompted; default: dist)
+#                       e.g. ../site to publish into a site/ at your repo root
+#   --env <env>         booth | host               (prompted; default: booth)
+#   --booth             keep the CodingBooth       (same as --env booth)
+#   --no-booth          remove it; build on the host (same as --env host)
 #   --ci / --no-ci      scaffold the Actions workflow
 #   --build / --no-build  run a verification build at the end
 #   --yes, -y           accept all defaults, skip confirmations (non-interactive)
@@ -74,9 +86,34 @@ KIND=""          # deck | text | none          (skeleton only; prompted if empty
 # depends on --kind (a deck is 'slides'; a Text is 'guide.html').
 NAME=""
 BASE=""          # e.g. /my-repo    (empty = served at domain root)
+# Where builds run. GeekPresent ships a CodingBooth (the `booth` wrapper + .booth/), and a
+# clone carries it along — so this is not "install a container", it is "keep the one that
+# came with it, or throw it away". The wrapper resolves .booth next to ITSELF, so the copy
+# in the subfolder is self-contained and cannot collide with a booth the host repo may
+# already have at its root.
+ENV_KIND=""      # booth | host     (resolved via prompt if empty)
+# Where the built site lands, relative to the subfolder. Feeds GEEKPRESENT_OUT, which is what
+# svelte.config.js hands adapter-static — so this one answer settles the local build, the
+# verification build AND what CI uploads, which until now disagreed (CI hardcoded docs/).
+DIST="dist"
 DO_CI=""         # yes | no         (resolved via prompt if empty)
 DO_BUILD=""      # yes | no
 ASSUME_YES=0
+
+# Prompts read from the terminal, NOT stdin — stdin is the script itself when you run
+# this through `curl | bash`. Opened ONCE, on fd 3: a fresh `< "$TTY_IN"` per prompt
+# re-opens at offset 0, which is invisible on a character device but hands back line 1
+# forever on a regular file. It is a variable, not a hardcoded /dev/tty, so a test can
+# stand a file of keystrokes in the terminal's place — and opening it here rather than
+# probing with -e also answers the only question that matters: does it actually open?
+TTY_IN="${GP_TTY:-/dev/tty}"
+TTY_OK=0
+if { exec 3<"$TTY_IN"; } 2>/dev/null; then
+	TTY_OK=1
+elif [ -t 0 ]; then
+	exec 3<&0 # no /dev/tty, but someone is at the keyboard
+	TTY_OK=1
+fi
 
 # -----------------------------------------------------------------------------
 # Pretty output (all status goes to stderr so stdout stays clean for piping)
@@ -92,33 +129,110 @@ warn() { printf '%s\n' "${YLW}!${RST} $*" >&2; }
 die()  { printf '%s\n' "${RED}✗ $*${RST}" >&2; exit 1; }
 
 # Is there a human at the keyboard? (piped/CI -> no)
-interactive() { [ -t 0 ] || [ -e /dev/tty ]; }
+interactive() { [ "$TTY_OK" = "1" ]; }
 
-# ask <prompt> <default> -> echoes the answer on stdout
+# Every prompt takes '?' (or 'help'). This is the whole point of asking rather than
+# flag-only: a question you don't understand is worse than no question, and the answer
+# to "what IS a base path?" should be one keystroke away, not a trip to the README.
+# Only '?' and the whole word 'help' — deliberately NOT a bare 'h', which is a real answer
+# to the build-environment question ([h]ost). A letter that means two things is a trap.
+is_help() { case "${1,,}" in '?'|help) return 0;; *) return 1;; esac; }
+
+# Print a help blurb: blank line, indented body, blank line. Keeps it visually distinct
+# from the prompt it interrupts, so the re-asked question doesn't look like a repeat bug.
+show_help() {
+	local line
+	printf '\n' >&2
+	while IFS= read -r line; do printf '  %s%s%s\n' "$DIM" "$line" "$RST" >&2; done <<< "$1"
+	printf '\n' >&2
+}
+
+# ask <prompt> <default> [help] -> echoes the answer on stdout
 ask() {
-	local prompt="$1" default="${2:-}" reply=""
+	local prompt="$1" default="${2:-}" help="${3:-}" reply=""
 	if [ "$ASSUME_YES" = "1" ] || ! interactive; then
 		printf '%s\n' "$default"; return
 	fi
-	if [ -n "$default" ]; then
-		printf '%s [%s]: ' "$prompt" "$default" >&2
-	else
-		printf '%s: ' "$prompt" >&2
-	fi
-	IFS= read -r reply </dev/tty || true
-	printf '%s\n' "${reply:-$default}"
+	while :; do
+		if [ -n "$default" ]; then
+			printf '%s [%s]: ' "$prompt" "$default" >&2
+		else
+			printf '%s: ' "$prompt" >&2
+		fi
+		IFS= read -r reply <&3 || true
+		if [ -n "$help" ] && is_help "$reply"; then show_help "$help"; continue; fi
+		printf '%s\n' "${reply:-$default}"; return
+	done
 }
 
-# confirm <prompt>  -> returns 0 (yes) / 1 (no). Defaults to YES.
+# pick <prompt> <default> <choice>...  -> echoes the chosen word on stdout.
+#
+# A <choice> is "<letters>:<word>" — "se:skeleton" means s (and, quietly, e for
+# "empty") both mean skeleton. Only the FIRST letter is advertised; the hint is
+# those letters with the default's capitalised, so "[Msf]" says minimal/skeleton/
+# full AND says minimal is what Enter gives you. One keystroke beats typing
+# "skeleton", and the full word still works, so the prompt's vocabulary and the
+# flag's can't drift apart. An answer that matches nothing re-asks rather than
+# dying — a typo at prompt 3 of 6 shouldn't cost you the other five.
+pick() {
+	local prompt="$1" default="$2" help="$3"; shift 3
+	local hint="" reply="" match="" choice letters word first
+	for choice in "$@"; do
+		letters="${choice%%:*}"; first="${letters:0:1}"
+		[ "${choice#*:}" = "$default" ] && first="${first^^}"
+		hint="$hint$first"
+	done
+	if [ "$ASSUME_YES" = "1" ] || ! interactive; then
+		printf '%s\n' "$default"; return
+	fi
+	while :; do
+		printf '%s [%s]: ' "$prompt" "$hint" >&2
+		IFS= read -r reply <&3 || true
+		reply="${reply,,}"
+		[ -n "$reply" ] || { printf '%s\n' "$default"; return; }
+		if [ -n "$help" ] && is_help "$reply"; then show_help "$help"; continue; fi
+		match=""
+		for choice in "$@"; do
+			letters="${choice%%:*}"; word="${choice#*:}"
+			if [ "$reply" = "$word" ]; then match="$word"; break; fi
+			case "$reply" in
+				[a-z]) case "$letters" in *"$reply"*) match="$word"; break;; esac;;
+			esac
+		done
+		[ -z "$match" ] || { printf '%s\n' "$match"; return; }
+		warn "'$reply' is not one of [$hint]${help:+ — type ? for help}. Try again."
+	done
+}
+
+# confirm <prompt> [help]  -> returns 0 (yes) / 1 (no). Defaults to YES.
 confirm() {
-	local prompt="$1" reply=""
+	local prompt="$1" help="${2:-}" reply=""
 	if [ "$ASSUME_YES" = "1" ] || ! interactive; then return 0; fi
-	printf '%s [Y/n]: ' "$prompt" >&2
-	IFS= read -r reply </dev/tty || true
-	case "${reply:-y}" in [Nn]*) return 1;; *) return 0;; esac
+	while :; do
+		printf '%s [Y/n]: ' "$prompt" >&2
+		IFS= read -r reply <&3 || true
+		if [ -n "$help" ] && is_help "$reply"; then show_help "$help"; continue; fi
+		case "${reply:-y}" in [Nn]*) return 1;; *) return 0;; esac
+	done
 }
 
 usage() { sed -n '2,/^set -euo/p' "$0" | sed 's/^# \{0,1\}//; s/^#$//' | sed '$d'; }
+
+# Collapse a/b/../c to a/c, textually — the path may not exist yet, so realpath is out.
+# Needed because the output folder is given relative to the SUBFOLDER ("../site"), while
+# the CI workflow has to name it relative to the REPO ROOT ("site").
+norm_path() {
+	local seg out=()
+	local IFS='/'
+	for seg in $1; do
+		case "$seg" in
+			''|.) ;;
+			..)   [ ${#out[@]} -gt 0 ] && unset 'out[-1]' ;;
+			*)    out+=("$seg") ;;
+		esac
+	done
+	printf '%s\n' "${out[*]}"
+}
 
 # -----------------------------------------------------------------------------
 # Parse arguments
@@ -132,6 +246,10 @@ while [ $# -gt 0 ]; do
 		--deck)   NAME="${2:?--deck needs a value}"; KIND="deck"; shift 2;;
 		--kind)   KIND="${2:?--kind needs a value}"; shift 2;;
 		--base)   BASE="${2:?--base needs a value}"; shift 2;;
+		--dist)   DIST="${2:?--dist needs a value}"; shift 2;;
+		--env)    ENV_KIND="${2:?--env needs a value}"; shift 2;;
+		--booth)    ENV_KIND="booth"; shift;;
+		--no-booth) ENV_KIND="host"; shift;;
 		--ci)     DO_CI="yes"; shift;;
 		--no-ci)  DO_CI="no"; shift;;
 		--build)    DO_BUILD="yes"; shift;;
@@ -145,33 +263,170 @@ done
 
 case "$MODE" in ""|full|minimal|skeleton) ;; *) die "--mode must be 'full', 'minimal' or 'skeleton'";; esac
 case "$KIND" in ""|deck|text|none) ;; *) die "--kind must be 'deck', 'text' or 'none'";; esac
+case "$ENV_KIND" in ""|booth|host) ;; *) die "--env must be 'booth' or 'host'";; esac
 
 # -----------------------------------------------------------------------------
 # Resolve configuration (flags win; otherwise prompt; otherwise default)
 # -----------------------------------------------------------------------------
-[ -n "$SOURCE" ] || SOURCE="$(ask "GeekPresent source (git URL or local path)" "$SOURCE_DEFAULT")"
-DIR="$(ask "Subfolder to create in this project" "$DIR")"
-[ -n "$MODE" ] || MODE="$(ask "Samples — 'minimal' (1 deck), 'skeleton' (empty deck) or 'full' (keep all)" "minimal")"
+interactive && [ "$ASSUME_YES" != "1" ] && info "Type ${B}?${RST} at any prompt for help."
+
+[ -n "$SOURCE" ] || SOURCE="$(ask "GeekPresent source (git URL or local path)" "$SOURCE_DEFAULT" \
+"Where to copy GeekPresent FROM. The default fetches the latest from GitHub.
+A local path works too (handy offline, or to adopt a version you have already
+vetted) — it is cloned if it is a git repo, plain-copied if it is not.")"
+
+DIR="$(ask "Subfolder to create in this project" "$DIR" \
+"GeekPresent is adopted INTO a subfolder of the repo you are standing in, so it
+sits alongside your code rather than taking over the root. Everything it owns —
+sources, build scripts, its own package.json — lives under this one folder, and
+deleting the folder undoes the adoption completely.")"
+
+[ -n "$MODE" ] || MODE="$(pick "Samples — [m]inimal (1 deck), [s]keleton (empty), [f]ull (keep all)" \
+	"minimal" \
+"GeekPresent ships ~60 demo slides showing off every component. They are great
+reference and terrible boilerplate, so pick how much of them you keep:
+
+  minimal   keep ONE deck as your starting template, move the rest aside.
+  skeleton  keep NONE: start from an empty deck (or page) and write your own.
+            The clean slate — you begin by writing, not by deleting.
+  full      keep everything; trim it yourself later.
+
+minimal and skeleton MOVE the samples to .samples-ref/ rather than deleting them:
+gitignored, still on disk, so you (and your coding agent) can read every demo." \
+	"m:minimal" "se:skeleton" "f:full")"
 case "$MODE" in full|minimal|skeleton) ;; *) die "mode must be 'full', 'minimal' or 'skeleton'";; esac
+
 if [ "$MODE" = "minimal" ]; then
-	[ -n "$NAME" ] || NAME="$(ask "Deck to keep as your starting template" "slides")"
+	[ -n "$NAME" ] || NAME="$(ask "Deck to keep as your starting template" "slides" \
+"The name of the sample deck to keep — it stays exactly as it is, and you edit it
+into your own talk. 'slides' is the general tour. Every other sample deck moves to
+.samples-ref/, where you can still read it.")"
 elif [ "$MODE" = "skeleton" ]; then
 	# What to start from. 'none' is for someone who wants the framework and an empty
 	# tree — it builds (the site is just the landing page), but they then hand-write
 	# the six files 'deck' would have written for them, so it is not the default.
-	[ -n "$KIND" ] || KIND="$(ask "Scaffold what — 'deck' (slides), 'text' (one long page) or 'none'" "deck")"
+	[ -n "$KIND" ] || KIND="$(pick "Scaffold — [d]eck (slides), [t]ext (one long page), [n]one" \
+		"deck" \
+"GeekPresent builds two kinds of thing, so say which you are here for:
+
+  deck  a slide deck — many small pages you arrow through. You get one title
+        slide, ready to present, and add the rest.
+  text  a Text — ONE long page that scrolls, for docs, an essay, a README site.
+  none  nothing at all. The framework and an empty tree; the landing page tells
+        you which files to write by hand. For shaping it entirely yourself.
+
+Whichever you pick, the samples still move to .samples-ref/ for reference." \
+		"d:deck" "t:text" "n:none")"
 	case "$KIND" in deck|text|none) ;; *) die "kind must be 'deck', 'text' or 'none'";; esac
 	case "$KIND" in
-		deck) [ -n "$NAME" ] || NAME="$(ask "Name for your new (empty) deck" "slides")";;
-		text) [ -n "$NAME" ] || NAME="$(ask "Name for your new Text page (a route, so .html)" "guide.html")";;
+		deck) [ -n "$NAME" ] || NAME="$(ask "Name for your new (empty) deck" "slides" \
+"The folder your deck lives in, and the URL it is served at: 'slides' gives you
+src/routes/slides/ and /slides/title.html. Lower-case, no spaces.")";;
+		text) [ -n "$NAME" ] || NAME="$(ask "Name for your new Text page (a route, so .html)" "guide.html" \
+"A Text is a single page, so its name IS its URL and ends in .html: 'guide.html'
+gives you src/routes/guide.html/ served at /guide.html. Lower-case, no spaces.")";;
 	esac
 fi
 [ -n "$NAME" ] || NAME="slides"
-BASE="$(ask "GitHub Pages base path for a project site, e.g. /my-repo (blank = domain root)" "$BASE")"
-[ -n "$DO_CI" ]    || { confirm "Scaffold a GitHub Actions deploy workflow?" && DO_CI="yes" || DO_CI="no"; }
-[ -n "$DO_BUILD" ] || { confirm "Run a verification build at the end? (slower; needs deps)" && DO_BUILD="yes" || DO_BUILD="no"; }
+
+BASE="$(ask "GitHub Pages base path for a project site, e.g. /my-repo (blank = domain root)" "$BASE" \
+"Only for a PROJECT site, served under a sub-path: https://you.github.io/my-repo/
+needs a base path of /my-repo, because the site does not live at the root.
+
+Leave it BLANK for a user/org site (you.github.io) or a custom domain — which is
+what GeekPresent is built for, and the path that actually works today: a base path
+currently breaks prerender, because the SEO wiring emits a root-absolute
+/sitemap.xml. The script will warn you again if you set one.")"
+
+# Where the built site lands. One answer, three consumers (local build, verification build,
+# CI upload) — before this they disagreed, with CI quietly writing somewhere else.
+DIST="$(ask "Build output folder (relative to $DIR)" "$DIST" \
+"Where the built static site is written. Relative to the $DIR folder, so:
+
+  dist      -> $DIR/dist          (default; already gitignored)
+  ../site   -> site/ at your repo ROOT, next to $DIR — for when the built site is
+              what you publish and commit, e.g. an existing hand-written site/
+              that you are adding a deck to.
+
+This drives the local build, the verification build, and what CI uploads, so they
+all agree. Nothing is clobbered: the build refuses to overwrite a non-empty folder
+it did not create, so pointing it at an existing site/ is safe — it will stop and
+tell you rather than delete your files.")"
+
+# Booth is the default because it is the environment GeekPresent is itself developed in —
+# the Boothfile pins the Node it wants and pre-installs the deck's dependencies into the
+# image, so it is the best-tested route to a green build, and it asks nothing of the host
+# but Docker or Podman. 'host' is for someone who already has node+pnpm and would rather
+# not run a container; it DELETES the booth rather than leaving it lying around unused.
+[ -n "$ENV_KIND" ] || ENV_KIND="$(pick "Build environment — [b]ooth (container, no host deps), [h]ost (your own node/pnpm)" \
+	"booth" \
+"GeekPresent develops itself inside a CodingBooth (codingbooth.io) — a container
+carrying the whole toolchain — and the copy you just cloned brings a working one
+along. So this is not 'install a container', it is 'keep the one that came with it':
+
+  booth  keep it. 'cd $DIR && ./booth -- ./build-static.sh ./$DIST' builds with
+         NOTHING installed on this machine but Docker or Podman. No Node, no pnpm,
+         no version drift. './booth' alone opens VS Code in the browser.
+  host   remove it — deletes $DIR/booth and $DIR/.booth/ — and build with your
+         own node + pnpm.
+
+The booth is used exactly as it comes; nothing here reconfigures or re-pins it." \
+	"b:booth" "hn:host")"
+case "$ENV_KIND" in booth|host) ;; *) die "environment must be 'booth' or 'host'";; esac
+
+[ -n "$DO_CI" ] || { confirm "Scaffold a GitHub Actions deploy workflow?" \
+"Writes .github/workflows/deploy-$DIR.yml at your repo root: on every push to main
+that touches $DIR/, it builds the site and deploys it to GitHub Pages.
+
+Safe to say yes — it only ever writes that one file, it will ask before overwriting
+an existing one, and nothing runs until you enable Pages in the repo settings
+(Settings -> Pages -> Source: 'GitHub Actions')." \
+	&& DO_CI="yes" || DO_CI="no"; }
+
+[ -n "$DO_BUILD" ] || { confirm "Run a verification build at the end? (slower; needs deps)" \
+"Builds the site once, right now, so you find out here rather than three commits
+later that something is wrong. Costs a few minutes: it installs dependencies and
+runs a full prerender.
+
+Say no if you are offline, or in a hurry, or just want to look at the files first —
+you can always run the build yourself afterwards; the last thing this script prints
+is the command." \
+	&& DO_BUILD="yes" || DO_BUILD="no"; }
 
 TARGET="$PWD/$DIR"
+
+# The same folder, said two ways. DIST is relative to the SUBFOLDER — that is what
+# build-static.sh takes and what GEEKPRESENT_OUT means, since CI runs with working-directory
+# $DIR. CI_PATH is the same place relative to the REPO ROOT, which is what upload-pages-artifact
+# needs. They differ the moment someone answers '../site', which is the whole reason to ask.
+CI_OUT="$DIST"
+case "$DIST" in
+	/*)
+		# Fine locally; GitHub can only upload from inside the checkout.
+		CI_OUT="dist"; CI_PATH="$DIR/dist"
+		warn "Output '$DIST' is absolute — CI cannot upload from outside the checkout,"
+		warn "  so the workflow will build to $DIR/dist instead."
+		;;
+	*)
+		CI_PATH="$(norm_path "$DIR/$DIST")"
+		[ -n "$CI_PATH" ] || die "output folder '$DIST' resolves to the repo root — pick a folder, not '..'"
+		;;
+esac
+
+# Does the output land OUTSIDE the subfolder ('../site')? That is a legitimate answer — it is
+# how you publish into an existing hand-written site at the repo root — but the booth mounts
+# ONLY the subfolder, so a build inside the container cannot write there: the path simply does
+# not exist in it. CI is unaffected (it is not a container with one mount). Catch it here
+# rather than let the booth build "succeed" and write the site into thin air.
+DIST_ESCAPES=0
+case "$DIST" in
+	/*) DIST_ESCAPES=1;;
+	*)  case "$(norm_path "$DIR/$DIST")/" in "$DIR"/*) ;; *) DIST_ESCAPES=1;; esac;;
+esac
+if [ "$DIST_ESCAPES" = "1" ] && [ "$ENV_KIND" = "booth" ]; then
+	warn "The booth only sees $DIR/, so it cannot write to '$DIST' (outside it)."
+	warn "  Builds to $CI_PATH/ will run on the host; the booth still works for everything else."
+fi
 
 # -----------------------------------------------------------------------------
 # Plan summary + go/no-go
@@ -192,11 +447,22 @@ TARGET="$PWD/$DIR"
 		*)        echo "  samples    : full";;
 	esac
 	echo "  base path  : ${BASE:-<none>}"
+	echo "  output     : $CI_PATH/  ${DIM}(built site; '$DIST' relative to $DIR)${RST}"
+	case "$ENV_KIND" in
+		booth) echo "  build env  : CodingBooth — keep $DIR/booth + $DIR/.booth/ (container; no host deps)";;
+		host)  echo "  build env  : host toolchain — REMOVE $DIR/booth + $DIR/.booth/ (you supply node + pnpm)";;
+	esac
 	echo "  workflow   : $DO_CI"
 	echo "  test build : $DO_BUILD"
 	echo
 } >&2
-confirm "Proceed?" || die "aborted."
+confirm "Proceed?" \
+"Everything above, in one go. Nothing is committed — the script only writes files, and
+you review them afterwards with 'git status' and stage what you want to keep.
+
+The only things it touches outside $DIR/ are the deploy workflow (if you asked for one)
+and the output folder shown above. Say no to walk away with nothing changed." \
+	|| die "aborted."
 
 # -----------------------------------------------------------------------------
 # Step 1 — acquire into TARGET
@@ -219,12 +485,39 @@ ok "Cloned into $DIR"
 # Step 2 — strip .git (make it part of YOUR repo)
 # -----------------------------------------------------------------------------
 if [ -d "$TARGET/.git" ]; then
-	if confirm "Remove $DIR/.git so it becomes part of this project (not an embedded clone)?"; then
+	if confirm "Remove $DIR/.git so it becomes part of this project (not an embedded clone)?" \
+"GeekPresent was just cloned, so $DIR/ is currently its own git repository sitting inside
+yours. Git will not track its contents — it sees a nested repo and records nothing but a
+stray gitlink, so your deck would never actually be committed.
+
+Removing $DIR/.git turns it into plain files that your repo tracks normally. That is what
+you want: this is copy-and-own, not a dependency. Say no only if you deliberately want a
+submodule (and are prepared to wire it up yourself)."; then
 		rm -rf "$TARGET/.git"
 		ok "Removed $DIR/.git — it's now plain files in your repo"
 	else
 		warn "Kept $DIR/.git — git will treat $DIR as an embedded repo/submodule"
 	fi
+fi
+
+# -----------------------------------------------------------------------------
+# Step 2b — build environment (CodingBooth, or the host's own toolchain)
+# -----------------------------------------------------------------------------
+# GeekPresent develops itself inside a CodingBooth, and `booth` + `.booth/` are tracked, so
+# the clone hands the adopter a working container environment whether they asked for one or
+# not. That is a gift to most people and clutter to the rest — so it is a decision now,
+# rather than an unexplained binary they find later and are afraid to delete.
+#
+# The booth that arrives is used AS IS — nothing here reconfigures, re-pins or re-downloads
+# it; the whole value of the thing is that it is the same environment GeekPresent is built
+# in. So there are exactly two outcomes: keep it, or delete the two paths it occupies.
+if [ "$ENV_KIND" = "host" ]; then
+	if [ -e "$TARGET/booth" ] || [ -d "$TARGET/.booth" ]; then
+		rm -rf "$TARGET/booth" "$TARGET/.booth"
+		ok "Removed $DIR/booth and $DIR/.booth/ — builds use your own node + pnpm"
+	fi
+elif [ -x "$TARGET/booth" ]; then
+	ok "Kept the CodingBooth — ${DIM}cd $DIR && ./booth${RST} builds with no host deps"
 fi
 
 ROUTES="$TARGET/src/routes"
@@ -442,12 +735,14 @@ jobs:
           cache-dependency-path: $DIR/pnpm-lock.yaml
       - name: Build
         run: pnpm install && pnpm build
-$( [ -n "$BASE" ] && printf '        env:\n          BASE_PATH: "%s"\n' "$BASE" )
+        env:
+          GEEKPRESENT_OUT: "$CI_OUT"
+$( [ -n "$BASE" ] && printf '          BASE_PATH: "%s"\n' "$BASE" )
       # One-time: repo Settings -> Pages -> Source: GitHub Actions
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: $DIR/docs
+          path: $CI_PATH
       - id: deployment
         uses: actions/deploy-pages@v4
 EOF
@@ -459,14 +754,25 @@ fi
 # -----------------------------------------------------------------------------
 # Step 6 — verification build
 # -----------------------------------------------------------------------------
+build_on_host() {
+	( cd "$TARGET" && pnpm install && ./build-static.sh "$DIST" ) \
+		&& ok "Built $CI_PATH/" || warn "Build failed — check node + pnpm are installed"
+}
+
 if [ "$DO_BUILD" = "yes" ]; then
 	info "Verification build ..."
-	if [ -x "$TARGET/booth" ]; then
-		( cd "$TARGET" && ./booth -- bash -lc 'pnpm install && ./build-static.sh ./dist' ) \
-			&& ok "Built $DIR/dist via CodingBooth" || warn "Booth build failed — try locally"
+	if [ "$ENV_KIND" = "booth" ] && [ -x "$TARGET/booth" ] && [ "$DIST_ESCAPES" = "0" ]; then
+		# The booth needs Docker or Podman running, which is exactly the host assumption it
+		# exists to avoid making. If it can't start, say so and use the toolchain we already
+		# know how to drive — a failed verification build shouldn't look like a failed adopt.
+		if ( cd "$TARGET" && ./booth -- bash -lc "pnpm install && ./build-static.sh '$DIST'" ); then
+			ok "Built $CI_PATH/ via CodingBooth"
+		else
+			warn "Booth build failed (is Docker/Podman running?) — falling back to the host toolchain"
+			build_on_host
+		fi
 	else
-		( cd "$TARGET" && pnpm install && ./build-static.sh ./dist ) \
-			&& ok "Built $DIR/dist" || warn "Build failed — check pnpm/node are installed"
+		build_on_host
 	fi
 fi
 
@@ -478,8 +784,19 @@ fi
 	echo "${GRN}${B}GeekPresent adopted into $DIR/${RST}"
 	echo
 	echo "${B}Next steps${RST}"
-	echo "  • Local build (no host deps): ${DIM}cd $DIR && ./booth -- ./build-static.sh ./dist --zip${RST}"
-	echo "  • Or native:                  ${DIM}cd $DIR && pnpm install && ./build-static.sh ./dist${RST}"
+	if [ "$ENV_KIND" = "booth" ] && [ "$DIST_ESCAPES" = "0" ]; then
+		echo "  • Local build (no host deps): ${DIM}cd $DIR && ./booth -- ./build-static.sh $DIST --zip${RST}"
+		echo "  • Or work inside it:          ${DIM}cd $DIR && ./booth${RST}  (VS Code in the browser, Node preinstalled)"
+		echo "  • Or native:                  ${DIM}cd $DIR && pnpm install && ./build-static.sh $DIST${RST}"
+	elif [ "$ENV_KIND" = "booth" ]; then
+		# The booth is still there and still useful — it just can't reach $DIST from inside.
+		echo "  • Build (on the host — the booth cannot write outside $DIR/):"
+		echo "                                ${DIM}cd $DIR && pnpm install && ./build-static.sh $DIST${RST}"
+		echo "  • Work inside the booth:      ${DIM}cd $DIR && ./booth${RST}  (VS Code in the browser, Node preinstalled)"
+	else
+		echo "  • Build:                      ${DIM}cd $DIR && pnpm install && ./build-static.sh $DIST${RST}"
+	fi
+	echo "  • Built site lands in:        ${DIM}$CI_PATH/${RST}"
 	[ "$MODE" = "minimal" ] && echo "  • Edit your deck:            ${DIM}$DIR/src/routes/$NAME/${RST}  (samples: $DIR/.samples-ref/)"
 	if [ "$MODE" = "skeleton" ]; then
 		case "$KIND" in
