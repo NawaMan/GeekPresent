@@ -43,6 +43,15 @@ export const pages = [
     { path: "draw-sequence.html",     title: "Draw — Building a Diagram", layout: true },
     { path: "connector-component.html", title: "Connector — Arrows by Name", layout: true },
     { path: "note-highlight-component.html", title: "Note-driven Highlight", layout: true },
+    // The pen sits next to the Spotlight it complements: the highlight rings what the
+    // AUTHOR named, ANNOTATE draws on what the SPEAKER decides to point at. No `annotate`
+    // flag here — that one is deck-wide (see +layout.svelte), because a speaker tool takes
+    // no instruction from the slide it happens to be standing on.
+    // Three slides, and they READ as three: draw on it, watch the ink survive the hop, then
+    // learn the switch. The middle one's payoff depends on the first having been drawn on.
+    { path: "annotate-component.html", title: "Annotate — The Speaker's Pen" },
+    { path: "annotate-persistence.html", title: "Annotate — The Ink Stays" },
+    { path: "annotate-setup.html",    title: "Annotate — Turning It On" },
     { path: "chart-bar.html",         title: "Chart — Grouped & Stacked Bars" },
     { path: "chart-line.html",        title: "Chart — Dual-Axis Line + Time" },
     { path: "chart-combo.html",       title: "Chart — Combo (Bars + Line)" },

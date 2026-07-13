@@ -100,6 +100,52 @@
 	--spotlight-glow:  var(--ACCENT-WARM, #F0A33E);
 	--spotlight-scrim: var(--BACKDROP, #000000);
 
+	/* Annotation — the speaker's ink (see components/Annotate.svelte). The pen reads in
+	   the same warm "look here" accent the Spotlight ring uses, since it is the same act:
+	   pointing at something. Its glow is a dark halo, not a coloured one — ink lands on
+	   whatever the slide put behind it (a photo, a chart, a code box), and a dark rim is
+	   what keeps a warm stroke legible over a warm backdrop.
+
+	   --annot-highlighter-blend is the load-bearing one. A highlighter must TINT the
+	   surface without covering the words, and which blend does that depends entirely on
+	   whether the page is dark or light. `screen` is the default because these fallbacks
+	   ARE the main deck's theme, and it is dark: screening a yellow band over a dark
+	   background lifts the background to yellow while light text stays light. A LIGHT
+	   theme must override this to `multiply` (band tints the white page, dark text stays
+	   dark). Leave it at `screen` on a light theme and the highlighter blows out to a
+	   white smear over the very words it points at. */
+	--annot-pen:               var(--ACCENT-WARM, #F0A33E);
+	--annot-pen-glow:          rgba(0, 0, 0, 0.55);
+	--annot-highlighter:       #F5E663;
+	--annot-highlighter-alpha: 0.45;
+	--annot-highlighter-blend: screen;
+
+	/* The pen's palette (PEN / HIGHLIGHT / swatches / UNDO / RESET / DONE) and the ANNOTATE
+	   toggle. Both float OVER the slide rather than sitting in the deck frame, so they carry
+	   their own dark plate instead of inheriting a surface colour they cannot predict.
+
+	   --annot-bar-idle is the resting opacity: the bar hangs over the slide the audience is
+	   reading, so it ghosts until pointed at — opacity, never visibility, so it keeps its
+	   full hit area and the pointer finds it exactly where it was (the same rule fadeChrome
+	   follows). Set it to 1 for a deck that would rather always see the pen. */
+	--annot-bar-bg:     rgba(20, 22, 26, 0.92);
+	--annot-bar-edge:   rgba(255, 255, 255, 0.16);
+	--annot-bar-fg:     var(--INK, #D7DDE5);
+	--annot-bar-hover:  rgba(255, 255, 255, 0.10);
+	--annot-bar-on-fg:  var(--ctrl-featured-on, #1A1206);
+	--annot-bar-done:   var(--ACCENT-2, #7FD1A0);
+	--annot-bar-idle:   0.28;
+
+	/* The toggle reads in the pen's own colour so the control and the ink it produces are
+	   visibly the same thing; armed, it FILLS with that colour, because "the next click will
+	   draw" is a state worth being unmistakable about. */
+	--annot-toggle-bg:  rgba(20, 22, 26, 0.92);
+	--annot-toggle-fg:  var(--ACCENT-WARM, #F0A33E);
+
+	/* The stale-ink notice — ink persists now, so a slide can greet you with marks you drew
+	   last week. Warm, like every other "look here" cue in the deck. */
+	--annot-stale-edge: var(--ACCENT-WARM, #F0A33E);
+
 	/* LAYOUT-mode style/geometry collision badge — the note a Block shows when the
 	   author's `style` tried to set a property the x/y/width/height props own (see
 	   layout/styleGuardCore.ts). Warm, like every other "look here" cue, and set

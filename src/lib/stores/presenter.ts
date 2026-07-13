@@ -156,6 +156,13 @@ export function subscribeHighlight(deckKey: string, cb: (name: string | null) =>
 	return () => window.removeEventListener('storage', onStorage);
 }
 
+// NOTE: annotation ink has NO relay here, deliberately. It used to — a publishInk /
+// subscribeInk pair sat exactly at this spot, mirroring the highlight channel. Persisting
+// the ink made it redundant: `stores/annotation.inkBook` is a persisted(sync: true) store,
+// so localStorage IS the channel, the `storage` event does the mirroring, and the presenter
+// console can RESET the ink by writing to the same store. Two mechanisms for one job is one
+// too many, and the relay was the one that could drift.
+
 // Durable presenter timer — the elapsed clock must survive both Ctrl+R AND slide
 // navigation (which pages the console with a full document load). Persisting the
 // START time per deck makes the elapsed value reload-proof; only an explicit reset

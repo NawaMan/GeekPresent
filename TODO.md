@@ -321,66 +321,119 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
     SSR test `tests/SpotlightSsr.ssr.test.ts` (inert with no target; geometry reaches the
     markup once one resolves). New `--spotlight-*` role tokens.
 
-- [ ] **Annotation tools** — let the speaker draw on the live slide and swipe a highlighter
+- [x] **Annotation tools** — let the speaker draw on the live slide and swipe a highlighter
       over text, mid-talk, with the ink landing on the audience screen.
-  - Every other presentation tool has this and GeekPresent has none. `Spotlight` can already
-    ring a *named* `Block`, but only what the author anticipated and named; annotation is for
-    the thing the speaker decides to point at while answering a question — circle the term,
-    underline the line of code, cross out the wrong branch of the diagram.
-  - Approach: an **annotation mode**, modelled on `layoutMode` — a store + a chrome button, a
-    canvas-spanning `<svg>` overlay mounted once by `SlideDeck` (a singleton like `Spotlight`
-    and the minimap, so no slide places it), which flips to `pointer-events: auto` only while
-    the mode is on. Freehand ink is already solved in `draw/drawCore.ts`: sample pointer
-    positions into a `Point[]` and hand them to **`smoothPath(points)`**, which is the same
-    smoothing `Polyline`/`Curve` render through, so a stroke is an ordinary `PathShape` and
-    inherits the NaN-safe, total discipline. Highlighter is the same stroke with a fat, low
-    opacity, `multiply`-blended band — text highlighting means *swiping over* the words, not
-    selecting DOM ranges, which keeps it working over code, images and diagrams alike, and
-    keeps it out of Monaco's way. Colours/thicknesses as `--annot-*` role tokens in
-    `src/lib/themes/roles.css` (dark-default fallbacks). No new dependencies — this is a
-    `pointerdown`/`pointermove` listener and an `<svg>`.
-  - Ink must reach the audience: reuse the **presenter localStorage channel** the way
-    `publishHighlight`/`subscribeHighlight` already do (`stores/presenter.ts`), top-window
-    only so the console's preview iframe doesn't double-draw. A stroke publishes on
-    `pointerup` (whole shapes, not per-move — the channel is JSON-over-`storage`, not a
-    firehose).
-  - **Decided: ink clears on slide change.** Annotation is a laser-pointer trail, not a
-    saved artifact — ephemeral like `Spotlight`'s hover cue, and for the same reason: it
-    tracks where the speaker is *pointing right now*. What that buys is most of the design
-    disappearing — strokes are a flat list in one store, not a map keyed by slide path;
-    nothing is persisted, so there is no storage to grow, no reconciliation when a slide's
-    content changes under saved ink, no question about whether a recording keeps it, and the
-    overlay is SSR-inert for free because it always starts empty. The clear hangs off the
-    navigation the deck already fires.
-  - **What that costs:** paging away destroys the drawing with no way back, so an
-    accidental → during a long annotated answer is unrecoverable. That is the price of not
-    persisting, and it is the thing to watch in the demo — it may argue for making page-away
-    *while ink is on screen* deliberate rather than instant, which folds into the eating-keys
-    question below.
-  - **Decided: the flag is deck-wide and sticky, not per-slide.** Annotation is a *speaker*
-    tool, so "which slide declared it" — the axis `layout: true` uses — is the wrong one:
-    the speaker decides to annotate, and the slide they happen to be on has no opinion. So
-    the `layoutAccessCore.ts` precedence is reused **minus its slide tier**:
-    dev > the speaker's sticky `?annotate` > a deck-wide prop on `SlideDeck` > off, in a pure
-    total core beside it (a corrupt sticky value falls through rather than vetoing, exactly
-    as `readSticky` already does).
-  - **What that costs:** no featured-pill treatment. The warm pulsing LAYOUT button works
-    because a *slide* can say "press this" — a deck-wide tool can't, so the button stays
-    chrome-grey and the demo slide has to teach the flag rather than light it up. Worth
-    re-checking against `fadeChrome` decks, where chrome sits at `opacity: 0.12` until
-    pointed at.
-  - Open questions:
-    - **The eating-keys problem.** In annotation mode the overlay swallows pointer events —
-      what still pages? `Draw`'s LAYOUT isolation and the appendix `Escape` note both flag
-      that a key which both dismisses a tool and navigates away is a trap. Sharpened by the
-      clear-on-nav decision: the paging keys now also *destroy* the ink.
-    - **Undo, and how a stroke dies.** Per-stroke undo (`layoutHistory.ts` is the local
-      precedent) plus a clear-all, and whether an eraser is worth it or a shift-drag
-      scrub-to-delete covers it.
-  - Done = the overlay component + a demo slide that *is* the docs (annotate it live, as
-    `layout-mode.html` does for LAYOUT) + a `*Core.test.ts` for the stroke geometry + DOM
-    tests (draws, publishes, clears; inert with the mode off) + an SSR test proving no ink
-    and no listener prerenders.
+  - `Spotlight` can already ring a *named* `Block`, but only what the author anticipated and
+    named; annotation is for the thing the speaker decides to point at while answering a
+    question — circle the term, underline the line of code, cross out the wrong branch.
+  - Done: `src/lib/components/Annotate.svelte` (the overlay, its palette and the ANNOTATE
+    toggle), with the geometry + persistence in `src/lib/annotate/annotateCore.ts` and the
+    precedence in `src/lib/annotate/annotateAccessCore.ts` (both pure and total —
+    `drawCore`/`layoutAccessCore` discipline), the stores in `src/lib/stores/annotation.ts`,
+    `--annot-*` role tokens, `SlideDeck`'s `annotate` / `inkStaleAfter` / `inkColors` props, and
+    the ink reset menu in `src/lib/components/PresenterView.svelte`. Demo in THREE slides, each
+    of which is the thing it describes — `annotate-component.html` (the tools; draw on it),
+    `annotate-persistence.html` (page back and the ink is still there; reset, and the stale
+    warning), `annotate-setup.html` (the deck-wide flag and why the axis differs from LAYOUT's).
+    The deck sets `annotate`, so the pen is real in the build and the ink lands on the very
+    slides that explain it. Tests: `tests/annotateCore.test.ts` (44), `tests/Annotate.test.ts`
+    (21), `tests/AnnotateSsr.ssr.test.ts` (6).
+  - A stroke is `Point[]` + a tool; the `d` is **derived** via `drawCore`'s `smoothPath` — the
+    same Catmull-Rom `Polyline`/`Curve` render through, so ink inherits the NaN-safe, total
+    discipline. (The original entry said a stroke "is a `PathShape`": `smoothPath` actually
+    returns a `d` *string*, and keeping the sampled points as the source of truth is what makes
+    a stroke re-render identically in the window that drew it and the window that mirrors it.)
+  - **Pointer → canvas is measured, not computed.** No `clientToCanvas` helper existed — `drag.ts`
+    gives scale-corrected *deltas*, not absolute points. `toCanvasPoint` reads the surface's own
+    on-screen rect, which already encodes whatever transform is in force, so one line is correct
+    in FITTED (centred), SCALED (top-left, panned) *and* the presenter console (no transform at
+    all) without asking which. A zero-area rect yields the origin, never `NaNpx`.
+  - **`simplifyPoints` is not a nicety.** A pointermove stream samples at the *pointer's* rate,
+    so a slow deliberate circle emits hundreds of near-duplicates — and every one of them would
+    have gone into the JSON pushed through `storage` on each stroke. Decimation is against the
+    last *kept* point, so a creeping drag can't sneak sub-threshold steps through; the lift point
+    is always kept, or a quick flick loses its tail.
+  - **Settled: the eating-keys problem — the overlay eats the POINTER, never the keyboard.** ←/→/
+    Space keep paging, and (because ink dies with the slide) paging away destroys the drawing.
+    That asymmetry is the answer to the trap the entry flagged: a speaker who cannot advance is
+    strictly worse off than one who lost a scribble, so the navigation keys are the one thing the
+    pen may not touch. `Escape` puts the pen down *without* navigating, which is what makes it
+    safe for `Escape` to exist at all. The demo slide says the cost out loud rather than hiding it.
+  - **Settled: how a stroke dies — per-stroke undo + clear-all, no eraser.** A stroke is the unit
+    the speaker drew, so it is the unit they expect back (`Ctrl+Z`, or UNDO on the palette); CLEAR
+    drops the lot. A shift-drag scrub-to-delete would need hit-testing against smoothed paths to
+    earn its keep, and the ink is ephemeral anyway — the cheapest eraser is the → key.
+  - **The palette carries DONE, not the chrome.** The one thing the design didn't see coming:
+    while the pen is armed the ink surface owns every pointer on the canvas, which *buries* the
+    deck's own LAYOUT/PRESENT chrome — so an ANNOTATE toggle up there could arm the pen but never
+    disarm it. `Annotate` renders its own toolbar above the surface (z 41 over 40), and that is
+    where PEN / HIGHLIGHT / UNDO / CLEAR / DONE live.
+  - **The highlighter's blend mode is a role token, and it is load-bearing.** The entry specified
+    `multiply` — which is right on a *light* page and wrong here: these fallbacks ARE the main
+    deck's theme, and it is dark, where multiply smears a dark band over the very words it points
+    at. `--annot-highlighter-blend` defaults to **`screen`**: screening a yellow band over a dark
+    background lifts the background to yellow while light text stays light. A light theme flips it
+    to `multiply`. Either way the words show through — which is the whole point of swiping *over*
+    text rather than selecting DOM ranges (and is why it works over code, images and diagrams
+    alike, and stays out of Monaco's way).
+  - **REVERSED on use: ink PERSISTS.** It shipped as a laser-pointer trail that died on
+    navigation, and that turned out to be wrong the moment anyone actually presented with it —
+    marks you make while preparing are exactly the marks you want on stage. Ink is now an
+    `inkBook`: strokes keyed by slide pathname, persisted, surviving reloads. What the reversal
+    cost, and what it bought:
+    - **`localStorage` becomes the channel, so the relay went away.** The `publishInk` /
+      `subscribeInk` pair is *deleted*: the book is a `persisted(sync: true)` store, both deck
+      windows are the same origin, and the `storage` event mirrors every stroke with nothing to
+      keep in step. It also makes the console's next-slide `<iframe>` a non-issue — ink is keyed
+      BY SLIDE, so a preview of another slide shows that slide's ink, which is right. Two
+      mechanisms for one job was one too many, and the relay was the one that could drift.
+    - **A persisted pen needs a conscience.** Ink can now go stale, so a slide whose marks are
+      older than `inkStaleAfter` (deck prop, a day by default) says so on arrival — *"annotations
+      from 3 days ago"* — and offers RESET SLIDE / RESET ALL / KEEP. Today's marks never nag;
+      last week's always do. KEEP is "not now", not "never again": it re-arms on the next visit.
+    - **There must be a way out, from both windows.** RESET / RESET ALL sit on the bar *and* in
+      the presenter console (beside its existing note-tick reset), which is only possible because
+      the console — which has no canvas of its own — can act on the shared store.
+    - **SSR-inertness now rests on `persisted()`, not on an empty store.** If `persisted` ever
+      stopped degrading to an in-memory writable on the server, every prerendered page would ship
+      whatever the person who ran the *build* had scribbled, to every visitor. `AnnotateSsr` pins
+      exactly that, and the built `docs/` still carries no ink markup at all.
+  - **The toggle had to move, and that was a real bug.** It shipped in the deck's top-right chrome
+    cluster — *underneath* the ink surface, which owns every pointer on the canvas while the pen is
+    armed. So it could arm the pen and never disarm it. It now lives in `Annotate` itself, top-centre
+    and flush to the canvas edge, above the surface (z 42 over 40) — which is also why the surface
+    may safely eat the pointer at all: everything that must survive an armed pen out-ranks it.
+  - **Colour: swatches + a picker, and the default is `null` on purpose.** A stroke with no colour is
+    painted by the `--annot-pen` role token, so ink follows a re-theme instead of freezing today's hex
+    into every mark; only an explicit pick stores a value. `isColor()` is a strict allow-list, because
+    the colour reaches the DOM as `style="stroke: …"` and arrives from `localStorage`, which another
+    tab can write — a `}` in the wrong place there is a CSS injection.
+  - **The bar ghosts until pointed at** (`--annot-bar-idle`), the same opacity-never-visibility rule
+    `fadeChrome` follows: it hangs over the slide the audience is reading, but it keeps its full hit
+    area so the speaker finds it exactly where they left it. It also **drags**, by a `⠿` grip rather
+    than by its face (a bar you drag by its body is a bar whose buttons you can no longer press),
+    and remembers where it was put — wherever it defaults to, it is over *somebody's* content.
+    `clampBarPos` keeps it on the canvas, because a bar dragged off the edge is one the speaker
+    cannot get back and the position is persisted; double-clicking the grip sends it home.
+  - **A highlighter is not a pen, and following the hand was a bug.** Swiping over a line of text,
+    the wrist drifts and rolls — so the band sloped across the very row it was meant to sit on, and
+    `smoothPath` then bowed it for good measure. `levelPoints` pins a swipe to ONE y and reduces it
+    to its horizontal extent: two points, dead level, nothing left to bow. A gesture with no
+    horizontal extent — a vertical swipe down a column of code, or a tap — is left alone rather than
+    collapsed to nothing. Applied to the LIVE stroke too, or the band would snap straight the instant
+    the pen lifted. Off via `levelHighlight={false}`.
+  - **The y is the FIRST point's, not the mean — and that took two tries.** The mean is the better
+    statistic and it shipped first: it deviates least from what the hand actually did, where an
+    anchor lets a sloppy start define the whole swipe. It was still wrong, in a way that only shows
+    up in the hand rather than in a test. Levelling runs on every `pointermove` (that is what makes
+    the live band honest), and *the mean shifts as each new sample arrives* — so the whole band slid
+    up and down under the cursor while the swipe was still being drawn. A mark that will not hold
+    still is unusable, whatever its statistics. Anchoring costs nothing anyway: you set the line
+    where you press, exactly as a physical highlighter does. `levelPoints` is now tested against the
+    PREFIXES of one gesture, so a future "improvement" back to a drifting y fails loudly.
+  - **What it cost, as predicted:** no featured-pill treatment. The warm pulsing LAYOUT button
+    works because a *slide* can say "press this"; a deck-wide tool has no slide speaking for it,
+    so the demo slide teaches the flag rather than lighting it up.
 
 - [x] **`Connector` / `Arrow`** — auto-routed arrow between two named `Block`s.
   - Turns the `Block` system into a diagramming tool.

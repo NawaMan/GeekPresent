@@ -42,6 +42,10 @@
 	import { displayMode, displayFactor, clampFactor } from '$lib/stores/displayMode';
 	import type { DisplayMode } from '$lib/stores/displayMode';
 	import { layoutMode, canLayout, canSave, setLayoutOffered, applyLayoutParam } from '$lib/stores/layoutMode';
+	import Annotate from '$lib/components/Annotate.svelte';
+	import {
+		setAnnotateOffered, applyAnnotateParam, setInkPath, inkStaleAfterMs
+	} from '$lib/stores/annotation';
 	import { saveLayout } from '$lib/stores/layoutSave';
 	import { getViewTransitions } from '$lib/presentation';
 	import {
@@ -130,6 +134,31 @@
 	   control regardless, and a sticky `?layout=off` outranks both (layout/layoutAccessCore). */
 	export let layout = false;
 
+	/* Offer the ANNOTATE control — the speaker's pen. Deck-wide and nothing else, because
+	   annotation is a SPEAKER tool, not an authoring one: LAYOUT is per-slide since the
+	   slide being authored has an opinion about whether you should be dragging on it,
+	   whereas the slide the speaker happens to be standing on has no opinion about whether
+	   they may circle a word on it. So there is no per-slide `annotate` flag to match
+	   `layout: true` — see annotate/annotateAccessCore.
+
+	   Available, not active: the mode still starts off. `vite dev` offers the pen
+	   regardless, and a sticky `?annotate` / `?annotate=off` outranks this prop. */
+	export let annotate = false;
+
+	/* Ink PERSISTS per slide, across reloads — so it can also go stale. A slide whose marks
+	   are older than this says so on arrival and offers to clear them. In HOURS; a day by
+	   default, so today's marks never nag and a previous sitting's always do. */
+	export let inkStaleAfter = 24;
+
+	/* The pen's swatches. The FIRST is the theme's own colour (null → painted by the
+	   --annot-* role token), so the default follows a re-theme rather than freezing a hex. */
+	export let inkColors: (string | null)[] = [null, '#E5484D', '#3FA9F5', '#4BD07A', '#FFFFFF'];
+
+	/* Keep a highlighter swipe LEVEL: the band sits on the row you swiped rather than sloping
+	   along with the hand that drew it. A highlighter is not a pen — nobody wants a wonky
+	   highlight. Set false for a genuinely freehand highlighter. */
+	export let levelHighlight = true;
+
 	let viewport:  HTMLElement;
 	let container: HTMLElement;
 	let content:   HTMLElement;
@@ -200,6 +229,18 @@
 	$: layoutOffered = slideOffersLayout || layout;
 	$: if (browser) setLayoutOffered(layoutOffered);
 	$: if (browser) applyLayoutParam($page.url);
+
+	// ANNOTATE (the speaker's pen) resolves from the DECK, not the slide — there is no
+	// per-slide flag to fold in, so this is set once from the prop rather than per page.
+	$: if (browser) setAnnotateOffered(annotate);
+	$: if (browser) applyAnnotateParam($page.url);
+	$: inkStaleAfterMs.set(Math.max(0, (Number(inkStaleAfter) || 24)) * 60 * 60 * 1000);
+
+	// Point the ink at THIS slide. Ink is persisted per slide (stores/annotation.inkBook), so
+	// navigation does not destroy it — it just changes which page of the book we are looking
+	// at, and the drawing is still there when you come back. The full pathname is the key, so
+	// /slides/intro.html and /portrait/intro.html never scribble on each other.
+	$: if (browser) setInkPath($page.url.pathname.replace(/\/+$/, ''));
 
 	// On a slide that INVITES you to use LAYOUT, the button is the SUBJECT, not backstage
 	// machinery — so it wears the featured look (filled warm pill) instead of receding
@@ -440,6 +481,11 @@
 			? subscribeHighlight(deckKey, (name) => setHighlight(name))
 			: () => {};
 
+		// NOTE: no ink subscription here. Ink rides a persisted(sync: true) store, so the
+		// `storage` event mirrors it between the two deck windows with nothing to wire up —
+		// and because it is keyed BY SLIDE, the console's next-slide <iframe> preview shows
+		// that slide's ink, which is right rather than a double-draw.
+
 		initialized = true;
 		apply(true);
 		return () => {
@@ -450,6 +496,7 @@
 			stopContinue();
 			stopHighlight();
 			setHighlight(null); // don't leave a stale spotlight across a deck swap
+			// Ink is NOT cleared here — it is meant to survive. That is the whole point.
 			window.removeEventListener('resize', onResize);
 		};
 	});
@@ -492,6 +539,10 @@
 			     the viewport-anchored DISPLAY control sits separately in the overlay below.
 			     Being a .content child placed BEFORE the slot, the slide's own blocks paint
 			     over it. Hidden by ?clean; PRESENT hides inside the console itself. -->
+			<!-- NOTE: ANNOTATE is NOT in this cluster. The pen's toggle lives in <Annotate>
+			     itself, top-centre and above the ink surface — because once the pen is armed
+			     the surface owns every pointer on the canvas and would bury a button placed
+			     here, leaving the speaker able to arm the pen but not to put it down. -->
 			{#if !clean && ($canLayout || !$presenterMode)}
 			<div
 				class="slide-chrome gp-chrome no-print"
@@ -541,6 +592,17 @@
 			     inert until a <Note> line or a slide sets the highlightTarget store.
 			     Placed after the slot so it paints over the slide's own blocks. -->
 			<Spotlight canvasWidth={width} canvasHeight={height} />
+			<!-- The speaker's ink, the other canvas-level singleton. After Spotlight, so a
+			     stroke lands on top of the cue it is drawn next to. Renders nothing at all
+			     until there is ink or the pen is armed — so it is inert (and SSR-inert) on
+			     every deck that never offers it. -->
+			<Annotate
+				canvasWidth={width}
+				canvasHeight={height}
+				{inkColors}
+				{levelHighlight}
+				chrome={!clean && !present}
+			/>
 			<TableOfContent {pages} {article} {articleText} {articleHref} />
 			<Copyright />
 			{/if}
