@@ -46,6 +46,8 @@
 	import {
 		setAnnotateOffered, applyAnnotateParam, setInkPath, inkStaleAfterMs
 	} from '$lib/stores/annotation';
+	import { captureSlide, downloadBlob } from '$lib/capture/captureSlide';
+	import { captureFileName, readCaptureParam, refusalText, resolveCanCapture, readSticky } from '$lib/capture/captureCore';
 	import { saveLayout } from '$lib/stores/layoutSave';
 	import { getViewTransitions } from '$lib/presentation';
 	import {
@@ -159,6 +161,16 @@
 	   highlight. Set false for a genuinely freehand highlighter. */
 	export let levelHighlight = true;
 
+	/* Offer CAPTURE — download the current slide as a PNG at TRUE canvas resolution (1920x1080),
+	   not at whatever size the window is showing it. Annotations are included; the deck's own
+	   chrome is not. Like ANNOTATE this is deck-wide and sticky (`?capture`), because taking a
+	   screenshot is the speaker's decision, not the slide's. */
+	export let capture = false;
+
+	/* Multiply the captured PNG's resolution (2 → a 3840x2160 file from a 1920x1080 canvas).
+	   The slide is re-rendered, not upscaled, so it stays crisp. */
+	export let captureScale = 1;
+
 	let viewport:  HTMLElement;
 	let container: HTMLElement;
 	let content:   HTMLElement;
@@ -202,13 +214,21 @@
 	// target. `browser &&` short-circuits so url.searchParams is never read during
 	// prerender (SvelteKit forbids it — a prerendered page can't vary by query
 	// string). Client hydration re-evaluates with browser=true and picks up ?clean.
-	$: clean = browser && $page.url.searchParams.has('clean');
+	// `?shot` implies `?clean`: a screenshot never wants the nav bar, the TOC or the buttons.
+	$: clean = browser && ($page.url.searchParams.has('clean') || $page.url.searchParams.has('shot'));
 	// `?present` turns THIS window into the presenter console (see stores/presenter
 	// + PresenterView). Browser-guarded like `?clean`, so it never affects SSR /
 	// prerender output. presenterMode (the store <Note> and NavigationBar read) is
 	// kept in step with it.
 	$: present = browser && $page.url.searchParams.has('present');
 	$: presenterMode.set(present);
+	// `?shot` — the BUILD-TIME capture render (see utils/capture-slides.sh). The canvas at
+	// exactly 1:1, top-left, no frame border, no letterbox, and no chrome: point a headless
+	// browser at it with a window the size of the canvas and the viewport IS the slide, so the
+	// PNG needs no cropping and no scaling. It implies `?clean` (which is why `clean` reads it
+	// too), and it is the one mode that deliberately does NOT fit the slide to the window —
+	// fitting is what a human wants and exactly what a screenshot must not do.
+	$: shot = browser && $page.url.searchParams.has('shot');
 	// Cross-window sync: whoever navigates publishes the new slide path; the other
 	// window follows. deckKey namespaces it per deck so /slides/ and /portrait/
 	// consoles never cross-drive. This deck's paging strategy is read once for the
@@ -241,6 +261,54 @@
 	// at, and the drawing is still there when you come back. The full pathname is the key, so
 	// /slides/intro.html and /portrait/intro.html never scribble on each other.
 	$: if (browser) setInkPath($page.url.pathname.replace(/\/+$/, ''));
+
+	// CAPTURE — the same precedence as the pen (dev > sticky ?capture > the deck's prop > off),
+	// for the same reason: a screenshot is the speaker's decision and the slide has no opinion.
+	// The sticky value is written here rather than in a store, since there is no mode to hold —
+	// pressing the button IS the whole feature.
+	$: if (browser) {
+		const choice = readCaptureParam($page.url.searchParams);
+		if (choice !== null) localStorage.setItem('canCapture', String(choice));
+	}
+	$: canCapture = browser
+		? resolveCanCapture(import.meta.env.DEV, readSticky(localStorage.getItem('canCapture')), capture)
+		: false;
+
+	// CAPTURE refuses out loud rather than sitting greyed out, exactly as SAVE does: a disabled
+	// button reads as "broken or missing", while one that answers when pressed teaches you why a
+	// slide with a live embed cannot be rasterised.
+	let captureLabel = 'CAPTURE';
+	let captureTip = '';
+	let capturing = false;
+
+	async function onCapture() {
+		if (capturing || !container) return;
+		capturing = true;
+		captureLabel = '…';
+		captureTip = '';
+		try {
+			const { blob, blockers } = await captureSlide(container, width, height, captureScale);
+			if (blockers.length > 0) {
+				captureTip = refusalText(blockers);
+				captureLabel = 'NOT ALLOWED';
+			} else if (!blob) {
+				captureTip = 'The browser refused to draw this slide';
+				captureLabel = 'FAILED';
+			} else {
+				downloadBlob(blob, captureFileName($page.url.pathname));
+				captureLabel = 'SAVED';
+			}
+		} catch {
+			captureTip = 'The browser refused to draw this slide';
+			captureLabel = 'FAILED';
+		} finally {
+			capturing = false;
+			setTimeout(() => {
+				captureLabel = 'CAPTURE';
+				captureTip = '';
+			}, 2600);
+		}
+	}
 
 	// On a slide that INVITES you to use LAYOUT, the button is the SUBJECT, not backstage
 	// machinery — so it wears the featured look (filled warm pill) instead of receding
@@ -377,6 +445,11 @@
 		// .content would also make the fixed <Note> panel a transformed containing
 		// block (fixed would then track .content, not the viewport). So: no transform.
 		if (present) return;
+		// `?shot` is a SCREENSHOT render: the canvas at exactly 1:1, filling the viewport,
+		// with no frame, no chrome and no letterbox — so a headless browser sized to the
+		// canvas produces a pixel-exact PNG with no cropping. FITTED would scale it by
+		// ~0.997 to fit the frame's own border, which is precisely what we don't want here.
+		if (shot) return;
 
 		if (mode === 'SCALED') {
 			// Exact factor: the frame is the canvas at `factor`, the content scales by
@@ -520,13 +593,14 @@
 
 <!-- .viewport is the screen-fixed pan area. It centres the frame when it fits and
      scrolls (top-left reachable, via `safe center`) when SCALED overflows it. -->
-<div class="viewport" class:zoom={!isFitted} bind:this={viewport} on:scroll={updateOverlay}>
+<div class="viewport" class:zoom={!isFitted} class:shot bind:this={viewport} on:scroll={updateOverlay}>
 	<div
 		class="container {deckClass}"
 		class:fit-mode={isFitted}
 		class:zoom-mode={!isFitted}
 		class:clean={clean}
 		class:present={present}
+		class:shot
 		class:fade-chrome={fadeChrome}
 		style="--canvas-w:{width}px; --canvas-h:{height}px; --aspect:{aspectRatio}; --base-font:{baseFontSize};{contentBackground ? ` --content-bg:${contentBackground};` : ''}{contentFont ? ` --content-font:${contentFont};` : ''}"
 		bind:this={container}
@@ -543,7 +617,7 @@
 			     itself, top-centre and above the ink surface — because once the pen is armed
 			     the surface owns every pointer on the canvas and would bury a button placed
 			     here, leaving the speaker able to arm the pen but not to put it down. -->
-			{#if !clean && ($canLayout || !$presenterMode)}
+			{#if !clean && ($canLayout || canCapture || !$presenterMode)}
 			<div
 				class="slide-chrome gp-chrome no-print"
 				class:pinned={$layoutMode}
@@ -581,6 +655,25 @@
 						{/if}
 					</span>
 				{/if}
+				{/if}
+				<!-- CAPTURE downloads the slide as a PNG at true canvas resolution — with the
+				     annotations, without this chrome (it wears `.no-print`, which is exactly the
+				     line capture strips along). It borrows SAVE's refusal: a slide holding a live
+				     <iframe> cannot be rasterised, and the button says so when pressed rather than
+				     sitting greyed out looking broken. -->
+				{#if canCapture}
+					<span class="capture-btn" class:refused={!!captureTip}>
+						<CtrlBtn
+							chrome
+							text={captureLabel}
+							hoverText={captureLabel}
+							isDisabled={capturing}
+							on:click={onCapture}
+						/>
+						{#if captureTip}
+							<span class="capture-tip" role="status">{captureTip}</span>
+						{/if}
+					</span>
 				{/if}
 				<!-- PRESENT opens the presenter console; a text label like the other chrome
 				     buttons, hidden inside the console itself ($presenterMode). -->
@@ -748,6 +841,42 @@
 	   corner so it sits ON the slide, not on its edge. No font-size: it inherits
 	   .content's --base-font like the nav bar, so these read at the same size as the
 	   other in-slide chrome. */
+	/* ── `?shot` — the build-time screenshot render ────────────────────────────────
+	   The canvas at exactly 1:1, flush to the viewport's top-left, with no frame border
+	   and no letterbox. Point a headless browser at it with a window the size of the
+	   canvas and the VIEWPORT IS THE SLIDE — so the PNG needs no cropping and no
+	   rescaling, and it is the browser's own rasteriser doing the drawing, which is why
+	   this path captures iframes, video and Monaco that the in-app CAPTURE cannot.
+
+	   It is the one mode that deliberately does NOT fit the slide to the window. Fitting
+	   is what a human wants; a screenshot must not do it, or every PNG would be scaled by
+	   whatever fraction the frame's own 1.5px border happens to cost. */
+	.viewport.shot {
+		display: block;
+		overflow: hidden;
+		padding: 0;
+		margin: 0;
+	}
+	.container.shot {
+		width: var(--canvas-w);
+		height: var(--canvas-h);
+		border: none;
+		margin: 0;
+		transform: none;
+	}
+	.container.shot :global(.content) {
+		transform: none !important;
+	}
+	/* Strip exactly what the in-app CAPTURE strips — the same `.no-print` / `.gp-chrome`
+	   markers, so the two capture paths agree on what a slide IS. If they disagreed, the
+	   PNG you get from the button and the PNG you get from the build would differ, and
+	   nobody would know which one was right. The ink surface wears neither, so annotations
+	   land in both. */
+	.container.shot :global(.no-print),
+	.container.shot :global(.gp-chrome) {
+		display: none !important;
+	}
+
 	.slide-chrome {
 		position: absolute;
 		top: 24px;
@@ -766,22 +895,28 @@
 	   So it isn't in the pin: the button grows for the ~2.6s the refusal is up, then
 	   settles. The row moving there is fine — it moves BECAUSE of the click the audience
 	   just watched, so it reads as the answer, not as a glitch. */
-	.slide-chrome .save-btn :global(button) {
+	.slide-chrome .save-btn :global(button),
+	.slide-chrome .capture-btn :global(button) {
 		min-width: 4.6em;
 	}
 	/* The refusal has to be READ from the back of a room, so it doesn't get the muted
 	   chrome grey. Danger red, and the same token the demo slide's own prose uses, so
 	   the words in the chrome and the words on the slide are literally one colour. */
-	.slide-chrome .save-btn.refused :global(button) {
+	.slide-chrome .save-btn.refused :global(button),
+	.slide-chrome .capture-btn.refused :global(button) {
 		color: var(--ctrl-forbidden-fg, #E5484D);
 	}
 	/* The tooltip: why it refused, not just that it did. Anchored under the button and
 	   centred on it; `left: 50%` + translate keeps it centred as the button grows into
 	   the NOT ALLOWED label. Never intercepts the pointer. */
-	.slide-chrome .save-btn {
+	.slide-chrome .save-btn,
+	.slide-chrome .capture-btn {
 		position: relative;
 	}
-	.slide-chrome .save-tip {
+	/* CAPTURE wears the same refusal clothes as SAVE, deliberately: both are buttons that
+	   look ordinary, are pressable, and answer WHY when they cannot do the thing. */
+	.slide-chrome .save-tip,
+	.slide-chrome .capture-tip {
 		position: absolute;
 		top: calc(100% + 8px);
 		left: 50%;

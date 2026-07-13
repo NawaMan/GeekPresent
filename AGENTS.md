@@ -437,6 +437,121 @@ Nothing to place: `SlideDeck` mounts `<Annotate>` once, like `Spotlight`. One pr
 >
 > Demo: `annotate-component.html` → `annotate-persistence.html` → `annotate-setup.html`.
 
+### "Save this slide as an image (CAPTURE)"
+
+One prop, and a **CAPTURE** button joins LAYOUT/PRESENT in the slide chrome. It downloads the
+current slide as a PNG.
+
+```svelte
+<SlideDeck {pages} capture captureScale={2} />
+```
+
+- **It re-renders the canvas; it does not screenshot the window.** That is the whole design.
+  A slide has a TRUE size (1920×1080) and is merely *displayed* at whatever scale the window
+  allows — so a screen grab yields 1147×645 of somebody's laptop, while re-rendering yields
+  exactly the canvas, identical on every machine. `captureScale` multiplies the output and
+  stays crisp, because it re-renders rather than upscales.
+- **Ink in, chrome out — and the rule is one you already know.** The clone strips
+  `.no-print` / `.gp-chrome` (`CHROME_SELECTOR`), which is the same marker that keeps the nav
+  bar out of a printout. The pen's bar, toggle and stale prompt wear it; **`.annot-surface`
+  does not**, so the annotations survive. That is deliberate: the speaker circled the thing,
+  so the circle has to be in the PNG. If you add chrome anywhere, mark it `.no-print` and
+  capture gets it right for free.
+- **It refuses rather than lying.** An `<iframe>` (`WebSite` / `WebPage` / `YouTube`) is a
+  separate document whose pixels we may not read — the same-origin policy working, not a gap
+  to patch. So CAPTURE answers **NOT ALLOWED** on click and names the embed, exactly as SAVE
+  does. `<canvas>` and `<video>` *look* like the same problem and are not: their pixels are
+  readable, so each is snapshotted into an `<img>` and lands in the file.
+- **The trap, if you ever touch `capture/captureSlide.ts`:** the SVG we rasterise through is a
+  `data:` URL, i.e. **a separate document**. It cannot see this page's stylesheets, fonts or
+  images, and anything not physically carried into it is absent — *silently*. A missing font
+  does not throw; the text renders in Times New Roman and the layout shifts. So every
+  stylesheet is inlined, every `@font-face` payload is fetched to a `data:` URI, and every
+  `<img>`'s bytes are embedded (which also stops a cross-origin logo from tainting the canvas
+  and killing `toBlob`).
+- **And the trap that actually bit:** that inlined CSS is embedded in **XML**, not HTML. The
+  deck's compiled CSS carries `@import url("…?family=Amatic+SC:wght@400;700&display=swap")`,
+  and a bare `&` opens an entity reference in XML — so the document was malformed, and a
+  malformed SVG is not partly drawn, it is rejected *whole*, with an `onerror` that explains
+  nothing. `xmlSafeCss()` escapes `&`/`<` and **drops `@import` outright** (an SVG rendered as
+  an image may not fetch external resources anyway; the imported sheet's *contents* are pulled
+  in separately, since `@import`ed sheets never appear in `document.styleSheets` — they hang
+  off their parent as nested `CSSImportRule`s). `tests/captureCore.test.ts` parses the result
+  through `DOMParser` as `image/svg+xml` and asserts no `<parsererror>`, which is exactly the
+  check the browser was failing.
+
+> Access follows ANNOTATE's precedence (`capture/captureCore.ts`): `pnpm dev` > sticky
+> `?capture` / `?capture=off` > the deck's `capture` prop > off. A screenshot is the
+> speaker's decision; the slide has no opinion. Demo: `capture-slide.html`.
+
+**Every slide to a PNG, offline** — `utils/capture-slides.sh` (for OG/social images, thumbnails,
+a contact sheet). It drives a real headless Chrome, so unlike the in-app button it captures
+**everything** — iframes, video, Monaco — because the browser's own rasteriser does the drawing.
+
+```bash
+pnpm build && utils/capture-slides.sh            # → captures/slides/*.png
+utils/capture-slides.sh --deck portrait --size 1080x1920
+```
+
+- **`?shot` is the whole trick.** A URL flag that tells `SlideDeck` to render the canvas at
+  exactly 1:1 — no frame border, no letterbox, no chrome (it implies `?clean`) — and to skip
+  `adjustSize` entirely. Size the browser window to the canvas and the **viewport IS the
+  slide**, so the PNG needs no cropping and no rescaling. It is the one mode that deliberately
+  does NOT fit the slide to the window: fitting is what a human wants and exactly what a
+  screenshot must not do.
+- **It strips the same `.no-print` / `.gp-chrome` as the in-app CAPTURE**, on purpose — if the
+  two paths disagreed about what a slide *is*, the PNG from the button and the PNG from the
+  build would differ and nobody would know which was right. (The selector is repeated in
+  `SlideDeck`'s `.container.shot` CSS; keep it in step with `CHROME_SELECTOR`.)
+- **Slides are mounted on hydration, so a screenshot taken too early is a valid, correctly
+  sized, entirely BLANK frame.** This is the trap, and it is nasty because it is *silent* — a
+  blank slide still yields a plausible ~10KB PNG, and a blank OG image is the sort of thing
+  nobody notices until it is on someone else's timeline. Three defences, all needed:
+  `--run-all-compositor-stages-before-draw`, a generous `--virtual-time-budget`, and — the one
+  that actually saves you — **shoot, check the size, and shoot again**. No single budget is
+  right for every machine: what works idle loses when 65 Chromes run back to back, so the
+  script verifies rather than guesses, and exits non-zero if a slide never comes out.
+- **Serve over http, never `file://`.** SvelteKit's client is an ES module and `file://` blocks
+  module scripts, so the deck never hydrates and *every* PNG is blank. This exact symptom was
+  once written off as "the deck doesn't render headless". It renders fine; it just needs an
+  origin.
+
+**Social cards — `--og`.** Every slide's OG/Twitter card *is that slide*, instead of the site's
+one default card. **CI already does this** — you rarely run it by hand.
+
+```bash
+pnpm build && utils/capture-slides.sh --og && pnpm build
+```
+
+- **The two builds are forced, not wasteful.** The cards are screenshots OF the built deck, and
+  each slide's `og:image` is baked into its PRERENDERED HTML. So: build to have something to
+  photograph → photograph → build again so the tags and the PNGs are in the output. There is no
+  single-pass version. `.github/workflows/deploy-pages.yml` runs exactly this.
+- Captures into `static/og/<deck>/` — `static/` is what the build copies to the site root, so
+  `static/og/slides/title.png` is served at `/og/slides/title.png`, exactly the site-relative
+  form `seo/config.resolveImage` turns into an absolute URL.
+- **`/static/og/` is GITIGNORED and regenerated in CI.** The PNGs are build output, not source:
+  derived from the slides, and stale the moment a slide changes. Nothing OG-related needs
+  committing — CI wires `pages.ts` in its own ephemeral workspace, so a slide added since the
+  last run gets a card automatically and there is no wiring to forget. (Commit the `pages.ts`
+  edit only if you want it visible in the repo; re-running is idempotent either way.)
+- **At FULL canvas resolution.** An earlier version shrank these to ~1200px wide to keep the
+  repo small — a reason that evaporated once they were gitignored. Shrinking buys nothing else:
+  the aspect ratio is identical either way (so a card crops on a timeline the same), the
+  platforms accept far larger, and a smaller file is just blurrier on a high-DPI screen. Use
+  `--scale 0.625` if you want them small anyway — via `--force-device-scale-factor`, so the
+  canvas keeps laying out at its true CSS px and nothing reflows. Shrinking the *window* would
+  CROP rather than scale, because `?shot` is 1:1 by design.
+- The `image:` field is **edited into `pages.ts`** (`utils/wire-og.mjs`, tested in
+  `tests/wireOg.test.ts`) rather than derived at runtime, because `image` is a field the AUTHOR
+  owns. The rules that make that safe: **it never overwrites an `image` an author set by hand**,
+  it invents no URL for a PNG that does not exist, it is idempotent, and anything it cannot
+  confidently place it *leaves alone and reports* — the same bargain `patchSource.ts` makes for
+  LAYOUT's SAVE. `--no-wire` writes the PNGs only.
+- It **refuses to wire when a slide failed to capture**, and the script exits non-zero so the
+  deploy fails with it: a card pointing at a blank PNG is worse than no card at all, and the
+  failure is silent (a blank slide still yields a perfectly plausible PNG).
+
 ### "Draw a diagram / connect these boxes with arrows"
 
 Don't compute arrow coordinates. Give each box a **`name`** and let **`Connector`** route

@@ -49,6 +49,7 @@
 	articleHref="../"
 	fadeChrome
 	annotate
+	capture
 >
 	<slot />
 </SlideDeck>

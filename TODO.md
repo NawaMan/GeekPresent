@@ -10,6 +10,102 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
 
 ## Tier 1 — closes clear gaps
 
+- [x] **Capture a slide as a PNG** — a CAPTURE button that downloads the current slide, ink and all.
+  - Done: `src/lib/capture/captureCore.ts` (pure, total — the strip/refuse/name/XML decisions) and
+    `src/lib/capture/captureSlide.ts` (the impure half: CSS + font + image inlining, the
+    `<canvas>`/`<video>` snapshot, the rasterise and the download), plus `SlideDeck`'s `capture` /
+    `captureScale` props and the chrome button. Demo `capture-slide.html`; tests
+    `tests/captureCore.test.ts` (20). No new dependencies — this is `fetch`, `cloneNode` and a 2D
+    context.
+  - **It re-renders the canvas rather than screenshotting the window**, and that is the whole reason
+    to build it rather than tell people to press PrtSc. A slide has a TRUE size (1920×1080) and is
+    merely *displayed* at whatever scale the window allows — so a screen grab hands you 1147×645 of
+    somebody's laptop, while re-rendering hands you exactly the canvas, identical on every machine.
+    `captureScale={2}` yields 3840×2160 and stays crisp, because it re-renders rather than upscales.
+    (The Screen Capture API was the alternative: pixel-perfect for *any* content, including iframes,
+    but a permission prompt every time and only ever as many pixels as the window was showing.)
+  - **Ink in, chrome out — and the rule already existed.** The clone strips `.no-print` / `.gp-chrome`,
+    the same marker that keeps the nav bar out of a printout, rather than inventing a second list that
+    would drift. The pen's bar, toggle and stale prompt now wear it (which also fixes *printing* the
+    pen's bar); `.annot-surface` does not, so the strokes survive. That asymmetry is the point of the
+    feature: the speaker circled the thing, so the circle has to be in the PNG.
+  - **It refuses instead of lying.** An `<iframe>` (`WebSite` / `WebPage` / `YouTube`) is a separate
+    document whose pixels we may not read — the same-origin policy working, not a gap to patch — so
+    CAPTURE answers NOT ALLOWED on click and *names the embed in the way*, the bargain SAVE already
+    makes. `<canvas>` and `<video>` look like the same problem and are not: their pixels ARE readable,
+    so each is snapshotted into an `<img>` (a `Canvas` drawing and a paused `Video` frame both land in
+    the file) rather than costing the capture.
+  - **The silent trap: a `data:` URL SVG is a SEPARATE DOCUMENT.** It cannot see this page's
+    stylesheets, fonts or images, and anything not carried into it is simply absent — with no error. A
+    missing font does not throw; the text renders in Times New Roman and the layout quietly shifts. So
+    every stylesheet is inlined, every `@font-face` payload fetched to a `data:` URI, and every
+    `<img>`'s bytes embedded (which also stops one cross-origin logo from tainting the canvas and
+    making `toBlob` throw, killing the whole export over a decoration).
+  - **The loud trap, which shipped broken: that CSS is embedded in XML, not HTML.** The deck's compiled
+    CSS carries `@import url("…family=Amatic+SC:wght@400;700&display=swap")`, and a bare `&` opens an
+    entity reference in XML — so the document was malformed, and a malformed SVG is not *partly* drawn,
+    it is rejected **whole**, with an `onerror` carrying no explanation. One ampersand, in a font
+    import, refused every screenshot in the deck. `xmlSafeCss()` escapes `&`/`<` and **drops `@import`
+    outright** — not tidiness: an SVG rendered as an image may not fetch external resources at all, so
+    the rule could never have worked. Fixing it exposed a third bug behind it: `@import`ed sheets never
+    appear in `document.styleSheets` (they hang off their parent as nested `CSSImportRule`s), so three
+    of the deck's fonts were being dropped silently anyway. `collectCss` now recurses into them.
+    The regression test has teeth — it parses the SVG through `DOMParser` as `image/svg+xml` and
+    asserts no `<parsererror>`, which is precisely the check the browser was failing.
+- [x] **Build-time capture** — every slide to a PNG, offline (OG/social images, thumbnails).
+  - Done: `utils/capture-slides.sh` + the `?shot` render mode in `SlideDeck`. 65 slides in ~70s.
+  - **THE BLOCKER DID NOT EXIST.** This was logged as "blocked on the deck rendering blank in headless
+    Chrome (`initialized` never flips)". That is false, and it had been sitting in a memory note as
+    settled fact — which is how a non-bug came to be recorded as the reason a feature was never
+    attempted. `initialized = true` is set *unconditionally* in `onMount`, so there was never a
+    mechanism for the claimed failure. Serve the built site over **http** and headless Chrome renders
+    it perfectly. The original observation was almost certainly `file://`, where SvelteKit's ES-module
+    client cannot load, so hydration never runs — which produces exactly the reported symptom
+    (container renders, `ready` never appears). An origin problem, diagnosed as a deck problem.
+  - **`?shot` is the mechanism.** It renders the canvas at exactly 1:1 — no frame border, no
+    letterbox, no chrome (it implies `?clean`), `adjustSize` skipped entirely. Size the browser window
+    to the canvas and the *viewport IS the slide*, so the PNG needs no cropping and no rescaling. It is
+    the one mode that deliberately does NOT fit the slide to the window; fitting is what a human wants
+    and precisely what a screenshot must not do. It strips the same `.no-print` / `.gp-chrome` the
+    in-app CAPTURE does, so the two paths agree on what a slide *is*.
+  - **This path captures what the in-app button cannot** — iframes, video, Monaco — because a real
+    browser does the rasterising rather than our SVG `<foreignObject>`. The two are complements, not
+    rivals: CAPTURE is one click on a deployed static site with no tooling; this is offline, batch,
+    and full-fidelity. Verified on `website-component.html`, whose live `example.com` frames land in
+    the PNG.
+  - **The trap, and it is a silent one.** Slide content is mounted on hydration, so a screenshot taken
+    too early is a valid, correctly-sized, entirely BLANK frame — and a blank slide still yields a
+    plausible ~10KB PNG. Three of 66 slides came out empty on the first full run and nothing complained.
+    `--run-all-compositor-stages-before-draw` and a bigger `--virtual-time-budget` help, but neither is
+    sufficient: **no single budget is right for every machine** (what works idle loses when 65 Chromes
+    run back to back). So the script *verifies* instead of guessing — shoot, check the size, shoot
+    again, and exit non-zero if a slide never comes out. Tuning would have hidden this; checking cannot.
+  - **Social cards (`--og`), wired into CI.** Every slide's OG/Twitter card becomes THAT SLIDE rather
+    than the site's one default. PNGs land in `static/og/<deck>/` (the dir the build copies to the site
+    root, so they are served at the site-relative path `seo/config.resolveImage` makes absolute).
+    `/static/og/` is **gitignored** and regenerated by `deploy-pages.yml`, which now runs **build →
+    capture → build**: the cards are screenshots OF the built deck, and `og:image` is baked into each
+    slide's PRERENDERED HTML, so there is no single-pass version of this.
+  - **Captured at FULL canvas resolution, and the first version was wrong to shrink them.** They were
+    downscaled to ~1200px wide on the grounds that a folder of full-res slides would add ~15MB to the
+    repo — a reason that evaporated the moment they were gitignored and generated in CI. Nothing else
+    argued for it: the ASPECT RATIO is identical either way (so a card crops on a timeline the same),
+    the platforms accept far larger, and the only thing a smaller file actually changes is that it
+    looks blurrier on a high-DPI screen. `--scale` still shrinks them on request, via
+    `--force-device-scale-factor` — the canvas keeps laying out at its true CSS px so nothing reflows.
+    Shrinking the *window* would CROP rather than scale, since `?shot` is 1:1 by design.
+  - **The `image:` field is EDITED INTO `pages.ts`** (`utils/wire-og.mjs`, `tests/wireOg.test.ts`) rather
+    than derived at runtime, and that is the deliberate part: `image` is a field the AUTHOR owns. A
+    convention that silently overrode a hand-made card would be a nasty surprise, and one that silently
+    invented a URL for a PNG nobody generated would 404 on someone's timeline. Written into source, the
+    wiring is visible, diffable and revertible. It never overwrites an existing `image`, invents no URL
+    for a PNG that is not there, is idempotent, and leaves-and-reports anything it cannot confidently
+    place — the same bargain `patchSource.ts` makes for SAVE. It also refuses to wire at all if a slide
+    failed to capture: a card pointing at a blank PNG is worse than no card.
+  - Nothing OG-related is committed: CI wires `pages.ts` in its own ephemeral workspace, so a slide
+    added since the last run gets a card automatically and there is no stale wiring to forget. The
+    deck's `pages.ts` ships unwired, and an author's hand-set `image` still outranks the tool.
+
 - [x] **A geometry-setting `style` on a LAYOUT-draggable shape fights the drag** — rule decided:
       **the props own the geometry.**
   - Every component takes `style` / `id` / `class`, appended last on the root so the author's

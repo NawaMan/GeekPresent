@@ -308,7 +308,7 @@
 {#if browser && chrome && $canAnnotate}
 	<button
 		type="button"
-		class="annot-toggle"
+		class="annot-toggle no-print"
 		class:on={$annotationMode}
 		aria-pressed={$annotationMode}
 		title={$annotationMode ? 'Put the pen down (Esc)' : 'Draw on this slide'}
@@ -322,7 +322,7 @@
      last week's rehearsal marks appear on stage and the speaker has to notice them before
      the audience does. Only for ink OLDER than the threshold — today's marks never nag. -->
 {#if $staleInk}
-	<div class="annot-stale" role="status">
+	<div class="annot-stale no-print" role="status">
 		<span class="annot-stale-text">
 			This slide has annotations from <b>{inkAgeText($staleInk.ts, browser ? Date.now() : 0)}</b>.
 		</span>
@@ -338,7 +338,7 @@
 	     it. Ghosted until pointed at (the fadeChrome trick), because it hangs over the slide
 	     the audience is reading — but it keeps its full hit area, so it is exactly where the
 	     speaker last left it. -->
-	<div class="annot-bar" role="toolbar" aria-label="Annotation tools" bind:this={bar} style={barStyle}>
+	<div class="annot-bar no-print" role="toolbar" aria-label="Annotation tools" bind:this={bar} style={barStyle}>
 		<!-- Drag by the GRIP, not by the bar's face — a bar you drag by its body is a bar whose
 		     buttons you can no longer press. Double-click sends it home. -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
