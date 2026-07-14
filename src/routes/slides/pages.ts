@@ -11,6 +11,10 @@ export const pages = [
     { path: "content-page.html",      title: "Using ContentPage" },
     { path: "content-header.html",    title: "The ContentPage Header" },
     { path: "navigation.html",        title: "Navigation" },
+    // Beside Navigation, because that is what it is: the OVERVIEW PAGE grid is the third way
+    // to move around a deck, after paging and the ToC. The slide IS its own demo — press
+    // O while reading it and this deck opens as a grid of itself.
+    { path: "overview-grid.html",     title: "Overview Page — The All-Slides Grid" },
     { path: "appendix-page.html",     title: "AppendixPage" },
     // `hidden: true` — an APPENDIX: real, prerendered, linkable slides that are NOT in
     // the deck's linear order. →/Space step over them and the Table of Contents doesn't

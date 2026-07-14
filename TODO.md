@@ -576,27 +576,47 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
   - Wrapping in a `Block` sizes it (resize rubber-bands both axes): `Block` now
     fills its content by default (`fill={false}` to opt out), so no per-component
     fill prop is needed. Demo parks a `<Block><Callout/></Block>` and flips LAYOUT.
-- [ ] **Deck overview — the all-slides grid** — an overlay showing every slide at once, click one
+- [x] **Deck overview — the all-slides grid** — an overlay showing every slide at once, click one
       to jump. The "press O" move reveal.js and the slide-sorter both have.
-  - Nothing in the deck shows more than one slide. The two things that *sound* like it are not it:
-    `SlideMap.svelte` is a contentless pan rectangle for a zoomed slide (it says so in its own
-    header comment — it renders NO slide content), and both TOCs (`TableOfContent.svelte:74`, the
-    console's at `PresenterView.svelte:337`) are plain text `<a>`/button lists. So finding slide 23
-    means paging to it or reading a list of titles.
-  - Approach: reuse the mechanism `PresenterView.svelte:288-315` already proves — a live `<iframe>`
-    of the prerendered slide at `?clean`, scaled to fit its panel. The console renders two of these
-    (current + next); the grid renders all of them off `pages.ts` (`visiblePages()`, so `hidden`
-    appendices stay out, exactly as the TOC filters today). Click → the same `jump(p.path)` the
-    console's TOC already calls. No capture step, no new data.
-  - **Do NOT reach for the OG social cards as thumbnails.** It looks tempting — `utils/wire-og.mjs`
-    writes `image:` into `pages.ts` and the `Page` type has carried `image?`/`imageAlt?` since
-    `navigate.ts:15` — but `grep "image:" src/routes/*/pages.ts` is **zero hits** in every committed
-    deck, `static/og/` is gitignored and only regenerated in CI, and the field's one consumer is SEO
-    meta. A grid built on it would be empty in `pnpm dev` and empty on a fresh clone.
-  - Open questions: the key to open it (`o`? `Escape`? both?) — the global keydown surface is
-    deliberately tiny today (`NavigationBar.svelte:94-117` owns arrows + Space, nothing else), so
-    adding one is a real decision, not a freebie. Does it lazily mount iframes (65 slides = 65
-    documents) or render a cheap title card until scrolled into view?
+  - Done: `src/lib/components/OverviewPage.svelte` (the overlay, the lazy-mount observer and the
+    tiles) and `src/lib/utils/overviewPageCore.ts` (pure, total — the fit-scale, the tile list, and
+    what a key press MEANS). Mounted by `SlideDeck` beside the ToC; role tokens `--overview-page-*` in
+    `themes/roles.css` over a new `--SCRIM` base in `themes.css` (all three palettes). Demo
+    `overview-grid.html` — which IS its own demo, like `layout-mode` and `capture-slide`: press O
+    while reading it and the deck opens as a grid of itself. Tests `tests/overviewPageCore.test.ts`
+    (19), `tests/OverviewPage.test.ts` (14), `tests/OverviewPageSsr.ssr.test.ts` (4). No new dependencies.
+  - **The tiles are live slides, not screenshots**, and that was the real decision. A captured
+    thumbnail is stale the moment its slide is edited and *missing entirely* on a fresh clone —
+    `/static/og/` is gitignored, no PNG is committed, and `grep "image:" src/routes/*/pages.ts` is
+    still zero hits across all 8 decks. So each tile is the prerendered page in an `<iframe>` at
+    `?clean`, rendered at native 1920×1080 and CSS-scaled to fit — the same mechanism the presenter
+    console's CURRENT/NEXT previews already prove (`PresenterView.svelte:290-313`). No capture
+    step, no artifact, nothing to regenerate.
+  - Embedding a slide is safe for free: `SlideDeck.svelte:241` already gates every cross-window
+    relay behind `isTopWindow`, so a tile follows nobody and publishes nothing.
+  - **Lazy, and one-way.** A tile is a cheap title card until it scrolls near the viewport, then it
+    keeps its iframe — unmounting on scroll-out would re-boot a slide every time it drifted past.
+    The current slide is always live, so the grid opens already showing where you are. Opening a
+    65-slide deck boots the dozen you can see, not 65. Where `IntersectionObserver` is absent it
+    mounts **eagerly** rather than leaving a card that can never resolve — the same "degrade to
+    eager, never blank" bargain `WebSite` strikes.
+  - Answering the open questions: **`o` opens it, `Escape` closes it.** `o` did NOT go into
+    `NavigationBar` — that file is the single keydown owner *for paging*, and an overlay is not
+    paging — so `OverviewPage` owns its own listener the way `TableOfContent` owns Escape. Escape only
+    ever *closes*, and only when the grid is open, so the deck's other Escape listeners still get
+    their key. The guard is a deliberately NARROWER `isTypingTarget` than `stepKeys`'
+    `isInteractiveTarget`: that one counts BUTTON/A as interactive (right for Space, which must
+    activate a focused button), and borrowing it here would have left Escape unable to close the
+    overlay — because with the grid open the focus IS on a tile button.
+  - It lives in CANVAS space (absolute over `.content`, like the ToC), not window-fixed: the deck's
+    scale transform sits on `.content`, and `SlideDeck.svelte:444-446` already records why that
+    matters — a `position: fixed` child of a transformed element anchors to that element, not the
+    window. Canvas space also means the grid inherits the deck's theme.
+  - Gated in MARKUP on `!clean && !present`, not merely hidden by the `?clean` CSS rule that
+    retires the rest of the chrome: a tile must not build a slide list or arm a global `o`
+    listener, and there are a dozen alive at once. It is also what stops a tile growing a grid of
+    its own, recursively. `OverviewPageSsr.ssr.test.ts` pins the negative that follows — a shut grid
+    prerenders to a button and *no iframe*, so a 65-slide deck does not emit 65×65 frames.
 - [ ] **Handout — the whole deck as one printable document / PDF** — one page per slide, notes
       optional, so `Ctrl+P → Save as PDF` exports the talk.
   - Today there is no deck export at all. The *entire* print story is four lines

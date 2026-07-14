@@ -62,6 +62,19 @@
 	--toc-border:        var(--LINE, #CCCCCC);
 	--toc-row-hover-bg:  var(--LINE, #DDDDDD);
 
+	/* Deck overview — the all-slides grid (OverviewPage.svelte). A near-opaque scrim over
+	   the canvas, so the tiles (which are the real slides) carry the colour and the
+	   chrome around them recedes. The scrim keeps its alpha in the fallback: a theme
+	   that hands back an opaque PANEL here would let the slide underneath show
+	   through the grid. */
+	--overview-page-scrim-bg:       var(--SCRIM, #0C0F13F2);
+	--overview-page-head-fg:        var(--INK, #E6EDF3);
+	--overview-page-dim-fg:         var(--INK-DIM, #8A99A8);
+	--overview-page-tile-bg:        var(--PAPER-RAISED, #14181D);
+	--overview-page-tile-border:    var(--LINE, #2B3440);
+	--overview-page-tile-hover-border: var(--ACCENT, #2980B9);
+	--overview-page-current-border: var(--ACCENT-2, #00B356);   /* the slide you're on */
+
 	/* Box overlay */
 	--box-bg:            var(--BACKDROP, #000000);
 	--box-border:        var(--ACCENT, #ADD8E6);

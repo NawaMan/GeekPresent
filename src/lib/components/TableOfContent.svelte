@@ -36,8 +36,12 @@
 	function turnOffTableOfContent() {
 		isContentVisible.update(__ => false);
 	}
+	// Only consume Escape when the ToC is actually OPEN. It used to preventDefault
+	// every Escape, open or shut — silently swallowing the key for every other
+	// listener on the deck, since they all (rightly) skip an already-handled event.
+	// A closed menu has no business claiming a key it is not using.
 	function handleGlobalKeydown(event: KeyboardEvent) {
-		if (event.key === 'Escape') {
+		if (event.key === 'Escape' && $isContentVisible) {
 			event.preventDefault();
 			turnOffTableOfContent();
 		}

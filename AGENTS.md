@@ -117,7 +117,14 @@ than misleading the next agent.
   live slide, persisted per slide; see its playbook, and note the deck must pass `annotate`
   to offer it),
   plus framework-internal `Copyright`, `CtrlBtn`,
-  `NavigationBar`, `TableOfContent`, `SizeMode`, `Seo` (renders SEO/social metadata
+  `NavigationBar`, `TableOfContent`,
+  `OverviewPage` (the all-slides grid — press **O**, click a slide to jump, Escape closes. `SlideDeck`
+  mounts it; no slide places it and no prop offers it. Its tiles are the *real* slides — each is the
+  prerendered page in an `<iframe>` at `?clean`, at native size and CSS-scaled to fit — not
+  screenshots, so nothing goes stale and nothing is generated. Tiles mount lazily as they scroll
+  into view and stay mounted; `hidden` appendices are omitted, as in the ToC. Logic lives in the
+  pure `utils/overviewPageCore.ts`),
+  `SizeMode`, `Seo` (renders SEO/social metadata
   into `<svelte:head>` — see the SEO note under *Gotchas*).
 - Package manager is **pnpm** (`pnpm dev` / `build` / `deploy`). The **user** runs the dev server —
   `http://localhost:31173` by default — not you (Rule 6).

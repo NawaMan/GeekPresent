@@ -29,6 +29,7 @@
 
 	import Copyright      from '$lib/components/Copyright.svelte';
 	import TableOfContent from '$lib/components/TableOfContent.svelte';
+	import OverviewPage  from '$lib/components/OverviewPage.svelte';
 	import SizeMode       from '$lib/components/SizeMode.svelte';
 	import SlideMap       from '$lib/components/SlideMap.svelte';
 	import CtrlBtn        from '$lib/components/CtrlBtn.svelte';
@@ -697,6 +698,16 @@
 				chrome={!clean && !present}
 			/>
 			<TableOfContent {pages} {article} {articleText} {articleHref} />
+			<!-- The all-slides grid (press O). Canvas-space, like the ToC — its tiles are
+			     live `?clean` iframes of the real slides.
+
+			     Gated in MARKUP rather than hidden in CSS (which is how ?clean retires the
+			     other chrome): a tile must not build a slide list or arm a global `o`
+			     listener, and there are a dozen tiles alive at once. Not rendering it is
+			     also what stops a tile from growing a grid of its own, recursively. -->
+			{#if !clean && !present}
+				<OverviewPage {pages} {width} {height} currentPath={currentSlide ?? ''} />
+			{/if}
 			<Copyright />
 			{/if}
 		</div>
