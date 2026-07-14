@@ -21,7 +21,7 @@ If you do any front-end work you already know HTML + CSS + JS, and you've probab
 - **Fixed canvas, automatic scaling.** You design on a fixed **1920×1080** canvas and position things with normal CSS — including absolute positioning at exact pixels — and the framework scales the whole slide to fit any screen. You think in one size; it handles the rest.
 - **Colocation, your choice.** Global CSS/JS/assets work, but each page can also keep its *own* assets (images, etc.) right next to it. Pick whatever keeps cognitive load low.
 - **Real componentization.** Svelte is excellent at components, so reusable slide pieces (boxes, code viewers, notes…) are just imports.
-- **Navigation built in.** Arrow keys, on-screen buttons, and a Table of Contents — no wiring required.
+- **Navigation built in.** Arrow keys, on-screen buttons, a Table of Contents, and an **Overview Page** grid (press <kbd>O</kbd> to see every slide at once) — no wiring required.
 - **FITTED / SCALED modes.** Present fit-to-window, or switch to an exact zoom (1:1 and beyond) you can pan, with a minimap; speaker notes show below when zoomed out.
 - **It's just text.** Slides are Svelte files, so they diff cleanly, version-control nicely, and hot-reload while you edit.
 
@@ -420,13 +420,24 @@ Add notes with the `Note` component (shown below the slide in SCALED mode; hidde
 
 ## Navigation & keyboard shortcuts
 
-The nav bar (FIRST / PREV / NEXT / LAST) and the **Table of Contents** (top-left button) are added to every slide automatically.
+The nav bar (FIRST / PREV / NEXT / LAST), the **Table of Contents** (top-left button) and the **Overview Page** grid (the button just below it) are added to every slide automatically.
 
-| Key         | Action          |
-|-------------|-----------------|
-| Arrow Left  | Previous slide  |
-| Arrow Right | Next slide      |
-| Escape      | Close ToC / Box |
+| Key         | Action                       |
+|-------------|------------------------------|
+| Arrow Left  | Previous slide               |
+| Arrow Right | Next slide                   |
+| Space       | Next step, else next slide   |
+| O           | Open the Overview Page grid       |
+| Escape      | Close Overview Page / ToC / Box   |
+
+`Space` advances a `<Steps>` build while one is running and pages the deck once it's spent, so a
+build simply inserts sub-steps into the deck's forward march (`Shift+Space` reverses).
+
+`O` opens the **Overview Page** — every slide at once, click one to jump. The tiles are the *real*
+slides (each is the prerendered page in an `<iframe>`, scaled to fit), not screenshots, so they're
+never stale and there's nothing to generate. They mount lazily as they scroll into view, so opening
+a 65-slide deck boots the dozen you can see rather than all 65. Appendices (`hidden: true`) stay
+out, exactly as they do in the ToC. Neither key fires while you're typing in a text field.
 
 ## Printing
 
