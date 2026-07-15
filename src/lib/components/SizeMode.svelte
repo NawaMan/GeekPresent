@@ -1,11 +1,12 @@
 <!--
-  SizeMode — the display-mode control (top-right chrome).
+  SizeMode — the display-mode (zoom) control.
 
   A TOC-style dropdown that switches between FITTED (fit to window) and SCALED
   (an exact zoom factor). The menu offers the same factor through two lenses —
-  a SCALE % group and a RESOLUTION group — plus a custom %. SlideDeck mounts this
-  in its screen-fixed overlay, so it stays reachable while a SCALED slide is
-  panned/zoomed. Reads/writes the displayMode + displayFactor stores.
+  a SCALE % group and a RESOLUTION group — plus a custom %. It renders two ways:
+  standalone it pins to the window's top-right corner; with `inline` it folds into
+  <SlideToolbar>'s top bar as the DISPLAY segment. Either way it stays reachable while
+  a SCALED slide is panned/zoomed. Reads/writes the displayMode + displayFactor stores.
 -->
 <script lang="ts">
 	import CtrlBtn from './CtrlBtn.svelte';
@@ -17,6 +18,9 @@
 	    (a portrait deck reads its own sizes; the friendly names assume 1920x1080). */
 	export let width  = 1920;
 	export let height = 1080;
+	/** Sit in a flex row (folded into SlideToolbar) rather than pinning to the window's
+	    top-right corner. The menu still drops beneath the control either way. */
+	export let inline = false;
 
 	let open = false;
 	let rootRef: HTMLElement;
@@ -78,7 +82,7 @@
 	});
 </script>
 
-<div class="mode gp-chrome no-print" class:expanded={open} bind:this={rootRef}>
+<div class="mode gp-chrome no-print" class:expanded={open} class:inline bind:this={rootRef}>
 	<!-- The ADJUST toggle used to live here; it moved into SlideDeck's content layer
 	     so slide blocks can render on top of it (see SlideDeck `.layout-ctrl`). -->
 	<CtrlBtn chrome text={label} hoverText={label} on:click={() => (open = !open)} isSelected={open} />
@@ -137,6 +141,49 @@
 		   a touch larger than the in-slide chrome so this always-present control reads
 		   clearly. 1em is the overlay's inherited --base-font. */
 		font-size: 1.2em;
+	}
+
+	/* Folded into SlideToolbar: drop the fixed corner inset and join the flex row instead.
+	   position:relative (not static) so the dropdown `.menu` still anchors to THIS control
+	   rather than to the toolbar's right edge, and font-size:inherit so it matches the bar. */
+	.mode.inline {
+		position: relative;
+		top: auto;
+		right: auto;
+		margin-right: 0;
+		font-size: inherit;
+		display: flex;
+		align-items: center;
+	}
+
+	/* Dress DISPLAY like the bar's word toggles when folded in — CtrlBtn's default `chrome`
+	   look is grey and recessed, but here it sits among PRESENT / ANNOTATE / ADJUST and must
+	   read as one of them: amber text, transparent, muted at rest, a filled amber pill while
+	   its menu is open (matching `.annot-tab.on`). :global reaches CtrlBtn's own <button>; the
+	   `.mode.inline` prefix keeps it from touching the corner (standalone) DISPLAY. */
+	.mode.inline :global(button.chrome) {
+		font-size: inherit;
+		font-weight: bold;
+		letter-spacing: 0.04em;
+		padding: 0.25em 0.7em;
+		margin: 0.2em 0.1em;
+		border-radius: 999px;
+		background: transparent;
+		color: var(--annot-toggle-fg, #F0A33E);
+		opacity: 0.62;
+		transition: opacity 120ms ease, background 120ms ease;
+	}
+	.mode.inline :global(button.chrome:hover:not(:disabled)) {
+		opacity: 1;
+		color: var(--annot-toggle-fg, #F0A33E);
+		background: var(--annot-bar-hover, rgba(255, 255, 255, 0.1));
+		border-color: transparent;
+	}
+	.mode.inline :global(button.chrome.selected) {
+		opacity: 1;
+		background: var(--annot-pen, #F0A33E);
+		color: var(--annot-bar-on-fg, #1A1206);
+		border-color: transparent;
 	}
 
 	.menu {

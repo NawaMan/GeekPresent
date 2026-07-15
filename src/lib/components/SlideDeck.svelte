@@ -30,7 +30,7 @@
 	import Copyright      from '$lib/components/Copyright.svelte';
 	import TableOfContent from '$lib/components/TableOfContent.svelte';
 	import OverviewPage  from '$lib/components/OverviewPage.svelte';
-	import SizeMode       from '$lib/components/SizeMode.svelte';
+	import SlideToolbar   from '$lib/components/SlideToolbar.svelte';
 	import SlideMap       from '$lib/components/SlideMap.svelte';
 	import PresenterView  from '$lib/components/PresenterView.svelte';
 	import Seo            from '$lib/components/Seo.svelte';
@@ -208,11 +208,10 @@
 	let mapRect = { left: 0, top: 0, width: 1, height: 1 };
 	const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 
-	// DISPLAY now attaches to the VIEWPORT's top-right corner (see SizeMode) — a
-	// window control, reachable no matter how the slide is scaled or panned — so there
-	// is nothing frame-relative to recompute here. The top-centre tool cluster (PRESENT +
-	// the menu) lives ON the slide (canvas space, inside <Annotate>) and rides the slide's
-	// own transform. updateOverlay is kept as the minimap's recompute hook.
+	// The top-centre tool cluster (PRESENT + the menu) and DISPLAY both live in the
+	// window-fixed overlay now (see <SlideToolbar>) — window controls, reachable no matter
+	// how the slide is scaled or panned — so there is nothing frame-relative to recompute
+	// here. updateOverlay is kept as the minimap's recompute hook.
 	function updateOverlay() {
 		updateMap();
 	}
@@ -690,130 +689,7 @@
 			     stroke lands on top of the cue it is drawn next to. Renders nothing at all
 			     until there is ink or the pen is armed — so it is inert (and SSR-inert) on
 			     every deck that never offers it. -->
-			<Annotate
-				canvasWidth={width}
-				canvasHeight={height}
-				{inkColors}
-				{levelHighlight}
-				chrome={!clean && !present}
-			>
-				<!-- The whole top-centre cluster now lives in <Annotate>, fed by these slots so
-				     their logic stays HERE while their HOME is the menu above the ink surface (an
-				     armed pen would bury a button placed anywhere else). PRESENT is the always-on
-				     anchor; OVERVIEW/CAPTURE/PRINT are flat action rows; ADJUST (the old ADJUST) is
-				     a sub-toggle with SAVE nested under it. The pen's own ANNOTATE toggle is owned
-				     by <Annotate>, so it is NOT slotted here. -->
-
-				<!-- PRESENT — the anchor. Ensures the presenter console is running (opens it, or
-				     re-focuses the existing one); it is not a mode, so it carries no on/off state.
-				     Hidden with the whole cluster inside the console itself (chrome={!present}). -->
-				{#snippet presentBtn()}
-					<button type="button" class="annot-anchor" on:click={openPresenter}>PRESENT</button>
-				{/snippet}
-
-				<!-- ADJUST — the old ADJUST toggle, moved into the menu and renamed. A sub-toggle
-				     that reads ADJUST:off / ADJUST:on in place (pinned width, so the label swap does
-				     not resize it), and only when the slide OFFERS layout ($canAdjust). SAVE appears
-				     beside it while ADJUST is on. The snippet also carries the divider that precedes
-				     the pair, so a deck that doesn't offer ADJUST leaves no dangling separator. -->
-				{#snippet adjustGroup()}
-					{#if $canAdjust}
-						<span class="annot-bar-sep" aria-hidden="true"></span>
-						<button
-							type="button"
-							class="annot-tab adjust-tab"
-							class:on={$adjustMode}
-							aria-pressed={$adjustMode}
-							aria-label={$adjustMode ? 'ADJUST on' : 'ADJUST off'}
-							title={$adjustMode
-								? 'ADJUST — placing blocks by hand (click to stop)'
-								: 'ADJUST — drag and resize blocks at exact pixels'}
-							on:click={() => adjustMode.update((v) => !v)}
-						>ADJUST</button>
-						<!-- Save writes moved Blocks back to source via the vite-dev endpoint. Shown
-						     whenever ADJUST is on, and it fires in BOTH worlds — it isn't greyed out
-						     where it can't write. It answers on click instead: the verdict flashes as a
-						     badge (SAVED / NONE / 1 OF 2 / NOT ALLOWED) and, on a refusal, a tooltip says
-						     why. A control disabled from the start invites the audience to assume the
-						     feature is missing; one that refuses when pressed teaches that saving is
-						     *forbidden here*. -->
-						{#if $adjustMode}
-							<span class="save-btn" class:refused={saveRefused}>
-								<button
-									type="button"
-									class="annot-act save-act"
-									aria-label="Save layout to source"
-									title="SAVE — write the moved blocks back to the source file"
-									on:click={onSave}
-								>SAVE</button>
-								{#if saveLabel !== 'SAVE' || saveRefused}
-									<!-- The verdict badge, and (on a refusal) the reason under it. aria-live on
-									     the tip so the refusal is announced, not just drawn. One interpolation,
-									     not a run of them: text split across lines carries the SOURCE's newlines
-									     and indentation into textContent, so "1 tag" would read "1\n\t\t\ttag". -->
-									<span class="save-pop">
-										{#if saveLabel !== 'SAVE'}
-											<span class="save-flash">{saveLabel}</span>
-										{/if}
-										{#if saveRefused}
-											<span class="save-tip" role="status">{saveTip}</span>
-										{/if}
-									</span>
-								{/if}
-							</span>
-						{/if}
-					{/if}
-				{/snippet}
-
-				<!-- PRINT/CAPTURE/OVERVIEW — the flat action rows. PLAIN buttons wearing `annot-tool`,
-				     not CtrlBtns, so Annotate can dress them in the menu's own amber livery. -->
-				{#snippet printBtn()}
-					<button
-						type="button"
-						class="annot-tool"
-						aria-haspopup="menu"
-						aria-expanded={printMenuOpen}
-						on:click={() => (printMenuOpen = !printMenuOpen)}
-					>PRINT</button>
-				{/snippet}
-				<!-- CAPTURE — the `canCapture` gate lives inside, so the snippet renders an empty
-				     (zero-size) flank on a deck that does not offer it. -->
-				{#snippet captureItem()}
-					<span class="capture-btn" class:refused={!!captureTip}>
-						{#if canCapture}
-							<button type="button" class="annot-tool" disabled={capturing} on:click={onCapture}>
-								{captureLabel}
-							</button>
-							{#if captureTip}
-								<span class="capture-tip" role="status">{captureTip}</span>
-							{/if}
-						{/if}
-					</span>
-				{/snippet}
-				<!-- OVERVIEW opens the all-slides grid — the same grid the `o` key opens, through the
-				     shared `overviewOpen` store. It is per-slide navigation, a speaker's tool, so it
-				     joins the menu rather than returning to a corner button of its own. -->
-				{#snippet overviewBtn()}
-					<button type="button" class="annot-tool" on:click={() => overviewOpen.set(true)}>OVERVIEW</button>
-				{/snippet}
-			</Annotate>
-
-			<!-- The PRINT menu. It is NOT inside the flyout (which collapses the moment the pointer
-			     leaves it) — it is a canvas-space popover of its own, so it survives the click that
-			     opened it. z above the ink surface, and `no-print` so it never prints itself. -->
-			{#if printMenuOpen}
-				<div class="print-scrim no-print" role="presentation" on:click={() => (printMenuOpen = false)}></div>
-				<div class="print-menu no-print" role="menu" aria-label="Print">
-					<button type="button" role="menuitem" on:click={() => printThisSlide(false)}>This slide</button>
-					<button type="button" role="menuitem" on:click={() => printThisSlide(true)}>This slide + notes</button>
-					<div class="print-menu-sep" role="separator"></div>
-					<button type="button" role="menuitem" on:click={() => openHandout('')}>Whole deck</button>
-					<button type="button" role="menuitem" on:click={() => openHandout('?notes')}>Whole deck + notes</button>
-					<div class="print-menu-sep" role="separator"></div>
-					<button type="button" role="menuitem" on:click={() => openHandout('?grid')}>Thumbnail grid</button>
-					<button type="button" role="menuitem" on:click={() => openHandout('?grid&notes')}>Notes grid</button>
-				</div>
-			{/if}
+				<Annotate canvasWidth={width} canvasHeight={height} {inkColors} {levelHighlight} />
 			<TableOfContent {pages} deck={deckName} {article} {articleText} {articleHref} />
 			<!-- The all-slides grid (press O). Canvas-space, like the ToC — its tiles are
 			     live `?clean` iframes of the real slides.
@@ -831,15 +707,127 @@
 	</div>
 </div>
 
-<!-- Viewport-fixed chrome that must stay reachable regardless of pan/zoom: the
-     display-mode (DISPLAY) control and the minimap. DISPLAY anchors to the WINDOW's
-     top-right corner (SizeMode's own fixed inset), so it's always in reach even when a
-     SCALED slide is panned or the frame is letterboxed — a window control, distinct
-     from the slide-owned PRESENT/tool cluster above. Hidden by ?clean and in the
-     presenter console (which has its own chrome). -->
+<!-- Viewport-fixed chrome that sticks to the WINDOW regardless of pan/zoom. <SlideToolbar> is
+     the top-centre PRESENT | ANNOTATE | ADJUST | DISPLAY | ☰ bar (it holds the DISPLAY zoom
+     control that used to pin to the top-right corner); the minimap rides alongside. Both are
+     lifted OUT of the scaled slide so they stay put and constant-size. The overlay is z-index
+     50 — above the ink surface (40) — so an armed pen can never bury the ANNOTATE toggle.
+     Hidden by ?clean and in the presenter console (which has its own chrome). -->
 {#if initialized && !clean && !present}
 <div class="overlay" class:fade-chrome={fadeChrome} style="--base-font:{baseFontSize};">
-	<SizeMode {width} {height} />
+	<SlideToolbar {width} {height}>
+
+		<!-- PRESENT — the anchor. Ensures the presenter console is running (opens it, or
+		     re-focuses the existing one); it is not a mode, so it carries no on/off state.
+		     Hidden with the whole overlay inside the console itself (the overlay is gated
+		     `!present`). -->
+		{#snippet presentBtn()}
+			<button type="button" class="annot-anchor" on:click={openPresenter}>PRESENT</button>
+		{/snippet}
+
+		<!-- ADJUST — the old ADJUST toggle, moved into the menu and renamed. A sub-toggle
+		     that reads ADJUST:off / ADJUST:on in place (pinned width, so the label swap does
+		     not resize it), and only when the slide OFFERS layout ($canAdjust). SAVE appears
+		     beside it while ADJUST is on. The snippet also carries the divider that precedes
+		     the pair, so a deck that doesn't offer ADJUST leaves no dangling separator. -->
+		{#snippet adjustGroup()}
+			{#if $canAdjust}
+				<span class="annot-bar-sep" aria-hidden="true"></span>
+				<button
+					type="button"
+					class="annot-tab adjust-tab"
+					class:on={$adjustMode}
+					aria-pressed={$adjustMode}
+					aria-label={$adjustMode ? 'ADJUST on' : 'ADJUST off'}
+					title={$adjustMode
+						? 'ADJUST — placing blocks by hand (click to stop)'
+						: 'ADJUST — drag and resize blocks at exact pixels'}
+					on:click={() => adjustMode.update((v) => !v)}
+				>ADJUST</button>
+				<!-- Save writes moved Blocks back to source via the vite-dev endpoint. Shown
+				     whenever ADJUST is on, and it fires in BOTH worlds — it isn't greyed out
+				     where it can't write. It answers on click instead: the verdict flashes as a
+				     badge (SAVED / NONE / 1 OF 2 / NOT ALLOWED) and, on a refusal, a tooltip says
+				     why. A control disabled from the start invites the audience to assume the
+				     feature is missing; one that refuses when pressed teaches that saving is
+				     *forbidden here*. -->
+				{#if $adjustMode}
+					<span class="save-btn" class:refused={saveRefused}>
+						<button
+							type="button"
+							class="annot-act save-act"
+							aria-label="Save layout to source"
+							title="SAVE — write the moved blocks back to the source file"
+							on:click={onSave}
+						>SAVE</button>
+						{#if saveLabel !== 'SAVE' || saveRefused}
+							<!-- The verdict badge, and (on a refusal) the reason under it. aria-live on
+							     the tip so the refusal is announced, not just drawn. One interpolation,
+							     not a run of them: text split across lines carries the SOURCE's newlines
+							     and indentation into textContent, so "1 tag" would read "1\n\t\t\ttag". -->
+							<span class="save-pop">
+								{#if saveLabel !== 'SAVE'}
+									<span class="save-flash">{saveLabel}</span>
+								{/if}
+								{#if saveRefused}
+									<span class="save-tip" role="status">{saveTip}</span>
+								{/if}
+							</span>
+						{/if}
+					</span>
+				{/if}
+			{/if}
+		{/snippet}
+
+		<!-- PRINT/CAPTURE/OVERVIEW — the flat action rows. PLAIN buttons wearing `annot-tool`,
+		     not CtrlBtns, so Annotate can dress them in the menu's own amber livery. -->
+		{#snippet printBtn()}
+			<button
+				type="button"
+				class="annot-tool"
+				aria-haspopup="menu"
+				aria-expanded={printMenuOpen}
+				on:click={() => (printMenuOpen = !printMenuOpen)}
+			>PRINT</button>
+		{/snippet}
+		<!-- CAPTURE — the `canCapture` gate lives inside, so the snippet renders an empty
+		     (zero-size) flank on a deck that does not offer it. -->
+		{#snippet captureItem()}
+			<span class="capture-btn" class:refused={!!captureTip}>
+				{#if canCapture}
+					<button type="button" class="annot-tool" disabled={capturing} on:click={onCapture}>
+						{captureLabel}
+					</button>
+					{#if captureTip}
+						<span class="capture-tip" role="status">{captureTip}</span>
+					{/if}
+				{/if}
+			</span>
+		{/snippet}
+		<!-- OVERVIEW opens the all-slides grid — the same grid the `o` key opens, through the
+		     shared `overviewOpen` store. It is per-slide navigation, a speaker's tool, so it
+		     joins the menu rather than returning to a corner button of its own. -->
+		{#snippet overviewBtn()}
+			<button type="button" class="annot-tool" on:click={() => overviewOpen.set(true)}>OVERVIEW</button>
+		{/snippet}
+	</SlideToolbar>
+
+	<!-- The PRINT menu. It is NOT inside the flyout (which collapses the moment the pointer
+	     leaves it) — it is a canvas-space popover of its own, so it survives the click that
+	     opened it. z above the ink surface, and `no-print` so it never prints itself. -->
+	{#if printMenuOpen}
+		<div class="print-scrim no-print" role="presentation" on:click={() => (printMenuOpen = false)}></div>
+		<div class="print-menu no-print" role="menu" aria-label="Print">
+			<button type="button" role="menuitem" on:click={() => printThisSlide(false)}>This slide</button>
+			<button type="button" role="menuitem" on:click={() => printThisSlide(true)}>This slide + notes</button>
+			<div class="print-menu-sep" role="separator"></div>
+			<button type="button" role="menuitem" on:click={() => openHandout('')}>Whole deck</button>
+			<button type="button" role="menuitem" on:click={() => openHandout('?notes')}>Whole deck + notes</button>
+			<div class="print-menu-sep" role="separator"></div>
+			<button type="button" role="menuitem" on:click={() => openHandout('?grid')}>Thumbnail grid</button>
+			<button type="button" role="menuitem" on:click={() => openHandout('?grid&notes')}>Notes grid</button>
+		</div>
+	{/if}
 	{#if mapVisible}
 	<SlideMap {width} {height} rect={mapRect} />
 	{/if}
@@ -1000,7 +988,7 @@
 
 	/* SAVE sits beside the ADJUST icon on the bar; its wrapper is the positioning context for the
 	   verdict badge that pops under it. inline-flex so the icon sits inline in the bar row. These
-	   are SLOTTED into <Annotate>'s bar, but this is still SlideDeck's scoped CSS — the elements
+	   are SLOTTED into <SlideToolbar>'s bar, but this is still SlideDeck's scoped CSS — the elements
 	   are compiled here, so the scope hash rides with them wherever the DOM puts them. */
 	.save-btn {
 		position: relative;
@@ -1083,21 +1071,22 @@
 	}
 
 	/* ── The PRINT menu ─────────────────────────────────────────────────────────────
-	   A canvas-space popover under the flyout. The scrim is the click-outside: it covers the
-	   whole canvas beneath the menu, so a click anywhere else dismisses. Both wear `no-print`. */
+	   A viewport-fixed popover under the toolbar (the toolbar and this menu both live in the
+	   window-fixed overlay now, not on the scaled slide). The scrim is the click-outside: it
+	   covers the whole window beneath the menu, so a click anywhere else dismisses. Both wear
+	   `no-print`. z-index is within the overlay's stacking context (the overlay itself is 50). */
 	.print-scrim {
-		position: absolute;
+		position: fixed;
 		inset: 0;
 		z-index: 58;
 	}
-	/* The PRINT sub-menu opens to the LEFT of the tool dropdown (which is centred), so the two
-	   panels sit side by side instead of overlapping. `right: calc(50% + 5.4em)` puts its right
-	   edge just past the dropdown's left edge (the dropdown is min-width 10em, half of that plus a
-	   gap); it then extends further left. Top-aligned with the PRINT row. */
+	/* Centred under the toolbar, just below the window's top edge. `top: 2.6em` clears the bar
+	   when it has dropped into view (a click on PRINT holds it down via :focus-within). */
 	.print-menu {
-		position: absolute;
-		top: 1.7em;
-		right: calc(50% + 5.4em);
+		position: fixed;
+		top: 2.6em;
+		left: 50%;
+		transform: translateX(-50%);
 		z-index: 60;
 		display: flex;
 		flex-direction: column;
