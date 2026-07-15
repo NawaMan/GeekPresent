@@ -12,13 +12,13 @@ export interface AnchorRect {
 //
 // This is the seam that turns Block into a diagramming primitive: a <Connector>
 // looks its endpoints up here by name, so an arrow follows its boxes as they are
-// dragged around in LAYOUT mode without the author touching a single coordinate.
+// dragged around in ADJUST mode without the author touching a single coordinate.
 //
 // Module-level (not context) for the same reason `selectedBlock` is: a Connector
 // and the Blocks it links are SIBLINGS in the slide markup, so no common provider
 // exists to hang a context on.
 //
-// NOT browser-gated, unlike `layoutChanges` — a Connector must resolve its
+// NOT browser-gated, unlike `adjustChanges` — a Connector must resolve its
 // endpoints during **SSR** too, or the prerendered slide would ship an empty
 // diagram. That has one consequence worth knowing:
 //

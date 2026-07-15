@@ -13,7 +13,7 @@
   here take an Element and return data — they never mutate, so they stay directly testable.
 */
 
-import { readSticky, type Choice } from '$lib/layout/layoutAccessCore';
+import { readSticky, type Choice } from '$lib/adjust/adjustAccessCore';
 
 export { readSticky };
 export type { Choice };

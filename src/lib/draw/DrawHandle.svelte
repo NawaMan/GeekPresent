@@ -1,5 +1,5 @@
 <!--
-  DrawHandle — internal point-handle primitive for LAYOUT-mode shape editing.
+  DrawHandle — internal point-handle primitive for ADJUST-mode shape editing.
   Not part of the public API.
 
   An SVG knob bound to a Point in canvas units (it scales with the deck,
@@ -141,7 +141,7 @@
 
 <style>
 	/* The surface is pointer-events:none; handles re-enable it — the ONLY
-	   elements that do, and they exist only in LAYOUT mode. */
+	   elements that do, and they exist only in ADJUST mode. */
 	.draw-handle {
 		pointer-events: all;
 		cursor: grab;

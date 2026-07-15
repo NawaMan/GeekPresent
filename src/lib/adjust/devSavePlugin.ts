@@ -3,18 +3,18 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { patchSlideSource, type LayoutChange } from './patchSource';
 
-// Dev-only Vite plugin that lets LAYOUT mode WRITE a slide's new Block geometry
+// Dev-only Vite plugin that lets ADJUST mode WRITE a slide's new Block geometry
 // back to its Svelte source. It exists solely under `vite dev` (apply: 'serve'):
-// a built/`?layout` site has no Node process and must stay copy → paste only, so
+// a built/`?adjust` site has no Node process and must stay copy → paste only, so
 // there is deliberately no production counterpart.
 //
-// The browser (see $lib/stores/layoutSave.ts) POSTs the current route plus the
+// The browser (see $lib/stores/adjustSave.ts) POSTs the current route plus the
 // dirty tags; we map the route to `src/routes/<route>/+page.svelte`, hand the
 // file and the changes to the pure patcher (patchSource.ts), write the result,
 // and let HMR reload the slide. Tags we can't confidently place come back as
 // `unmatched` so the UI can tell the author to paste those by hand.
 
-const ENDPOINT = '/__geekpresent/layout-save';
+const ENDPOINT = '/__geekpresent/adjust-save';
 
 interface SaveRequest {
 	/** The slide's `location.pathname`, e.g. `/slides/title.html`. */
@@ -27,7 +27,7 @@ function readBody(req: import('node:http').IncomingMessage): Promise<string> {
 		let data = '';
 		req.on('data', (chunk) => {
 			data += chunk;
-			// Guard against an absurd payload — LAYOUT patches are tiny.
+			// Guard against an absurd payload — ADJUST patches are tiny.
 			if (data.length > 1_000_000) reject(new Error('payload too large'));
 		});
 		req.on('end', () => resolve(data));
@@ -93,9 +93,9 @@ async function handleSave(server: ViteDevServer, body: string) {
 	};
 }
 
-export function layoutSavePlugin(): Plugin {
+export function adjustSavePlugin(): Plugin {
 	return {
-		name: 'geekpresent-layout-save',
+		name: 'geekpresent-adjust-save',
 		apply: 'serve',
 		configureServer(server) {
 			server.middlewares.use(async (req, res, next) => {

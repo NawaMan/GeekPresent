@@ -27,7 +27,7 @@
   forward march. It stays opt-in all the same — see Video.svelte for why.
 
   Layering: the player is absolutely positioned and carries no z-index, so it paints
-  in DOM order — the deck's own chrome (LAYOUT toggle, Table of Contents, speaker
+  in DOM order — the deck's own chrome (ADJUST toggle, Table of Contents, speaker
   Notes) and this component's nav bar are later siblings and stay above it. A
   <video> takes no keys of its own, so nothing here competes for the deck's.
 

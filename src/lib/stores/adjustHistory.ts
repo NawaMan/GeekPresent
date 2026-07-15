@@ -1,6 +1,6 @@
 import { browser } from '$app/environment';
 
-// A tiny shared undo/redo stack for LAYOUT-mode drags. Each committed Block
+// A tiny shared undo/redo stack for ADJUST-mode drags. Each committed Block
 // gesture records a command — a pair of closures that restore the element's
 // geometry to before / after the drag. Undo/redo is GLOBAL across every Block
 // on the page (you drag several, then Ctrl+Z walks back through all of them), so

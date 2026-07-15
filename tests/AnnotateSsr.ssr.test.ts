@@ -31,7 +31,8 @@ describe('Annotate (SSR)', () => {
 		expect(body).not.toContain('annot-surface');
 		expect(body).not.toContain('annot-stroke');
 		expect(body).not.toContain('annot-bar');
-		expect(body).not.toContain('annot-toggle');
+		expect(body).not.toContain('annot-tools');
+		expect(body).not.toContain('annot-tab');
 		expect(body).not.toContain('<path');
 	});
 

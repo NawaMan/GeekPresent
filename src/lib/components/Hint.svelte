@@ -1,7 +1,7 @@
 <!--
   Hint — a faint cue pinned to the bottom of the slide.
 
-    <Hint text="Flip LAYOUT (top-right) to drag & resize any callout" />
+    <Hint text="Flip ADJUST (top-right) to drag & resize any callout" />
 
   A Hint floats over whatever the slide happens to put behind it — an image, a
   chart, a live website — so it cannot rely on contrasting with the deck surface.

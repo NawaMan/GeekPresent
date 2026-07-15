@@ -244,7 +244,7 @@ export function toWeights(tracks: number[], precision = 2): number[] {
 	return usable.map((w) => Math.max(Math.round((w * usable.length * unit) / total) / unit, smallest));
 }
 
-/** The `widths={[…]}` snippet a LAYOUT-mode Copy puts on the clipboard. */
+/** The `widths={[…]}` snippet a ADJUST-mode Copy puts on the clipboard. */
 export function formatWidths(tracks: number[], precision = 2): string {
 	const weights = toWeights(tracks, precision);
 	if (!weights.length) return '';

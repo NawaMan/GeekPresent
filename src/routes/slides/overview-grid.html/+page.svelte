@@ -2,7 +2,7 @@
   Example: OVERVIEW — the all-slides grid, demonstrated live.
   File: src/routes/slides/overview-grid.html/+page.svelte
 
-  Like capture-slide.html and layout-mode.html, this slide IS its own demo: the `O` key is real
+  Like capture-slide.html and adjust-mode.html, this slide IS its own demo: the `O` key is real
   in the deployed build. Press it while reading this and the deck you are standing in opens as
   a grid.
 -->

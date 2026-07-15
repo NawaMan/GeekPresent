@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
 
-// The <Block> currently "selected" in LAYOUT mode.
+// The <Block> currently "selected" in ADJUST mode.
 //
 // Selecting a Block brings it temporarily to the top so its body and resize grip
 // stay grabbable even when Blocks overlap (Blocks otherwise paint in DOM order,

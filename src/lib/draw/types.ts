@@ -244,7 +244,7 @@ export interface ShapeEditor {
 	/** Tag name, e.g. 'Line' — shown when the shape has no `name`. */
 	readonly kind: string;
 	readonly name: string;
-	/** This shape's LAYOUT editing chrome — guide lines + handles, wrapped in a
+	/** This shape's ADJUST editing chrome — guide lines + handles, wrapped in a
 	 *  `<g class="draw-chrome" data-shape="…">`. The shape renders it inline
 	 *  (inside its own `<g>`) while it is NOT the hoisted one; when it IS, <Draw>
 	 *  renders this very snippet last inside the surface instead, so the handles
@@ -270,7 +270,7 @@ export interface ShapeEditor {
 }
 
 /** What a box-geometry shape (Rect/Ellipse) registers with Draw so its
- *  LAYOUT-mode editing can ride Block wholesale: Draw renders one
+ *  ADJUST-mode editing can ride Block wholesale: Draw renders one
  *  <Block tag={tag} …> per registration as an HTML sibling of the svg
  *  (HTML can't render inside it), two-way bound to the live geometry.
  *  Block then provides move, resize, aspect-lock, grid, bounds, undo, and
@@ -296,7 +296,7 @@ export interface BlockShapeRegistration {
 	/** The shape's author `style`, forwarded so the editing Block can badge a
 	 *  geometry collision on the box you actually grab. The shape applies (and
 	 *  guards) this style itself, on its own SVG element — the Block never renders
-	 *  or emits it. See layout/styleGuardCore.ts. */
+	 *  or emits it. See adjust/styleGuardCore.ts. */
 	readonly style?: string;
 	/** Live box geometry, get/set — Block binds to these. */
 	x: number;
@@ -305,12 +305,12 @@ export interface BlockShapeRegistration {
 	height: number;
 }
 
-/** Canvas size (and, in LAYOUT mode, the editing/selection surface) shared
+/** Canvas size (and, in ADJUST mode, the editing/selection surface) shared
  *  by <Draw> with its shape children via context. */
 export interface DrawContext {
 	readonly width: number;
 	readonly height: number;
-	/** True while LAYOUT-mode editing is active (canLayout && layoutMode).
+	/** True while ADJUST-mode editing is active (canAdjust && adjustMode).
 	 *  Shapes render handles/selection chrome only when this is on. */
 	readonly editing: boolean;
 	/** The shape whose geometry the floating toolbar currently shows. */
@@ -346,7 +346,7 @@ export const DRAW_CONTEXT_KEY = Symbol('geekpresent-draw');
 /** Provided by <Sprite> to any <Draw> nested inside it (a "group"), so that
  *  nested Draw only shows its editing chrome while the group is ISOLATED
  *  (entered via double-click). A top-level Draw sees no provider and edits
- *  normally in LAYOUT. This keeps a flying group's inner handles/toolbar from
+ *  normally in ADJUST. This keeps a flying group's inner handles/toolbar from
  *  lingering (or riding along with the moving box) when you aren't editing it. */
 export interface SpriteIsolation {
 	readonly entered: boolean;

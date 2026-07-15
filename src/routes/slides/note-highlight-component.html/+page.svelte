@@ -5,7 +5,7 @@
 
   A <Note> line carrying `data-highlight="db"` spotlights the Block named "db" as
   the speaker covers it in the presenter console — a laser pointer the audience
-  sees, drawn on the live slide and tracking the box even in LAYOUT mode. The
+  sees, drawn on the live slide and tracking the box even in ADJUST mode. The
   spotlight is a canvas-level singleton SlideDeck mounts for you; nothing is placed
   on the slide but the named Blocks.
 
@@ -40,7 +40,7 @@
 			Give a note line a <code>data-highlight</code> that names an on-slide
 			<b>Block</b>. As the speaker covers that line in the presenter console, the
 			named box lights up on the audience slide — a laser pointer drawn in canvas
-			space, so it tracks the box even in LAYOUT mode.
+			space, so it tracks the box even in ADJUST mode.
 		</p>
 
 		<QuickCode style="margin-top: 0.5em;" lang="svelte" code={`<Block name="db" …>DB</Block>

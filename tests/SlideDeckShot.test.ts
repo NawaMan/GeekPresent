@@ -60,17 +60,17 @@ describe('?shot — the screenshot render', () => {
 	it('implies ?clean — a screenshot never wants the chrome', async () => {
 		const root = await mount('?shot');
 		expect(frame(root).classList.contains('clean')).toBe(true);
-		// The slide-owned chrome cluster (LAYOUT / CAPTURE / PRESENT) is gone…
-		expect(root.querySelector('.slide-chrome')).toBeNull();
-		// …as is the pen's toggle, which lives in <Annotate> rather than that cluster.
-		expect(root.querySelector('.annot-toggle')).toBeNull();
+		// The whole top-centre tool cluster (PRESENT anchor + the ANNOTATE/ADJUST/OVERVIEW/
+		// CAPTURE/PRINT menu) is gone — it only renders while `chrome` is on, and ?shot (via
+		// ?clean) turns chrome off.
+		expect(root.querySelector('.annot-tools')).toBeNull();
 	});
 
 	it('leaves the chrome alone on an ordinary slide', async () => {
 		// Otherwise the test above would pass for the wrong reason (chrome that never renders).
 		const root = await mount();
 		expect(frame(root).classList.contains('clean')).toBe(false);
-		expect(root.querySelector('.slide-chrome')).not.toBeNull();
+		expect(root.querySelector('.annot-tools')).not.toBeNull();
 	});
 
 	it('is not the same thing as ?clean', async () => {

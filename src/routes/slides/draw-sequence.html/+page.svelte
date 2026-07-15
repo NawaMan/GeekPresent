@@ -31,7 +31,7 @@
 			the response returns underneath, and the hot node gets circled — five beats,
 			one timeline. It's pure CSS, so it plays in the prerendered page, and the
 			<b>ANIMATE</b> bar can pause, <b>drag</b>-scrub, and restart the whole
-			build-up like any slide animation. Flip <b>LAYOUT</b> and each shape is still
+			build-up like any slide animation. Flip <b>ADJUST</b> and each shape is still
 			fully editable; the toolbar even retimes its <code>draw</code>/<code
 				>drawDelay</code
 			>.

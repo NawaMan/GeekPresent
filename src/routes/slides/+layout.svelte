@@ -22,9 +22,9 @@
 	// context, not the shell's.
 	setPages(pages);
 
-	// NOTE: LAYOUT is off in this build by default, deck-wide. The slides that TEACH it
-	// opt in one by one, via `layout: true` on their own pages.ts entries — see
-	// layout-mode.html. Nothing here needs to change for that.
+	// NOTE: ADJUST is off in this build by default, deck-wide. The slides that TEACH it
+	// opt in one by one, via `adjust: true` on their own pages.ts entries — see
+	// adjust-mode.html. Nothing here needs to change for that.
 	//
 	// ANNOTATE, by contrast, is deck-WIDE (`annotate` below) and has no per-slide flag —
 	// the pen is a SPEAKER tool, so the slide they happen to be on has no say in whether

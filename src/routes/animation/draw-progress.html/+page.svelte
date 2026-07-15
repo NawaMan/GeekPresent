@@ -13,7 +13,7 @@
   Line eases in then out, the Curve sweeps ease-in, the Arc runs linear.
   All pure generated CSS (d: path() / sampled polyline + stroke-dashoffset
   keyframes), so it prerenders and the ANIMATE bar scrubs every track
-  together. Flip LAYOUT on and select ANY shape: the keyframe panel shows a
+  together. Flip ADJUST on and select ANY shape: the keyframe panel shows a
   %, a drawn % field, and an easing picker per keyframe — editable on all
   three — plus a LIVE readout (▸ 48% · 62% drawn) that tracks the playhead
   as you drag the ANIMATE bar. The panel stays up while you scrub.
@@ -38,7 +38,7 @@
 			<Label>Curve</Label> and <Label>Arc</Label> also morph their geometry as they
 			go, and each keyframe carries its own <b>easing</b> (the Line's crawl
 			eases <i>in</i> then its sweep eases <i>out</i>; the Curve sweeps
-			<i>ease-in</i>, the Arc <i>linear</i>). Flip <b>LAYOUT</b> on, select any
+			<i>ease-in</i>, the Arc <i>linear</i>). Flip <b>ADJUST</b> on, select any
 			shape, and edit each keyframe's <b>%</b>, <b>drawn %</b>, and <b>easing</b>
 			right in the panel — which shows a <b>live ▸ progress · drawn</b> readout
 			that follows the playhead as you press <b>ANIMATE</b> and drag the bar

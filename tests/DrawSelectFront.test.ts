@@ -9,8 +9,8 @@
 import { render } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { undo } from '../src/lib/stores/layoutHistory';
-import { canLayout, layoutMode } from '../src/lib/stores/layoutMode';
+import { undo } from '../src/lib/stores/adjustHistory';
+import { canAdjust, adjustMode } from '../src/lib/stores/adjustMode';
 import DrawEditHost from './DrawEditHost.svelte';
 import DrawHoistUnmountHost from './DrawHoistUnmountHost.svelte';
 
@@ -34,14 +34,14 @@ async function selectByStroke(c: HTMLElement, group: string) {
 	await tick();
 }
 
-describe('select-to-front (LAYOUT mode)', () => {
+describe('select-to-front (ADJUST mode)', () => {
 	beforeEach(() => {
-		canLayout.set(true);
-		layoutMode.set(true);
+		canAdjust.set(true);
+		adjustMode.set(true);
 	});
 	afterEach(() => {
-		canLayout.set(false);
-		layoutMode.set(false);
+		canAdjust.set(false);
+		adjustMode.set(false);
 	});
 
 	it('an unselected shape keeps its chrome at home, inside its own <g>', () => {
@@ -207,18 +207,18 @@ describe('select-to-front (LAYOUT mode)', () => {
 		expect(chrome(container, 'stay')[0].parentElement).toBe(surface(container));
 	});
 
-	it('no chrome layer at all outside LAYOUT mode, or in a published build', async () => {
+	it('no chrome layer at all outside ADJUST mode, or in a published build', async () => {
 		const { container } = render(DrawEditHost);
 		await selectByStroke(container, 'draw-line');
 		expect(container.querySelectorAll('g.draw-chrome')).not.toHaveLength(0);
 
-		layoutMode.set(false);
+		adjustMode.set(false);
 		await tick();
 		expect(container.querySelectorAll('g.draw-chrome')).toHaveLength(0);
 
-		// canLayout false is the published deck: LAYOUT can't be forced back on
-		layoutMode.set(true);
-		canLayout.set(false);
+		// canAdjust false is the published deck: ADJUST can't be forced back on
+		adjustMode.set(true);
+		canAdjust.set(false);
 		await tick();
 		expect(container.querySelectorAll('g.draw-chrome')).toHaveLength(0);
 	});

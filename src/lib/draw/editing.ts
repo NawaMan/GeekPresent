@@ -1,4 +1,4 @@
-// Internal helpers for LAYOUT-mode shape editing (DRAW-3). Not public API.
+// Internal helpers for ADJUST-mode shape editing (DRAW-3). Not public API.
 //
 // The snippet a shape's Copy emits is its current OPENING tag with live
 // geometry — snippet-emit, never live source rewrite (Block's contract).
@@ -129,9 +129,9 @@ export interface SharedShapeAttrs {
 	draw?: number;
 	drawDelay?: number;
 	grid?: number;
-	/** The author's own pass-through props. They carry NO meaning for LAYOUT — it
+	/** The author's own pass-through props. They carry NO meaning for ADJUST — it
 	    neither reads nor edits them — but they must survive the round-trip, because
-	    LAYOUT replaces the whole opening tag. Anything this function forgets to emit
+	    ADJUST replaces the whole opening tag. Anything this function forgets to emit
 	    is DELETED from the author's source the moment they drag the shape. */
 	id?: string;
 	class?: string;

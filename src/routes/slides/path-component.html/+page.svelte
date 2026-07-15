@@ -33,14 +33,14 @@
 			arc, neither for a straight line. One path means one <b>draw-on</b> reveal for
 			the whole route, one <b>arrowhead</b> at the real end, and joins that meet
 			cleanly — not several shapes' stroke caps butting together. Flip
-			<b>LAYOUT</b> on and every vertex grows a handle — the start point, each
+			<b>ADJUST</b> on and every vertex grows a handle — the start point, each
 			segment's <code>to</code>, a hollow control handle per Bézier control point,
 			and a green <i>bend</i> handle at each arc's apex; drag to reshape, then
 			<b>Copy</b> the whole updated tag back over the source. Add
 			<code>stops</code> + <code>animate</code> and the whole chain
 			<b>morphs</b> between poses on the AnimationBar timeline (sampled so any mix
 			of segment kinds tweens smoothly), with a per-stop <b>keyframes</b> panel in
-			the LAYOUT toolbar — the same animation model as <Label>Line</Label>/<Label
+			the ADJUST toolbar — the same animation model as <Label>Line</Label>/<Label
 				>Curve</Label
 			>/<Label>Arc</Label>.
 		</p>
@@ -72,7 +72,7 @@
 >
 	<!-- The headline: four segment kinds, one stroke, one end arrow. These
 	     <Path> tags are written on ONE line each, in the exact attribute order
-	     Copy emits — so a LAYOUT drag → Copy → paste-over is a numbers-only
+	     Copy emits — so a ADJUST drag → Copy → paste-over is a numbers-only
 	     diff, AND the dev "Save" button (which finds a Draw shape's tag by an
 	     exact literal string) can rewrite it in place. A multi-line tag would
 	     drag fine but Save couldn't find it. -->

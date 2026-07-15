@@ -51,7 +51,7 @@
 		</p>
 		<p style="margin-top: 0.5em;">
 			<b>Editing the shapes inside</b> — the Sprite makes its content
-			pointer-inert, and a rotated box breaks the drag math. So in <b>LAYOUT</b>,
+			pointer-inert, and a rotated box breaks the drag math. So in <b>ADJUST</b>,
 			<b>double-click</b> the badge: it <b>freezes in place and straightens</b>
 			to rot&nbsp;0 (isolation mode), and its nested shapes become directly
 			selectable with the ordinary Draw handles + toolbar — because upright at

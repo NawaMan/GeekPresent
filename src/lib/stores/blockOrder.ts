@@ -8,7 +8,7 @@ import { writable, get } from 'svelte/store';
 // slide markup, so no common provider exists to hang a context on. Same reason
 // `selectedBlock` and `blockAnchors` are module-level stores.
 //
-// This is a pure AUTHORING aid (front/back only run in LAYOUT mode), so unlike
+// This is a pure AUTHORING aid (front/back only run in ADJUST mode), so unlike
 // `blockAnchors` it is browser-only — a server render never needs it and must
 // not touch module state that outlives one SSR pass.
 export const blockOrder = writable<Map<number, number>>(new Map());

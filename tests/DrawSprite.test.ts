@@ -1,12 +1,12 @@
 // Sprite — the KeyframeStudio flying element folded into the Draw family. The
 // moving element renders in a <foreignObject> and animates as pure generated
-// CSS @keyframes; LAYOUT-mode ghosts get move/resize/rotate handles and the
+// CSS @keyframes; ADJUST-mode ghosts get move/resize/rotate handles and the
 // shared keyframe panel (pct + easing, no drawn — a Sprite has no reveal).
 import { render } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { redo, undo } from '../src/lib/stores/layoutHistory';
-import { canLayout, layoutMode } from '../src/lib/stores/layoutMode';
+import { redo, undo } from '../src/lib/stores/adjustHistory';
+import { canAdjust, adjustMode } from '../src/lib/stores/adjustMode';
 import DrawSpriteHost from './DrawSpriteHost.svelte';
 
 const moveTo = (clientX: number, clientY: number) =>
@@ -28,8 +28,8 @@ const keyframeStyle = (c: HTMLElement) =>
 
 describe('Sprite rendering', () => {
 	beforeEach(() => {
-		canLayout.set(false);
-		layoutMode.set(false);
+		canAdjust.set(false);
+		adjustMode.set(false);
 	});
 
 	it('renders the moving element in a foreignObject at the 0% base pose', () => {
@@ -59,7 +59,7 @@ describe('Sprite rendering', () => {
 		expect(css).not.toContain('NaN');
 	});
 
-	it('shows no editing chrome outside LAYOUT mode, but the element still flies', () => {
+	it('shows no editing chrome outside ADJUST mode, but the element still flies', () => {
 		const { container } = render(DrawSpriteHost);
 		expect(container.querySelector('.sprite-hit')).toBeNull();
 		expect(container.querySelector('.draw-handle')).toBeNull();
@@ -67,14 +67,14 @@ describe('Sprite rendering', () => {
 	});
 });
 
-describe('Sprite editing (LAYOUT mode)', () => {
+describe('Sprite editing (ADJUST mode)', () => {
 	beforeEach(() => {
-		canLayout.set(true);
-		layoutMode.set(true);
+		canAdjust.set(true);
+		adjustMode.set(true);
 	});
 	afterEach(() => {
-		canLayout.set(false);
-		layoutMode.set(false);
+		canAdjust.set(false);
+		adjustMode.set(false);
 	});
 
 	it('renders one ghost box per stop; selecting reveals move/resize/rotate handles', async () => {

@@ -21,7 +21,7 @@
 <SlideDeck
 	{pages}
 	title="Draw & Block"
-	description="A step-by-step deck: make an object editable (Block, Shape, then both under one LAYOUT gate), then make it animated (Block-as-Sprite, Shape, then both on one AnimationBar and one Draw editor)."
+	description="A step-by-step deck: make an object editable (Block, Shape, then both under one ADJUST gate), then make it animated (Block-as-Sprite, Shape, then both on one AnimationBar and one Draw editor)."
 	width={1920}
 	height={1080}
 	fill

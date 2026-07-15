@@ -2,7 +2,7 @@ import { get } from 'svelte/store';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /*
-  The three stores that predate persisted() — displayMode/displayFactor, layoutMode and
+  The three stores that predate persisted() — displayMode/displayFactor, adjustMode and
   diagramScroll — pinned BEFORE they move onto the factory, because the move has to be
   behaviour-preserving and "it still seems to work" is not a proof.
 
@@ -18,7 +18,7 @@ const freshDisplay = async () => {
 };
 const freshLayout = async () => {
 	vi.resetModules();
-	return import('../src/lib/stores/layoutMode');
+	return import('../src/lib/stores/adjustMode');
 };
 const freshDiagram = async () => {
 	vi.resetModules();
@@ -136,44 +136,44 @@ describe('displayMode — the zoom factor', () => {
 	});
 });
 
-describe('layoutMode', () => {
+describe('adjustMode', () => {
 	it('starts OFF on a first visit', async () => {
-		const { layoutMode } = await freshLayout();
-		expect(get(layoutMode)).toBe(false);
+		const { adjustMode } = await freshLayout();
+		expect(get(adjustMode)).toBe(false);
 	});
 
 	it('remembers being on across a reload', async () => {
-		localStorage.setItem('layoutMode', 'true');
-		const { layoutMode } = await freshLayout();
-		expect(get(layoutMode)).toBe(true);
+		localStorage.setItem('adjustMode', 'true');
+		const { adjustMode } = await freshLayout();
+		expect(get(adjustMode)).toBe(true);
 	});
 
 	it('reads a stored false as off', async () => {
-		localStorage.setItem('layoutMode', 'false');
-		const { layoutMode } = await freshLayout();
-		expect(get(layoutMode)).toBe(false);
+		localStorage.setItem('adjustMode', 'false');
+		const { adjustMode } = await freshLayout();
+		expect(get(adjustMode)).toBe(false);
 	});
 
 	it('treats a garbage key as off — the authoring chrome fails CLOSED', async () => {
-		localStorage.setItem('layoutMode', '{"not":"a boolean"}');
-		const { layoutMode } = await freshLayout();
-		expect(get(layoutMode)).toBe(false);
+		localStorage.setItem('adjustMode', '{"not":"a boolean"}');
+		const { adjustMode } = await freshLayout();
+		expect(get(adjustMode)).toBe(false);
 	});
 
 	it('mirrors a change out to storage as a plain boolean string', async () => {
-		const { layoutMode } = await freshLayout();
-		layoutMode.set(true);
-		expect(localStorage.getItem('layoutMode')).toBe('true');
-		layoutMode.set(false);
-		expect(localStorage.getItem('layoutMode')).toBe('false');
+		const { adjustMode } = await freshLayout();
+		adjustMode.set(true);
+		expect(localStorage.getItem('adjustMode')).toBe('true');
+		adjustMode.set(false);
+		expect(localStorage.getItem('adjustMode')).toBe('false');
 	});
 
-	it('leaves canLayout and canSave — which are NOT persisted stores — alone', async () => {
-		// canLayout is resolved from DEV + the sticky ?layout flag + the slide's own
+	it('leaves canAdjust and canSave — which are NOT persisted stores — alone', async () => {
+		// canAdjust is resolved from DEV + the sticky ?adjust flag + the slide's own
 		// declaration; canSave from the dev server's existence. Neither is a localStorage
 		// mirror, and neither moves onto persisted().
-		const { canLayout, canSave } = await freshLayout();
-		expect(typeof get(canLayout)).toBe('boolean');
+		const { canAdjust, canSave } = await freshLayout();
+		expect(typeof get(canAdjust)).toBe('boolean');
 		expect(typeof get(canSave)).toBe('boolean');
 	});
 });
@@ -225,9 +225,9 @@ describe('the stores do not sync across tabs', () => {
 		expect(get(displayMode)).toBe('FITTED');
 	});
 
-	it('ignores a layoutMode written by another tab', async () => {
-		const { layoutMode } = await freshLayout();
-		window.dispatchEvent(new StorageEvent('storage', { key: 'layoutMode', newValue: 'true' }));
-		expect(get(layoutMode)).toBe(false);
+	it('ignores a adjustMode written by another tab', async () => {
+		const { adjustMode } = await freshLayout();
+		window.dispatchEvent(new StorageEvent('storage', { key: 'adjustMode', newValue: 'true' }));
+		expect(get(adjustMode)).toBe(false);
 	});
 });

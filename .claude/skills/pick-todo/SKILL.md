@@ -50,7 +50,7 @@ Prefer items that are:
   before it.
 
 Actively check whether a candidate is **already partly built**. Several TODO entries predate work that
-landed since, and the entry may understate what exists (e.g. LAYOUT's `?layout` flag already works in
+landed since, and the entry may understate what exists (e.g. ADJUST's `?adjust` flag already works in
 production; the TODO for it only needs the *default-on* half). Verify against the code before you
 pitch — a proposal that misdescribes the starting point wastes the user's pick. If you find this,
 say so: "half of this already exists; the remaining work is X."
@@ -65,7 +65,7 @@ patterns worth pointing at:
   `NaNpx`. New geometry follows suit and gets unit tests directly against the core.
 - **Named `Block`s are the anchor system.** `stores/blockAnchors.ts` publishes each named Block's live
   box; `Connector` and `Spotlight` both resolve against it, which is why they track boxes through
-  LAYOUT-mode drags. Anything that points *at* a component reuses this rather than reading the DOM.
+  ADJUST-mode drags. Anything that points *at* a component reuses this rather than reading the DOM.
 - **Reveals/animations are opt-in and SSR-inert.** They render nothing at prerender and light up on
   the client; `Canvas` and the chart `animate` prop ride the `AnimationBar`'s CSS-keyframe clock.
 - **Colours and metrics are role tokens** in `src/lib/themes/roles.css`. A new visual gets `--thing-*`

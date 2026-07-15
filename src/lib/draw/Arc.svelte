@@ -11,7 +11,7 @@
   the radius / large-arc / sweep math — raw SVG arc parameters never appear
   here or in a slide's diff.
 
-  LAYOUT-mode editing (Phase 3): endpoint handles plus one accent-colored
+  ADJUST-mode editing (Phase 3): endpoint handles plus one accent-colored
   BEND handle riding the apex (pointAt 0.5); dragging it perpendicular to
   the chord updates `bend` via the pure inverse bendFromApex — dragging
   across the chord flips the sign. That handle is what makes `bend` the
@@ -24,7 +24,7 @@
 <script lang="ts">
 	import { getContext, onDestroy, untrack } from 'svelte';
 	import { browser } from '$app/environment';
-	import { record } from '$lib/stores/layoutHistory';
+	import { record } from '$lib/stores/adjustHistory';
 	import DrawHandle from './DrawHandle.svelte';
 	import {
 		fmtNum,
@@ -123,7 +123,7 @@
 		class: klass = ''
 	}: Props = $props();
 
-	// LAYOUT-mode editing overrides (finder state — reset on reload; Copy →
+	// ADJUST-mode editing overrides (finder state — reset on reload; Copy →
 	// paste into the source is the only persistence).
 	let liveFrom = $state<Point | null>(null);
 	let liveTo = $state<Point | null>(null);
@@ -309,7 +309,7 @@
 		return parts.length ? ` animation: ${parts.join(', ')};` : '';
 	});
 
-	// --- LAYOUT-mode editing chrome ------------------------------------------
+	// --- ADJUST-mode editing chrome ------------------------------------------
 	const ctx = getContext<DrawContext | undefined>(DRAW_CONTEXT_KEY);
 	const editing = $derived(ctx?.editing ?? false);
 
@@ -711,7 +711,7 @@
 			opacity: 1;
 		}
 	}
-	/* Editing chrome (LAYOUT mode only). */
+	/* Editing chrome (ADJUST mode only). */
 	.draw-hit {
 		fill: none;
 		stroke: transparent;

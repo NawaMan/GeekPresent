@@ -253,7 +253,7 @@
 	<li>
 		<a href="animation-check/title.html">Draw &amp; Block, step by step</a> &mdash; a
 		short deck that builds one idea up a slide at a time: first make an object
-		<i>editable</i> (a Block, a Shape, then both under one LAYOUT gate), then reach
+		<i>editable</i> (a Block, a Shape, then both under one ADJUST gate), then reach
 		for motion &mdash; where a plain Block hits a wall, a Shape animates, and both
 		move together once the Block&rsquo;s content rides in a Sprite &mdash; and finally
 		how the older <b>KeyframeStudio</b> folded into that one Sprite path (and was

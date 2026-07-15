@@ -40,7 +40,7 @@ const freshDisplay = async () => {
 };
 const freshLayout = async () => {
 	vi.resetModules();
-	return import('../src/lib/stores/layoutMode');
+	return import('../src/lib/stores/adjustMode');
 };
 const freshDiagram = async () => {
 	vi.resetModules();
@@ -54,9 +54,9 @@ describe('the persisted stores prerender at their defaults', () => {
 		expect(get(displayFactor)).toBe(1);
 	});
 
-	it('layoutMode is OFF — the authoring chrome never reaches a prerendered page', async () => {
-		const { layoutMode } = await freshLayout();
-		expect(get(layoutMode)).toBe(false);
+	it('adjustMode is OFF — the authoring chrome never reaches a prerendered page', async () => {
+		const { adjustMode } = await freshLayout();
+		expect(get(adjustMode)).toBe(false);
 	});
 
 	it('diagramScroll is -500, and is a number rather than NaN', async () => {
@@ -75,7 +75,7 @@ describe('the persisted stores never touch storage on the server', () => {
 		expect(storage.setItem).not.toHaveBeenCalled();
 	});
 
-	it('layoutMode neither reads nor writes', async () => {
+	it('adjustMode neither reads nor writes', async () => {
 		await freshLayout();
 		expect(storage.getItem).not.toHaveBeenCalled();
 		expect(storage.setItem).not.toHaveBeenCalled();

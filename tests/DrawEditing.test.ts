@@ -1,4 +1,4 @@
-// LAYOUT-mode editing (DRAW-3): the DrawHandle primitive and, in later
+// ADJUST-mode editing (DRAW-3): the DrawHandle primitive and, in later
 // suites, per-shape handles + the selection/Copy toolbar. jsdom has no
 // PointerEvent/getBoundingClientRect layout, so the live scale falls back to
 // 1 (screen px == canvas px) — which is exactly what the math expects here.
@@ -7,8 +7,8 @@ import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import DrawHandle from '../src/lib/draw/DrawHandle.svelte';
 import type { Point } from '../src/lib/draw/types';
-import { redo, undo } from '../src/lib/stores/layoutHistory';
-import { canLayout, layoutMode } from '../src/lib/stores/layoutMode';
+import { redo, undo } from '../src/lib/stores/adjustHistory';
+import { canAdjust, adjustMode } from '../src/lib/stores/adjustMode';
 import DrawEditHost from './DrawEditHost.svelte';
 import PathHost from './PathHost.svelte';
 
@@ -125,14 +125,14 @@ describe('DrawHandle', () => {
 	});
 });
 
-describe('Line editing (LAYOUT mode)', () => {
+describe('Line editing (ADJUST mode)', () => {
 	beforeEach(() => {
-		canLayout.set(true);
-		layoutMode.set(true);
+		canAdjust.set(true);
+		adjustMode.set(true);
 	});
 	afterEach(() => {
-		canLayout.set(false);
-		layoutMode.set(false);
+		canAdjust.set(false);
+		adjustMode.set(false);
 	});
 
 	const handles = (c: HTMLElement) => handlesOf(c, 'main');
@@ -143,14 +143,14 @@ describe('Line editing (LAYOUT mode)', () => {
 		const { container } = render(DrawEditHost);
 		expect(handles(container)).toHaveLength(2);
 		expect(container.querySelector('.draw-hit')).not.toBeNull();
-		layoutMode.set(false);
+		adjustMode.set(false);
 		await tick();
 		expect(handles(container)).toHaveLength(0);
 		expect(container.querySelector('.draw-hit')).toBeNull();
 	});
 
-	it('published build (canLayout false) shows no chrome even with layoutMode on', async () => {
-		canLayout.set(false);
+	it('published build (canAdjust false) shows no chrome even with adjustMode on', async () => {
+		canAdjust.set(false);
 		const { container } = render(DrawEditHost);
 		expect(container.querySelectorAll('circle.draw-handle')).toHaveLength(0);
 		expect(container.querySelector('.draw-hit')).toBeNull();
@@ -203,14 +203,14 @@ describe('Line editing (LAYOUT mode)', () => {
 	});
 });
 
-describe('Curve editing (LAYOUT mode)', () => {
+describe('Curve editing (ADJUST mode)', () => {
 	beforeEach(() => {
-		canLayout.set(true);
-		layoutMode.set(true);
+		canAdjust.set(true);
+		adjustMode.set(true);
 	});
 	afterEach(() => {
-		canLayout.set(false);
-		layoutMode.set(false);
+		canAdjust.set(false);
+		adjustMode.set(false);
 	});
 
 	const curveG = (c: HTMLElement) => c.querySelector('g.draw-curve')!;
@@ -225,8 +225,8 @@ describe('Curve editing (LAYOUT mode)', () => {
 		expect(guides[1].getAttribute('d')).toBe('M 400 200 L 500 300'); // c2 → to
 	});
 
-	it('guide lines and handles never render outside LAYOUT mode', async () => {
-		layoutMode.set(false);
+	it('guide lines and handles never render outside ADJUST mode', async () => {
+		adjustMode.set(false);
 		const { container } = render(DrawEditHost);
 		expect(guidesOf(container, 'hop')).toHaveLength(0);
 		expect(handlesOf(container, 'hop')).toHaveLength(0);
@@ -249,14 +249,14 @@ describe('Curve editing (LAYOUT mode)', () => {
 	});
 });
 
-describe('animated-Line stop editing (LAYOUT mode)', () => {
+describe('animated-Line stop editing (ADJUST mode)', () => {
 	beforeEach(() => {
-		canLayout.set(true);
-		layoutMode.set(true);
+		canAdjust.set(true);
+		adjustMode.set(true);
 	});
 	afterEach(() => {
-		canLayout.set(false);
-		layoutMode.set(false);
+		canAdjust.set(false);
+		adjustMode.set(false);
 	});
 
 	// the host's animated line is the second g.draw-line
@@ -450,12 +450,12 @@ describe('animated-Line stop editing (LAYOUT mode)', () => {
 
 describe('keyframe panel — per-stop drawn %', () => {
 	beforeEach(() => {
-		canLayout.set(true);
-		layoutMode.set(true);
+		canAdjust.set(true);
+		adjustMode.set(true);
 	});
 	afterEach(() => {
-		canLayout.set(false);
-		layoutMode.set(false);
+		canAdjust.set(false);
+		adjustMode.set(false);
 	});
 
 	// the progress Curve is the sole g.draw-curve[?] with a reveal track;
@@ -601,14 +601,14 @@ describe('keyframe panel — per-stop drawn %', () => {
 	});
 });
 
-describe('Arc editing (LAYOUT mode)', () => {
+describe('Arc editing (ADJUST mode)', () => {
 	beforeEach(() => {
-		canLayout.set(true);
-		layoutMode.set(true);
+		canAdjust.set(true);
+		adjustMode.set(true);
 	});
 	afterEach(() => {
-		canLayout.set(false);
-		layoutMode.set(false);
+		canAdjust.set(false);
+		adjustMode.set(false);
 	});
 
 	const arcG = (c: HTMLElement) => c.querySelector('g.draw-arc')!;
@@ -641,14 +641,14 @@ describe('Arc editing (LAYOUT mode)', () => {
 	});
 });
 
-describe('Rect/Ellipse editing via Block (LAYOUT mode)', () => {
+describe('Rect/Ellipse editing via Block (ADJUST mode)', () => {
 	beforeEach(() => {
-		canLayout.set(true);
-		layoutMode.set(true);
+		canAdjust.set(true);
+		adjustMode.set(true);
 	});
 	afterEach(() => {
-		canLayout.set(false);
-		layoutMode.set(false);
+		canAdjust.set(false);
+		adjustMode.set(false);
 	});
 
 	const blockOf = (c: HTMLElement, name: string) =>
@@ -666,8 +666,8 @@ describe('Rect/Ellipse editing via Block (LAYOUT mode)', () => {
 		expect(rectBlock.style.top).toBe('100px');
 	});
 
-	it('no hosted Blocks outside LAYOUT mode', async () => {
-		layoutMode.set(false);
+	it('no hosted Blocks outside ADJUST mode', async () => {
+		adjustMode.set(false);
 		const { container } = render(DrawEditHost);
 		await tick();
 		// only the slide-level Block's plain wrapper remains — no editing chrome
@@ -745,14 +745,14 @@ describe('Rect/Ellipse editing via Block (LAYOUT mode)', () => {
 	});
 });
 
-describe('selection + Copy toolbar (LAYOUT mode)', () => {
+describe('selection + Copy toolbar (ADJUST mode)', () => {
 	beforeEach(() => {
-		canLayout.set(true);
-		layoutMode.set(true);
+		canAdjust.set(true);
+		adjustMode.set(true);
 	});
 	afterEach(() => {
-		canLayout.set(false);
-		layoutMode.set(false);
+		canAdjust.set(false);
+		adjustMode.set(false);
 	});
 
 	async function clickStroke(c: HTMLElement, group: string) {
@@ -807,7 +807,7 @@ describe('selection + Copy toolbar (LAYOUT mode)', () => {
 	it('the surface is raised above the HTML chrome whenever editing, so handles are always reachable', async () => {
 		const { container } = render(DrawEditHost);
 		const svg = container.querySelector('svg.draw')!;
-		// raised from the moment LAYOUT is on — a Block/ghost sitting on a
+		// raised from the moment ADJUST is on — a Block/ghost sitting on a
 		// handle must never make it unselectable
 		expect(svg.classList.contains('raised')).toBe(true);
 
@@ -819,8 +819,8 @@ describe('selection + Copy toolbar (LAYOUT mode)', () => {
 		expect(container.querySelector('g.draw-line .draw-selglow')).toBeNull();
 		expect(svg.classList.contains('raised')).toBe(true);
 
-		// leaving LAYOUT mode drops it back down
-		layoutMode.set(false);
+		// leaving ADJUST mode drops it back down
+		adjustMode.set(false);
 		await tick();
 		expect(svg.classList.contains('raised')).toBe(false);
 	});
@@ -1018,24 +1018,24 @@ describe('selection + Copy toolbar (LAYOUT mode)', () => {
 		undo();
 	});
 
-	it('the toolbar never exists outside LAYOUT mode', async () => {
+	it('the toolbar never exists outside ADJUST mode', async () => {
 		const { container } = render(DrawEditHost);
 		await clickStroke(container, 'draw-line');
 		expect(container.querySelector('.draw-toolbar')).not.toBeNull();
-		layoutMode.set(false);
+		adjustMode.set(false);
 		await tick();
 		expect(container.querySelector('.draw-toolbar')).toBeNull();
 	});
 });
 
-describe('Path editing (LAYOUT mode)', () => {
+describe('Path editing (ADJUST mode)', () => {
 	beforeEach(() => {
-		canLayout.set(true);
-		layoutMode.set(true);
+		canAdjust.set(true);
+		adjustMode.set(true);
 	});
 	afterEach(() => {
-		canLayout.set(false);
-		layoutMode.set(false);
+		canAdjust.set(false);
+		adjustMode.set(false);
 	});
 
 	// Host Path: start [700,700], arrow="end", segments =
@@ -1055,8 +1055,8 @@ describe('Path editing (LAYOUT mode)', () => {
 		expect(guides[1].getAttribute('d')).toBe('M 1000 700 L 1100 600');
 	});
 
-	it('handles and guides never render outside LAYOUT mode', () => {
-		layoutMode.set(false);
+	it('handles and guides never render outside ADJUST mode', () => {
+		adjustMode.set(false);
 		const { container } = render(DrawEditHost);
 		expect(handlesOf(container, 'route')).toHaveLength(0);
 		expect(guidesOf(container, 'route')).toHaveLength(0);
@@ -1095,7 +1095,7 @@ describe('Path editing (LAYOUT mode)', () => {
 		undo();
 	});
 
-	// The demo authors these Paths on ONE line each so the LAYOUT "Save"
+	// The demo authors these Paths on ONE line each so the ADJUST "Save"
 	// endpoint (literal indexOf(oldTag) in patchSource) can find and rewrite
 	// them. This pins that canonical single-line form: an author selecting the
 	// shape and hitting Copy must get back the exact string sitting in source.
@@ -1147,14 +1147,14 @@ describe('Path editing (LAYOUT mode)', () => {
 	});
 });
 
-describe('animated-Path stop editing (LAYOUT mode)', () => {
+describe('animated-Path stop editing (ADJUST mode)', () => {
 	beforeEach(() => {
-		canLayout.set(true);
-		layoutMode.set(true);
+		canAdjust.set(true);
+		adjustMode.set(true);
 	});
 	afterEach(() => {
-		canLayout.set(false);
-		layoutMode.set(false);
+		canAdjust.set(false);
+		adjustMode.set(false);
 	});
 
 	// The host's animated Path (`morph`, stops + animate) is the second g.draw-path.

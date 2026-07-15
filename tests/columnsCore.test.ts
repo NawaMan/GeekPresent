@@ -258,7 +258,7 @@ describe('toWeights / formatWidths', () => {
 		expect(big).toBeGreaterThan(1.9);
 	});
 
-	it('formats the snippet a LAYOUT Copy puts on the clipboard', () => {
+	it('formats the snippet a ADJUST Copy puts on the clipboard', () => {
 		expect(formatWidths([700, 500])).toBe('widths={[1.17, 0.83]}');
 		expect(formatWidths([])).toBe('');
 		expect(formatWidths([0, 0])).toBe('');

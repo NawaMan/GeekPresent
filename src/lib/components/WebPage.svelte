@@ -19,7 +19,7 @@
   give you two nav bars — pass `nav={false}` there.
 
   Layering: the frame is absolutely positioned and carries no z-index, so it paints
-  in DOM order — the deck's own chrome (LAYOUT toggle, Table of Contents, speaker
+  in DOM order — the deck's own chrome (ADJUST toggle, Table of Contents, speaker
   Notes) and this component's own nav bar all stay above it and stay clickable. The
   site behind them is inert anyway until you click the shield.
 

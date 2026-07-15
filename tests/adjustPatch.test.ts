@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { patchSlideSource, type LayoutChange } from '$lib/layout/patchSource';
+import { patchSlideSource, type LayoutChange } from '$lib/adjust/patchSource';
 
 const change = (over: Partial<LayoutChange> = {}): LayoutChange => ({
 	kind: 'Block',
@@ -208,7 +208,7 @@ describe('patchSlideSource', () => {
 		expect(source).toContain('<ImageBlock name="pic" x={50} y={60} width={70} height={80} />');
 	});
 
-	// Every component now takes `style` / `id` / `class`, and LAYOUT knows nothing about
+	// Every component now takes `style` / `id` / `class`, and ADJUST knows nothing about
 	// them — which is precisely why they are worth pinning here. SAVE is a surgical
 	// rewrite of the geometry attributes ONLY, so a decorated tag must come out the far
 	// side still decorated. (COPY is the other, blunter path: it emits a whole tag, which

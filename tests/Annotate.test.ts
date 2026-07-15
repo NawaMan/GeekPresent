@@ -216,10 +216,11 @@ describe('Annotate — armed', () => {
 		expect(get(annotationMode)).toBe(false);
 
 		// The bug this fixes: the toggle used to sit UNDER the ink surface, which owns every
-		// pointer while armed — so it could arm the pen and never disarm it.
+		// pointer while armed — so it could arm the pen and never disarm it. The ANNOTATE icon
+		// lives on the bar above the surface; its aria-label carries the on/off state.
 		annotationMode.set(true);
-		await tick(); // a bare store.set doesn't flush the DOM; getByText below needs it to
-		await fireEvent.click(screen.getByText('✎ ANNOTATE on'));
+		await tick(); // a bare store.set doesn't flush the DOM; getByLabelText below needs it to
+		await fireEvent.click(screen.getByLabelText('ANNOTATE on'));
 		expect(get(annotationMode)).toBe(false);
 	});
 
@@ -346,8 +347,8 @@ describe('Annotate — disarmed', () => {
 
 		expect(document.querySelector('.annot-surface')).toBeNull();
 		expect(screen.queryByText('PEN')).toBeNull();
-		// …but the toggle IS there, or the pen could never be armed in the first place.
-		expect(screen.getByText('✎ ANNOTATE')).toBeTruthy();
+		// …but the ANNOTATE icon IS there, or the pen could never be armed in the first place.
+		expect(screen.getByLabelText('ANNOTATE off')).toBeTruthy();
 	});
 
 	it('still SHOWS ink it is mirroring, with the pen down and the pointer let through', () => {
@@ -363,7 +364,7 @@ describe('Annotate — disarmed', () => {
 
 	it('shows no chrome under ?clean / ?present', () => {
 		render(AnnotateHost, { props: { chrome: false } });
-		expect(screen.queryByText('✎ ANNOTATE')).toBeNull();
+		expect(screen.queryByLabelText('ANNOTATE off')).toBeNull();
 	});
 
 	it('ignores a gesture when the deck never offered the pen', () => {

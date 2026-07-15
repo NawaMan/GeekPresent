@@ -9,7 +9,7 @@
   the page prerenders and the ANIMATE bar scrubs the rocket's flight and the
   beam's draw-progress together.
 
-  Flip LAYOUT on and click a shape:
+  Flip ADJUST on and click a shape:
     · the Sprite's stops each show a ghost box with MOVE / RESIZE / ROTATE
       handles — drag to author the flight; the panel retimes / adds / removes
       stops and sets per-stop easing (the launch eases in, the bank eases out);
@@ -36,7 +36,7 @@
 			<b>ease-in</b>, banks hard <b>ease-out</b>, and grows with its box
 			(<code>fontScale</code>); alongside it a plain <Label>Line</Label> draws
 			itself in. Both are pure CSS animations on <b>one</b> AnimationBar. Flip
-			<b>LAYOUT</b> on, click the rocket, and drag each stop's ghost —
+			<b>ADJUST</b> on, click the rocket, and drag each stop's ghost —
 			<b>move</b>, <b>resize</b>, <b>rotate</b> — then retime / add / ease the
 			keyframes in the panel and <b>Copy</b>.
 		</p>

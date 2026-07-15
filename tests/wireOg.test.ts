@@ -1,7 +1,7 @@
 // Unit tests for the pages.ts OG-image patcher (utils/wire-og.mjs).
 //
 // This is a tool that EDITS SOURCE, so the tests are about what it refuses to do as much as
-// what it does — the same bargain patchSource.ts makes for LAYOUT's SAVE: anything it cannot
+// what it does — the same bargain patchSource.ts makes for ADJUST's SAVE: anything it cannot
 // confidently place is left alone and reported, never guessed.
 import { describe, expect, it } from 'vitest';
 // Plain .mjs build tooling, deliberately outside src/ so it never reaches the app bundle —

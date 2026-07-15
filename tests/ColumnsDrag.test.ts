@@ -1,7 +1,7 @@
 import { render } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { canLayout, layoutMode } from '../src/lib/stores/layoutMode';
+import { canAdjust, adjustMode } from '../src/lib/stores/adjustMode';
 import ColumnsHost from './ColumnsHost.svelte';
 
 // The draggable divider. jsdom has no layout engine, so `getComputedStyle` never
@@ -56,8 +56,8 @@ function drag(handle: HTMLElement, dx: number, opts: { release?: boolean } = {})
 
 beforeEach(() => {
 	stubGrid();
-	layoutMode.set(false);
-	canLayout.set(false);
+	adjustMode.set(false);
+	canAdjust.set(false);
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -68,10 +68,10 @@ describe('Columns — draggable divider', () => {
 		expect(handles(container)).toHaveLength(0);
 	});
 
-	it('LAYOUT mode makes the gutters draggable without `resizable`', async () => {
+	it('ADJUST mode makes the gutters draggable without `resizable`', async () => {
 		const { container } = render(ColumnsHost, { props: {} });
-		canLayout.set(true);
-		layoutMode.set(true);
+		canAdjust.set(true);
+		adjustMode.set(true);
 		await tick();
 		await tick();
 		expect(handles(container)).toHaveLength(1);

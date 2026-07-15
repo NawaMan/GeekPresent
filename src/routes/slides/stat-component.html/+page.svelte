@@ -41,7 +41,7 @@
 </Block>
 
 <!-- The KPI row in a `card` panel so it lifts off the surface, in a full-width band
-     below both the intro and the usage sample. Parked in a Block for LAYOUT mode. -->
+     below both the intro and the usage sample. Parked in a Block for ADJUST mode. -->
 <Block name="kpis" x={120} y={640} width={1680} height={250} grid={10}>
 	<StatGroup card>
 		<Stat value="99.9%" label="Uptime"      sub="last 90 days" trend="up"   delta="+0.4%" />
@@ -51,6 +51,6 @@
 	</StatGroup>
 </Block>
 
-<Hint text="Flip LAYOUT (top-right) to place & resize the KPI row" />
+<Hint text="Flip ADJUST (top-right) to place & resize the KPI row" />
 
 <ViewSource {source} {path} />

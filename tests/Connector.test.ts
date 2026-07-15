@@ -31,7 +31,7 @@ describe('Connector', () => {
 		await tick();
 		expect(d(container)).toBe('M 300 150 L 500 150');
 
-		// The same mutation a LAYOUT-mode drag makes: push db down and right, so
+		// The same mutation a ADJUST-mode drag makes: push db down and right, so
 		// it now sits below api and the shaft has to leave through a new border.
 		await rerender({ dbX: 700, dbY: 600 });
 		await tick();

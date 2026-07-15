@@ -1,5 +1,5 @@
 <!-- Host for Sprite editing tests: a Draw surface with one flying Sprite
-     (three stops, a rotation + easing flourish) so the LAYOUT-mode ghosts,
+     (three stops, a rotation + easing flourish) so the ADJUST-mode ghosts,
      handles and keyframe panel have something to drive. -->
 <script lang="ts">
 	import Draw from '../src/lib/draw/Draw.svelte';

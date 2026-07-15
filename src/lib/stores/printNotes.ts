@@ -6,7 +6,7 @@ import { writable } from 'svelte/store';
 // to infer it from a display mode that is about something else.
 //
 // A STORE, not a context, and that is forced rather than chosen: a deck's slides are the
-// LAYOUT's slot content, so they read the layout's context and not <SlideDeck>'s — which is
+// ADJUST's slot content, so they read the layout's context and not <SlideDeck>'s — which is
 // exactly why `setPages()` has to be called from each deck's +layout.svelte and cannot live in
 // the shell. SlideDeck reads the URL, so a context set there would never reach the <Note> that
 // needs it. A store crosses that boundary because it does not care about the tree.

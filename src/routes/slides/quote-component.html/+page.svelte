@@ -60,6 +60,6 @@
 		role="The Art of Computer Programming" />
 </Block>
 
-<Hint text="Flip LAYOUT (top-right) to place & resize either quote" />
+<Hint text="Flip ADJUST (top-right) to place & resize either quote" />
 
 <ViewSource {source} {path} />

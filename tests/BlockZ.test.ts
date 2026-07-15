@@ -4,22 +4,22 @@ import { get } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import Block from '$lib/components/Block.svelte';
 import BlockZHost from './BlockZHost.svelte';
-import { layoutMode, canLayout } from '$lib/stores/layoutMode';
+import { adjustMode, canAdjust } from '$lib/stores/adjustMode';
 import { blockOrder } from '$lib/stores/blockOrder';
 
 // The live half of the `z` prop: in PRESENTATION a non-zero z becomes the
-// wrapper's z-index; in LAYOUT mode the Front / Back buttons order a Block
+// wrapper's z-index; in ADJUST mode the Front / Back buttons order a Block
 // against its siblings (read from the blockOrder registry). The Save-path half
-// is unit-tested in layoutPatch.test.ts; the pure order math in stackingCore.test.ts.
+// is unit-tested in adjustPatch.test.ts; the pure order math in stackingCore.test.ts.
 
 const movable = (root: ParentNode) => root.querySelector('.movable') as HTMLElement;
 
 beforeEach(() => {
 	blockOrder.set(new Map());
-	layoutMode.set(false);
-	canLayout.set(true); // make LAYOUT available; individual tests turn the mode on
+	adjustMode.set(false);
+	canAdjust.set(true); // make ADJUST available; individual tests turn the mode on
 });
-afterEach(() => layoutMode.set(false));
+afterEach(() => adjustMode.set(false));
 
 describe('Block z-index (presentation)', () => {
 	it('applies a non-zero z as the wrapper z-index when not editing', () => {
@@ -39,10 +39,10 @@ describe('Block z-index (presentation)', () => {
 
 });
 
-describe('Block z-index (LAYOUT mode — live reorder)', () => {
-	beforeEach(() => layoutMode.set(true));
+describe('Block z-index (ADJUST mode — live reorder)', () => {
+	beforeEach(() => adjustMode.set(true));
 
-	it('reflects the author z in real time while editing (not just after leaving LAYOUT)', async () => {
+	it('reflects the author z in real time while editing (not just after leaving ADJUST)', async () => {
 		const { container } = render(Block, { props: { z: 4 } });
 		await tick();
 		// A non-grabbed editing Block shows its authored order live, so a reorder is
@@ -78,8 +78,8 @@ describe('Block z-index (LAYOUT mode — live reorder)', () => {
 	});
 });
 
-describe('Block Front / Back (LAYOUT mode)', () => {
-	beforeEach(() => layoutMode.set(true));
+describe('Block Front / Back (ADJUST mode)', () => {
+	beforeEach(() => adjustMode.set(true));
 
 	it('registers every Block z in the order registry', async () => {
 		render(BlockZHost, { props: { aZ: 0, bZ: 2 } });

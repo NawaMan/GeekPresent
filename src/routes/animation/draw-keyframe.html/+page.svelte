@@ -10,7 +10,7 @@
   are all pure CSS @keyframes, they pause / scrub / restart together as ONE scene
   that PRERENDERS.
 
-  Everything is LAYOUT-editable on this very slide: click the rocket and drag its
+  Everything is ADJUST-editable on this very slide: click the rocket and drag its
   ghost stops (or type L/T/W/H/R) to re-route it, drag the Curve's handles to
   re-trace the plan, and retime each self-draw right in the Draw toolbar — the
   Curve's draw-on time/delay, the Ellipse's under its editing box — then Copy
@@ -41,13 +41,13 @@
 <ContentPage title="Draw × Sprite" subtitle="Keyframe motion and self-drawing annotation, one scrubbable scene">
 	<div style="line-height: 1.5em;">
 		<p>
-			A <Label>Sprite</Label> flies the rocket through three LAYOUT-draggable stops
+			A <Label>Sprite</Label> flies the rocket through three ADJUST-draggable stops
 			<i>inside</i> a <Label>Draw</Label> that also traces the flight plan with a
 			dashed <Label>Curve</Label> over the <b>same 4 seconds</b> and circles the
 			destination just before arrival. <b>One</b> AnimationBar collects every finite
 			animation in the slide — all pure CSS — so motion and annotation pause, scrub,
 			and restart as <b>one timeline</b>, and the whole scene prerenders. Flip
-			<b>LAYOUT</b> on and each piece is editable in place: re-route the rocket
+			<b>ADJUST</b> on and each piece is editable in place: re-route the rocket
 			(drag ghosts or type <code>L/T/W/H/R</code>), retime the Curve's reveal in the
 			toolbar's <b>draw-on</b> fields (and the Ellipse's under its box), then Copy.
 		</p>

@@ -61,7 +61,7 @@ describe('SlideDeck — printing one slide', () => {
 
 	it('`?notes` grows the paper by the notes band, and arms the note to render', async () => {
 		// The same flag the handout takes, and the same three inches. It reaches <Note> through a
-		// store rather than context, because a slide is the LAYOUT's slot content and cannot see
+		// store rather than context, because a slide is the ADJUST's slot content and cannot see
 		// anything the shell sets — the same reason setPages() lives in each deck's layout.
 		setPageUrl('/slides/stub.html?notes');
 		const { container } = render(SlideDeck, { props: { pages } });

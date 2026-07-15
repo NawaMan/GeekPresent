@@ -21,7 +21,7 @@
       refused — an appendix reached by a hostile link renders with NO return
       control rather than with one that walks the audience off the deck.
 
-  Pure and total in the drawCore / layoutAccessCore tradition: a query string with
+  Pure and total in the drawCore / adjustAccessCore tradition: a query string with
   no `return`, a `return` naming another origin, one hand-built out of `../` —
   each has one defined answer, and the answer is never "navigate somewhere
   surprising".

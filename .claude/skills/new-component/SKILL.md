@@ -40,7 +40,7 @@ which is far more confusing. On the root element:
   `:global(...)` block) or as a hook for scripts and tests. For a one-off tweak from a slide, `style` is
   the answer.
 - **On a draggable, the props own the geometry — `style` does not.** The one carve-out to "style wins".
-  See the `layout-mode` skill; reuse `guardStyle()` from `src/lib/layout/styleGuardCore.ts` rather than
+  See the `adjust-mode` skill; reuse `guardStyle()` from `src/lib/adjust/styleGuardCore.ts` rather than
   re-deriving the reserved list.
 
 ## 2. Put the logic in a pure core module
@@ -82,7 +82,7 @@ clock. Never put an `<AnimationBar />` on a `Terminal` slide — both would driv
 
 Anything that points *at* another component (`Connector`, `Spotlight`) resolves through
 `src/lib/stores/blockAnchors.ts`, which publishes each named `Block`'s live box. That is why arrows track
-their boxes through a LAYOUT-mode drag. Reuse it rather than reading the DOM.
+their boxes through a ADJUST-mode drag. Reuse it rather than reading the DOM.
 
 ## Definition of done
 
@@ -94,7 +94,7 @@ A component is not done because the `.svelte` file exists. It is done when all f
    explanation, a `QuickCode` showing the tag an author would type, a props line, live examples wrapped in
    named `Block`s so they can be dragged, a `Hint`, and a `ViewSource` at the end. **Elide geometry in the
    `QuickCode` sample** (`<Block name="api" …>`) — a sample that spells out `x`/`y`/`width`/`height` is
-   indistinguishable from the real tag to LAYOUT's source patcher, and neither can then be saved.
+   indistinguishable from the real tag to ADJUST's source patcher, and neither can then be saved.
    Register it in `src/routes/slides/pages.ts` and give it a `+layout.js`; see the `new-slide` skill.
 3. **A DOM test** — `tests/<Name>.test.ts`.
 4. **An SSR test** — `tests/<Name>Ssr.ssr.test.ts`. Not optional: built deck HTML never contains slide

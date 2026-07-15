@@ -18,13 +18,13 @@ grep -rn "<keyword>" TODO.md src/lib      # is it already built, or already list
 ```
 
 If it exists, **update that entry instead of adding a duplicate**. If it's already built, say so and
-stop. If it's *partly* built, say which half is missing and write only that (e.g. LAYOUT's `?layout`
+stop. If it's *partly* built, say which half is missing and write only that (e.g. ADJUST's `?adjust`
 flag already works in a build; only the default-on half was open).
 
 ## 2. Place it
 
 Pick the section by kind, not by excitement: **Tier 1** (closes a clear gap) · **Tier 2** (polish) ·
-**Tier 3** (nice to have) · **Authoring / LAYOUT mode** · **Adoption / distribution** ·
+**Tier 3** (nice to have) · **Authoring / ADJUST mode** · **Adoption / distribution** ·
 **Chrome & legibility** · **Page templates**. Put new items next to related ones.
 
 ## 3. Write it in the house shape

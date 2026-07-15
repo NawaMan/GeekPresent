@@ -1,9 +1,9 @@
 ---
-name: layout-mode
-description: Place elements at exact canvas pixels with Block/ImageBlock and LAYOUT mode, connect them with Connector, and understand who may offer LAYOUT, why SAVE can refuse or land only partly, and the style guard. Use when a slide needs precise positioning, a boxes-and-arrows diagram, or the user asks about LAYOUT/dragging/SAVE.
+name: adjust-mode
+description: Place elements at exact canvas pixels with Block/ImageBlock and ADJUST mode, connect them with Connector, and understand who may offer ADJUST, why SAVE can refuse or land only partly, and the style guard. Use when a slide needs precise positioning, a boxes-and-arrows diagram, or the user asks about ADJUST/dragging/SAVE.
 ---
 
-# Place things visually (LAYOUT mode)
+# Place things visually (ADJUST mode)
 
 When a slide positions things at exact canvas pixels, **don't guess the numbers**. Wrap the element in a
 `Block` (or `ImageBlock` for a picture), drag it in the browser, and copy the resulting tag back into the
@@ -28,37 +28,37 @@ and the anchor other components resolve against), `grid` (snap step), `aspect` (
 - `ImageBlock` for pictures: the image fills the panel and reshapes with the box, aspect locked by default
   (Alt breaks it).
 
-## Who may offer LAYOUT
+## Who may offer ADJUST
 
-**LAYOUT is an authoring aid, not a viewer feature. In production it is OFF.** Three things can offer the
-control, highest authority first — precedence lives in `src/lib/layout/layoutAccessCore.ts` (pure,
+**ADJUST is an authoring aid, not a viewer feature. In production it is OFF.** Three things can offer the
+control, highest authority first — precedence lives in `src/lib/adjust/adjustAccessCore.ts` (pure,
 unit-tested):
 
 1. **`pnpm dev`** — always, and nothing can take it away.
-2. **`?layout` on any slide URL** — the escape hatch on a built site; `?layout=off` disables it. The
+2. **`?adjust` on any slide URL** — the escape hatch on a built site; `?adjust=off` disables it. The
    speaker asked, so this outranks the content.
-3. **`layout: true` on the slide's `pages.ts` entry** — a *per-slide* opt-in, so a slide that **teaches**
-   layout offers the button in the build while the rest of the deck ships LAYOUT-free. There the button
+3. **`adjust: true` on the slide's `pages.ts` entry** — a *per-slide* opt-in, so a slide that **teaches**
+   layout offers the button in the build while the rest of the deck ships ADJUST-free. There the button
    renders **featured** (a filled warm pill with a halo that pulses until used) and is exempt from
    `fadeChrome` — which otherwise holds chrome at `opacity: 0.12` until pointed at, and would defeat any
    amount of restyling.
 
 **Offered is not active** — the mode still starts off.
 
-> **Gotcha: `?layout` is sticky and global, not per-deck.** Once seen on a built site it is saved to
-> `localStorage` and the control then shows on **every deck on that origin** until `?layout=off`. "I
-> enabled it on one slide and now it's everywhere" is expected. See `src/lib/stores/layoutMode.ts`.
+> **Gotcha: `?adjust` is sticky and global, not per-deck.** Once seen on a built site it is saved to
+> `localStorage` and the control then shows on **every deck on that origin** until `?adjust=off`. "I
+> enabled it on one slide and now it's everywhere" is expected. See `src/lib/stores/adjustMode.ts`.
 
 ## SAVE, and why it refuses
 
-**SAVE cannot follow LAYOUT into a build.** It POSTs to `/__geekpresent/layout-save`, an endpoint that
+**SAVE cannot follow ADJUST into a build.** It POSTs to `/__geekpresent/adjust-save`, an endpoint that
 exists only inside the vite dev server — a static host has no source tree to rewrite. The button is
 deliberately **not** greyed out there: it looks ordinary and **refuses on click** (`NOT ALLOWED`, with a
 tooltip). That ordering is the point — a button disabled from the start reads as broken; a button that
 answers when pressed teaches that saving is *forbidden here*. **Copy** is the write-back path that works
 everywhere.
 
-**SAVE can land only PARTLY, and says so.** The patcher (`src/lib/layout/patchSource.ts`) never guesses: a
+**SAVE can land only PARTLY, and says so.** The patcher (`src/lib/adjust/patchSource.ts`) never guesses: a
 tag it cannot confidently place comes back `unmatched` rather than risking a rewrite of the wrong one. So
 the button has a fourth outcome beside `SAVED` / `NONE` / `NOT ALLOWED` — the tally **`1 OF 2`**, naming
 what didn't land. A partial write that claimed `SAVED` would quietly lose the author's drag on the next
@@ -72,7 +72,7 @@ reload.
 ## Dragging (what to tell the user)
 
 Ask the user to open the slide in *their* dev server — you never run it. The **SizeMode** control
-(top-right) shows a LAYOUT toggle; a dashed outline appears around each `Block`.
+(top-right) shows a ADJUST toggle; a dashed outline appears around each `Block`.
 
 - **Drag** the body to move, **drag the bottom-right grip** to resize.
 - **Alt** breaks an aspect lock; **Esc** cancels the gesture; **Ctrl/Cmd+Z** undoes and
@@ -114,11 +114,11 @@ The one exception to "author's `style` wins". A `Block` (and Draw's `Rect`/`Elli
 so `left`, `top`, `width`, `height`, `inset*` and `position` are **reserved**: a declaration for one of
 them in `style` is **stripped** before the style is applied. Otherwise it would land in the same
 declaration block as the box's own geometry, where the last declaration simply wins — and
-`style="left: 40px"` would cancel `x={200}` outright, leaving LAYOUT dragging a box that cannot move.
+`style="left: 40px"` would cancel `x={200}` outright, leaving ADJUST dragging a box that cannot move.
 
 `style` is still for **cosmetics** (stroke, dash, colour, a decorative `rotate()`); those pass through and
 still win. Reserving changes what *renders*, never what you *wrote* — your source `style` is echoed back
-verbatim by Copy/Save, and LAYOUT chrome badges the dead declaration so you know to delete it.
+verbatim by Copy/Save, and ADJUST chrome badges the dead declaration so you know to delete it.
 
-The rule lives in `src/lib/layout/styleGuardCore.ts` (pure, unit-tested). **A new draggable reuses
+The rule lives in `src/lib/adjust/styleGuardCore.ts` (pure, unit-tested). **A new draggable reuses
 `guardStyle()`** rather than re-deriving the list.

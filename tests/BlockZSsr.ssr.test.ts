@@ -1,7 +1,7 @@
 // @vitest-environment node
 //
 // True server-side render of a Block's `z` (svelte/server, no DOM). On the
-// server `editing` is always false (canLayout/layoutMode are off), so the author
+// server `editing` is always false (canAdjust/adjustMode are off), so the author
 // z is the presentation z — a non-zero value must reach the prerendered wrapper's
 // z-index, and z=0 must leave the style clean (no stacking context, so a slide's
 // Blocks keep painting in DOM order until an author opts one out).

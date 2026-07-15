@@ -1,5 +1,5 @@
 <!--
-  Example: Block component (LAYOUT mode — drag to place, copy the values)
+  Example: Block component (ADJUST mode — drag to place, copy the values)
   File: src/routes/slides/block-component.html/+page.svelte
 -->
 <script>
@@ -20,7 +20,7 @@
 		<p>
 			Wrap content in a <Label>Block</Label> to pin it at an exact
 			<code>(x, y)</code> with a fixed <code>width</code>/<code>height</code> in
-			canvas pixels &mdash; then flip <b>LAYOUT</b> on (top-right, next to the
+			canvas pixels &mdash; then flip <b>ADJUST</b> on (top-right, next to the
 			display control) to drag and resize it by hand.
 		</p>
 		<QuickCode style="margin-top: 0.5em;" lang="svelte" code={`<Block x={180} y={620} width={520} height={200}>
@@ -35,7 +35,7 @@
 		</p>
 		<p style="margin-top: 0.6em; opacity: 0.8;">
 			Overlapping Blocks paint in DOM order &mdash; give one a <code>z</code> to
-			change that. In LAYOUT mode the <b>&#x2912;</b> / <b>&#x2913;</b> buttons
+			change that. In ADJUST mode the <b>&#x2912;</b> / <b>&#x2913;</b> buttons
 			bring a Block to the front or send it to the back; the value rides along in
 			<b>Copy</b> / <b>Save</b>. The two swatches below overlap: <code>front</code>
 			carries <code>z={1}</code>, so it sits over <code>back</code>.
@@ -58,7 +58,7 @@
 <ImageBlock name="cat" src={codecat} alt="Coding Booth cat" x={786} y={798} width={249} height={249} bounds="none" />
 
 <!-- Stacking order: `front` comes FIRST in the markup, so DOM paint order alone
-     would bury it — but z={1} lifts it over `back` (default z=0). Flip LAYOUT on
+     would bury it — but z={1} lifts it over `back` (default z=0). Flip ADJUST on
      and use the ⤒ / ⤓ buttons to reorder them; Copy/Save writes the z back. -->
 <Block name="front" x={1216} y={298} width={280} height={168} z={1}>
 	<div class="demo c"><b>front</b><br/>z=1</div>

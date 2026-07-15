@@ -3,20 +3,20 @@ import { tick } from 'svelte';
 import { beforeEach, describe, expect, it } from 'vitest';
 import Block from '../src/lib/components/Block.svelte';
 import DrawHost from './StyleIdClassDrawHost.svelte';
-import { layoutMode, canLayout } from '../src/lib/stores/layoutMode';
+import { adjustMode, canAdjust } from '../src/lib/stores/adjustMode';
 
 const box = (container: HTMLElement) => container.querySelector('.movable') as HTMLElement;
 
-/** LAYOUT chrome only renders when the control is BOTH available and switched on. */
+/** ADJUST chrome only renders when the control is BOTH available and switched on. */
 async function enterLayoutMode() {
-	canLayout.set(true);
-	layoutMode.set(true);
+	canAdjust.set(true);
+	adjustMode.set(true);
 	await tick();
 }
 
 beforeEach(() => {
-	canLayout.set(false);
-	layoutMode.set(false);
+	canAdjust.set(false);
+	adjustMode.set(false);
 });
 
 describe('Block — the props own the geometry', () => {
@@ -43,7 +43,7 @@ describe('Block — the props own the geometry', () => {
 
 	it('dragging a style-pinned Block actually moves it — the geometry is authoritative', async () => {
 		// The whole point: x is free to change and the paint follows it. Before the
-		// guard, x changed and the box stayed put, which is what made LAYOUT look broken.
+		// guard, x changed and the box stayed put, which is what made ADJUST look broken.
 		const { container, rerender } = render(Block, {
 			props: { x: 200, y: 300, width: 400, height: 160, style: 'left: 40px' }
 		});
@@ -81,7 +81,7 @@ describe('Block — the props own the geometry', () => {
 	});
 });
 
-describe('Block — the LAYOUT badge', () => {
+describe('Block — the ADJUST badge', () => {
 	it('says which property was ignored, and why', async () => {
 		const { container } = render(Block, {
 			props: { name: 'db', x: 200, y: 300, width: 400, height: 160, style: 'left: 40px' }
@@ -120,7 +120,7 @@ describe('Block — the LAYOUT badge', () => {
 		expect(container.querySelector('.style-warn')).toBeNull();
 	});
 
-	it('shows no badge outside LAYOUT mode — the chrome never reaches an audience', async () => {
+	it('shows no badge outside ADJUST mode — the chrome never reaches an audience', async () => {
 		const { container } = render(Block, {
 			props: { x: 0, y: 0, width: 100, height: 50, style: 'left: 40px' }
 		});
@@ -132,7 +132,7 @@ describe('Block — the LAYOUT badge', () => {
 // The Draw box shapes are the OTHER draggable geometry. They carry x/y/width/height
 // as SVG PRESENTATION attributes — the weakest style there is, outranked by any css,
 // an inline `style` included. So `style="width: 50px"` on a <Rect> would silently
-// cancel the box, and the LAYOUT Block hosting it would drag something that never
+// cancel the box, and the ADJUST Block hosting it would drag something that never
 // moves: the same bug as Block's, through a different door. Same rule, same core.
 describe('Draw shapes — the props own the geometry there too', () => {
 	it('Rect: a reserved property never reaches the SVG, so the presentation attrs stand', () => {

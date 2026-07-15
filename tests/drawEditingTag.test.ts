@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { boxTag, sharedAttrs } from '$lib/draw/editing';
 
-// The opening tag LAYOUT emits — what COPY puts on your clipboard, and what you paste
+// The opening tag ADJUST emits — what COPY puts on your clipboard, and what you paste
 // over the tag in your source.
 //
-// Which is why the author's own props have to be in it. LAYOUT neither reads nor edits
+// Which is why the author's own props have to be in it. ADJUST neither reads nor edits
 // `id` / `class` / `style`, but Copy emits a WHOLE tag and the author pastes it OVER the
 // one they wrote — so anything the emitter forgets is deleted from their slide by the
 // act of dragging a box. (SAVE is a different, safer path: patchSource rewrites only the
 // geometry attributes in place and leaves every other prop alone — see patchSource.ts
-// and the round-trip test in layoutPatch.test.ts.)
+// and the round-trip test in adjustPatch.test.ts.)
 
 describe('sharedAttrs — the author’s props survive the round-trip', () => {
 	it('emits id, class and style when the author set them', () => {

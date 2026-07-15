@@ -20,7 +20,7 @@ describe('Block style guard (SSR)', () => {
 		expect(body).toContain('border: 1px solid red');
 	});
 
-	it('ships no LAYOUT chrome — the badge is author-facing and must not prerender', () => {
+	it('ships no ADJUST chrome — the badge is author-facing and must not prerender', () => {
 		expect(body).not.toContain('style-warn');
 		expect(body).not.toContain('ignored');
 	});

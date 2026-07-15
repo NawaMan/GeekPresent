@@ -25,7 +25,7 @@
 	</div>
 </ContentPage>
 
-<!-- Three even columns with gutter rules. Parked in a Block so LAYOUT mode can move
+<!-- Three even columns with gutter rules. Parked in a Block so ADJUST mode can move
      and resize the band; Block fills its content, so the grid stretches to the box. -->
 <Block name="trio" x={60} y={400} width={1800} height={220} grid={10}>
 	<Columns columns={3} divider gap="3em">
@@ -67,7 +67,7 @@
 			</p>
 			<p style="margin-top: 0.6em;">
 				<b>Drag the divider</b> between these two. <code>resizable</code> makes it
-				grabbable for a viewer; LAYOUT mode does so regardless, and adds a
+				grabbable for a viewer; ADJUST mode does so regardless, and adds a
 				<code>widths</code> chip that copies the ratio you dragged. Double-click
 				resets it. Nothing is saved — a slide is a page load.
 			</p>
@@ -75,6 +75,6 @@
 	</Columns>
 </Block>
 
-<Hint text="Drag the divider in the lower band — or flip LAYOUT to place & copy the ratio" />
+<Hint text="Drag the divider in the lower band — or flip ADJUST to place & copy the ratio" />
 
 <ViewSource {source} {path} />

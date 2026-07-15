@@ -8,7 +8,7 @@
   L/T/W/H/R + per-stop easing), a scrubbable bar and a <Sprite>-tag Copy. The
   motion is pure CSS @keyframes, so the slide prerenders.
 
-    1. Open this slide with `?layout` (or toggle LAYOUT, top-right, in dev).
+    1. Open this slide with `?adjust` (or toggle ADJUST, top-right, in dev).
     2. Click the element; drag a ghost to move / resize / rotate that stop, or
        type exact L/T/W/H/R in the toolbar.
     3. Retime a stop's %, set its per-segment easing, "+ keyframe", ✕ to remove.
@@ -39,7 +39,7 @@
 	<div style="line-height: 1.5em;">
 		<p>
 			The rocket flies through a row of faint <b>ghost</b> stops. Flip
-			<b>LAYOUT</b> on, click it, then drag a ghost to <b>move / resize / rotate</b>
+			<b>ADJUST</b> on, click it, then drag a ghost to <b>move / resize / rotate</b>
 			that stop &mdash; or type exact <code>L/T/W/H/R</code> in the Draw toolbar.
 			Retime each stop's <code>%</code>, set its <b>easing</b> (the launch eases
 			<i>in</i>, the bank eases <i>out</i>), <b>+&nbsp;keyframe</b> to add one,

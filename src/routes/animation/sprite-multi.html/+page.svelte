@@ -13,7 +13,7 @@
     · ONE timeline, on purpose. The bar scrubs all three sprites (pure CSS
       @keyframes) together — the shared playhead is now the design, not a side
       effect of `.content` scoping.
-    · Per-object LAYOUT editing still works: click a sprite, drag its stops'
+    · Per-object ADJUST editing still works: click a sprite, drag its stops'
       MOVE / RESIZE / ROTATE ghosts, retime/ease in the panel, Copy just that tag.
     · Draw shapes can ride the SAME bar (see draw-sprite.html: a <Line> drawing
       itself in beside the rocket) — sprites and native shapes on one surface.
@@ -62,7 +62,7 @@
 		</p>
 		<p style="margin-top: 0.4em;">
 			The shared timeline is now <b>the design</b>, not a scoping accident. Flip
-			<b>LAYOUT</b> on, click any sprite to edit just its stops
+			<b>ADJUST</b> on, click any sprite to edit just its stops
 			(<b>move / resize / rotate</b>), then <b>Copy</b> that one tag. Native Draw
 			shapes can ride the same bar too (see <i>Draw — Flying Sprite</i>).
 		</p>

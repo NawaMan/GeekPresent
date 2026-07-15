@@ -23,7 +23,7 @@
 		A shape animates by keyframing its <i>own geometry</i>. This <Label>Curve</Label>'s
 		endpoint carries <Label>stops</Label> &mdash; it sweeps from <b>B₀</b> up to
 		<b>B₁₀₀</b> while the bend whips over. Same <code>stops</code> / <code>animate</code>
-		shape the Sprite uses. Press <b>ANIMATE</b> to scrub; in <b>LAYOUT</b> each stop has
+		shape the Sprite uses. Press <b>ANIMATE</b> to scrub; in <b>ADJUST</b> each stop has
 		a handle and the toolbar's keyframes panel retimes them.
 	</p>
 </ContentPage>

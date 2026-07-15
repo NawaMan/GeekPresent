@@ -7,7 +7,7 @@ import { type Codec, jsonCodec } from '$lib/utils/stateCore';
 
   Every persisted store in this deck used to hand-roll the same four steps, and
   each one got a slightly different subset right. displayMode.ts,
-  diagramScroll.ts and layoutMode.ts have since moved onto this factory, and are
+  diagramScroll.ts and adjustMode.ts have since moved onto this factory, and are
   now the worked examples rather than the cautionary tale — but the four steps
   are why it exists:
 
