@@ -429,7 +429,7 @@ does, and the ambiguity never arises.
    <ImageBlock src={photo} alt="…" x={760} y={560} width={320} height={320} />
    ```
 2. Have the user open the slide in their dev server. The top-centre tool bar
-   (`PRESENT │ ANNOTATE │ ADJUST`) now shows an **ADJUST** toggle — turn it on. A dashed
+   (`PRESENT │ ANNOTATE │ ADJUST │ DISPLAY │ ☰`) now shows an **ADJUST** toggle — turn it on. A dashed
    outline appears around each `Block`.
 3. **Drag** the body to move, **drag the bottom-right grip** to resize. Snap to a
    grid with the `grid` prop; hold **Alt** to break an aspect lock; **Esc** cancels

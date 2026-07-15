@@ -71,8 +71,9 @@ reload.
 
 ## Dragging (what to tell the user)
 
-Ask the user to open the slide in *their* dev server — you never run it. The **SizeMode** control
-(top-right) shows a ADJUST toggle; a dashed outline appears around each `Block`.
+Ask the user to open the slide in *their* dev server — you never run it. The top-centre tool bar
+(`PRESENT │ ANNOTATE │ ADJUST │ DISPLAY │ ☰`) shows an **ADJUST** toggle — turn it on; a dashed
+outline appears around each `Block`.
 
 - **Drag** the body to move, **drag the bottom-right grip** to resize.
 - **Alt** breaks an aspect lock; **Esc** cancels the gesture; **Ctrl/Cmd+Z** undoes and

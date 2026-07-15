@@ -4,7 +4,6 @@
 import { render, cleanup, fireEvent, screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { get } from 'svelte/store';
-import { tick } from 'svelte';
 import AnnotateHost from './AnnotateHost.svelte';
 import {
 	annotationMode,
@@ -205,7 +204,7 @@ describe('Annotate — armed', () => {
 		expect(get(annotateColor).highlighter).toBe(null);
 	});
 
-	it('puts the pen down on DONE, on Escape — and on the toggle itself', async () => {
+	it('puts the pen down on DONE and on Escape', async () => {
 		render(AnnotateHost);
 
 		await fireEvent.click(screen.getByText('DONE'));
@@ -215,13 +214,9 @@ describe('Annotate — armed', () => {
 		await fireEvent.keyDown(window, { key: 'Escape' });
 		expect(get(annotationMode)).toBe(false);
 
-		// The bug this fixes: the toggle used to sit UNDER the ink surface, which owns every
-		// pointer while armed — so it could arm the pen and never disarm it. The ANNOTATE icon
-		// lives on the bar above the surface; its aria-label carries the on/off state.
-		annotationMode.set(true);
-		await tick(); // a bare store.set doesn't flush the DOM; getByLabelText below needs it to
-		await fireEvent.click(screen.getByLabelText('ANNOTATE on'));
-		expect(get(annotationMode)).toBe(false);
+		// The ANNOTATE toggle itself (the other way to put the pen down) now lives in
+		// <SlideToolbar>, above the ink surface so an armed pen can't bury it — covered in
+		// SlideToolbar.test.ts, not here (this fixture no longer renders the toggle).
 	});
 
 	it('undoes on Ctrl+Z', async () => {
@@ -342,13 +337,13 @@ describe('Annotate — the stale-ink notice', () => {
 });
 
 describe('Annotate — disarmed', () => {
-	it('renders nothing but the toggle when there is no ink and the pen is down', () => {
+	it('renders nothing when there is no ink and the pen is down', () => {
 		render(AnnotateHost);
 
 		expect(document.querySelector('.annot-surface')).toBeNull();
 		expect(screen.queryByText('PEN')).toBeNull();
-		// …but the ANNOTATE icon IS there, or the pen could never be armed in the first place.
-		expect(screen.getByLabelText('ANNOTATE off')).toBeTruthy();
+		// The ANNOTATE toggle (which arms the pen in the first place) now lives in
+		// <SlideToolbar>; its presence/absence is asserted there, not on this fixture.
 	});
 
 	it('still SHOWS ink it is mirroring, with the pen down and the pointer let through', () => {
@@ -362,10 +357,8 @@ describe('Annotate — disarmed', () => {
 		expect(screen.queryByText('PEN')).toBeNull(); // no palette in the audience's window
 	});
 
-	it('shows no chrome under ?clean / ?present', () => {
-		render(AnnotateHost, { props: { chrome: false } });
-		expect(screen.queryByLabelText('ANNOTATE off')).toBeNull();
-	});
+	// (The "no chrome under ?clean / ?present" case moved to SlideToolbar.test.ts, which now
+	//  owns the ANNOTATE toggle and the browser/chrome gating that hides it.)
 
 	it('ignores a gesture when the deck never offered the pen', () => {
 		// A stale persisted `annotationMode: true` from another deck must stay inert here.
