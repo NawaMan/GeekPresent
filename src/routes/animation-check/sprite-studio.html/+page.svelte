@@ -6,7 +6,7 @@
   Sprite-in-Draw wrapper. It carries the exact drop-in shape KeyframeStudio did
   (name / initialStops / duration / fontScale), yet the motion is pure CSS
   @keyframes and it is edited by the shared Draw toolbar — now WITH numeric
-  L/T/W/H/R fields (flip LAYOUT, click the card). KeyframeStudio is gone; this is
+  L/T/W/H/R fields (flip ADJUST, click the card). KeyframeStudio is gone; this is
   the one authoring tool.
 -->
 <script lang="ts">
@@ -37,7 +37,7 @@
 		fields per stop, the one thing the old panel had that the Draw editor lacked.
 	</p>
 	<p class="watch">
-		▶ Flip <b>LAYOUT</b> and click the card: drag its ghosts <i>or</i> type exact
+		▶ Flip <b>ADJUST</b> and click the card: drag its ghosts <i>or</i> type exact
 		<code>L/T/W/H/R</code> in the toolbar &mdash; same setter, live preview. One
 		box vocabulary, one unified editor.
 	</p>

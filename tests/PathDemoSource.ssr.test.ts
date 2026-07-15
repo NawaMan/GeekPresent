@@ -1,6 +1,6 @@
 // @vitest-environment node
 //
-// The LAYOUT "Save" button rewrites a Draw shape by finding its tag as an
+// The ADJUST "Save" button rewrites a Draw shape by finding its tag as an
 // EXACT literal string in the slide source (patchSource: indexOf(oldTag)). So
 // the demo's <Path> tags must sit in source on ONE line, in the canonical form
 // Copy emits — otherwise a drag → Save is silently "unmatched" and reverts on
@@ -9,7 +9,7 @@
 // patcher.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { patchSlideSource } from '../src/lib/layout/patchSource';
+import { patchSlideSource } from '../src/lib/adjust/patchSource';
 
 // Both demos that author a <Path> element (the static/reveal deck and the
 // scrubbing animation demo). Each maps a shape `name` → the file it lives in.
@@ -27,7 +27,7 @@ const tagOf = (name: string) => {
 	return src.match(new RegExp(`<Path name="${name}"[^\\n]*?/>`))?.[0];
 };
 
-describe('Path demo — LAYOUT Save round-trip', () => {
+describe('Path demo — ADJUST Save round-trip', () => {
 	it('authors each <Path> as a single-line, canonical tag', () => {
 		for (const name of Object.keys(DEMOS)) {
 			const tag = tagOf(name);

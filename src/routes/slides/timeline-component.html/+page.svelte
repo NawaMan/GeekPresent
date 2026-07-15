@@ -61,6 +61,6 @@
 	</Timeline>
 </Block>
 
-<Hint text="Flip LAYOUT (top-right) to place & resize either timeline" />
+<Hint text="Flip ADJUST (top-right) to place & resize either timeline" />
 
 <ViewSource {source} {path} />

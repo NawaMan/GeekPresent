@@ -4,7 +4,7 @@
       <Rect x={860} y={480} width={400} height={120} rounded={12} />
 
   Box geometry, deliberately Block-shaped (x/y/width/height, not corner
-  pairs): in LAYOUT mode this shape registers its box with <Draw>, which
+  pairs): in ADJUST mode this shape registers its box with <Draw>, which
   hosts a real <Block tag="Rect"> for it — move, resize, aspect-lock, grid,
   bounds, undo, and Copy arrive wholesale, and Copy emits `<Rect …/>`, not
   `<Block>`. Stroke-only by default (fill none); `fill` or --draw-fill adds
@@ -14,7 +14,7 @@
 	import { getContext, untrack } from 'svelte';
 	import { boxTag, fmtNum, newEditorId, sharedAttrs } from './editing';
 	import { finite } from './drawCore';
-	import { guardStyle } from '$lib/layout/styleGuardCore';
+	import { guardStyle } from '$lib/adjust/styleGuardCore';
 	import {
 		DRAW_CONTEXT_KEY,
 		type DrawContext,
@@ -88,7 +88,7 @@
 		drawSecs && drawDelayVal && Number.isFinite(drawDelayVal) && drawDelayVal > 0 ? drawDelayVal : 0
 	);
 
-	// LAYOUT-mode editing overrides (finder state, driven by Draw's hosted
+	// ADJUST-mode editing overrides (finder state, driven by Draw's hosted
 	// Block; reset on reload — Copy → paste is the only persistence).
 	let live = $state<{ x: number; y: number; w: number; h: number } | null>(null);
 	const X = $derived(live?.x ?? finite(x));
@@ -105,13 +105,13 @@
 
 	// x/y/width/height reach the <rect> as PRESENTATION attributes, which any css —
 	// an inline style included — outranks. So an author's `style="width: 50px"`
-	// would silently cancel the geometry this shape is drawing, and the LAYOUT Block
+	// would silently cancel the geometry this shape is drawing, and the ADJUST Block
 	// hosting it would drag a box that never moves. Same rule as Block: the props own
 	// the geometry, cosmetics pass through. (`rx` is NOT reserved — here it means
-	// corner rounding, not a radius.) See layout/styleGuardCore.ts.
+	// corner rounding, not a radius.) See adjust/styleGuardCore.ts.
 	const guard = $derived(guardStyle(style));
 
-	// --- LAYOUT-mode editing: register the box with Draw, which hosts the
+	// --- ADJUST-mode editing: register the box with Draw, which hosts the
 	// editing <Block tag="Rect"> (registered post-render via $effect so a
 	// child never mutates the parent's state mid-render).
 	const ctx = getContext<DrawContext | undefined>(DRAW_CONTEXT_KEY);

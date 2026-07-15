@@ -64,6 +64,6 @@
  print(greet("world"))`} />
 </Block>
 
-<Hint text="before/after computes the diff; a diff string spells it out — flip LAYOUT to place either" />
+<Hint text="before/after computes the diff; a diff string spells it out — flip ADJUST to place either" />
 
 <ViewSource {source} {path} />

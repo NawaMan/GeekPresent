@@ -23,20 +23,20 @@
   the AnimationBar scrubs it exactly like every other shape's animation —
   no Web Animations API, unlike the standalone KeyframeStudio.
 
-  LAYOUT-mode editing: each stop grows a ghost box with a MOVE handle (drag to
+  ADJUST-mode editing: each stop grows a ghost box with a MOVE handle (drag to
   reposition), a RESIZE handle (bottom-right corner) and a ROTATE handle; the
   keyframe panel retimes / adds / removes stops and sets per-stop easing, just
   like the path shapes. Geometry is edited by DRAGGING (the Draw convention),
   so the panel needs no l/t/w/h fields. Edits are finder state — Copy → paste
-  is the only persistence — and every completed drag records to LAYOUT undo.
+  is the only persistence — and every completed drag records to ADJUST undo.
 
   The moving element is pointer-events:none (the surface never eats input);
-  only the LAYOUT handles re-enable the pointer, and only in LAYOUT mode.
+  only the ADJUST handles re-enable the pointer, and only in ADJUST mode.
 -->
 <script lang="ts">
 	import { getContext, onDestroy, setContext, untrack, type Snippet } from 'svelte';
 	import { browser } from '$app/environment';
-	import { record } from '$lib/stores/layoutHistory';
+	import { record } from '$lib/stores/adjustHistory';
 	import DrawHandle from './DrawHandle.svelte';
 	import {
 		fmtNum,
@@ -75,7 +75,7 @@
 		/** Snap step (canvas px) while dragging handles. 1 = freeform. */
 		grid?: number;
 		/** Treat this sprite as a GROUP of editable shapes (children are a nested
-		 *  <Draw>): in LAYOUT, double-click to enter isolation — freeze + straighten
+		 *  <Draw>): in ADJUST, double-click to enter isolation — freeze + straighten
 		 *  — and edit the nested shapes; Esc / click-outside exits. Off by default,
 		 *  so a plain glyph sprite keeps its simple select-and-fly behavior. */
 		group?: boolean;
@@ -104,7 +104,7 @@
 		class: klass = ''
 	}: Props = $props();
 
-	// LAYOUT-mode editing overrides: the editor is a coordinate FINDER — drags
+	// ADJUST-mode editing overrides: the editor is a coordinate FINDER — drags
 	// mutate these locals (reset on reload), never the props; Copy → paste is
 	// the only persistence.
 	type IdStop = SpriteStop & { id: number };
@@ -174,7 +174,7 @@
 			`${animSecs ? ` animation:${animName} ${animSecs}s ease-in-out both;` : ''}`
 	);
 
-	// --- LAYOUT-mode editing chrome ------------------------------------------
+	// --- ADJUST-mode editing chrome ------------------------------------------
 	const ctx = getContext<DrawContext | undefined>(DRAW_CONTEXT_KEY);
 	const editing = $derived(ctx?.editing ?? false);
 	const cw = $derived(ctx?.width ?? 1920);
@@ -329,8 +329,8 @@
 	// that broke DrawHandle's drag scale (getBoundingClientRect on a turned box
 	// inflates the bbox); at rot 0 the nested svg is upright at plain deck scale,
 	// identical to a standalone Draw, so its editing is known-good. Esc (or
-	// toggling LAYOUT off) exits and restores the flight. Reachable only in
-	// LAYOUT, so published builds stay byte-inert and never eat input.
+	// toggling ADJUST off) exits and restores the flight. Reachable only in
+	// ADJUST, so published builds stay byte-inert and never eat input.
 	let entered = $state(false);
 	let editPose = $state<{ x: number; y: number; w: number; h: number } | null>(null);
 
@@ -363,7 +363,7 @@
 		entered = false;
 		editPose = null;
 	}
-	// Esc exits; so does turning LAYOUT off underneath an entered sprite.
+	// Esc exits; so does turning ADJUST off underneath an entered sprite.
 	$effect(() => {
 		if (!entered || !browser) return;
 		const onKey = (e: KeyboardEvent) => {
@@ -606,13 +606,13 @@
 		   inline style is ever trimmed — the surface must never eat input. */
 		pointer-events: none;
 	}
-	/* Isolation mode (LAYOUT + double-click only): the frozen, straightened box
+	/* Isolation mode (ADJUST + double-click only): the frozen, straightened box
 	   becomes pointer-live so the nested Draw's own handles/hit-strokes work. */
 	.sprite-el.entered {
 		pointer-events: auto;
 	}
 
-	/* Editing chrome (LAYOUT mode only). */
+	/* Editing chrome (ADJUST mode only). */
 	.sprite-hit {
 		fill: transparent;
 		stroke: none;

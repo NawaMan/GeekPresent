@@ -1,5 +1,5 @@
 <!-- Host pinning the canonical single-line <Path> tag Copy emits — the exact
-     form the LAYOUT "Save" endpoint matches literally (patchSource
+     form the ADJUST "Save" endpoint matches literally (patchSource
      indexOf(oldTag)). The test selects each Path WITHOUT dragging and asserts
      its Copy output equals the known canonical string, so the serializer's
      format (attribute order, segment literals) can't silently drift. -->

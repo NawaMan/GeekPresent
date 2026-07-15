@@ -372,7 +372,7 @@ describe('isStaleInk / inkAgeText', () => {
 	});
 });
 
-describe('resolveCanAnnotate — the precedence, one tier shorter than LAYOUT', () => {
+describe('resolveCanAnnotate — the precedence, one tier shorter than ADJUST', () => {
 	it('offers the pen in dev no matter what', () => {
 		expect(resolveCanAnnotate(true, false, false)).toBe(true);
 	});

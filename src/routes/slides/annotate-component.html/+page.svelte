@@ -2,7 +2,7 @@
   Example: ANNOTATE — the speaker's pen (1 of 3: drawing).
   File: src/routes/slides/annotate-component.html/+page.svelte
 
-  Like layout-mode.html, this slide IS its own demo: the ✎ ANNOTATE button at the top of
+  Like adjust-mode.html, this slide IS its own demo: the ✎ ANNOTATE button at the top of
   the canvas is real in the deployed build (the deck sets `annotate` on <SlideDeck>), so
   the audience watches the ink land on the very slide that explains it.
 

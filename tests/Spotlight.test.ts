@@ -42,7 +42,7 @@ describe('Spotlight', () => {
 		expect(container.innerHTML).not.toContain('NaN');
 	});
 
-	it('tracks the box when it moves — a LAYOUT-mode drag re-anchors the ring', async () => {
+	it('tracks the box when it moves — a ADJUST-mode drag re-anchors the ring', async () => {
 		blockAnchors.set(new Map([['db', { x: 100, y: 100, width: 200, height: 80 }]]));
 		const { container } = render(Spotlight);
 		setHighlight('db');

@@ -1,7 +1,7 @@
 <!--
   SSR fixture: a Block whose author `style` collides with the geometry the props
   own, next to one whose style is purely cosmetic. Prerendered HTML must show the
-  props' box (never the style's), keep the cosmetics, and carry no LAYOUT chrome.
+  props' box (never the style's), keep the cosmetics, and carry no ADJUST chrome.
 -->
 <script lang="ts">
 	import Block from '../src/lib/components/Block.svelte';

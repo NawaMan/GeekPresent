@@ -2,7 +2,7 @@
   Step 1a — a Block is an editable HTML box.
   File: src/routes/animation-check/block-edit.html/+page.svelte
 
-  Just a <Block>. In LAYOUT it grows a drag body + resize handle + a Copy that
+  Just a <Block>. In ADJUST it grows a drag body + resize handle + a Copy that
   emits the updated <Block …> tag. Nothing is saved — you paste the tag back.
 -->
 <script lang="ts">
@@ -19,7 +19,7 @@
 	<p class="hint">
 		A <Label>Block</Label> wraps any HTML &mdash; text, a card, an image, a table
 		&mdash; and pins it at exact <code>(x, y)</code> with a fixed size in the deck's
-		1920&times;1080 space. Turn <b>LAYOUT</b> on (add <code>?layout</code> to the URL,
+		1920&times;1080 space. Turn <b>ADJUST</b> on (add <code>?adjust</code> to the URL,
 		then click the toggle): <b>drag</b> the body, drag the corner to <b>resize</b>,
 		and <b>Copy</b> writes the updated <code>&lt;Block&gt;</code> tag.
 	</p>

@@ -3,8 +3,8 @@
   File: src/routes/slides/annotate-setup.html/+page.svelte
 
   The authoring half: how a deck offers the pen, and why that switch is DECK-wide when
-  LAYOUT's is per-slide. The distinction is the whole reason annotation's access core is a
-  tier shorter than layoutAccessCore's, so it is worth a slide of its own rather than a
+  ADJUST's is per-slide. The distinction is the whole reason annotation's access core is a
+  tier shorter than adjustAccessCore's, so it is worth a slide of its own rather than a
   parenthesis on the demo.
 -->
 <script>
@@ -48,12 +48,12 @@
 	</div>
 </Block>
 
-<!-- The design note that earns this slide: the axis is different from LAYOUT's, on purpose. -->
+<!-- The design note that earns this slide: the axis is different from ADJUST's, on purpose. -->
 <Block name="why" x={995} y={370} width={860} height={330}>
 	<Callout kind="info" title="Why deck-wide, and not per-slide?">
 		<p>
-			<code>layout: true</code> is set on the individual slides that <i>teach</i> LAYOUT,
-			because LAYOUT is an <b>authoring</b> aid &mdash; the slide being authored has a real
+			<code>adjust: true</code> is set on the individual slides that <i>teach</i> ADJUST,
+			because ADJUST is an <b>authoring</b> aid &mdash; the slide being authored has a real
 			opinion about whether you should be dragging on it.
 		</p>
 		<p style="margin-top: 0.4em;">

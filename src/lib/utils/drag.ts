@@ -1,4 +1,4 @@
-// Shared pointer-drag helper for LAYOUT-mode gestures.
+// Shared pointer-drag helper for ADJUST-mode gestures.
 //
 // The live-scale drag math (screen-px pointer deltas ÷ the element's rendered
 // scale, pointer capture, window listener teardown, Esc-cancel) used to exist

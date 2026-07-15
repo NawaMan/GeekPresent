@@ -1,4 +1,4 @@
-<!-- Host for LAYOUT-mode editing tests: a Draw surface with editable shapes.
+<!-- Host for ADJUST-mode editing tests: a Draw surface with editable shapes.
      Grows a shape per DRAW-3 deliverable. -->
 <script lang="ts">
 	import Block from '../src/lib/components/Block.svelte';

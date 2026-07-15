@@ -37,9 +37,9 @@ Two optional flags on a `pages.ts` entry:
   You arrive via `<AppendixLink to="…">`, which stamps the calling slide as the return address, and you
   leave by paging off the end. `hidden` is optional and does **not** make an appendix — it only decides
   whether the forward march can find one.
-- **`layout: true`** — this slide *offers* the LAYOUT control even in the built site. Set it only on
-  slides that **teach** layout ("flip LAYOUT and drag this box"), so the button exists when the audience
-  is told to look for it. Offered is not active. See the `layout-mode` skill.
+- **`adjust: true`** — this slide *offers* the ADJUST control even in the built site. Set it only on
+  slides that **teach** layout ("flip ADJUST and drag this box"), so the button exists when the audience
+  is told to look for it. Offered is not active. See the `adjust-mode` skill.
 
 ## Writing the content
 

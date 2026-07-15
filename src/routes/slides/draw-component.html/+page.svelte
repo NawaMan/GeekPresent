@@ -3,7 +3,7 @@
   File: src/routes/slides/draw-component.html/+page.svelte
 
   <Draw> is a full-canvas, pointer-transparent SVG overlay whose user units
-  ARE canvas pixels — the same coordinates as Block x/y. Flip LAYOUT on
+  ARE canvas pixels — the same coordinates as Block x/y. Flip ADJUST on
   (top-right) and every shape becomes editable in place: drag a Line/Arc
   endpoint, a Curve's control points, or the Arc's green bend handle;
   Rect/Ellipse move and resize exactly like Blocks. Then hit Copy — the
@@ -30,7 +30,7 @@
 			<Label>Draw</Label> lays one SVG surface over the whole canvas; inside it,
 			<Label>Line</Label>, <Label>Curve</Label>, <Label>Arc</Label>,
 			<Label>Polyline</Label>, <Label>Rect</Label>, and <Label>Ellipse</Label> take
-			the <b>same pixel coordinates as Block</b>. Flip <b>LAYOUT</b> on (top-right)
+			the <b>same pixel coordinates as Block</b>. Flip <b>ADJUST</b> on (top-right)
 			and drag: endpoints and control points grow handles, the arc gets a green
 			<i>bend</i> handle at its apex, and the boxes move/resize like Blocks.
 			<b>Copy</b> hands back the shape's updated tag — paste it over the source
@@ -41,7 +41,7 @@
 			so <b>ANIMATE</b> replays the whole diagram building itself on one timeline.
 		</p>
 		<QuickCode style="margin-top: 0.5em;" lang="svelte" code={`<Arc name="request" from={[510, 760]} to={[1410, 760]} bend={0.124} arrow="end" />
-<!-- LAYOUT → drag → Copy → paste that one line back -->`} />
+<!-- ADJUST → drag → Copy → paste that one line back -->`} />
 	</div>
 </ContentPage>
 

@@ -1,14 +1,14 @@
 import { get } from 'svelte/store';
-import { layoutChanges, shapeChanges } from './layoutChanges';
+import { adjustChanges, shapeChanges } from './adjustChanges';
 
-// Client half of the LAYOUT "Save" feature (dev only). Gathers the page's dirty
-// Block edits from the layoutChanges registry and POSTs them to the dev-server
-// endpoint (see $lib/layout/devSavePlugin.ts), which rewrites the slide's Svelte
+// Client half of the ADJUST "Save" feature (dev only). Gathers the page's dirty
+// Block edits from the adjustChanges registry and POSTs them to the dev-server
+// endpoint (see $lib/adjust/devSavePlugin.ts), which rewrites the slide's Svelte
 // source. On success HMR reloads the slide, so the Blocks re-mount at their new
 // source geometry and the registry goes clean on its own — this module doesn't
 // mutate the registry itself.
 
-const ENDPOINT = '/__geekpresent/layout-save';
+const ENDPOINT = '/__geekpresent/adjust-save';
 
 export interface SaveResult {
 	ok: boolean;
@@ -20,10 +20,10 @@ export interface SaveResult {
 }
 
 /** Write every dirty Block AND Draw shape on the current slide back to source. */
-export async function saveLayout(): Promise<SaveResult> {
+export async function saveAdjust(): Promise<SaveResult> {
 	// Blocks patch by geometry (robust to formatting); Draw shapes patch by a
 	// literal old→new tag swap (a Curve has no box to patch numerically).
-	const blockChanges = [...get(layoutChanges).values()]
+	const blockChanges = [...get(adjustChanges).values()]
 		.filter((e) => e.dirty)
 		.map((e) => ({ kind: e.kind, name: e.name || undefined, before: e.before, after: e.after }));
 	const drawChanges = [...get(shapeChanges).values()]

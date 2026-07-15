@@ -3,7 +3,7 @@
   File: src/routes/slides/connector-component.html/+page.svelte
 
   Every arrow on this slide is authored by NAME — not one coordinate appears in
-  a Connector tag. Flip LAYOUT mode on and drag any box: the arrows re-route to
+  a Connector tag. Flip ADJUST mode on and drag any box: the arrows re-route to
   follow it. That is the whole point of the component.
 -->
 <script>
@@ -25,7 +25,7 @@
 			Give a <b>Block</b> a <code>name</code> and it publishes its box. A
 			<b>Connector</b> looks two of them up and routes an arrow between them —
 			so a diagram is written in <i>names</i>, and the arrows follow the boxes
-			when you drag them in LAYOUT mode.
+			when you drag them in ADJUST mode.
 		</p>
 
 		<QuickCode style="margin-top: 0.6em;" lang="svelte" code={`<Block name="api" …>API</Block>
@@ -84,7 +84,7 @@
 	</Callout>
 </Block>
 
-<Hint text="Flip LAYOUT (top-right) and drag a box — every arrow follows it" />
+<Hint text="Flip ADJUST (top-right) and drag a box — every arrow follows it" />
 <ViewSource {source} {path} />
 
 <style>

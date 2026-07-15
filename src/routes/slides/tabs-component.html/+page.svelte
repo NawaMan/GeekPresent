@@ -41,7 +41,7 @@
 </Tabs>`} />
 </Block>
 
-<!-- The demo: one greeting in three languages. Parked in a Block so LAYOUT mode can
+<!-- The demo: one greeting in three languages. Parked in a Block so ADJUST mode can
      move and resize it; Block fills its content, so the tab group stretches to the box. -->
 <Block name="demo" x={120} y={560} width={1000} height={360} grid={10}>
 	<Tabs>
@@ -70,6 +70,6 @@ fmt.Println(greet("world"))`} />
 	</Tabs>
 </Block>
 
-<Hint text="Focus a tab and press ←/→ — or flip LAYOUT to place & resize the group" />
+<Hint text="Focus a tab and press ←/→ — or flip ADJUST to place & resize the group" />
 
 <ViewSource {source} {path} />

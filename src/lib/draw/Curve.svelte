@@ -10,7 +10,7 @@
   subdivision (shortenShape) so no stroke pokes past the tip — the same
   computed-polygon approach as Line, fed by the curve's tangents.
 
-  LAYOUT-mode editing (Phase 3): endpoint handles plus hollow control-point
+  ADJUST-mode editing (Phase 3): endpoint handles plus hollow control-point
   handles with the conventional thin guide lines from each control point to
   its endpoint (c1 → from, c2 → to; a quadratic's single c1 guides to both
   ends). Guide lines are editing chrome — never in the published output.
@@ -22,7 +22,7 @@
 <script lang="ts">
 	import { getContext, onDestroy, untrack } from 'svelte';
 	import { browser } from '$app/environment';
-	import { record } from '$lib/stores/layoutHistory';
+	import { record } from '$lib/stores/adjustHistory';
 	import DrawHandle from './DrawHandle.svelte';
 	import {
 		fmtNum,
@@ -124,7 +124,7 @@
 		class: klass = ''
 	}: Props = $props();
 
-	// LAYOUT-mode editing overrides (finder state — reset on reload; Copy →
+	// ADJUST-mode editing overrides (finder state — reset on reload; Copy →
 	// paste into the source is the only persistence).
 	let liveFrom = $state<Point | null>(null);
 	let liveTo = $state<Point | null>(null);
@@ -330,7 +330,7 @@
 		return parts.length ? ` animation: ${parts.join(', ')};` : '';
 	});
 
-	// --- LAYOUT-mode editing chrome ------------------------------------------
+	// --- ADJUST-mode editing chrome ------------------------------------------
 	const ctx = getContext<DrawContext | undefined>(DRAW_CONTEXT_KEY);
 	const editing = $derived(ctx?.editing ?? false);
 
@@ -714,7 +714,7 @@
 			opacity: 1;
 		}
 	}
-	/* Editing chrome (LAYOUT mode only). */
+	/* Editing chrome (ADJUST mode only). */
 	.draw-hit {
 		fill: none;
 		stroke: transparent;

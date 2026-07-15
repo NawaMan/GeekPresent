@@ -5,8 +5,8 @@
 // moved to `src/lib/themes/`.)
 //
 // So: every repo-relative path a skill states as fact must exist. Prose placeholders
-// (`src/routes/<deck>/pages.ts`), globs (`tests/**/*.test.ts`) and non-paths (`?layout=off`,
-// `/__geekpresent/layout-save`) are not claims about the tree and are skipped.
+// (`src/routes/<deck>/pages.ts`), globs (`tests/**/*.test.ts`) and non-paths (`?adjust=off`,
+// `/__geekpresent/adjust-save`) are not claims about the tree and are skipped.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
@@ -39,8 +39,8 @@ function citedPaths(md: string): string[] {
 describe('agent skills', () => {
 	it('ships the four GeekPresent convention skills alongside the TODO workflow ones', () => {
 		expect(skillNames).toEqual([
+			'adjust-mode',
 			'deck-tests',
-			'layout-mode',
 			'new-component',
 			'new-slide',
 			'pick-todo',
@@ -83,8 +83,8 @@ describe('agent skills', () => {
 		// Cheap smoke test that the skills still point at the real mechanisms, so a
 		// rename of one of these lands here rather than in an agent's lap.
 		expect(skillBody('new-component')).toContain('src/lib/themes/roles.css');
-		expect(skillBody('layout-mode')).toContain('src/lib/layout/styleGuardCore.ts');
-		expect(skillBody('layout-mode')).toContain('src/lib/stores/blockAnchors.ts');
+		expect(skillBody('adjust-mode')).toContain('src/lib/adjust/styleGuardCore.ts');
+		expect(skillBody('adjust-mode')).toContain('src/lib/stores/blockAnchors.ts');
 		expect(skillBody('deck-tests')).toContain('svelte/server');
 	});
 });

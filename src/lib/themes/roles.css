@@ -45,8 +45,8 @@
 	--ctrl-selected-bg:  var(--ACCENT-2, #00B356);
 	--ctrl-active-shadow:var(--ACCENT, #0056B3);
 	--ctrl-disabled-fg:  var(--INK-DIM, #222222);
-	/* A chrome control the slide WANTS you to press — the LAYOUT button on a slide that
-	   teaches LAYOUT. The chrome look is built to be missed; this one must not be. It is
+	/* A chrome control the slide WANTS you to press — the ADJUST button on a slide that
+	   teaches ADJUST. The chrome look is built to be missed; this one must not be. It is
 	   a FILLED pill, so it needs both the fill and an ink that reads on it (the warm
 	   accent is light, so the ink is near-black rather than the usual --on-accent white). */
 	--ctrl-featured-fg:  var(--ACCENT-WARM, #F0A33E);
@@ -163,15 +163,15 @@
 	   last week. Warm, like every other "look here" cue in the deck. */
 	--annot-stale-edge: var(--ACCENT-WARM, #F0A33E);
 
-	/* LAYOUT-mode style/geometry collision badge — the note a Block shows when the
+	/* ADJUST-mode style/geometry collision badge — the note a Block shows when the
 	   author's `style` tried to set a property the x/y/width/height props own (see
 	   layout/styleGuardCore.ts). Warm, like every other "look here" cue, and set
 	   apart from the blue readout pill next to it so a caution never reads as a
-	   status line. AUTHOR-FACING ONLY: LAYOUT chrome never ships in a published
+	   status line. AUTHOR-FACING ONLY: ADJUST chrome never ships in a published
 	   deck, so these are tuned for the editing surface, not the audience's screen.
 	   Dark ink, because the warm accent is a light surface. */
-	--layout-warn-bg:  var(--ACCENT-WARM, #F0A33E);
-	--layout-warn-fg:  var(--ON-ACCENT-WARM, #1A1A1A);
+	--adjust-warn-bg:  var(--ACCENT-WARM, #F0A33E);
+	--adjust-warn-fg:  var(--ON-ACCENT-WARM, #1A1A1A);
 
 	/* Stat / StatGroup — big-number KPI tiles. The figure reads in ink; the label
 	   and dividers derive from the same ink (dimmed in-component), so they stay
@@ -229,7 +229,7 @@
 	/* Columns / Column — the gutter rule of a divided group. Derived from the ink and
 	   softened via color-mix in-component, like --stat-divider, so it reads as a
 	   hairline on any surface. The grid itself paints nothing else, except a
-	   draggable divider (`resizable` / LAYOUT mode), which lights the accent on
+	   draggable divider (`resizable` / ADJUST mode), which lights the accent on
 	   hover, focus and drag — the same "this is a control" cue the deck's chrome uses. */
 	--columns-divider: var(--INK, #C0F1FF);
 	--columns-handle:  var(--ACCENT, #2980B9);

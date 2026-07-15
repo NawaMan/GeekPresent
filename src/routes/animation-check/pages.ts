@@ -1,6 +1,6 @@
 export const pages = [
     { path: "title.html",       title: "Draw & Block, step by step" },
-    // Step 1 — place it. The same LAYOUT gate for an HTML box and an SVG shape.
+    // Step 1 — place it. The same ADJUST gate for an HTML box and an SVG shape.
     { path: "block-edit.html",  title: "Block — Editable" },
     { path: "shape-edit.html",  title: "Shape — Editable" },
     { path: "mix-edit.html",    title: "Block + Shape — Editable" },

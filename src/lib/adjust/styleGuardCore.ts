@@ -2,7 +2,7 @@
 //
 // Every author-facing component takes a `style` prop that is appended LAST on the
 // root element, so the author's declaration outranks the component's own rules
-// (see AGENTS.md, "Give it `style`, `id` and `class`"). On a LAYOUT-draggable
+// (see AGENTS.md, "Give it `style`, `id` and `class`"). On a ADJUST-draggable
 // shape that rule has one pathological case: `Block` writes its box as inline
 // `left/top/width/height`, and an author's `style="left: 40px"` lands in the SAME
 // declaration block — where the last declaration simply wins. The DOM keeps ONE
@@ -11,9 +11,9 @@
 //     <Block name="db" x={200} style="left: 40px">
 //     -> left: 40px; top: 300px; width: 400px; height: 160px;   (x={200} is gone)
 //
-// LAYOUT then drags a box that cannot move: `x` tracks the pointer, the readout
+// ADJUST then drags a box that cannot move: `x` tracks the pointer, the readout
 // climbs, SAVE dutifully writes `x={640}` to source — and on screen, nothing.
-// LAYOUT looks broken while behaving exactly as specified.
+// ADJUST looks broken while behaving exactly as specified.
 //
 // The rule this module encodes: THE PROPS OWN THE GEOMETRY. `style` is for
 // cosmetics — stroke, dash, colour, a decorative `rotate()`. The handful of
@@ -24,7 +24,7 @@
 //
 // Reserving is not the same as rewriting. The author's source `style` is left
 // alone (Copy/Save echo it back verbatim); the stray declaration just stops
-// having an effect, and LAYOUT-mode chrome says so. Nothing is guessed, nothing
+// having an effect, and ADJUST-mode chrome says so. Nothing is guessed, nothing
 // is silently edited on disk.
 //
 // Pure and browser-free, so it unit-tests without a DOM (tests/styleGuardCore.test.ts).
@@ -80,7 +80,7 @@ export interface StyleGuard {
 	safe: string;
 	/** Reserved properties the author declared, in source order, de-duplicated.
 	 *  Non-empty means "this style tried to set geometry and was ignored" — the
-	 *  LAYOUT badge. Empty for the overwhelmingly common case. */
+	 *  ADJUST badge. Empty for the overwhelmingly common case. */
 	reserved: string[];
 	/** Properties that displace the painted box from its geometry without
 	 *  overriding it (a translate-bearing `transform`, or standalone `translate`).
@@ -123,7 +123,7 @@ function declarations(style: string): string[] {
 }
 
 /**
- * Decide what an author's `style` string is allowed to do to a LAYOUT-draggable
+ * Decide what an author's `style` string is allowed to do to a ADJUST-draggable
  * shape: strip the properties the component owns, keep everything else, and say
  * what was taken and what merely displaces.
  *

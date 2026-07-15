@@ -13,7 +13,7 @@
 
   The wrapped content fills the box in both axes by default (a resize rubber-bands
   it) — pass `fill={false}` for pure positioning, where the content keeps its
-  natural size. When LAYOUT mode is ON, the wrapper grows a drag body + a bottom-right
+  natural size. When ADJUST mode is ON, the wrapper grows a drag body + a bottom-right
   resize handle + a small toolbar. Dragging updates x/y/width/height live; the
   COPY button writes the updated OPENING tag — just `<Block … x={…} y={…} …>` —
   to the clipboard, so you paste that one line over your element's existing open
@@ -26,22 +26,22 @@
   1:1 whether the deck is FITTED (fit-to-window) or SCALED to any zoom factor.
 -->
 <script lang="ts">
-	import { layoutMode, canLayout } from '$lib/stores/layoutMode';
-	import { record } from '$lib/stores/layoutHistory';
-	import { nextChangeId, reportChange, withdrawChange } from '$lib/stores/layoutChanges';
+	import { adjustMode, canAdjust } from '$lib/stores/adjustMode';
+	import { record } from '$lib/stores/adjustHistory';
+	import { nextChangeId, reportChange, withdrawChange } from '$lib/stores/adjustChanges';
 	import { selectedBlock, nextBlockId } from '$lib/stores/selectedBlock';
 	import { reportAnchor, withdrawAnchor } from '$lib/stores/blockAnchors';
 	import { reportBlockZ, withdrawBlockZ, otherZValues } from '$lib/stores/blockOrder';
 	import { frontZ, backZ } from '$lib/utils/stackingCore';
 	import { trackPointer } from '$lib/utils/drag';
-	import { guardStyle } from '$lib/layout/styleGuardCore';
+	import { guardStyle } from '$lib/adjust/styleGuardCore';
 	import { browser } from '$app/environment';
 	import { onDestroy } from 'svelte';
 
-	// Editing affordances only when the LAYOUT control is BOTH available (dev or an
-	// opted-in `?layout` session) and switched on. canLayout keeps the published
-	// deck inert even if a stale layoutMode=true lingers in localStorage.
-	$: editing = $canLayout && $layoutMode;
+	// Editing affordances only when the ADJUST control is BOTH available (dev or an
+	// opted-in `?adjust` session) and switched on. canAdjust keeps the published
+	// deck inert even if a stale adjustMode=true lingers in localStorage.
+	$: editing = $canAdjust && $adjustMode;
 
 	// Selection: grabbing a Block selects it, which floats it to the top so it (and
 	// its grip) stays reachable when Blocks overlap. Transient — never written to
@@ -74,11 +74,11 @@
 	/** Optional label, shown in edit mode and used in the copied snippet's comment. */
 	export let name = '';
 	/** Persistent stacking order for OVERLAPPING Blocks (CSS z-index in canvas
-	    space). Author it by hand or with the LAYOUT-mode Front / Back buttons, then
+	    space). Author it by hand or with the ADJUST-mode Front / Back buttons, then
 	    Copy / Save writes it back to source alongside x/y/width/height. Default 0
 	    emits no z-index at all (Blocks keep painting in DOM order, `z-index: auto`,
-	    so a grip can still float across a neighbour in LAYOUT mode). The order shows
-	    live in LAYOUT too — the Block you're grabbing lifts to the top, every other
+	    so a grip can still float across a neighbour in ADJUST mode). The order shows
+	    live in ADJUST too — the Block you're grabbing lifts to the top, every other
 	    sits at its authored z — so a reorder is visible as you make it (see
 	    `displayZ`). The Front/Back buttons keep z at or above 0 (a Block stays above
 	    the slide's in-flow content); a negative z is honoured when hand-authored, for
@@ -128,9 +128,9 @@
 	    properties this Block writes itself (left/top/width/height/inset/position),
 	    which are reserved: the x/y/width/height props own the box. A geometry
 	    declaration here is stripped before the style is applied, so what you see
-	    always matches the props and a LAYOUT drag actually moves the box. Your
-	    source is left alone; the dead declaration is just called out in the LAYOUT
-	    chrome. See layout/styleGuardCore.ts. */
+	    always matches the props and a ADJUST drag actually moves the box. Your
+	    source is left alone; the dead declaration is just called out in the ADJUST
+	    chrome. See adjust/styleGuardCore.ts. */
 	export let style: string = '';
 	/** The `style` of the shape a HOSTED Block is editing (a Draw Rect/Ellipse).
 	    That style is applied — and guarded — by the shape itself, on its own SVG
@@ -254,7 +254,7 @@
 	const sendToBack = () => setZ(Math.max(0, backZ(z, otherZValues(blockId))));
 
 	// Publish this Block's live z so its siblings' Front/Back can order against it.
-	// Browser-only: purely a LAYOUT-mode aid, and SSR must not touch module state
+	// Browser-only: purely a ADJUST-mode aid, and SSR must not touch module state
 	// that outlives one render (unlike blockAnchors, which a Connector needs on the
 	// server).
 	$: if (browser) reportBlockZ(blockId, z);
@@ -272,7 +272,7 @@
 			: 'none';
 
 	// The applied z-index folds the AUTHOR z and the transient editing lift into
-	// ONE inline value, so the author's stacking shows in real time while LAYOUT is
+	// ONE inline value, so the author's stacking shows in real time while ADJUST is
 	// on (dragging a Block over/under others reflects the order you're authoring)
 	// without an inline value fighting a stylesheet class on specificity.
 	//
@@ -288,7 +288,7 @@
 	// Lift band (all < 50, the KeyframeStudio panel/ghost layer). The author z shown
 	// for a non-grabbed Block is capped one below the lowest lift so a grabbed Block
 	// is always on top. Real Front/Back values are single digits, so the cap only
-	// ever bites a deliberately huge hand-authored z — and even then, only in LAYOUT.
+	// ever bites a deliberately huge hand-authored z — and even then, only in ADJUST.
 	const Z_HOVER = 44;
 	const Z_SELECTED = 46;
 	const Z_ACTIVE = 48;
@@ -313,7 +313,7 @@
 	// source, so unrelated Blocks stay `z-index: auto` and a copied tag stays clean.
 	$: zAttr = z ? ` z={${Math.round(z)}}` : '';
 
-	// The author's own pass-through props. LAYOUT neither reads nor edits them — but
+	// The author's own pass-through props. ADJUST neither reads nor edits them — but
 	// Copy/Save replaces the WHOLE opening tag, so anything not emitted here is DELETED
 	// from the author's source the moment they drag the Block. They are echoed back
 	// verbatim, and a value carrying a double quote is single-quoted so the line still
@@ -325,7 +325,7 @@
 	// NOTE: the ORIGINAL `style` is echoed, not the guarded one. Reserving a
 	// property changes what RENDERS, never what the author wrote — Copy/Save hand
 	// the source string back byte-for-byte, and a stray `left: 40px` survives in
-	// source as an inert declaration for the author to delete. LAYOUT never edits
+	// source as an inert declaration for the author to delete. ADJUST never edits
 	// inside an author's attribute value.
 	$: passAttrs =
 		(id ? quoted('id', id) : '') + (klass ? quoted('class', klass) : '') + (style ? quoted('style', style) : '');
@@ -333,7 +333,7 @@
 	// The props own the geometry: strip any left/top/width/height/inset/position the
 	// author's `style` declares, so it cannot cancel the box this Block is drawing.
 	// Without this, the two land in ONE inline declaration block and the author's
-	// wins — LAYOUT then drags a box that cannot move (see layout/styleGuardCore.ts).
+	// wins — ADJUST then drags a box that cannot move (see adjust/styleGuardCore.ts).
 	// Cosmetics (stroke, dash, colour, a decorative rotate) pass through untouched
 	// and still win, exactly as before.
 	$: guard = guardStyle(style);
@@ -393,7 +393,7 @@
 	// keep following them as they're dragged. Unlike reportChange above this is
 	// NOT browser-gated: a prerendered slide must ship its connectors drawn.
 	// `track={false}` wrappers (Draw's hosted Rect/Ellipse blocks, KeyframeStudio
-	// ghosts) opt out — they only exist in LAYOUT mode, so an anchor on them
+	// ghosts) opt out — they only exist in ADJUST mode, so an anchor on them
 	// would appear and vanish with the toggle.
 	// Plain object, not a `let`: mutating a field must not itself invalidate the
 	// reactive statement that writes it (that would be a self-triggering cycle).
@@ -439,11 +439,11 @@
 			{name ? name + ' · ' : ''}{Math.round(x)},{Math.round(y)} · {Math.round(width)}×{Math.round(height)}{z ? ' · z' + Math.round(z) : ''}
 		</div>
 		{#if ignoredGeometry.length || displacedBy.length}
-			<!-- The style/geometry collision, said out loud — LAYOUT-mode only, so it
+			<!-- The style/geometry collision, said out loud — ADJUST-mode only, so it
 			     can never reach a published deck. Not a blocker: the drag works fine
 			     (that is the point of reserving the properties). This exists so an
 			     author who wrote `style="left: 40px"` learns why it does nothing,
-			     instead of concluding LAYOUT is broken. -->
+			     instead of concluding ADJUST is broken. -->
 			<div class="style-warn" role="status">
 				{#if ignoredGeometry.length}
 					<span>⚠ <code>style</code> sets {ignoredGeometry.join(', ')} — ignored, the {ignoredGeometry.length > 1 ? 'props win' : 'prop wins'}</span>
@@ -591,8 +591,8 @@
 		font-family: 'Fira Code', monospace;
 		white-space: nowrap;
 		padding: 0 0.4em;
-		background: var(--layout-warn-bg, #f0a33e);
-		color: var(--layout-warn-fg, #1a1a1a);
+		background: var(--adjust-warn-bg, #f0a33e);
+		color: var(--adjust-warn-fg, #1a1a1a);
 		border-radius: 3px;
 	}
 	.movable .style-warn code {
@@ -652,7 +652,7 @@
 	}
 	/* Bring-to-front / send-to-back. Glyph buttons in the deck's control palette,
 	   reusing the --ctrl-* tokens the Copy button and resize grip already do (no
-	   new role tokens: this is dev-only LAYOUT chrome, not themeable slide surface). */
+	   new role tokens: this is dev-only ADJUST chrome, not themeable slide surface). */
 	.movable .zbtn {
 		font-size: 0.7em;
 		line-height: 1;

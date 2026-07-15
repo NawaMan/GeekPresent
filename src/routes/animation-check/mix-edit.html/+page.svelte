@@ -2,7 +2,7 @@
   Step 1c — a Block and a Shape on ONE slide, both editable.
   File: src/routes/animation-check/mix-edit.html/+page.svelte
 
-  The Block and the Draw share the one LAYOUT gate. Draw's "Copy changed"
+  The Block and the Draw share the one ADJUST gate. Draw's "Copy changed"
   bundles the moved Block AND the moved shape into a single OLD/NEW patch.
 -->
 <script lang="ts">
@@ -16,11 +16,11 @@
 	const path = 'src/routes/animation-check/mix-edit.html/+page.svelte';
 </script>
 
-<ContentPage title="Block + Shape — editable" subtitle="Both on one slide, both under one LAYOUT toggle.">
+<ContentPage title="Block + Shape — editable" subtitle="Both on one slide, both under one ADJUST toggle.">
 	<p class="hint">
 		A <Label>Block</Label> (HTML) and a <Label>Draw</Label> shape (SVG) sit on the
-		same slide in the same coordinate space and share the <i>one</i> LAYOUT gate.
-		Flip <b>LAYOUT</b> and drag either one; Draw's <b>Copy&nbsp;changed</b> even
+		same slide in the same coordinate space and share the <i>one</i> ADJUST gate.
+		Flip <b>ADJUST</b> and drag either one; Draw's <b>Copy&nbsp;changed</b> even
 		bundles the moved Block <i>and</i> the moved shape into a single patch.
 	</p>
 </ContentPage>
@@ -35,7 +35,7 @@
 <Draw
 	title="A Block and a Shape side by side"
 	name="mix-edit"
-	description="An HTML Block card on the left and a rounded Rect shape on the right, both editable in LAYOUT mode on one slide."
+	description="An HTML Block card on the left and a rounded Rect shape on the right, both editable in ADJUST mode on one slide."
 >
 	<Rect name="frame" x={1210} y={480} width={480} height={220} rounded={16} color="#4aa3f0" thickness={4} />
 </Draw>

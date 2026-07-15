@@ -11,7 +11,7 @@
   a fixed-count polyline, so any mix of segment kinds morphs smoothly. It's all
   CSS — runs in the prerendered page — and ANIMATE opens a bar you can DRAG.
 
-  In LAYOUT mode each stop gets its own on-canvas handle set (every vertex at
+  In ADJUST mode each stop gets its own on-canvas handle set (every vertex at
   both 0% and 100%), and the toolbar grows a KEYFRAMES panel to add / remove /
   retime stops. Copy round-trips the whole `stops` + `animate` tag.
 -->
@@ -40,7 +40,7 @@
 			<b>samples</b> each pose into a fixed-count polyline that morphs smoothly.
 			A stop's <code>drawn</code> (0–1) is an <b>independent</b> track: here the
 			stroke is only <b>75%</b> drawn at the <code>50%</code> mark, so the line
-			paints in ahead of — then settles with — the morph. Flip <b>LAYOUT</b> to
+			paints in ahead of — then settles with — the morph. Flip <b>ADJUST</b> to
 			drag any stop's handle or retime its <b>keyframes</b> (each row has a
 			<code>drawn</code> field); press <b>ANIMATE</b> and <b>drag</b> the bar to
 			park it anywhere.

@@ -32,7 +32,6 @@
 	import OverviewPage  from '$lib/components/OverviewPage.svelte';
 	import SizeMode       from '$lib/components/SizeMode.svelte';
 	import SlideMap       from '$lib/components/SlideMap.svelte';
-	import CtrlBtn        from '$lib/components/CtrlBtn.svelte';
 	import PresenterView  from '$lib/components/PresenterView.svelte';
 	import Seo            from '$lib/components/Seo.svelte';
 	import { SITE_DESCRIPTION } from '$lib/seo/config';
@@ -47,14 +46,14 @@
 	import { onMount, tick } from 'svelte';
 	import { displayMode, displayFactor, clampFactor } from '$lib/stores/displayMode';
 	import type { DisplayMode } from '$lib/stores/displayMode';
-	import { layoutMode, canLayout, canSave, setLayoutOffered, applyLayoutParam } from '$lib/stores/layoutMode';
+	import { adjustMode, canAdjust, canSave, setAdjustOffered, applyAdjustParam } from '$lib/stores/adjustMode';
 	import Annotate from '$lib/components/Annotate.svelte';
 	import {
 		setAnnotateOffered, applyAnnotateParam, setInkPath, inkStaleAfterMs
 	} from '$lib/stores/annotation';
 	import { captureSlide, downloadBlob } from '$lib/capture/captureSlide';
 	import { captureFileName, readCaptureParam, refusalText, resolveCanCapture, readSticky } from '$lib/capture/captureCore';
-	import { saveLayout } from '$lib/stores/layoutSave';
+	import { saveAdjust } from '$lib/stores/adjustSave';
 	import { getViewTransitions } from '$lib/presentation';
 	import {
 		presenterMode, publishCurrentSlide, subscribeCurrentSlide, subscribeAnimCommand,
@@ -129,7 +128,7 @@
 	export let articleText = 'View as article';
 	export let articleHref = '../text.html';
 
-	/* Fade the deck's own controls (NAV, TOC, DISPLAY/minimap, LAYOUT) down to a
+	/* Fade the deck's own controls (NAV, TOC, DISPLAY/minimap, ADJUST) down to a
 	   ghost until the pointer reaches them, so the slide — not the chrome — is what
 	   the audience looks at. Especially wanted where the chrome sits over someone
 	   else's pixels (a full-canvas WebPage). Opt-in: a deck that says nothing keeps
@@ -141,24 +140,24 @@
 	   disabled there outright. */
 	export let fadeChrome = false;
 
-	/* Offer the LAYOUT authoring control on EVERY slide of this deck, even in a build.
-	   Almost no deck wants this — LAYOUT is off in production by default, and the usual
-	   way to demo it is per-slide: set `layout: true` on the individual pages.ts entries
-	   for the slides that actually teach it (see Page.layout), which is what the /slides
+	/* Offer the ADJUST authoring control on EVERY slide of this deck, even in a build.
+	   Almost no deck wants this — ADJUST is off in production by default, and the usual
+	   way to demo it is per-slide: set `adjust: true` on the individual pages.ts entries
+	   for the slides that actually teach it (see Page.adjust), which is what the /slides
 	   deck does. This deck-wide switch exists for the rare deck that is ENTIRELY about
 	   authoring.
 
-	   Either way it makes LAYOUT *available*, not *active*: the mode still starts off, so
+	   Either way it makes ADJUST *available*, not *active*: the mode still starts off, so
 	   the audience sees a normal slide until the speaker flips it. `vite dev` offers the
-	   control regardless, and a sticky `?layout=off` outranks both (layout/layoutAccessCore). */
-	export let layout = false;
+	   control regardless, and a sticky `?adjust=off` outranks both (adjust/adjustAccessCore). */
+	export let adjust = false;
 
 	/* Offer the ANNOTATE control — the speaker's pen. Deck-wide and nothing else, because
-	   annotation is a SPEAKER tool, not an authoring one: LAYOUT is per-slide since the
+	   annotation is a SPEAKER tool, not an authoring one: ADJUST is per-slide since the
 	   slide being authored has an opinion about whether you should be dragging on it,
 	   whereas the slide the speaker happens to be standing on has no opinion about whether
 	   they may circle a word on it. So there is no per-slide `annotate` flag to match
-	   `layout: true` — see annotate/annotateAccessCore.
+	   `adjust: true` — see annotate/annotateAccessCore.
 
 	   Available, not active: the mode still starts off. `vite dev` offers the pen
 	   regardless, and a sticky `?annotate` / `?annotate=off` outranks this prop. */
@@ -211,9 +210,9 @@
 
 	// DISPLAY now attaches to the VIEWPORT's top-right corner (see SizeMode) — a
 	// window control, reachable no matter how the slide is scaled or panned — so there
-	// is nothing frame-relative to recompute here. The authoring LAYOUT/PRESENT cluster
-	// lives ON the slide (.content, canvas space) and rides the slide's own transform.
-	// updateOverlay is kept as the minimap's recompute hook.
+	// is nothing frame-relative to recompute here. The top-centre tool cluster (PRESENT +
+	// the menu) lives ON the slide (canvas space, inside <Annotate>) and rides the slide's
+	// own transform. updateOverlay is kept as the minimap's recompute hook.
 	function updateOverlay() {
 		updateMap();
 	}
@@ -258,7 +257,7 @@
 	//
 	// `?notes` prints the slide WITH its speaker note beneath it, on the one page — the same flag
 	// the handout takes, and the paper grows by the same three inches. It reaches the <Note>
-	// through a store rather than context: a slide is the LAYOUT's slot content, so it cannot see
+	// through a store rather than context: a slide is the ADJUST's slot content, so it cannot see
 	// anything this shell sets (the same reason setPages() lives in each deck's +layout.svelte).
 	// See stores/printNotes.
 	// `?notes` in the URL, OR the PRINT menu's "this slide + notes" (which prints without
@@ -282,15 +281,15 @@
 	// ITS slide to the shared channel and drag every window onto the preview slide.
 	$: isTopWindow = browser && window.self === window.top;
 	$: if (isTopWindow && currentSlide) publishCurrentSlide(deckKey, currentSlide);
-	// Does THIS slide offer LAYOUT? Its own pages.ts `layout` flag, or the deck-wide
-	// `layout` prop. Re-runs on every slide change, so paging off a LAYOUT demo onto an
-	// ordinary slide takes the control away again. The sticky `?layout` flag outranks
-	// both (layout/layoutAccessCore). Browser-guarded so url.searchParams is never read
+	// Does THIS slide offer ADJUST? Its own pages.ts `adjust` flag, or the deck-wide
+	// `adjust` prop. Re-runs on every slide change, so paging off a ADJUST demo onto an
+	// ordinary slide takes the control away again. The sticky `?adjust` flag outranks
+	// both (adjust/adjustAccessCore). Browser-guarded so url.searchParams is never read
 	// during prerender.
-	$: slideOffersLayout = pages.find((p) => p.path === currentSlide)?.layout === true;
-	$: layoutOffered = slideOffersLayout || layout;
-	$: if (browser) setLayoutOffered(layoutOffered);
-	$: if (browser) applyLayoutParam($page.url);
+	$: slideOffersAdjust = pages.find((p) => p.path === currentSlide)?.adjust === true;
+	$: adjustOffered = slideOffersAdjust || adjust;
+	$: if (browser) setAdjustOffered(adjustOffered);
+	$: if (browser) applyAdjustParam($page.url);
 
 	// ANNOTATE (the speaker's pen) resolves from the DECK, not the slide — there is no
 	// per-slide flag to fold in, so this is set once from the prop rather than per page.
@@ -384,26 +383,14 @@
 		if (browser) window.location.assign(`${base}/handout/${deckName}.html${query}`);
 	}
 
-	// On a slide that INVITES you to use LAYOUT, the button is the SUBJECT, not backstage
-	// machinery — so it wears the featured look (filled warm pill) instead of receding
-	// into the chrome like its neighbours. Not when the control merely happens to be
-	// around (dev, or a sticky `?layout` the speaker set three slides ago): there it's a
-	// tool, and a tool that shouts on every slide is just noise.
-	$: featureLayoutBtn = layoutOffered;
-	// …and it pulses only until it is USED. Once LAYOUT is on, the button has done its
-	// job of being found: it drops to CtrlBtn's ordinary selected-green and stops calling
-	// for attention, so the thing the audience now watches is the slide, not the chrome.
-	// The pill geometry is kept in BOTH states, so toggling it doesn't jiggle the row.
-	$: callLayoutBtn = layoutOffered && !$layoutMode;
-
 	// "Save" writes the slide's moved Blocks back to source. It only reaches a source
 	// tree under `vite dev` (the endpoint lives in the dev server — see
-	// layout/devSavePlugin); on a static host there is nothing to rewrite.
+	// adjust/devSavePlugin); on a static host there is nothing to rewrite.
 	//
 	// The button looks and behaves like a NORMAL control either way — no pre-emptive
 	// greying-out. Where it can't fire, it says so ON CLICK: the label flips to
 	// NOT ALLOWED and a tooltip explains that saving isn't allowed in this setup. That
-	// ordering is the whole point of a LAYOUT demo. A button disabled from the start
+	// ordering is the whole point of a ADJUST demo. A button disabled from the start
 	// invites the audience to assume the feature is missing or broken; a button that
 	// answers when pressed teaches them that saving is *refused here*, and why — the
 	// deck is static, and there is no source tree behind it to rewrite.
@@ -448,10 +435,10 @@
 			flashSave('NOT ALLOWED', 2600);
 			return;
 		}
-		const r = await saveLayout();
+		const r = await saveAdjust();
 		if (!r.ok) {
 			flashSave('ERROR', 1600);
-			console.error('[layout save] failed:', r.error);
+			console.error('[adjust save] failed:', r.error);
 		} else if (r.patched === 0 && r.unmatched.length === 0) {
 			flashSave('NONE', 1600);
 		} else if (r.unmatched.length) {
@@ -464,14 +451,15 @@
 			saveRefused = true;
 			savePartial = r.unmatched.length;
 			flashSave(`${r.patched} OF ${r.patched + r.unmatched.length}`, 2600);
-			console.warn('[layout save] not written — Copy these by hand:', r.unmatched);
+			console.warn('[adjust save] not written — Copy these by hand:', r.unmatched);
 		} else {
 			flashSave('SAVED', 1600);
 		}
 	}
-	// Open (or focus) the presenter console at the current slide. Moved here from the
-	// nav bar so PRESENT sits with LAYOUT in the slide's top-right chrome cluster.
-	// Runs in the click handler (a user gesture) so the popup isn't blocked.
+	// Open (or focus) the presenter console at the current slide — the PRESENT anchor's
+	// click. It only ENSURES the console is running: opening it, or re-focusing the window
+	// already named for this deck. Runs in the click handler (a user gesture) so the popup
+	// isn't blocked.
 	function openPresenter() {
 		openPresenterWindow(window.location.href, deckKeyFromPath(window.location.pathname));
 	}
@@ -534,7 +522,7 @@
 			content.style.transform = `scale(${factor})`;
 			content.style.transformOrigin = 'top left';
 			viewScale = factor;
-			// Expose the fit factor to canvas-space chrome (the LAYOUT/SAVE row) so it
+			// Expose the fit factor to canvas-space chrome (the ADJUST/SAVE row) so it
 			// can counter-scale its screen inset to match the screen-fixed MODE control.
 			content.style.setProperty('--view-scale', String(factor));
 			if (recenter) centerScroll();
@@ -693,62 +681,6 @@
 	>
 		<div class="content" class:fill class:ready={initialized} bind:this={content}>
 			{#if initialized}
-			<!-- Slide-owned chrome, pinned to the SLIDE's top-right corner (canvas space,
-			     so it rides the slide's own scale/pan — its home is the page, not the
-			     window). LAYOUT (authoring) + PRESENT (open the console) live here together;
-			     the viewport-anchored DISPLAY control sits separately in the overlay below.
-			     Being a .content child placed BEFORE the slot, the slide's own blocks paint
-			     over it. Hidden by ?clean; PRESENT hides inside the console itself. -->
-			<!-- NOTE: ANNOTATE, PRINT and CAPTURE are NOT in this cluster. They live in
-			     <Annotate>'s top-centre flyout, above the ink surface, since an armed pen's
-			     surface would bury a button placed here. This cluster is LAYOUT/SAVE
-			     (authoring) and PRESENT (mode); the flyout is the per-slide output tools. -->
-			{#if !clean && ($canLayout || !$presenterMode)}
-			<div
-				class="slide-chrome gp-chrome no-print"
-				class:pinned={$layoutMode}
-				class:featuring={featureLayoutBtn}
-			>
-				{#if $canLayout}
-				<!-- Featured on a slide that invites you to use LAYOUT (its pages.ts `layout`
-				     flag), muted where the control is merely around (dev, a sticky ?layout).
-				     `calling` adds the halo, and lasts only until the button is used. -->
-				<span class="layout-btn" class:featured={featureLayoutBtn} class:calling={callLayoutBtn}>
-					<CtrlBtn
-						chrome
-						text="LAYOUT"
-						hoverText={$layoutMode ? 'LAYOUT on' : 'LAYOUT off'}
-						isSelected={$layoutMode}
-						on:click={() => layoutMode.update((v) => !v)}
-					/>
-				</span>
-				<!-- Save writes moved Blocks back to source via the vite-dev endpoint. Shown
-				     whenever LAYOUT is on, and it looks like an ordinary control in BOTH worlds
-				     — it isn't greyed out where it can't fire. It answers on click instead:
-				     NOT ALLOWED, plus a tooltip saying why. A button disabled from the start
-				     invites the audience to assume the feature is missing or broken; a button
-				     that refuses when pressed teaches them saving is *forbidden here*. -->
-				{#if $layoutMode}
-					<span class="save-btn" class:refused={saveRefused}>
-						<CtrlBtn chrome text={saveLabel} hoverText={saveLabel} on:click={onSave} />
-						{#if saveRefused}
-							<!-- aria-live so the refusal is announced, not just drawn. One
-							     interpolation, not a run of them: text split across lines in the
-							     template carries the SOURCE's newlines and indentation into
-							     textContent, so "1 tag" would read "1\n\t\t\ttag" to a screen
-							     reader and to a test. -->
-							<span class="save-tip" role="status">{saveTip}</span>
-						{/if}
-					</span>
-				{/if}
-				{/if}
-				<!-- CAPTURE used to live here; it moved to Annotate's top-centre flyout, beside
-				     PRINT (both are per-slide output tools). See <Annotate> below. -->
-				<!-- PRESENT opens the presenter console; a text label like the other chrome
-				     buttons, hidden inside the console itself ($presenterMode). -->
-				<CtrlBtn chrome text="PRESENT" on:click={openPresenter} isVisible={!$presenterMode} />
-			</div>
-			{/if}
 			<slot />
 			<!-- Note-driven spotlight: a canvas-level singleton (like the minimap),
 			     inert until a <Note> line or a slide sets the highlightTarget store.
@@ -765,43 +697,105 @@
 				{levelHighlight}
 				chrome={!clean && !present}
 			>
-				<!-- PRINT and CAPTURE ride in Annotate's top-centre flyout, behind the ANNOTATE
-				     toggle — they are per-slide OUTPUT tools (draw it / snapshot it / print it), and
-				     the toggle is the one thing already guaranteed to sit above the ink surface, so
-				     an armed pen cannot bury them. Their logic stays here; only their HOME moved.
+				<!-- The whole top-centre cluster now lives in <Annotate>, fed by these slots so
+				     their logic stays HERE while their HOME is the menu above the ink surface (an
+				     armed pen would bury a button placed anywhere else). PRESENT is the always-on
+				     anchor; OVERVIEW/CAPTURE/PRINT are flat action rows; ADJUST (the old ADJUST) is
+				     a sub-toggle with SAVE nested under it. The pen's own ANNOTATE toggle is owned
+				     by <Annotate>, so it is NOT slotted here. -->
 
-				     They are PLAIN buttons wearing `annot-tool`, not CtrlBtns, so Annotate can dress
-				     them in the toggle's own amber livery — the three read as one set. -->
-				<button
-					slot="print"
-					type="button"
-					class="annot-tool"
-					aria-haspopup="menu"
-					aria-expanded={printMenuOpen}
-					on:click={() => (printMenuOpen = !printMenuOpen)}
-				>PRINT</button>
-				<!-- The `slot=` element must be a direct child of <Annotate> (Svelte 5), so the
-				     span is always here and the `canCapture` gate lives INSIDE it — which is also
-				     exactly the empty, zero-size flank the flyout is built to tolerate. -->
-				<span slot="capture" class="capture-btn" class:refused={!!captureTip}>
-					{#if canCapture}
-						<button type="button" class="annot-tool" disabled={capturing} on:click={onCapture}>
-							{captureLabel}
-						</button>
-						{#if captureTip}
-							<span class="capture-tip" role="status">{captureTip}</span>
+				<!-- PRESENT — the anchor. Ensures the presenter console is running (opens it, or
+				     re-focuses the existing one); it is not a mode, so it carries no on/off state.
+				     Hidden with the whole cluster inside the console itself (chrome={!present}). -->
+				{#snippet presentBtn()}
+					<button type="button" class="annot-anchor" on:click={openPresenter}>PRESENT</button>
+				{/snippet}
+
+				<!-- ADJUST — the old ADJUST toggle, moved into the menu and renamed. A sub-toggle
+				     that reads ADJUST:off / ADJUST:on in place (pinned width, so the label swap does
+				     not resize it), and only when the slide OFFERS layout ($canAdjust). SAVE appears
+				     beside it while ADJUST is on. The snippet also carries the divider that precedes
+				     the pair, so a deck that doesn't offer ADJUST leaves no dangling separator. -->
+				{#snippet adjustGroup()}
+					{#if $canAdjust}
+						<span class="annot-bar-sep" aria-hidden="true"></span>
+						<button
+							type="button"
+							class="annot-tab adjust-tab"
+							class:on={$adjustMode}
+							aria-pressed={$adjustMode}
+							aria-label={$adjustMode ? 'ADJUST on' : 'ADJUST off'}
+							title={$adjustMode
+								? 'ADJUST — placing blocks by hand (click to stop)'
+								: 'ADJUST — drag and resize blocks at exact pixels'}
+							on:click={() => adjustMode.update((v) => !v)}
+						>ADJUST</button>
+						<!-- Save writes moved Blocks back to source via the vite-dev endpoint. Shown
+						     whenever ADJUST is on, and it fires in BOTH worlds — it isn't greyed out
+						     where it can't write. It answers on click instead: the verdict flashes as a
+						     badge (SAVED / NONE / 1 OF 2 / NOT ALLOWED) and, on a refusal, a tooltip says
+						     why. A control disabled from the start invites the audience to assume the
+						     feature is missing; one that refuses when pressed teaches that saving is
+						     *forbidden here*. -->
+						{#if $adjustMode}
+							<span class="save-btn" class:refused={saveRefused}>
+								<button
+									type="button"
+									class="annot-act save-act"
+									aria-label="Save layout to source"
+									title="SAVE — write the moved blocks back to the source file"
+									on:click={onSave}
+								>SAVE</button>
+								{#if saveLabel !== 'SAVE' || saveRefused}
+									<!-- The verdict badge, and (on a refusal) the reason under it. aria-live on
+									     the tip so the refusal is announced, not just drawn. One interpolation,
+									     not a run of them: text split across lines carries the SOURCE's newlines
+									     and indentation into textContent, so "1 tag" would read "1\n\t\t\ttag". -->
+									<span class="save-pop">
+										{#if saveLabel !== 'SAVE'}
+											<span class="save-flash">{saveLabel}</span>
+										{/if}
+										{#if saveRefused}
+											<span class="save-tip" role="status">{saveTip}</span>
+										{/if}
+									</span>
+								{/if}
+							</span>
 						{/if}
 					{/if}
-				</span>
+				{/snippet}
+
+				<!-- PRINT/CAPTURE/OVERVIEW — the flat action rows. PLAIN buttons wearing `annot-tool`,
+				     not CtrlBtns, so Annotate can dress them in the menu's own amber livery. -->
+				{#snippet printBtn()}
+					<button
+						type="button"
+						class="annot-tool"
+						aria-haspopup="menu"
+						aria-expanded={printMenuOpen}
+						on:click={() => (printMenuOpen = !printMenuOpen)}
+					>PRINT</button>
+				{/snippet}
+				<!-- CAPTURE — the `canCapture` gate lives inside, so the snippet renders an empty
+				     (zero-size) flank on a deck that does not offer it. -->
+				{#snippet captureItem()}
+					<span class="capture-btn" class:refused={!!captureTip}>
+						{#if canCapture}
+							<button type="button" class="annot-tool" disabled={capturing} on:click={onCapture}>
+								{captureLabel}
+							</button>
+							{#if captureTip}
+								<span class="capture-tip" role="status">{captureTip}</span>
+							{/if}
+						{/if}
+					</span>
+				{/snippet}
 				<!-- OVERVIEW opens the all-slides grid — the same grid the `o` key opens, through the
 				     shared `overviewOpen` store. It is per-slide navigation, a speaker's tool, so it
-				     joins the flyout rather than returning to a corner button of its own. -->
-				<button
-					slot="overview"
-					type="button"
-					class="annot-tool"
-					on:click={() => overviewOpen.set(true)}
-				>OVERVIEW</button>
+				     joins the menu rather than returning to a corner button of its own. -->
+				{#snippet overviewBtn()}
+					<button type="button" class="annot-tool" on:click={() => overviewOpen.set(true)}>OVERVIEW</button>
+				{/snippet}
 			</Annotate>
 
 			<!-- The PRINT menu. It is NOT inside the flyout (which collapses the moment the pointer
@@ -841,7 +835,7 @@
      display-mode (DISPLAY) control and the minimap. DISPLAY anchors to the WINDOW's
      top-right corner (SizeMode's own fixed inset), so it's always in reach even when a
      SCALED slide is panned or the frame is letterboxed — a window control, distinct
-     from the slide-owned LAYOUT/PRESENT cluster above. Hidden by ?clean and in the
+     from the slide-owned PRESENT/tool cluster above. Hidden by ?clean and in the
      presenter console (which has its own chrome). -->
 {#if initialized && !clean && !present}
 <div class="overlay" class:fade-chrome={fadeChrome} style="--base-font:{baseFontSize};">
@@ -916,7 +910,7 @@
 		background: var(--content-bg, var(--surface-bg, #181818));
 		font-family: var(--content-font, 'Noto Sans', 'Cormorant Garamond', serif);
 	}
-	/* Keep the content OUT OF LAYOUT until JS has applied the scale transform (the
+	/* Keep the content OUT OF ADJUST until JS has applied the scale transform (the
 	   `ready` class flips on at onMount, right after the first adjustSize()). At its
 	   native px size the unscaled box overflows the frame; display:none removes it
 	   from layout entirely — adjustSize() only measures the CONTAINER, so this is
@@ -928,9 +922,9 @@
 
 	/* --- Chrome fade (opt-in via `fadeChrome`) ---------------------------------
 	   Every deck control tags its own root `.gp-chrome`; the two hosts that can
-	   contain one are .container (NAV, TOC, LAYOUT/PRESENT) and .overlay (DISPLAY,
-	   minimap), so the rule is written once against each. :global because those roots
-	   belong to sibling components with their own scoped styles.
+	   contain one are .container (NAV, TOC) and .overlay (DISPLAY, minimap), so the rule
+	   is written once against each. :global because those roots belong to sibling
+	   components with their own scoped styles.
 
 	   Opacity, never visibility/display: a ghosted control keeps its full hit area,
 	   so the pointer can find it exactly where it always was. */
@@ -948,7 +942,7 @@
 		opacity: 0.75;
 	}
 	/* Lit on approach — and STAY lit while open (`.expanded`, the class TOC and
-	   SizeMode already flip) or pinned (LAYOUT mid-edit). :focus-within carries the
+	   SizeMode already flip) or pinned (ADJUST mid-edit). :focus-within carries the
 	   keyboard: tabbing to a control reveals it exactly as hovering does. */
 	.container.fade-chrome :global(.gp-chrome:hover),
 	.container.fade-chrome :global(.gp-chrome:focus-within),
@@ -968,13 +962,6 @@
 			opacity: 1;
 		}
 	}
-	/* LAYOUT / PRESENT cluster — pinned to the SLIDE's own top-right corner, in CANVAS
-	   space (a .content child), so it rides the slide's scale/pan: its home is the page,
-	   not the window. That is the whole point of the split — the DISPLAY control belongs
-	   to the viewport (overlay), this belongs to the slide. Inset a little from the
-	   corner so it sits ON the slide, not on its edge. No font-size: it inherits
-	   .content's --base-font like the nav bar, so these read at the same size as the
-	   other in-slide chrome. */
 	/* ── `?shot` — the build-time screenshot render ────────────────────────────────
 	   The canvas at exactly 1:1, flush to the viewport's top-left, with no frame border
 	   and no letterbox. Point a headless browser at it with a window the size of the
@@ -1011,48 +998,73 @@
 		display: none !important;
 	}
 
-	.slide-chrome {
-		position: absolute;
-		top: 24px;
-		right: 24px;
-		/* Right-anchored row: LAYOUT, the dev-only SAVE, then PRESENT. The box shrinks to
-		   content, so an absent LAYOUT (viewer, not authoring) just leaves PRESENT. */
-		display: flex;
+	/* SAVE sits beside the ADJUST icon on the bar; its wrapper is the positioning context for the
+	   verdict badge that pops under it. inline-flex so the icon sits inline in the bar row. These
+	   are SLOTTED into <Annotate>'s bar, but this is still SlideDeck's scoped CSS — the elements
+	   are compiled here, so the scope hash rides with them wherever the DOM puts them. */
+	.save-btn {
+		position: relative;
+		display: inline-flex;
 		align-items: center;
-		gap: 8px;
 	}
-	/* Pin the SAVE button's width so its label can swap (SAVE → SAVED / NONE / ERROR)
-	   without nudging the row; the text stays centred in the reserved box.
-
-	   NOT ALLOWED is far wider than any of those, and reserving room for it would pad
-	   the button with dead space on every slide to spare one transient state a nudge.
-	   So it isn't in the pin: the button grows for the ~2.6s the refusal is up, then
-	   settles. The row moving there is fine — it moves BECAUSE of the click the audience
-	   just watched, so it reads as the answer, not as a glitch. */
-	.slide-chrome .save-btn :global(button),
+	/* Pin CAPTURE's width so its label can swap (CAPTURE → SAVED / NOT ALLOWED) without nudging the
+	   dropdown row. SAVE is an icon now, so it needs no such pin. */
 	.capture-btn :global(button) {
 		min-width: 4.6em;
 	}
-	/* The refusal has to be READ from the back of a room, so it doesn't get the muted
-	   chrome grey. Danger red, and the same token the demo slide's own prose uses, so
-	   the words in the chrome and the words on the slide are literally one colour. */
-	.slide-chrome .save-btn.refused :global(button),
+	/* A refusal has to READ from the back of a room, so the icon/label turns danger red — the same
+	   token the demo slide's own prose uses, so chrome and slide are literally one colour. */
+	.save-btn.refused :global(.save-act),
 	.capture-btn.refused :global(button) {
 		color: var(--ctrl-forbidden-fg, #E5484D);
+		border-color: var(--ctrl-forbidden-fg, #E5484D);
 	}
-	/* The tooltip: why it refused, not just that it did. Anchored under the button and
-	   centred on it; `left: 50%` + translate keeps it centred as the button grows into
-	   the NOT ALLOWED label. Never intercepts the pointer. */
-	.slide-chrome .save-btn,
+
+	/* SAVE's answer, popped under the icon: the verdict badge (SAVED / NONE / 1 OF 2 / NOT ALLOWED),
+	   and — on a refusal — the reason below it. Absolute, so it never widens the bar; centred on the
+	   icon; never eats the pointer. */
+	.save-pop {
+		position: absolute;
+		top: calc(100% + 6px);
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 10;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 4px;
+		pointer-events: none;
+	}
+	.save-flash {
+		white-space: nowrap;
+		padding: 0.15em 0.6em;
+		border-radius: 6px;
+		font-size: 0.72em;
+		font-weight: bold;
+		background: var(--tooltip-bg, #000000);
+		color: var(--annot-toggle-fg, #F0A33E);
+		border: 1px solid var(--annot-bar-edge, rgba(255, 255, 255, 0.2));
+	}
+	.save-btn.refused .save-flash {
+		color: var(--ctrl-forbidden-fg, #E5484D);
+		border-color: var(--ctrl-forbidden-fg, #E5484D);
+	}
+	.save-tip {
+		max-width: 22em;
+		text-align: center;
+		padding: 0.3em 0.7em;
+		border-radius: 6px;
+		font-size: 0.68em;
+		font-weight: bold;
+		background: var(--tooltip-bg, #000000);
+		color: var(--tooltip-fg, #FFFFFF);
+		border: 1px solid var(--ctrl-forbidden-fg, #E5484D);
+	}
+
+	/* CAPTURE keeps the old anchored tooltip — it's still a dropdown row, not a bar icon. */
 	.capture-btn {
 		position: relative;
 	}
-	/* CAPTURE wears the same refusal clothes as SAVE, deliberately: both are buttons that
-	   look ordinary, are pressable, and answer WHY when they cannot do the thing. (CAPTURE now
-	   lives in Annotate's flyout, not `.slide-chrome`, so its selectors stand alone — but this
-	   is still SlideDeck's scoped CSS: the button is SLOTTED content, compiled here, so the
-	   scope hash is here too, wherever the DOM ends up putting it.) */
-	.slide-chrome .save-tip,
 	.capture-tip {
 		position: absolute;
 		top: calc(100% + 8px);
@@ -1118,76 +1130,6 @@
 		background: var(--annot-bar-edge, rgba(255, 255, 255, 0.16));
 	}
 
-	/* ── The featured LAYOUT button ────────────────────────────────────────────────
-	   On a slide that TEACHES layout, this button is the subject of the slide. Two
-	   forces work against it being seen, and both have to be answered:
-
-	   1. The chrome look (--ctrl-fg) is a near-invisible grey on the dark frame — it is
-	      DESIGNED to be missed, which is right for a tool and wrong for a demo.
-	   2. `fadeChrome` (which the /slides deck sets) drops the whole cluster to
-	      opacity 0.12 until pointed at. That multiplies over any colour we pick, so
-	      restyling alone would have left the button a ghost on exactly the slides that
-	      point at it. Hence the exemption below — it is the load-bearing half.
-
-	   So: a filled warm pill, at full opacity, with a halo pulsing out of it until it's
-	   used. Loud on purpose; it only ever appears on the handful of slides that ask for
-	   it by name. */
-
-	/* (2) A featuring slide opts its chrome OUT of the fade entirely. The whole cluster
-	   stays lit, not just LAYOUT: opacity on the parent can't be undone by a child, and
-	   on a slide whose subject IS the chrome, chrome that hides is the wrong default.
-	   Beats the 0.12 rule on specificity (two classes to its one). */
-	.container.fade-chrome :global(.slide-chrome.featuring) {
-		opacity: 1;
-	}
-
-	/* Geometry, applied in BOTH states (warm and selected-green) so toggling LAYOUT
-	   recolours the button without resizing it — the control row never jiggles. The
-	   min-width also absorbs the hover label swap (LAYOUT → "LAYOUT off"). */
-	.slide-chrome .layout-btn.featured :global(button) {
-		margin-left: 0;
-		padding: 0.28em 1.05em;
-		border-radius: 999px;
-		font-size: 1em;
-		letter-spacing: 0.04em;
-		min-width: 7.4em;
-	}
-	/* The colour, only while unselected. Once LAYOUT is on, CtrlBtn's own selected-green
-	   takes over — the button has been found, and green is the right "you are in this
-	   mode" signal. */
-	.slide-chrome .layout-btn.featured :global(button:not(.selected)) {
-		background: var(--ctrl-featured-fg, #F0A33E);
-		color: var(--ctrl-featured-on, #1A1206);
-	}
-
-	/* The halo: a ring expanding out of the button and fading. It rides a pseudo-element
-	   on the WRAPPER rather than a box-shadow on the button, so it needs no alpha colour
-	   (the role tokens are opaque hex by convention) and can't disturb the filled pill. */
-	.slide-chrome .layout-btn {
-		display: inline-flex;
-		position: relative;
-	}
-	.slide-chrome .layout-btn.calling::after {
-		content: '';
-		position: absolute;
-		inset: 0;
-		border-radius: 999px;
-		border: 2px solid var(--ctrl-featured-fg, #F0A33E);
-		pointer-events: none;
-		animation: gp-layout-halo 1.9s ease-out infinite;
-	}
-	@keyframes gp-layout-halo {
-		0%   { transform: scale(1);    opacity: 0.75; }
-		100% { transform: scale(1.5);  opacity: 0;    }
-	}
-	/* Motion is an attention-getter, not information — the pill and its colour already
-	   carry the message, so drop the pulse for anyone who asked for less movement. */
-	@media (prefers-reduced-motion: reduce) {
-		.slide-chrome .layout-btn.calling::after {
-			animation: none;
-			opacity: 0.75;
-		}
-	}
 	.content.fill {
 		/* Exact-fit: the box IS the full canvas (padding folded in via border-box),
 		   so it fills the frame edge to edge on BOTH axes with no fudge. */
@@ -1230,7 +1172,7 @@
 	}
 
 	/* `?present`: hide the whole slide canvas (frame, background, slide body, its
-	   chrome) with visibility so it keeps LAYOUT — the slide still mounts, so its
+	   chrome) with visibility so it keeps ADJUST — the slide still mounts, so its
 	   <Note> exists. The note then flips ITSELF back to visible + fixed as the
 	   presenter panel (see Note.presenter). No transform is applied in present mode
 	   (adjustSize early-returns), so that fixed note tracks the viewport. */

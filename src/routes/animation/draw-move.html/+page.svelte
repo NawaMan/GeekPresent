@@ -10,7 +10,7 @@
   interpolates the numbers); the arrowhead and label ride along. It's all
   CSS — runs in the prerendered page — and ANIMATE opens a bar you can DRAG.
 
-  In LAYOUT mode every stop has its own on-canvas handle (B at both B₀ and
+  In ADJUST mode every stop has its own on-canvas handle (B at both B₀ and
   B₁₀₀, and the control point at each end of its arc), and the toolbar grows
   a KEYFRAMES panel to add / remove / retime stops. Copy round-trips it all.
 -->
@@ -34,7 +34,7 @@
 			geometry <Label>stops</Label> — at <code>0%</code> it sits on
 			<Label>B₀</Label>, at <code>100%</code> on <Label>B₁₀₀</Label>. It's a
 			<Label>Curve</Label>, so it curls through a control point that keyframes
-			too, whipping the bend over as B rises. Flip <b>LAYOUT</b> on to drag any
+			too, whipping the bend over as B rises. Flip <b>ADJUST</b> on to drag any
 			stop's handle or add keyframes from the toolbar's panel; press
 			<b>ANIMATE</b> and <b>drag</b> the bar to park the whole shape anywhere.
 		</p>

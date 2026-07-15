@@ -42,7 +42,7 @@
 	</Callout>
 </Block>
 
-<!-- The interesting half, on the slide rather than hidden — the same way layout-mode.html puts
+<!-- The interesting half, on the slide rather than hidden — the same way adjust-mode.html puts
      SAVE's refusal in front of the audience instead of behind it. -->
 <Block name="stale" x={995} y={400} width={860} height={280}>
 	<Callout kind="warn" title="…so it can go stale">

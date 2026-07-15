@@ -6,7 +6,7 @@ import { writable } from 'svelte/store';
 // `data-highlight="db"` calls attention to the Block named "db" as the speaker
 // covers it, and <Spotlight> (mounted once by SlideDeck) rings that Block's box —
 // looked up in the SAME blockAnchors registry a <Connector> resolves against, so
-// the spotlight tracks the box even as it is dragged in LAYOUT mode.
+// the spotlight tracks the box even as it is dragged in ADJUST mode.
 //
 // Module-level (not context) for the same reason `selectedBlock` / `blockAnchors`
 // are: the trigger (a Note line) and the overlay (Spotlight) are far-apart siblings

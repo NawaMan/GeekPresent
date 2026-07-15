@@ -3,7 +3,7 @@
   File: src/routes/animation-check/shape-edit.html/+page.svelte
 
   A <Rect> (box-shaped, so Draw hosts a real Block for it — move/resize just
-  like a Block) and a <Line> (endpoint handles). Same LAYOUT gate as a Block;
+  like a Block) and a <Line> (endpoint handles). Same ADJUST gate as a Block;
   Copy emits the shape's own tag.
 -->
 <script lang="ts">
@@ -16,11 +16,11 @@
 	const path = 'src/routes/animation-check/shape-edit.html/+page.svelte';
 </script>
 
-<ContentPage title="Shape — editable" subtitle="An SVG object inside Draw — same LAYOUT gate, same Copy.">
+<ContentPage title="Shape — editable" subtitle="An SVG object inside Draw — same ADJUST gate, same Copy.">
 	<p class="hint">
 		Shapes &mdash; <Label>Rect</Label>, <Label>Line</Label>, <Label>Curve</Label>,
 		<Label>Ellipse</Label>, … &mdash; live inside a <Label>Draw</Label> surface (one
-		full-canvas SVG in the very same coordinates as a Block). In <b>LAYOUT</b>, a box
+		full-canvas SVG in the very same coordinates as a Block). In <b>ADJUST</b>, a box
 		shape like <b>Rect</b> gives you the same move / resize handles as a Block; a line
 		gives you endpoint handles. <b>Copy</b> emits the shape's own tag.
 	</p>
@@ -29,7 +29,7 @@
 <Draw
 	title="An editable rounded rectangle and a line"
 	name="shape-edit"
-	description="A rounded Rect and a straight Line drawn on one Draw surface; in LAYOUT mode each is draggable and copyable."
+	description="A rounded Rect and a straight Line drawn on one Draw surface; in ADJUST mode each is draggable and copyable."
 >
 	<Rect name="frame" x={710} y={460} width={500} height={210} rounded={16} color="#4aa3f0" thickness={4} />
 	<Line name="rule" from={[720, 760]} to={[1200, 760]} color="#f39c12" thickness={6} />

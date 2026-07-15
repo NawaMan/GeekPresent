@@ -5,7 +5,7 @@
   ($lib/stores/blockAnchors). A Connector looks its two endpoints up by that
   name and routes an arrow between the boxes — so the diagram is authored in
   NAMES, not coordinates, and every arrow follows its boxes when you drag them
-  around in LAYOUT mode. That is what turns Block into a diagramming tool.
+  around in ADJUST mode. That is what turns Block into a diagramming tool.
 
       <Block name="api" x={200} y={400} width={280} height={140}>API</Block>
       <Block name="db"  x={900} y={400} width={280} height={140}>DB</Block>

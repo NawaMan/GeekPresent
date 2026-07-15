@@ -5,7 +5,7 @@
       <Ellipse x={1300} y={200} width={360} height={200} />
 
   Same Block-shaped box geometry as Rect (x/y/width/height, NOT cx/cy/rx/ry):
-  in LAYOUT mode the box registers with <Draw>, which hosts a real
+  in ADJUST mode the box registers with <Draw>, which hosts a real
   <Block tag="Ellipse"> for it — move/resize/aspect/grid/undo/Copy arrive
   wholesale, and Copy emits `<Ellipse …/>`. "Draw an ellipse over that area"
   is how an author thinks about it anyway.
@@ -14,7 +14,7 @@
 	import { getContext, untrack } from 'svelte';
 	import { boxTag, newEditorId, sharedAttrs } from './editing';
 	import { finite, round } from './drawCore';
-	import { guardStyle } from '$lib/layout/styleGuardCore';
+	import { guardStyle } from '$lib/adjust/styleGuardCore';
 	import {
 		DRAW_CONTEXT_KEY,
 		type DrawContext,
@@ -85,7 +85,7 @@
 		drawSecs && drawDelayVal && Number.isFinite(drawDelayVal) && drawDelayVal > 0 ? drawDelayVal : 0
 	);
 
-	// LAYOUT-mode editing overrides (finder state, driven by Draw's hosted
+	// ADJUST-mode editing overrides (finder state, driven by Draw's hosted
 	// Block; reset on reload — Copy → paste is the only persistence).
 	let live = $state<{ x: number; y: number; w: number; h: number } | null>(null);
 	const X = $derived(live?.x ?? finite(x));
@@ -104,13 +104,13 @@
 	const dasharray = $derived(dash === true ? '12 8' : dash === false ? undefined : dash);
 
 	// The props own the geometry — an author's `style="width: 50px"` must not cancel
-	// the box the hosting LAYOUT Block drags. (An <ellipse> is driven by cx/cy/rx/ry,
+	// the box the hosting ADJUST Block drags. (An <ellipse> is driven by cx/cy/rx/ry,
 	// so the reserved box properties are inert here; guarding anyway keeps ONE rule
 	// across every draggable, and the badge still tells the truth.) See
-	// layout/styleGuardCore.ts.
+	// adjust/styleGuardCore.ts.
 	const guard = $derived(guardStyle(style));
 
-	// --- LAYOUT-mode editing: register the box with Draw, which hosts the
+	// --- ADJUST-mode editing: register the box with Draw, which hosts the
 	// editing <Block tag="Ellipse"> (see Rect.svelte).
 	const ctx = getContext<DrawContext | undefined>(DRAW_CONTEXT_KEY);
 

@@ -1,11 +1,11 @@
 /*
   ANNOTATE access — the pure decision layer behind the annotation stores (see
-  stores/annotation.ts). The sibling of layout/layoutAccessCore.ts, and deliberately
+  stores/annotation.ts). The sibling of adjust/adjustAccessCore.ts, and deliberately
   ONE TIER SHORTER than it.
 
-  LAYOUT resolves dev > sticky ?layout > what the SLIDE declares > off. Annotation
+  ADJUST resolves dev > sticky ?adjust > what the SLIDE declares > off. Annotation
   drops the slide tier, because "which slide declared it" is the wrong axis for this
-  tool: LAYOUT is an AUTHORING aid, so the slide being authored has a real opinion
+  tool: ADJUST is an AUTHORING aid, so the slide being authored has a real opinion
   about whether you should be dragging on it. Annotation is a SPEAKER tool — the
   speaker decides to circle a term while answering a question, and the slide they
   happen to be standing on has no opinion about that at all. So the flag is
@@ -13,7 +13,7 @@
 
     dev > the speaker's sticky ?annotate > a deck-wide prop on SlideDeck > off
 
-  What it costs: no featured-pill treatment. The warm pulsing LAYOUT button works
+  What it costs: no featured-pill treatment. The warm pulsing ADJUST button works
   because a SLIDE can say "press this"; a deck-wide tool can't, so the ANNOTATE
   button stays chrome-grey and the demo slide has to teach the flag rather than
   light it up.
@@ -21,10 +21,10 @@
   Side-effect free and total, like the core it sits beside: junk in, plain boolean out.
 */
 
-import { readSticky, type Choice } from '$lib/layout/layoutAccessCore';
+import { readSticky, type Choice } from '$lib/adjust/adjustAccessCore';
 
 // Re-exported so a caller reaching for the annotation precedence never has to
-// import half of it from the LAYOUT module. `readSticky` is shared verbatim rather
+// import half of it from the ADJUST module. `readSticky` is shared verbatim rather
 // than copied: "the two exact strings the store writes, everything else is
 // no-choice-recorded" is the same rule here, for the same reason.
 export { readSticky };

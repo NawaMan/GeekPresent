@@ -69,7 +69,7 @@
 />`} />
 </Block>
 
-<!-- The console itself, in a Block so LAYOUT mode can place and size it. Block fills
+<!-- The console itself, in a Block so ADJUST mode can place and size it. Block fills
      its content, so the Terminal stretches to the box and its screen scrolls if the
      session outgrows the space. -->
 <Block name="console" x={120} y={570} width={1680} height={400} grid={10}>

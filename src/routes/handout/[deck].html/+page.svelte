@@ -83,7 +83,7 @@
 	// just click. Browser-only, like every other flag the deck reads (SlideDeck's ?clean/?shot).
 	let showNotes = browser && $page.url.searchParams.has('notes');
 
-	// The LAYOUT: the default one-slide-per-page handout, or one of the two compact OVERVIEW
+	// The ADJUST: the default one-slide-per-page handout, or one of the two compact OVERVIEW
 	// layouts. It stays 'pages' until onMount, deliberately: the server has no query string, so
 	// it prerenders the pages layout, and starting the client there too means hydration adopts a
 	// matching tree before the URL flips it. A print page can afford one settling frame; a

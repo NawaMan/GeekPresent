@@ -1,8 +1,8 @@
-// `layout: true` — this slide OFFERS the LAYOUT authoring control, even in the built
-// site. Set on the slides that TEACH layout (their prose says "flip LAYOUT and drag
+// `adjust: true` — this slide OFFERS the ADJUST authoring control, even in the built
+// site. Set on the slides that TEACH layout (their prose says "flip ADJUST and drag
 // this box"), so the button is there when the audience is told to look for it. The
-// rest of the deck ships LAYOUT-free. It makes the control AVAILABLE, not active —
-// the mode still starts off. See lib/layout/layoutAccessCore.ts.
+// rest of the deck ships ADJUST-free. It makes the control AVAILABLE, not active —
+// the mode still starts off. See lib/adjust/adjustAccessCore.ts.
 export const pages = [
     { path: "title.html",             title: "Title" },
     { path: "what-is-geekpresent.html", title: "What is GeekPresent?" },
@@ -36,20 +36,20 @@ export const pages = [
     // forward march can find one.
     { path: "components.html",        title: "Components" },
     { path: "box-component.html",     title: "Box Component" },
-    { path: "block-component.html",   title: "Block Component", layout: true },
-    { path: "layout-mode.html",       title: "LAYOUT Mode", layout: true },
-    { path: "layout-style-guard.html", title: "style vs. LAYOUT", layout: true },
+    { path: "block-component.html",   title: "Block Component", adjust: true },
+    { path: "adjust-mode.html",       title: "ADJUST Mode", adjust: true },
+    { path: "adjust-style-guard.html", title: "style vs. ADJUST", adjust: true },
     { path: "highlight-component.html", title: "Highlight Component" },
     { path: "carousel-component.html", title: "Carousel Component" },
     { path: "steps-component.html",   title: "Steps & Fragment" },
     { path: "datatable-component.html", title: "DataTable — Static Data" },
     { path: "datatable-tools.html",   title: "DataTable — Table Tools" },
     { path: "datatable-server.html",  title: "DataTable — Server-Side Data" },
-    { path: "draw-component.html",    title: "Draw — Shapes & Arrows", layout: true },
-    { path: "path-component.html",    title: "Path — Multi-Segment Stroke", layout: true },
-    { path: "draw-sequence.html",     title: "Draw — Building a Diagram", layout: true },
-    { path: "connector-component.html", title: "Connector — Arrows by Name", layout: true },
-    { path: "note-highlight-component.html", title: "Note-driven Highlight", layout: true },
+    { path: "draw-component.html",    title: "Draw — Shapes & Arrows", adjust: true },
+    { path: "path-component.html",    title: "Path — Multi-Segment Stroke", adjust: true },
+    { path: "draw-sequence.html",     title: "Draw — Building a Diagram", adjust: true },
+    { path: "connector-component.html", title: "Connector — Arrows by Name", adjust: true },
+    { path: "note-highlight-component.html", title: "Note-driven Highlight", adjust: true },
     // The pen sits next to the Spotlight it complements: the highlight rings what the
     // AUTHOR named, ANNOTATE draws on what the SPEAKER decides to point at. No `annotate`
     // flag here — that one is deck-wide (see +layout.svelte), because a speaker tool takes
@@ -74,13 +74,13 @@ export const pages = [
     { path: "video-component.html",   title: "Video — Player & Bookmarks" },
     { path: "videopage-component.html", title: "VideoPage — Full-Canvas Video" },
     { path: "hint-component.html",    title: "Hint" },
-    { path: "callout-component.html", title: "Callout", layout: true },
-    { path: "stat-component.html",    title: "Stat & StatGroup", layout: true },
-    { path: "quote-component.html",   title: "Quote", layout: true },
-    { path: "timeline-component.html", title: "Timeline", layout: true },
+    { path: "callout-component.html", title: "Callout", adjust: true },
+    { path: "stat-component.html",    title: "Stat & StatGroup", adjust: true },
+    { path: "quote-component.html",   title: "Quote", adjust: true },
+    { path: "timeline-component.html", title: "Timeline", adjust: true },
     { path: "timeline-horizontal.html", title: "Timeline — Horizontal & Scroll" },
-    { path: "columns-component.html", title: "Columns & Column", layout: true },
-    { path: "tabs-component.html",    title: "Tabs & Tab", layout: true },
+    { path: "columns-component.html", title: "Columns & Column", adjust: true },
+    { path: "tabs-component.html",    title: "Tabs & Tab", adjust: true },
     { path: "kbd-component.html",     title: "Kbd" },
     { path: "qrcode-component.html",  title: "QRCode" },
     { path: "label-component.html",   title: "Label" },
@@ -88,7 +88,7 @@ export const pages = [
     { path: "code-component.html",    title: "Code" },
     { path: "javacode-component.html", title: "JavaCode" },
     { path: "codebox-component.html", title: "CodeBox" },
-    { path: "codediff-component.html", title: "CodeDiff", layout: true },
+    { path: "codediff-component.html", title: "CodeDiff", adjust: true },
     { path: "terminal-component.html", title: "Terminal" },
     { path: "speaker-notes.html",     title: "Speaker Notes" },
     // Beside Speaker Notes, because the notes are half of what it prints: the HANDOUT is

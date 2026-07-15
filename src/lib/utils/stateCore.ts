@@ -14,7 +14,7 @@
   What they share is that the first two are STRINGS FROM OUTSIDE, so every read
   is a parse that can fail. This module is where those parses live.
 
-  Pure and total in the drawCore / layoutAccessCore / appendixCore tradition:
+  Pure and total in the drawCore / adjustAccessCore / appendixCore tradition:
   every input may be junk — an absent param, a NaN, a value another tab
   corrupted, a 4 MB string — and each has exactly one defined answer. Nothing
   here throws, and nothing here returns NaN. That matters more than it sounds:
@@ -86,7 +86,7 @@ const CONTROL = /[\u0000-\u001F\u007F]/g;
 
     This is NOT an XSS guard and does not pretend to be one — Svelte escapes text it
     interpolates, so `<script>` in a param renders as those literal characters and is
-    inert. The danger being handled here is a LAYOUT one, which is the danger that is
+    inert. The danger being handled here is a ADJUST one, which is the danger that is
     actually real. */
 export function parseText(raw: string | null | undefined, fallback = ''): string {
 	if (typeof raw !== 'string') return fallback;

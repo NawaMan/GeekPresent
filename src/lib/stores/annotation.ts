@@ -24,7 +24,7 @@ import {
 //   - annotationMode: is the pen currently ARMED? Persisted; per-window (sync: false).
 //   - canAnnotate:    is the ANNOTATE control OFFERED here? dev > sticky ?annotate > the
 //     deck's `annotate` prop > off. Precedence in annotate/annotateAccessCore — one tier
-//     shorter than LAYOUT's, because a speaker tool takes no instruction from the slide it
+//     shorter than ADJUST's, because a speaker tool takes no instruction from the slide it
 //     happens to be standing on.
 //   - inkBook:        the ink itself, per slide, PERSISTED.
 //
@@ -46,7 +46,7 @@ function recompute(): void {
 	canAnnotate.set(resolveCanAnnotate(import.meta.env.DEV, sticky(), deckWide));
 }
 
-/** Is the pen armed? `booleanCodec` and not `jsonCodec<boolean>` for the reason LAYOUT
+/** Is the pen armed? `booleanCodec` and not `jsonCodec<boolean>` for the reason ADJUST
     uses it: a corrupt key must read as OFF, and JSON would hand back a truthy object for
     `{"x":1}` — arming a pen over someone's slide that nobody asked for.
 
@@ -59,7 +59,7 @@ export const annotationMode = persisted<boolean>(MODE_KEY, false, {
 });
 
 /** DERIVED (dev + the sticky ?annotate flag + the deck's prop). Reads CAN_KEY but never
-    mirrors itself to it, so — like canLayout — it stays a hand-rolled writable. */
+    mirrors itself to it, so — like canAdjust — it stays a hand-rolled writable. */
 export const canAnnotate = writable<boolean>(
 	resolveCanAnnotate(import.meta.env.DEV, sticky(), deckWide)
 );
@@ -196,7 +196,7 @@ export function dismissStale(): void {
 
 export type { SlideInk };
 
-/** Declare whether the DECK offers the ANNOTATE control. Unlike setLayoutOffered this is
+/** Declare whether the DECK offers the ANNOTATE control. Unlike setAdjustOffered this is
     NOT re-called per slide — the flag is deck-wide, so paging cannot take the pen out of
     the speaker's hand mid-answer. */
 export function setAnnotateOffered(on: boolean): void {

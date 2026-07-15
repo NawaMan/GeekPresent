@@ -1,6 +1,6 @@
-// Server-side source patcher for the LAYOUT-mode "Save" feature.
+// Server-side source patcher for the ADJUST-mode "Save" feature.
 //
-// LAYOUT edits live only in the browser (see layoutMode.ts / layoutChanges.ts) —
+// ADJUST edits live only in the browser (see adjustMode.ts / adjustChanges.ts) —
 // the author drags a <Block>, and the only way those coordinates ever reach the
 // slide's Svelte source is a copy → paste. "Save" closes that loop IN DEV ONLY:
 // the browser POSTs the changed tags to a Vite dev endpoint (devSavePlugin.ts)
@@ -18,7 +18,7 @@
 // Anything we can't confidently place is returned as `unmatched` for the author
 // to paste by hand — never guessed.
 //
-// Pure and browser-free so it unit-tests without a dev server (tests/layoutPatch.test.ts).
+// Pure and browser-free so it unit-tests without a dev server (tests/adjustPatch.test.ts).
 
 export interface Geometry {
 	x: number;
@@ -198,7 +198,7 @@ function applyGeometry(tagText: string, after: Geometry): string {
 }
 
 /**
- * Apply LAYOUT geometry changes to a slide's Svelte source. Each change is
+ * Apply ADJUST geometry changes to a slide's Svelte source. Each change is
  * matched to one opening tag and its x/y/width/height rewritten in place; the
  * rest of the tag (and file) is untouched. Changes are applied sequentially so
  * a just-patched tag can't be re-matched by a later change.

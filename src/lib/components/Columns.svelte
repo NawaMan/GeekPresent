@@ -34,7 +34,7 @@
     divider  — hairline rules in the gutters (default false). Needs `<Column>`
                children; see the caveat below.
     resizable— let a VIEWER drag the gutters during the talk (default false). In
-               LAYOUT mode they are draggable regardless, `resizable` or not.
+               ADJUST mode they are draggable regardless, `resizable` or not.
     minTrack — narrowest a track may be dragged, in canvas px (default 40).
     stack    — collapse to a single column, spans and rules included. The switch a
                slide flips when the same content wants stacking rather than splitting.
@@ -53,8 +53,8 @@
     sum to it), so nothing jumps on the first frame — but a track authored as a fixed
     `'360px'` rail comes out proportional. A drag is a RATIO editor.
   - **Nothing is saved.** Each slide is its own page load, so a drag is gone the
-    moment you page away. In LAYOUT mode a `widths` chip copies the dragged ratio to
-    the clipboard, to paste back into source — the same bargain every LAYOUT gesture
+    moment you page away. In ADJUST mode a `widths` chip copies the dragged ratio to
+    the clipboard, to paste back into source — the same bargain every ADJUST gesture
     makes. Double-click any divider to reset it to the authored widths.
   - A focused handle owns ←/→ (Shift for a bigger step). It is the only control in
     the deck that may: `NavigationBar` claims the arrows on `window` in the bubble
@@ -67,7 +67,7 @@
 
   It hugs its content in normal flow; wrap it in a <Block> to pin and size the whole
   group on a slide (Block fills its content, so the grid stretches to the box and a
-  LAYOUT-mode resize rubber-bands the columns).
+  ADJUST-mode resize rubber-bands the columns).
 
   Two caveats, both consequences of CSS rather than choices:
 
@@ -89,7 +89,7 @@
 	import { onMount, setContext, tick } from 'svelte';
 	import { writable } from 'svelte/store';
 	import { getMode } from '$lib/presentation';
-	import { canLayout, layoutMode } from '$lib/stores/layoutMode';
+	import { canAdjust, adjustMode } from '$lib/stores/adjustMode';
 	import { trackPointer } from '$lib/utils/drag';
 	import {
 		COLUMNS_CONTEXT,
@@ -117,7 +117,7 @@
 	export let divider: boolean = false;
 	/** Collapse to a single column, spans and rules included. */
 	export let stack: boolean = false;
-	/** Let a VIEWER drag the gutters. LAYOUT mode makes them draggable regardless. */
+	/** Let a VIEWER drag the gutters. ADJUST mode makes them draggable regardless. */
 	export let resizable: boolean = false;
 	/** Narrowest a track may be dragged, in canvas px. */
 	export let minTrack: number = 40;
@@ -143,9 +143,9 @@
 	});
 	setContext(COLUMNS_CONTEXT, shared);
 
-	// LAYOUT mode is an authoring aid, available only where the deck allows it;
-	// canLayout keeps a published deck inert even if a stale layoutMode lingers.
-	$: editing = $canLayout && $layoutMode;
+	// ADJUST mode is an authoring aid, available only where the deck allows it;
+	// canAdjust keeps a published deck inert even if a stale adjustMode lingers.
+	$: editing = $canAdjust && $adjustMode;
 	// One divider can't be dragged: there is nothing on the other side of it.
 	$: grabbable = (resizable || editing) && !stack;
 
@@ -206,7 +206,7 @@
 		mounted = true;
 		measure();
 
-		// The grid resizes when the Block around it does — in LAYOUT mode, constantly.
+		// The grid resizes when the Block around it does — in ADJUST mode, constantly.
 		if (typeof ResizeObserver === 'undefined') return;
 		const ro = new ResizeObserver(() => measure());
 		ro.observe(el);
@@ -419,7 +419,7 @@
 		box-shadow: 0 0 0 2px color-mix(in srgb, var(--columns-handle, #2980b9) 35%, transparent);
 	}
 
-	/* LAYOUT-mode Copy: the dragged ratio as a `widths={[…]}` you paste back into
+	/* ADJUST-mode Copy: the dragged ratio as a `widths={[…]}` you paste back into
 	   source. Bottom-left, clear of Block's own Copy chip at the top. */
 	.copy {
 		position: absolute;

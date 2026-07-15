@@ -2,7 +2,7 @@
   Example: CAPTURE — the slide as a PNG, demonstrated live.
   File: src/routes/slides/capture-slide.html/+page.svelte
 
-  Like layout-mode.html, this slide IS its own demo: the deck sets `capture`, so the button is
+  Like adjust-mode.html, this slide IS its own demo: the deck sets `capture`, so the button is
   real in the deployed build. It rides ANNOTATE's top-centre flyout — hover ANNOTATE and CAPTURE
   slides out beside it. Press it and you download *this slide* — including anything you drew on
   it, and none of the chrome you drew it with.
@@ -46,7 +46,7 @@
 		</p>
 		<p style="margin-top: 0.4em;">
 			<b>Out:</b> anything wearing <code>.no-print</code> &mdash; the nav bar, the TOC, the
-			LAYOUT and CAPTURE buttons, the pen's palette. Capture reuses the very same rule that
+			ADJUST and CAPTURE buttons, the pen's palette. Capture reuses the very same rule that
 			keeps chrome out of a printout, rather than inventing a second list that could drift.
 		</p>
 		<p style="margin-top: 0.4em;">
@@ -56,7 +56,7 @@
 	</Callout>
 </Block>
 
-<!-- The honest boundary, on the slide — as layout-mode.html puts SAVE's refusal in front of the
+<!-- The honest boundary, on the slide — as adjust-mode.html puts SAVE's refusal in front of the
      audience rather than behind it. -->
 <Block name="cannot" x={995} y={620} width={860} height={310}>
 	<Callout kind="warn" title="What it refuses to draw">

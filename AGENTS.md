@@ -16,7 +16,7 @@ background.
 |---|---|
 | `new-slide` | authoring a slide — route folder, `+layout.js`, the `pages.ts` entry, templates |
 | `new-component` | adding a component — the `style`/`id`/`class` contract, a pure `*Core.ts`, role tokens |
-| `layout-mode` | placing things at exact canvas pixels, `Connector` diagrams, SAVE, the style guard |
+| `adjust-mode` | placing things at exact canvas pixels, `Connector` diagrams, SAVE, the style guard |
 | `deck-tests` | the test contract — the `dom` / `ssr` projects, and why prerender needs `svelte/server` |
 
 `tests/skills.test.ts` pins every repo path those skills cite, so a moved file fails the suite rather
@@ -99,7 +99,7 @@ than misleading the next agent.
   use it on any slide reached by a CLIENT-SIDE navigation, i.e. a View-Transition deck or an
   appendix with `transition`, because Monaco's CDN loader renders blank after a `goto`),
   `Block` / `ImageBlock` (absolutely-positioned
-  wrappers you place at exact canvas pixels — drag/resize them in **LAYOUT mode**,
+  wrappers you place at exact canvas pixels — drag/resize them in **ADJUST mode**,
   see that playbook), `Connector` (an arrow auto-routed between two *named* `Block`s —
   see the diagram playbook), `Video` (a `<video>` with themeable chrome and *time
   bookmarks* — chapter buttons that seek, the current one highlighted; import the
@@ -107,7 +107,7 @@ than misleading the next agent.
   filling the canvas, nav bar included — a complete slide, as `WebPage` is) and
   `Columns` / `Column` (a thin grid for two- and three-column layouts; a media/text
   *split* is the same component with unequal `widths`, not a second one. `resizable`
-  lets a viewer drag the gutters, and LAYOUT mode always does — with a `widths` chip
+  lets a viewer drag the gutters, and ADJUST mode always does — with a `widths` chip
   that copies the dragged ratio back into source, since a drag saves nothing),
   `QRCode` (a scannable link, encoded on the slide — the symbol is computed from the
   text, not fetched, and drawn as SVG so it survives the canvas transform. `value` is
@@ -360,37 +360,37 @@ is possible precisely *because* each slide is its own document. See the `transit
 examples (slide, flip, zoom, cross-fade, and shared-element `view-transition-name` morphs). No library,
 no client-side router — just a slide-scoped `<style>` opting navigation transitions in.
 
-### "Place an element visually (LAYOUT mode)"
+### "Place an element visually (ADJUST mode)"
 
 When a slide positions things at exact canvas pixels, you don't have to guess the
 numbers. Wrap the element in a **`Block`** (or **`ImageBlock`** for a picture) and
-turn on **LAYOUT mode** to drag/resize it in the browser, then copy the resulting
+turn on **ADJUST mode** to drag/resize it in the browser, then copy the resulting
 tag — with its final `x`/`y`/`width`/`height` — back into the source by hand.
 
-**LAYOUT mode is an authoring aid, not a viewer feature.** It is on by default in
+**ADJUST mode is an authoring aid, not a viewer feature.** It is on by default in
 `pnpm dev`, where **SAVE** writes moved `Block`s straight back into the slide's
 `.svelte` file. **In production it is OFF.** Three things can offer the control,
 highest authority first:
 
 1. **`pnpm dev`** — always, and nothing can take it away.
-2. **`?layout`** on any slide URL — the escape hatch on a built/deployed site;
-   **`?layout=off`** disables it again. (Both sticky per browser origin — see the
+2. **`?adjust`** on any slide URL — the escape hatch on a built/deployed site;
+   **`?adjust=off`** disables it again. (Both sticky per browser origin — see the
    Gotcha.) The speaker asked, so this outranks the content.
-3. **`layout: true` on the slide's `pages.ts` entry** — a *per-slide* opt-in, so a
+3. **`adjust: true` on the slide's `pages.ts` entry** — a *per-slide* opt-in, so a
    slide that TEACHES layout can offer the control in the build while the rest of the
-   deck ships LAYOUT-free. Set it on the slides whose prose says "flip LAYOUT and drag
+   deck ships ADJUST-free. Set it on the slides whose prose says "flip ADJUST and drag
    this box" — the button must be there when the audience is told to look for it. On
    such a slide the button is rendered **featured**: a filled warm pill with a halo that
    pulses until it's used, and the slide's chrome is exempted from `fadeChrome` (which
    would otherwise hold it at `opacity: 0.12` until pointed at — worth knowing, because
    it defeats any amount of restyling). There the button is the subject, not backstage
-   machinery. See `layout-mode.html`, and `layout` on `<SlideDeck>` for the rare deck
+   machinery. See `adjust-mode.html`, and `adjust` on `<SlideDeck>` for the rare deck
    that is entirely about authoring.
 
 Offered is not active: the mode still starts **off**. Precedence lives in
 `src/lib/layout/layoutAccessCore.ts` (pure, unit-tested).
 
-**SAVE cannot follow LAYOUT into a build.** It POSTs to `/__geekpresent/layout-save`,
+**SAVE cannot follow ADJUST into a build.** It POSTs to `/__geekpresent/adjust-save`,
 an endpoint that exists only inside the vite dev server; a static host has no source
 tree to rewrite. The button is **not** greyed out there — it looks ordinary and
 **refuses on click**: the label flips to `NOT ALLOWED` and a tooltip says *"Save not
@@ -428,8 +428,9 @@ does, and the ambiguity never arises.
    ```svelte
    <ImageBlock src={photo} alt="…" x={760} y={560} width={320} height={320} />
    ```
-2. Have the user open the slide in their dev server. The **SizeMode** control (top-right) now shows
-   a LAYOUT toggle — turn it on. A dashed outline appears around each `Block`.
+2. Have the user open the slide in their dev server. The top-centre tool bar
+   (`PRESENT │ ANNOTATE │ ADJUST`) now shows an **ADJUST** toggle — turn it on. A dashed
+   outline appears around each `Block`.
 3. **Drag** the body to move, **drag the bottom-right grip** to resize. Snap to a
    grid with the `grid` prop; hold **Alt** to break an aspect lock; **Esc** cancels
    the in-progress gesture. **Ctrl/Cmd+Z** undoes, **Ctrl/Cmd+Shift+Z** / **Ctrl+Y**
@@ -437,7 +438,7 @@ does, and the ambiguity never arises.
 4. Click **Copy** on the block to put its current tag (with the live coordinates) on
    the clipboard, then **paste it over the original tag in the source**. `ImageBlock`
    emits a `src={…}` placeholder — keep your real `import`ed `src`.
-5. Turn LAYOUT off (or just leave dev) and verify the slide looks right.
+5. Turn ADJUST off (or just leave dev) and verify the slide looks right.
 
 > Key props (full list in the component headers): `x`/`y`/`width`/`height` (canvas
 > px), `name` (label + snippet comment), `grid` (snap step), `aspect`
@@ -459,11 +460,11 @@ Nothing to place: `SlideDeck` mounts `<Annotate>` once, like `Spotlight`. One pr
 ```
 
 - **The flag is DECK-wide, and there is deliberately no per-slide `annotate:`** to match
-  `layout: true`. That is the one thing to understand here. LAYOUT is an *authoring* aid, so
+  `adjust: true`. That is the one thing to understand here. ADJUST is an *authoring* aid, so
   the slide being authored has a real opinion about whether you should be dragging on it.
   The pen is a *speaker* tool — the slide you happen to be standing on when someone asks a
   question has no opinion about whether you may circle a word on it, and paging must not take
-  the pen out of your hand mid-answer. So the precedence is LAYOUT's **minus its slide tier**:
+  the pen out of your hand mid-answer. So the precedence is ADJUST's **minus its slide tier**:
   `pnpm dev` > sticky `?annotate` / `?annotate=off` > the deck's `annotate` prop > off. It
   lives in `src/lib/annotate/annotateAccessCore.ts` (pure, unit-tested). Offered is not
   active — the mode still starts **off**.
@@ -487,9 +488,9 @@ Nothing to place: `SlideDeck` mounts `<Annotate>` once, like `Spotlight`. One pr
   arrive and the band slides around under the cursor mid-swipe. `levelHighlight={false}` opts
   out.
 - **Anything clickable must out-rank the ink surface** (z-index 40). While armed it owns every
-  pointer on the canvas — which is why the ✎ ANNOTATE toggle and the pen's bar live *inside*
-  `Annotate` at 42/41, not in the deck's chrome cluster. Put a control under the surface and
-  the speaker can arm the pen but never put it down.
+  pointer on the canvas — which is why the whole top-centre tool bar (the ANNOTATE toggle
+  included) and the pen's own bar live *inside* `Annotate` at 42/41, above the surface. Put a
+  control under the surface and the speaker can arm the pen but never put it down.
 
 > Other props: `inkColors` (the swatches; `null` is the theme's own colour, so un-picked ink
 > follows a re-theme instead of freezing a hex), `penWidth` / `highlighterWidth`. Colours and
@@ -500,14 +501,14 @@ Nothing to place: `SlideDeck` mounts `<Annotate>` once, like `Spotlight`. One pr
 
 ### "Save this slide as an image (CAPTURE)"
 
-One prop, and a **CAPTURE** button appears in **ANNOTATE's top-centre flyout** — hover ANNOTATE
-and CAPTURE (and PRINT) slide out beside it. It downloads the current slide as a PNG. (CAPTURE is
-grouped with ANNOTATE/PRINT as the per-slide *output* tools; LAYOUT/SAVE/PRESENT stay in the
-top-right authoring cluster.) **PRINT** sits on ANNOTATE's other side and opens a small menu —
-This slide / This slide + notes (print in place; the notes toggle is a local override, no
-navigation), and Whole deck / + notes (a full nav to `/handout/<deck>.html`). The whole flyout is
-anchored to ANNOTATE (`$canAnnotate`): a deck must offer the pen to get PRINT/CAPTURE, which every
-real deck that wants them does.
+One prop, and a **CAPTURE** entry appears in the top-centre tool bar's **hamburger (☰) menu** —
+hover the ☰ at the bar's right end and OVERVIEW / CAPTURE / PRINT drop down. It downloads the
+current slide as a PNG. (The bar itself is `PRESENT │ ANNOTATE │ ADJUST SAVE │ ☰`: PRESENT and the
+ANNOTATE / ADJUST toggles sit in the open, while OVERVIEW / CAPTURE / PRINT — the *navigation and
+output* tools — live behind the hamburger.) **PRINT** opens a small submenu — This slide / This
+slide + notes (print in place; the notes toggle is a local override, no navigation), and Whole
+deck / + notes (a full nav to `/handout/<deck>.html`). CAPTURE only appears when the deck offers it
+(`capture`), and the whole bar is hidden under `?clean` / `?present`.
 
 ```svelte
 <SlideDeck {pages} capture captureScale={2} />
@@ -614,7 +615,7 @@ pnpm build && utils/capture-slides.sh --og && pnpm build
   owns. The rules that make that safe: **it never overwrites an `image` an author set by hand**,
   it invents no URL for a PNG that does not exist, it is idempotent, and anything it cannot
   confidently place it *leaves alone and reports* — the same bargain `patchSource.ts` makes for
-  LAYOUT's SAVE. `--no-wire` writes the PNGs only.
+  ADJUST's SAVE. `--no-wire` writes the PNGs only.
 - It **refuses to wire when a slide failed to capture**, and the script exits non-zero so the
   deploy fails with it: a card pointing at a blank PNG is worse than no card at all, and the
   failure is silent (a blank slide still yields a perfectly plausible PNG).
@@ -622,7 +623,7 @@ pnpm build && utils/capture-slides.sh --og && pnpm build
 ### "Draw a diagram / connect these boxes with arrows"
 
 Don't compute arrow coordinates. Give each box a **`name`** and let **`Connector`** route
-between them — then a LAYOUT-mode drag moves the box *and* its arrows together.
+between them — then a ADJUST-mode drag moves the box *and* its arrows together.
 
 ```svelte
 <Block name="api" x={200} y={400} width={280} height={140}>API</Block>
@@ -776,10 +777,10 @@ vanishes). The convention, on the component's root element:
   `inset*` and `position` are **reserved**: a declaration for one of them in `style` is *stripped*
   before the style is applied. Otherwise it would land in the same declaration block as the box's own
   geometry, where the last declaration simply wins — and `style="left: 40px"` would cancel `x={200}`
-  outright, leaving LAYOUT dragging a box that cannot move. `style` is for **cosmetics** (stroke, dash,
+  outright, leaving ADJUST dragging a box that cannot move. `style` is for **cosmetics** (stroke, dash,
   colour, a decorative `rotate()`); those still pass through and still win, untouched. Reserving
   changes what *renders*, never what you *wrote*: your source `style` is echoed back verbatim by
-  Copy/Save, and LAYOUT-mode chrome badges the dead declaration so you know to delete it. The rule
+  Copy/Save, and ADJUST-mode chrome badges the dead declaration so you know to delete it. The rule
   lives in `src/lib/layout/styleGuardCore.ts` (pure, unit-tested); a new draggable reuses `guardStyle()`
   rather than re-deriving the list.
 
@@ -810,11 +811,11 @@ vanishes). The convention, on the component's root element:
   diagnose. Svelte's scoped styles do **not** protect you: scoping adds a hash class, it does not stop
   a global selector from matching the class you wrote. Pick any other name (`.cue`, `.caption`); the
   `state-demo.html` slide uses `.cue` for exactly this reason.
-- **LAYOUT mode's `?layout` opt-in is sticky and global, not per-deck.** Once `?layout`
-  is seen on a built site, it's saved to `localStorage` and the LAYOUT control then
-  shows on **every deck on that origin** until `?layout=off`; the on/off toggle state
+- **ADJUST mode's `?adjust` opt-in is sticky and global, not per-deck.** Once `?adjust`
+  is seen on a built site, it's saved to `localStorage` and the ADJUST control then
+  shows on **every deck on that origin** until `?adjust=off`; the on/off toggle state
   is one global flag too. So "I enabled it on one slide and now it's everywhere" is
-  expected, not a bug. The flag isn't stripped from the URL, so a shared `?layout`
+  expected, not a bug. The flag isn't stripped from the URL, so a shared `?adjust`
   link also enables it for the recipient (harmless — nothing is ever saved). In
   `pnpm dev` it's always available regardless. See `src/lib/stores/layoutMode.ts`.
 - **No `pnpm install` purge in CI sandboxes.** If `pnpm install` wants to wipe `node_modules`, prefer

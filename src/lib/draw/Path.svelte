@@ -25,13 +25,13 @@
   fixed-count polyline (drawCore.sampleMultiPath) that morphs smoothly. The
   static (no-CSS) render still uses the exact multiPath, and prerenders.
 
-  LAYOUT-mode editing (like Line/Curve/Arc): every vertex grows a handle — the
+  ADJUST-mode editing (like Line/Curve/Arc): every vertex grows a handle — the
   `start`, each segment's `to`, a control handle per Bézier control point, an
   accent bend handle at each arc's apex; when animating, one handle per stop
   pose instead. Drag to reshape, then Copy the whole `<Path start=… segments=…>`
   tag (with `stops`/`animate`) back over the source. Edits are finder state
   (reset on reload; Copy → paste / dev "Save" is the only persistence) and every
-  completed drag records to the LAYOUT undo/redo.
+  completed drag records to the ADJUST undo/redo.
 
   All geometry math is in drawCore.ts (pure, NaN-safe); this component is only
   $derived wiring and SVG markup.
@@ -39,7 +39,7 @@
 <script lang="ts">
 	import { getContext, onDestroy, untrack } from 'svelte';
 	import { browser } from '$app/environment';
-	import { record } from '$lib/stores/layoutHistory';
+	import { record } from '$lib/stores/adjustHistory';
 	import DrawHandle from './DrawHandle.svelte';
 	import {
 		fmtNum,
@@ -99,7 +99,7 @@
 		/** Geometry keyframes: the whole path's pose per percent, morphed over
 		 *  `animate` seconds. Needs ≥2 geometry stops; takes precedence over
 		 *  `draw`. The base start/segments should match the 0% stop (the
-		 *  static/no-CSS fallback and the LAYOUT-editing geometry). */
+		 *  static/no-CSS fallback and the ADJUST-editing geometry). */
 		stops?: PathStop[];
 		/** Seconds for one pass through `stops` (ease-in-out, fill both). */
 		animate?: number;
@@ -140,7 +140,7 @@
 		class: klass = ''
 	}: Props = $props();
 
-	// LAYOUT-mode editing overrides: the editor is a coordinate FINDER — drags
+	// ADJUST-mode editing overrides: the editor is a coordinate FINDER — drags
 	// mutate these locals (reset on reload), never the props; Copy → paste is
 	// the only persistence.
 	let liveStart = $state<Point | null>(null);
@@ -332,7 +332,7 @@
 		return parts.length ? ` animation: ${parts.join(', ')};` : '';
 	});
 
-	// --- LAYOUT-mode editing chrome ------------------------------------------
+	// --- ADJUST-mode editing chrome ------------------------------------------
 	const ctx = getContext<DrawContext | undefined>(DRAW_CONTEXT_KEY);
 	const editing = $derived(ctx?.editing ?? false);
 
@@ -881,7 +881,7 @@
 			opacity: 1;
 		}
 	}
-	/* Editing chrome (LAYOUT mode only): the hit stroke re-enables pointer
+	/* Editing chrome (ADJUST mode only): the hit stroke re-enables pointer
 	   events on just this shape's stroke; the glow marks the selected shape;
 	   the guide connects a Bézier control point to the endpoint it steers. */
 	.draw-hit {

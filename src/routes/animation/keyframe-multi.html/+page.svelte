@@ -17,7 +17,7 @@
   SpriteStudio slot on its own. To fly a shape as a Sprite you hand it a COMPLETE
   little <svg> as the slot. The tighter many-objects-on-one-timeline path is
   instead ONE <Draw> with several <Sprite>s (see the "Sprites × Many" slide) —
-  one AnimationBar governing every sprite, with per-sprite LAYOUT editing.
+  one AnimationBar governing every sprite, with per-sprite ADJUST editing.
 
   ONE CAVEAT WORTH SEEING: each SpriteStudio also bundles an <AnimationBar/>, and
   that bar defaults to scope `.content` — the whole slide. So the three bars overlap
@@ -26,7 +26,7 @@
   That shared-timeline behaviour is exactly what one <Draw> + <Sprite>s makes
   first-class (one bar, on purpose) — the point of the "Sprites × Many" slide.
 
-    1. Open with `?layout` (or toggle LAYOUT, top-right, in dev).
+    1. Open with `?adjust` (or toggle ADJUST, top-right, in dev).
     2. Click an object, drag its ghosts to re-pose it; swing a grip to rotate.
     3. Each panel: edit %, L/T/W/H/R + easing, +keyframe, ✕, Copy.
 -->

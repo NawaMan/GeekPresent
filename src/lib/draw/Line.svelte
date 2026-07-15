@@ -11,12 +11,12 @@
   head's tip lands exactly on `to` (or `from` for arrow="start"). Inline
   polygons inherit the shape's color reliably everywhere.
 
-  LAYOUT-mode editing (Phase 3): with the deck's LAYOUT control on, each
+  ADJUST-mode editing (Phase 3): with the deck's ADJUST control on, each
   endpoint grows a drag handle (Shift snaps to H/V/45° relative to the other
   endpoint, `grid` quantizes) and clicking the stroke or a handle selects
   the shape into Draw's Copy toolbar. Edits are local finder state — Copy →
   paste is the only persistence — and every completed gesture records to
-  the global LAYOUT undo/redo.
+  the global ADJUST undo/redo.
 
   All geometry math lives in drawCore.ts (pure, NaN-safe); this component is
   only $derived wiring and SVG markup.
@@ -29,7 +29,7 @@
 <script lang="ts">
 	import { getContext, onDestroy, untrack } from 'svelte';
 	import { browser } from '$app/environment';
-	import { record } from '$lib/stores/layoutHistory';
+	import { record } from '$lib/stores/adjustHistory';
 	import DrawHandle from './DrawHandle.svelte';
 	import {
 		fmtNum,
@@ -80,7 +80,7 @@
 		 *  prerenders and AnimationBar scrubs it; arrowheads and labelText ride
 		 *  along via transform keyframes. Needs ≥2 stops; takes precedence over
 		 *  `draw`. The base from/to should match the 0% stop (they're the
-		 *  static/no-CSS fallback and the LAYOUT-editing geometry). */
+		 *  static/no-CSS fallback and the ADJUST-editing geometry). */
 		stops?: LineStop[];
 		/** Seconds for one pass through `stops` (ease-in-out, fill both). */
 		animate?: number;
@@ -121,7 +121,7 @@
 		class: klass = ''
 	}: Props = $props();
 
-	// LAYOUT-mode editing overrides: the editor is a coordinate FINDER — drags
+	// ADJUST-mode editing overrides: the editor is a coordinate FINDER — drags
 	// mutate these locals (reset on reload), never the props; Copy → paste into
 	// the source is the only persistence. Geometry stops are editable too.
 	let liveFrom = $state<Point | null>(null);
@@ -292,7 +292,7 @@
 		return parts.length ? ` animation: ${parts.join(', ')};` : '';
 	});
 
-	// --- LAYOUT-mode editing chrome ------------------------------------------
+	// --- ADJUST-mode editing chrome ------------------------------------------
 	const ctx = getContext<DrawContext | undefined>(DRAW_CONTEXT_KEY);
 	const editing = $derived(ctx?.editing ?? false);
 
@@ -581,7 +581,7 @@
 {#snippet chrome()}
 	<!-- The handles, wrapped so <Draw> can re-parent them whole into its top
 	     layer once this shape is selected (select-to-front). Rendered inline in
-	     the shape's own <g> until then. Never outside LAYOUT mode. -->
+	     the shape's own <g> until then. Never outside ADJUST mode. -->
 	<g class="draw-chrome" data-shape={name || 'Line'}>
 		{#if !fromAnimated}
 			<DrawHandle selected={isSelected}
@@ -674,7 +674,7 @@
 			opacity: 1;
 		}
 	}
-	/* Editing chrome (LAYOUT mode only): the hit stroke re-enables pointer
+	/* Editing chrome (ADJUST mode only): the hit stroke re-enables pointer
 	   events on just this shape's stroke; the glow marks the selected shape. */
 	.draw-hit {
 		fill: none;

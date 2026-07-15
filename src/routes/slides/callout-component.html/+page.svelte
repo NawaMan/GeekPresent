@@ -34,7 +34,7 @@
 </ContentPage>
 
 <!-- The four kinds, each wrapped in a Block so the author can place/resize them in
-     LAYOUT mode (readers just see them fixed). Block fills its content, so the
+     ADJUST mode (readers just see them fixed). Block fills its content, so the
      callout stretches to whatever shape you drag the box into. -->
 <Block name="info"   x={820}  y={250} width={520} height={170} grid={10}>
 	<Callout kind="info">
@@ -57,6 +57,6 @@
 	</Callout>
 </Block>
 
-<Hint text="Flip LAYOUT (top-right) to drag & resize any callout" />
+<Hint text="Flip ADJUST (top-right) to drag & resize any callout" />
 
 <ViewSource {source} {path} />

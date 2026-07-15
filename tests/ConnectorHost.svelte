@@ -1,5 +1,5 @@
 <!-- Connector fixture: two named Blocks and an arrow between them. The test
-     moves a Block (the same thing a LAYOUT-mode drag does) and asserts the
+     moves a Block (the same thing a ADJUST-mode drag does) and asserts the
      arrow re-routes to follow it. -->
 <script lang="ts">
 	import Block from '../src/lib/components/Block.svelte';

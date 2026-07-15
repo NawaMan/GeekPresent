@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { guardStyle } from '../src/lib/layout/styleGuardCore';
+import { guardStyle } from '../src/lib/adjust/styleGuardCore';
 
 describe('guardStyle — the props own the geometry', () => {
 	it('strips a reserved property and reports it', () => {

@@ -44,7 +44,7 @@
 </ContentPage>
 
 <!-- A live build on the right: the base line shows immediately, each Fragment
-     arrives on the next Space. Parked in a Block so it can be placed in LAYOUT mode. -->
+     arrives on the next Space. Parked in a Block so it can be placed in ADJUST mode. -->
 <Block name="demo" x={900} y={250} width={900} height={560} grid={10}>
 	<Steps transition="fly">
 		<div style="font-size: 1.35em; line-height: 1.6em;">

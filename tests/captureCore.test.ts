@@ -64,9 +64,8 @@ describe('CHROME_SELECTOR — the ink stays, the pen goes', () => {
 		const el = frag(`
 			<svg class="annot-surface"><path class="annot-stroke" d="M 0 0 L 9 9"/></svg>
 			<div class="annot-bar no-print">PEN</div>
-			<button class="annot-toggle no-print">ANNOTATE</button>
+			<div class="annot-tools no-print">PRESENT · ANNOTATE · ADJUST · OVERVIEW · CAPTURE · PRINT</div>
 			<div class="annot-stale no-print">old ink</div>
-			<div class="slide-chrome gp-chrome no-print">LAYOUT</div>
 			<p>slide content</p>
 		`);
 		el.querySelectorAll(CHROME_SELECTOR).forEach((n) => n.remove());
@@ -76,9 +75,8 @@ describe('CHROME_SELECTOR — the ink stays, the pen goes', () => {
 		expect(el.querySelector('p')).toBeTruthy();
 
 		expect(el.querySelector('.annot-bar')).toBeNull();
-		expect(el.querySelector('.annot-toggle')).toBeNull();
+		expect(el.querySelector('.annot-tools')).toBeNull();
 		expect(el.querySelector('.annot-stale')).toBeNull();
-		expect(el.querySelector('.slide-chrome')).toBeNull();
 	});
 
 	it('matches the live elements whose bitmaps a clone would drop', () => {

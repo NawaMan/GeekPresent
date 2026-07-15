@@ -15,7 +15,7 @@
 
   The surface never eats input: pointer-events none, so a full-canvas Draw
   never blocks clicks, drags, or text selection on content beneath it.
-  (Phase 3 re-enables pointer events only on editing chrome, only in LAYOUT.)
+  (Phase 3 re-enables pointer events only on editing chrome, only in ADJUST.)
 
   Accessibility: role="img" with a required `title` (→ <title>) and optional
   `description` (→ <desc>); purely decorative surfaces opt out with
@@ -31,12 +31,12 @@
 	import { browser } from '$app/environment';
 	import Block from '$lib/components/Block.svelte';
 	import {
-		layoutChanges,
+		adjustChanges,
 		nextDrawInstanceId,
 		reportShapeChanges,
 		withdrawShapeChanges
-	} from '$lib/stores/layoutChanges';
-	import { canLayout, layoutMode } from '$lib/stores/layoutMode';
+	} from '$lib/stores/adjustChanges';
+	import { canAdjust, adjustMode } from '$lib/stores/adjustMode';
 	import { trackPointer } from '$lib/utils/drag';
 	import {
 		DRAW_CONTEXT_KEY,
@@ -84,14 +84,14 @@
 		class: klass = ''
 	}: Props = $props();
 
-	// LAYOUT-mode editing (Phase 3): shapes read this gate + selection surface
-	// from context. canLayout keeps the published deck inert even if a stale
-	// layoutMode=true lingers in localStorage — same rule as Block.
+	// ADJUST-mode editing (Phase 3): shapes read this gate + selection surface
+	// from context. canAdjust keeps the published deck inert even if a stale
+	// adjustMode=true lingers in localStorage — same rule as Block.
 	// When nested inside a <Sprite> group, a Draw edits only while the group is
 	// ISOLATED (double-clicked), so its chrome never lingers on the flying box.
 	// A top-level Draw sees no isolation provider and edits normally.
 	const iso = getContext<SpriteIsolation | undefined>(SPRITE_ISOLATION_KEY);
-	const editing = $derived($canLayout && $layoutMode && (iso ? iso.entered : true));
+	const editing = $derived($canAdjust && $adjustMode && (iso ? iso.entered : true));
 	// $state.raw: shapes check `ctx.selected === editor` by identity, so the
 	// stored editor must not be wrapped in a reactive proxy.
 	let selected = $state.raw<ShapeEditor | null>(null);
@@ -263,14 +263,14 @@
 			.filter((s) => s.dirty)
 			.sort((a, b) => a.id - b.id)
 	);
-	const dirtyBlocks = $derived([...$layoutChanges.values()].filter((e) => e.dirty));
+	const dirtyBlocks = $derived([...$adjustChanges.values()].filter((e) => e.dirty));
 	const dirtyAll = $derived([...dirtyShapes, ...dirtyBlocks]);
 
 	// Publish this Draw's shapes (curves/lines/arcs/boxes) to the page-level shape
 	// registry so the top-right "Save" writes them too — they can't ride the
 	// geometry registry (a Curve has no box), so they carry their whole old/new
 	// opening tag for a literal source replacement. Keyed per Draw instance; the
-	// registry is separate from layoutChanges, so dirtyShapes above never reads
+	// registry is separate from adjustChanges, so dirtyShapes above never reads
 	// these back and double-counts. onDestroy clears them when the slide unmounts.
 	const drawInstance = nextDrawInstanceId();
 	$effect(() => {
@@ -369,7 +369,7 @@
 </svg>
 
 {#if editing}
-	<!-- LAYOUT-mode editing Blocks for the box-geometry shapes: rendered as
+	<!-- ADJUST-mode editing Blocks for the box-geometry shapes: rendered as
 	     HTML siblings of the svg (same canvas coordinates — Draw must be a
 	     direct child of the slide, like a bare Block), two-way bound so the
 	     svg shape follows every drag. Block supplies move/resize/aspect/grid/
@@ -574,7 +574,7 @@
 		   cascade into the svg); --draw-font-size feeds Phase 2 labels. */
 		font-size: var(--draw-font-size, 32px);
 	}
-	/* In LAYOUT mode the whole surface lifts above the HTML editing chrome
+	/* In ADJUST mode the whole surface lifts above the HTML editing chrome
 	   (Blocks/ghosts have no z-index) so handles and hit strokes always win
 	   the pointer — otherwise a Block or a KeyframeStudio ghost sitting on a
 	   shape (e.g. a ghost stop centered on a curve endpoint) makes the
@@ -586,7 +586,7 @@
 		z-index: 60;
 	}
 
-	/* Floating Copy toolbar (LAYOUT mode, selected shape only) — the
+	/* Floating Copy toolbar (ADJUST mode, selected shape only) — the
 	   KeyframeStudio panel look. */
 	.draw-toolbar {
 		position: absolute;

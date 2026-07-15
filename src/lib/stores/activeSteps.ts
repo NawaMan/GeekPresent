@@ -10,7 +10,7 @@ import { writable } from 'svelte/store';
 // Steps sits inside the slide's content while NavigationBar is rendered by the
 // page template (ContentPage/TitlePage) — they are SIBLINGS, so Svelte context
 // can't reach from one to the other. This module-level store is the bridge, the
-// same trick selectedBlock uses for the LAYOUT-mode selection.
+// same trick selectedBlock uses for the ADJUST-mode selection.
 //
 // A Steps with keyboard stepping on (keys='global') registers itself here and
 // keeps `hasNext` in sync as the build advances; NavigationBar reads it to enable

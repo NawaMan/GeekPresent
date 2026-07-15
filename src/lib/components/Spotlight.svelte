@@ -5,7 +5,7 @@
   so no slide has to place it. It is inert until something sets the `highlightTarget`
   store: then it looks that name up in the SAME blockAnchors registry a <Connector>
   resolves against, dims the rest of the canvas, and rings the named Block's box —
-  so the spotlight follows the box even as it is dragged in LAYOUT mode, and needs
+  so the spotlight follows the box even as it is dragged in ADJUST mode, and needs
   not one coordinate authored.
 
   What SETS the store is usually a <Note> line carrying `data-highlight="db"`: as the
