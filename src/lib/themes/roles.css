@@ -61,6 +61,10 @@
 	--toc-fg:            var(--INK, #111111);
 	--toc-border:        var(--LINE, #CCCCCC);
 	--toc-row-hover-bg:  var(--LINE, #DDDDDD);
+	/* The current slide's row — a tint of the deck accent over the light panel, with the
+	   accent itself as the ink. color-mix keeps it a wash whatever the theme's accent. */
+	--toc-current-bg:    color-mix(in srgb, var(--ACCENT, #2980B9) 20%, var(--toc-bg, #EEEEEE));
+	--toc-current-fg:    var(--ACCENT, #2980B9);
 
 	/* Deck overview — the all-slides grid (OverviewPage.svelte). A near-opaque scrim over
 	   the canvas, so the tiles (which are the real slides) carry the colour and the
@@ -317,6 +321,13 @@
 	--tooltip-bg:        var(--INK, #000000);
 	--tooltip-fg:        var(--PAPER, #FFFFFF);
 
+	/* Progress bar (ProgressBar.svelte) — the "how far through the deck" bar. The fill
+	   is the deck accent; the track is a translucent wash of that same fill, so it reads
+	   over a light surface and a dark one alike without a second token to keep in step.
+	   Fallbacks are the dark default. */
+	--progress-fill:     var(--ACCENT, #2980B9);
+	--progress-track:    color-mix(in srgb, var(--progress-fill) 20%, transparent);
+
 	/* ── METRICS (non-colour) ──────────────────────────────────────────────────
 	   Sizes and spacing a theme may legitimately want to move. Same contract as
 	   the colours: these values reproduce the stock look, and a component's own
@@ -336,4 +347,7 @@
 
 	/* Timeline: vertical space between events. A per-Timeline `gap` prop overrides it. */
 	--timeline-gap:       1.6em;
+
+	/* Progress bar: its thickness (ProgressBar.svelte). */
+	--progress-height:    6px;
 }

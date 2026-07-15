@@ -10,6 +10,38 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
 
 ## Tier 1 — closes clear gaps
 
+- [x] **Progress API for slides — "which page of how many"** — let a slide's own JS/TS read the deck's
+      full slide list and its own position, demoed with a progress bar along the bottom of `geeklight`.
+  - Done: `getProgress()` in `src/lib/presentation.ts` (the reactive companion to the existing
+    `getPages()`), the pure/total/NaN-safe maths in `src/lib/utils/progressCore.ts`
+    (`tests/progressCore.test.ts`, 7), the `src/lib/components/ProgressBar.svelte` component
+    (`tests/ProgressBar.test.ts` DOM 4, `tests/ProgressBarSsr.ssr.test.ts` SSR 1, with
+    `tests/ProgressBarHost.svelte` / `tests/ProgressBarSsrHost.svelte`), the `--progress-fill` /
+    `--progress-track` / `--progress-height` role tokens in `src/lib/themes/roles.css`, and the demo
+    wiring in `src/routes/geeklight/+layout.svelte`.
+  - **Half of it already existed, and the new half stayed small because of it.** `getPages()` already
+    published the whole slide list into every slide via context, and `visiblePages` / `getPageNavigation`
+    (`src/lib/utils/navigate.ts`) already defined the linear (hidden-appendix-excluded) order. What was
+    missing was the *position*: a slide had the list but no clean way to know which entry was itself. So
+    `getProgress()` is a five-line `derived(page, …)` over `progressOf()` — the deck shell publishes
+    nothing new; the slide combines the list it already has with the live route.
+  - **The arithmetic is a pure core, so it degrades instead of throwing.** `progressOf(pages, path)`
+    guards a non-array `pages`, junk elements, and a non-string `path` — all fall through to a
+    `present:false` result, never `NaN%`. `currentSlidePath()` factors out the exact last-segment
+    derivation `SlideDeck` uses for `currentSlide`, so the bar and the shell can't disagree about which
+    slide we're on. Both are unit-tested directly against the core (single-slide deck reads 1/1, an
+    off-list route reads present:false).
+  - **Settled the open question: count VISIBLE slides only, and hide the bar off the march.** `progressOf`
+    runs the list through `visiblePages`, so a hidden appendix neither inflates the denominator nor lights
+    the bar — on an appendix `present` is false and `ProgressBar` renders nothing, rather than showing a
+    stale or empty bar. `fraction` is `position / total` (1-based over the visible count), so the title
+    slide reads 1/6 = 16.7% and the last reads 100% — verified in the prerendered `docs/geeklight/*.html`,
+    so it works without JS.
+  - Colours come from `roles.css`: the fill is the deck `--ACCENT`, the track a `color-mix` wash of that
+    same fill, so it reads on the light `geeklight` surface and the dark main deck alike without a second
+    token to keep in step. Tagged `gp-chrome no-print` in the demo, so it retires from a PNG capture and a
+    printout with the rest of the chrome.
+
 - [x] **Capture a slide as a PNG** — a CAPTURE button that downloads the current slide, ink and all.
   - Done: `src/lib/capture/captureCore.ts` (pure, total — the strip/refuse/name/XML decisions) and
     `src/lib/capture/captureSlide.ts` (the impure half: CSS + font + image inlining, the

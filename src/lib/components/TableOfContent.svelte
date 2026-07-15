@@ -6,8 +6,10 @@
 	import { onDestroy } from 'svelte';
 	import { writable }  from 'svelte/store';
 
+	import { page } from '$app/stores';
 	import { visiblePages } from '$lib/utils/navigate';
 	import type { Page } from '$lib/utils/navigate';
+	import { currentSlidePath } from '$lib/utils/progressCore';
 	import { searchDocs, type SearchDoc } from '$lib/utils/searchCore';
 	import { deckSearchDocs } from '$lib/utils/searchIndex';
 
@@ -30,6 +32,11 @@
 	// than at the call site keeps every deck's TOC honest without each one
 	// remembering to do it.
 	$: listed = visiblePages(pages);
+
+	// Which listed slide is the one on screen — so the TOC can mark it. The same
+	// last-segment derivation SlideDeck uses for `currentSlide`, factored into
+	// progressCore, so the highlight and the deck can't disagree about where we are.
+	$: currentPath = currentSlidePath($page.url.pathname);
 
 	// Search covers exactly what the TOC lists (the linear deck; appendices stay
 	// out, same as the list). Text comes from the build-time index keyed by deck +
@@ -89,6 +96,14 @@
 	function focusOnMount(node: HTMLInputElement) {
 		node.focus();
 	}
+	// Bring the highlighted (current) row into view when the menu opens — a deck deep
+	// past the fold would otherwise hide the very mark this adds. `nearest` scrolls the
+	// list, not the page.
+	function scrollActiveIntoView(node: HTMLElement, active: boolean) {
+		if (active && typeof node.scrollIntoView === 'function') {
+			node.scrollIntoView({ block: 'nearest' });
+		}
+	}
 	function handleClickOutside(event: MouseEvent) {
 		if (tocRef && !tocRef.contains(event.target as Node)) {
 			turnOffTableOfContent();
@@ -115,40 +130,52 @@
 
 	{#if $isContentVisible}
 	<div class="content">
-		{#if article}
-		<div id="article"><a href={articleHref}>{articleText}</a></div>
-		{/if}
-		<input
-			class="search"
-			type="search"
-			placeholder="Search slides…"
-			aria-label="Search slides"
-			bind:value={query}
-			on:keydown={handleSearchKeydown}
-			use:focusOnMount
-		/>
-		{#if searching}
-			{#if hits.length}
-			<ol class="results" aria-label="Search results">
-				{#each hits as { path, title, snippet }}
-					<li>
-						<a href={`./${path}`}>
-							<span class="hit-title">{title}</span>
-							{#if snippet}<span class="snippet">{snippet}</span>{/if}
-						</a>
+		<!-- The head stays put; only the list beneath it scrolls, so the search box is
+		     always reachable no matter how far down the results run. -->
+		<div class="head">
+			{#if article}
+			<div id="article"><a href={articleHref}>{articleText}</a></div>
+			{/if}
+			<input
+				class="search"
+				type="search"
+				placeholder="Search slides…"
+				aria-label="Search slides"
+				bind:value={query}
+				on:keydown={handleSearchKeydown}
+				use:focusOnMount
+			/>
+		</div>
+		<div class="scroll">
+			{#if searching}
+				{#if hits.length}
+				<ol class="results" aria-label="Search results">
+					{#each hits as { path, title, snippet }}
+						<li class:current={path === currentPath}>
+							<a href={`./${path}`} aria-current={path === currentPath ? 'page' : undefined}>
+								<span class="hit-title">{title}</span>
+								{#if snippet}<span class="snippet">{snippet}</span>{/if}
+							</a>
+						</li>
+					{/each}
+				</ol>
+				{:else}
+				<p class="no-matches" role="status">No slides match “{query.trim()}”.</p>
+				{/if}
+			{:else}
+			<ol>
+				{#each listed as { path, title }}
+					<li class:current={path === currentPath}>
+						<a
+							href={`./${path}`}
+							aria-current={path === currentPath ? 'page' : undefined}
+							use:scrollActiveIntoView={path === currentPath}
+						>{title}</a>
 					</li>
 				{/each}
 			</ol>
-			{:else}
-			<p class="no-matches" role="status">No slides match “{query.trim()}”.</p>
 			{/if}
-		{:else}
-        <ol>
-            {#each listed as { path, title }}
-                <li><a href={`./${path}`}>{title}</a></li>
-            {/each}
-        </ol>
-		{/if}
+		</div>
 	</div>
 	{/if}
 </div>
@@ -175,25 +202,54 @@
 
 	.toc .content {
 		/* cosmetic */
-		padding-left: 2em; /* The number will take some space so we have to prepare extra space. */
-		padding-right: 1em;
-		padding-top: 0em;
-		padding-bottom: 0em;
+		/* No horizontal padding here: the number gutter has to live INSIDE the scrolling
+		   box, or its overflow clips the ol's hanging markers on the left (which is how the
+		   page numbers went missing). The head and the list own their own insets instead. */
+		padding: 0;
 		margin: 0em;
 		margin-left: 0.2em;
 		border: 1.5px solid var(--toc-border, #CCCCCC);
 		border-radius: 3px;
 		color: var(--toc-fg, #111111);
 		background-color: var(--toc-bg, #EEEEEE);
-		/* Scroll the list when it's taller than the space the flex column leaves;
-		   min-height:0 lets this flex child shrink below its content height. */
+		/* A flex column so the head (article link + search box) stays put while only the
+		   list beneath it scrolls. min-height:0 lets this flex child shrink below its
+		   content height; the panel itself never scrolls — its .scroll child does. */
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+		overflow: hidden;
+	}
+
+	/* The pinned part: search box (and the optional article link). It never scrolls,
+	   so the box is always reachable however long the list gets. */
+	.toc .content .head {
+		flex: none;
+		padding: 0 1em;
+	}
+
+	/* The scrolling part: the slide list or the search results. Only a right inset here,
+	   to keep the scrollbar off the text; the left number gutter is on the <ol> below. */
+	.toc .content .scroll {
+		flex: 1 1 auto;
 		min-height: 0;
 		overflow-y: auto;
+		padding-right: 0.6em;
 	}
 
 	.toc .content ol {
 		/* cosmetic */
 		padding: 0px;
+	}
+
+	/* The numbered slide list keeps its number gutter as padding on the <ol> itself, so
+	   the markers hang inside the scrolling box and survive its overflow clip. */
+	.toc .content .scroll > ol:not(.results) {
+		padding-left: 2em;
+	}
+	/* Results have no numbers (list-style:none); a small inset aligns them under the box. */
+	.toc .content ol.results {
+		padding-left: 0.8em;
 	}
 
 	a {
@@ -209,6 +265,19 @@
 	#article:hover,
 	.toc .content ol li:hover {
 		background-color: var(--toc-row-hover-bg, #DDDDDD);
+	}
+
+	/* The slide you're on, marked in the list so the TOC doubles as a "you are here".
+	   A tint of the deck accent over the panel, with the accent as the row's ink. */
+	.toc .content ol li.current {
+		background-color: var(--toc-current-bg, #CFE3F5);
+	}
+	.toc .content ol li.current > a {
+		color: var(--toc-current-fg, #0B3A63);
+		font-weight: 600;
+	}
+	.toc .content ol li.current:hover {
+		background-color: var(--toc-current-bg, #CFE3F5);
 	}
 
 	/* Filter box. The TOC is a light chrome panel whatever the deck theme, so the

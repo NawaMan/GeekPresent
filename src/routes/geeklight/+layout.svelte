@@ -6,6 +6,7 @@
 -->
 <script lang="ts">
 	import SlideDeck       from '$lib/components/SlideDeck.svelte';
+	import ProgressBar     from '$lib/components/ProgressBar.svelte';
 	import { deck, pages } from './pages';
 	import { setPages }    from '$lib/presentation';
 
@@ -37,3 +38,8 @@
 >
 	<slot />
 </SlideDeck>
+
+<!-- A "how far through the deck" bar along the bottom, demonstrating getProgress(): it
+     reads the same slide list setPages() published above, so it needs no props. Tagged
+     gp-chrome/no-print so it bows out of a capture and a printout with the rest of the chrome. -->
+<ProgressBar class="gp-chrome no-print" />

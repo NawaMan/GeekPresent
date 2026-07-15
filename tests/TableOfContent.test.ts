@@ -2,6 +2,7 @@ import { render, screen, cleanup, fireEvent } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 import TableOfContent from '$lib/components/TableOfContent.svelte';
 import type { Page } from '$lib/utils/navigate';
+import { setPageUrl, resetPageUrl } from './stubs/app-stores';
 
 // The TOC lists the deck's LINEAR ORDER — the same one →/Space walk. So an appendix
 // marked `hidden` must not appear in it: a slide the forward march steps over is a
@@ -19,7 +20,10 @@ const deck: Array<Page> = [
 	{ path: 'thanks.html', title: 'Thanks' }
 ];
 
-afterEach(() => cleanup());
+afterEach(() => {
+	cleanup();
+	resetPageUrl();
+});
 
 /** The TOC is a popover: nothing is listed until its button is pressed. */
 async function open(pages: Array<Page>) {
@@ -50,5 +54,27 @@ describe('TableOfContent', () => {
 
 		const titles = screen.getAllByRole('link').map((a) => a.textContent);
 		expect(titles).toEqual(['Title', 'Appendix — Listed', 'Thanks']);
+	});
+
+	// The TOC doubles as a "you are here": the row for the slide on screen is marked,
+	// and only that one.
+	it('marks the current slide, and only it', async () => {
+		setPageUrl('/slides/listed.html');
+		await open(deck);
+
+		const current = screen.getByText('Appendix — Listed');
+		expect(current.getAttribute('aria-current')).toBe('page');
+		expect(current.closest('li')?.classList.contains('current')).toBe(true);
+
+		// No other row claims to be current.
+		expect(screen.getByText('Title').getAttribute('aria-current')).toBeNull();
+		expect(screen.getByText('Thanks').getAttribute('aria-current')).toBeNull();
+		expect([...document.querySelectorAll('li.current')]).toHaveLength(1);
+	});
+
+	it('marks nothing when the route is not one of the listed slides', async () => {
+		setPageUrl('/slides/off-list.html');
+		await open(deck);
+		expect(document.querySelector('li.current')).toBeNull();
 	});
 });
