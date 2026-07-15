@@ -23,13 +23,13 @@
   the window. Canvas space also means the grid inherits the deck's theme tokens.
 -->
 <script lang="ts">
-	import CtrlBtn from './CtrlBtn.svelte';
 
 	import { browser }   from '$app/environment';
 	import { onMount }   from 'svelte';
 	import { onDestroy } from 'svelte';
 
 	import { navigate } from '$lib/utils/deckNav';
+	import { overviewOpen } from '$lib/stores/overviewOpen';
 	import { getViewTransitions } from '$lib/presentation';
 	import { overviewPageTiles, tileScale, overviewPageKeyIntent, mountedTiles } from '$lib/utils/overviewPageCore';
 	import type { Page } from '$lib/utils/navigate';
@@ -44,7 +44,9 @@
 
 	const viewTransitions = getViewTransitions();
 
-	let open = false;
+	// Open state lives in a shared store so the OVERVIEW item in the tool flyout can drive it
+	// too, not just the `o` key. See stores/overviewOpen.
+
 
 	$: tiles = overviewPageTiles(pages, currentPath);
 	$: currentNumber = tiles.find((t) => t.isCurrent)?.number ?? 0;
@@ -111,15 +113,12 @@
 		for (const node of tileNodes.values()) observer.observe(node);
 	}
 
-	function toggle() {
-		open = !open;
-	}
 	function close() {
-		open = false;
+		overviewOpen.set(false);
 	}
 
 	function jump(path: string, number: number) {
-		open = false;
+		overviewOpen.set(false);
 		const direction = currentNumber > 0 && number < currentNumber ? 'back' : 'forward';
 		navigate(`./${path}`, { viewTransitions, kind: 'slide', direction });
 	}
@@ -128,10 +127,10 @@
 	// typing, not when the browser owns the chord) lives in overviewCore so the rule
 	// is stated once and testable without a DOM.
 	function handleGlobalKeydown(event: KeyboardEvent) {
-		const intent = overviewPageKeyIntent(event, open);
+		const intent = overviewPageKeyIntent(event, $overviewOpen);
 		if (intent === 'ignore') return;
 		event.preventDefault();
-		open = intent === 'open';
+		overviewOpen.set(intent === "open");
 	}
 
 	onMount(() => {
@@ -148,25 +147,19 @@
 	// The observer can only exist once the grid is in the DOM; tear it down on close
 	// so a shut grid holds no callbacks.
 	$: if (browser) {
-		if (open && gridRef) startObserver();
-		if (!open && observer) {
+		if ($overviewOpen && gridRef) startObserver();
+		if (!$overviewOpen && observer) {
 			observer.disconnect();
 			observer = undefined;
 		}
 	}
 </script>
 
-<div class="overview-page gp-chrome no-print" class:expanded={open}>
-	<CtrlBtn
-		chrome
-		text="OVERVIEW PAGE"
-		hoverText={open ? 'Close overview (Esc)' : 'All slides (O)'}
-		isSelected={open}
-		on:click={toggle}
-	/>
-</div>
-
-{#if open}
+<!-- OverviewPage has no button of its OWN — no third thing sitting in the corner competing with
+     the ToC for the eye. It opens with `O` (the shortcut a speaker who wants slide 40 already
+     reaches for) and, for the mouse, from the OVERVIEW item in ANNOTATE's tool flyout, which
+     drives the same `overviewOpen` store. Esc (or a click outside) closes it. -->
+{#if $overviewOpen}
 	<!-- The scrim covers the whole canvas. Clicking it (but not the grid) closes,
 	     the same "click outside dismisses" the ToC has. -->
 	<div
@@ -229,18 +222,6 @@
 {/if}
 
 <style>
-	/* The toggle. Sits under the ToC's button (which owns the top-left corner), so
-	   the two slide-list controls read as a pair. */
-	.overview-page {
-		/* functional */
-		position: absolute;
-		top: calc(var(--ctrl-top, 12px) + 2.1em);
-		left: 0px;
-		margin: 0px;
-		padding: 0px;
-		z-index: 40;
-	}
-
 	.scrim {
 		/* functional */
 		position: absolute;

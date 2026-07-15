@@ -616,31 +616,116 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
     retires the rest of the chrome: a tile must not build a slide list or arm a global `o`
     listener, and there are a dozen alive at once. It is also what stops a tile growing a grid of
     its own, recursively. `OverviewPageSsr.ssr.test.ts` pins the negative that follows — a shut grid
-    prerenders to a button and *no iframe*, so a 65-slide deck does not emit 65×65 frames.
-- [ ] **Handout — the whole deck as one printable document / PDF** — one page per slide, notes
+    prerenders *no iframe*, so a 65-slide deck does not emit 65×65 frames.
+  - **The toggle button is gone** (later change): the grid is `o` and Escape, and nothing else. A
+    deck's corner is not the place to advertise a shortcut, and the ToC already owns the "list of
+    slides" affordance — a second control beside it read as a competing one. A shut grid now
+    prerenders **no element at all**, which makes that negative true by construction rather than by
+    care, and `OverviewPageSsr.ssr.test.ts` says so.
+- [x] **Handout — the whole deck as one printable document / PDF** — one page per slide, notes
       optional, so `Ctrl+P → Save as PDF` exports the talk.
-  - Today there is no deck export at all. The *entire* print story is four lines
-    (`src/lib/styles/global.css:88`: `@media print { .no-print { display: none } }`) — repo-wide
-    there are zero hits for `@page`, `page-break`, `break-inside` or `window.print()`. Since each
-    slide is its own SvelteKit document, Ctrl+P prints **exactly one slide**, which is what
-    `README.md:433` actually promises. `utils/capture-slides.sh` emits PNG only (no
-    `--print-to-pdf`). Wanted for: leave-behinds, reviewers who want the deck in one file, and
-    conferences that ask for a PDF.
+  - Done: `src/routes/handout/[deck].html/` (the route: `+page.js` prerenders one per deck from
+    `entries()`, `+page.svelte` stacks them), with the arithmetic in
+    `src/lib/handout/handoutCore.ts` (pure, total — `drawCore`/`captureCore` discipline: a junk
+    canvas yields the 1920×1080 default, because every number here ends up inside a CSS
+    declaration and a printer handed `@page { size: NaNin }` does not ignore the rule, it falls
+    back to some other paper) and the build-time view of the tree in
+    `src/lib/handout/handoutDecks.ts` (the `pages.ts` glob of `seo/routes.ts:11`, taken one level
+    down to the slide *components*, so the handout cannot drift from the deck).
+    Demo/docs: `src/routes/slides/handout-page.html/`. Tests: `tests/handoutCore.test.ts`,
+    `tests/Handout.test.ts`, `tests/HandoutSsr.ssr.test.ts`.
+  - **`@page` is the whole trick, and CSS px are its unit.** A CSS pixel is *absolute* when
+    printing (96px = 1in, on every printer), so a 1920×1080 slide has a true printed size; and
+    `@page { size }` lets the SHEET take the slide's shape instead of the slide being letterboxed
+    onto A4. Scaling from the deck's LONGEST side is the one line that needs no special case: 16:9
+    prints edge-to-edge on 13.333in × 7.5in (the standard slide page — what a conference means by
+    "the deck as a PDF"), and `portrait` prints on its transpose, same maths. Verified end to end:
+    Chrome honours it — 66 pages at 960×540pt, and 540×960pt for portrait.
+  - **It is the only page in the project whose slides exist in the prerendered HTML**, and that is
+    the feature, not a detail: `SlideDeck` gates its slot on `initialized`, so a built slide is an
+    empty shell until the browser arrives. A document must not be. Hence the handout mounts no
+    shell — it publishes `setPages` itself and renders the components directly — and
+    `HandoutSsr.ssr.test.ts` pins the positive, since nothing else would notice it going blank.
+  - **Rendering slides for real surfaced a latent SSR bug**: `AppendixPage` read
+    `url.searchParams` during render, which SvelteKit forbids on a prerendered page. No slide had
+    ever been server-rendered, so it had never fired. Now `browser`-guarded.
+  - Settles both open questions. **Notes: a `?notes` flag**, and the two artifacts are genuinely
+    different paper — without it the sheet *is* the slide; with it the page grows 3in and the
+    slide keeps its size. Notes are always in the DOM and shown by a CLASS, so the prerendered and
+    hydrated markup agree. `Note` learned a third home (`getHandout()` in `presentation.ts`) and
+    the handout OVERRIDES the display mode rather than reading it — `displayMode` is persisted, so
+    a speaker who once zoomed a slide would otherwise carry SCALED into their handout.
+    **Embeds: refuse and name**, the CAPTURE bargain, reusing `captureCore.findBlockers` itself.
+    But scanned from the DOM rather than from the source, which corrected two guesses in this
+    entry: `YouTube` is a *thumbnail* until clicked, so it prints perfectly and must never be
+    refused; and `WebSite` mounts its iframe *lazily*, so a once-only scan finds a clean document
+    and then prints a hollow rectangle out of the middle of it — a `MutationObserver` watches for
+    embeds appearing as the reader scrolls.
+  - **A deck's SURFACE moved into `pages.ts`** (`export const deck = { width, height, baseFontSize,
+    deckClass, background, font }`), read by both its `+layout.svelte` and the handout. It had to:
+    the handout never mounts the layout, so props passed to `<SlideDeck>` there are invisible to
+    it — and a light deck (`geeklight`) would have printed on GeekPresent's black, a `portrait` at
+    two-thirds text size. Declared once, they cannot drift.
+  - **It RESERVES NO SLIDE NAME**, and that is why it lives at `/handout/<deck>.html` rather than
+    inside the deck. A deck is a folder of slides its author owns. The reason inside is tempting is
+    that a slide's links are relative (`./appendix-detail.html`, `../`), so from outside they would
+    all point into a directory that does not exist — a wall of 404s in the crawl. `<base
+    href="…/<deck>/">` is the mechanism built for exactly that, and SvelteKit's prerender crawler
+    honours it (`kit/src/core/postbuild/crawl.js` reads BASE), so the crawl walks into the real
+    slides. `.html` is not decoration either: a bare `/handout/slides` loads from a dumb static
+    host but the CLIENT ROUTER cannot match the url it lands on, and hydrates the document into
+    nothing — a blank page after a perfect prerender.
+  - Two things paper needed that the screen never did: `print-color-adjust: exact` (a browser does
+    not print background colours by default — a dark deck would print white text on white paper),
+    and the sheet clipping rather than the slide box, since `.canvas` is a faithful copy of
+    `SlideDeck`'s `.content` *including* its 50px bleed, which would otherwise widen the document
+    past the paper and make the printer shrink the whole deck to fit.
+  - **A HALF-INCH margin, and the slide centred in it** (`handoutCore.MARGIN_IN`). Not taste, and
+    it earns the half-inch three times over: a real printer cannot reach the edge of the paper, so
+    a full-bleed sheet is cropped or shrunk at the hardware's discretion; `@page { size }` is
+    honoured by Chrome and Edge but not by every engine — one that prints on A4 instead scales the
+    sheet to fit its width, and centred, the leftover splits evenly instead of all landing at the
+    bottom; and, the reason it is not the 0.25in it started at, **the margin is where the browser
+    draws its OWN header and footer**. Every engine prints the document title at the top of the
+    sheet and the page number at the bottom, inside the page margin, at a fixed inset from the
+    paper's edge — give it a quarter inch and it has nowhere to put them, so they land on top of
+    the slide. The sheet's long side stays the standard 13.333in and the SLIDE is inset within it,
+    so the margin comes out equal on all four sides.
+  - **The scale is derived FROM the printed box, not the box from the scale** — and it reads
+    backwards for a reason. Rounding the scale first (0.666650 → 0.6667) and multiplying back made
+    the canvas 1280.064px against 1279.968px of paper: a tenth of a pixel of overhang, invisible
+    everywhere except in a PDF, and enough for a printer to call it an overflow and shrink the deck.
+  - **The `@page` rule cannot live in `<svelte:head>`** (`handout/pageRuleDom.ts`). An `{@html}`
+    there is server-rendered and then ADOPTED unchanged at hydration — so the rule the *server*
+    computed survives, and the client's never lands. `?notes` grew the frame, the paper stayed put,
+    and the note was pushed onto a second sheet, with nothing in the markup looking wrong. It is
+    now written to the head imperatively, by both the deck and the handout.
+  - **`Ctrl+P` on ONE slide now prints as a slide too** — `SlideDeck` grew an `@media print` block
+    that reuses `handoutCore`, so a printed slide is exactly the size that slide is on a handout
+    sheet (verified: both land the same word at the same point). Before, it photographed the
+    viewport and came out chopped down the side of a portrait sheet. **`?notes` works on a slide as
+    well as on the handout**: the slide, and its `<Note>` beneath it, on the one page. It reaches
+    `<Note>` through a STORE (`stores/printNotes.ts`) rather than a context, and that is forced
+    rather than chosen — a slide is the LAYOUT's slot content, so it cannot see anything `SlideDeck`
+    sets, which is the same reason `setPages()` has to live in each deck's `+layout.svelte`.
+    Three things had to be retracted for paper, and each was invisible until a PDF was measured:
+    - the frame CENTRES its content on screen (FITTED scales from the centre); print scales from
+      the top-left, so the centring had to go with it or the slide printed with its left edge sliced
+      off. The two must always change together.
+    - `ViewSource`/`SourceView` mark only their BUTTON as chrome — the source PANEL is a sibling and
+      was unmarked, so a closed Monaco (whose scroll surface lays out ~667,000px wide) printed.
+    - **The landmine:** Chrome, laying out for PRINT, measures an absolutely-positioned element
+      inside a `transform: scale()`d ancestor *without applying the transform*. The `Copyright` is
+      anchored to the canvas's RIGHT edge, so its unscaled left edge sits at 1674px against 1280px
+      of paper — Chrome called that overflow and shrank every sheet to 0.7645. Nothing in the DOM
+      looked wrong (`scrollWidth` is 1280, and the box measures correctly under emulated print
+      media); only the PDF was. `overflow: clip` and `contain: paint` do not help. The watermark now
+      does not print, which also matches the handout and `?clean`. **The rule: canvas-space chrome
+      anchored with `right`/`bottom` is fine on screen and poison on paper.**
   - **`text.html` is not this and must not be mistaken for it.** It imports `Label`,
     `AnimationScene` and a local SVG — never `pages.ts`, never a slide route. Its own body says "A
     Text is not a stack of slides glued together — it is a document." It is a second, *hand-authored*
     artifact; `capture-slides.sh:99` even excludes it from the slide list.
-  - Approach: a `handout` route that `import.meta.glob`s `/src/routes/<deck>/*/+page.svelte` (the
-    globbing precedent is `src/lib/seo/routes.ts:11`, which globs `pages.ts` for the sitemap — this
-    is the same move one level down, at the *component*), stacks each inside a 1920×1080 box under
-    the deck's own `setPages` context, and adds the `@page` + `page-break-after: always` rules that
-    don't exist yet. The existing `.no-print` rule already strips the chrome for free, and ink
-    already prints (the annotation surface deliberately does not wear `.no-print`). The browser is
-    the PDF engine — no dependency, in the grain of the project.
-  - Open questions: notes below each slide or a `?notes` flag (a handout and a speaker's notes-page
-    are different artifacts). Slides that self-mount under `{#if initialized}` and iframe-bearing
-    slides (`WebSite`/`WebPage`/`YouTube`) will print blank or hollow — does the handout *refuse and
-    name them* the way CAPTURE does (`captureCore.ts`), which is the established house bargain?
 
 ## Web & video embeds (requested)
 

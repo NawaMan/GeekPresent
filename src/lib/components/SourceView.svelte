@@ -62,7 +62,10 @@
 	<CtrlBtn {chrome} text="</> Source" hoverText="View this slide's source" isSelected={expanded} on:click={() => (expanded = true)} />
 </div>
 
-<Box bind:expanded width={1500} height={975} scrollable>
+<!-- The panel is a SIBLING of the button, so it carries the print marker in its own right; the
+     button's `no-print` does not reach it. (ViewSource has the same shape, and there it is
+     load-bearing — see the note there.) -->
+<Box bind:expanded width={1500} height={975} scrollable class="gp-chrome no-print">
 	<div class="src">
 		<div class="src-title">{filePath}</div>
 		{#if html}

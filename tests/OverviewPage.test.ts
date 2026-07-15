@@ -3,6 +3,7 @@ import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import OverviewPageHost from './OverviewPageHost.svelte';
 import OverviewPageDeckHost from './OverviewPageDeckHost.svelte';
+import { overviewOpen } from '$lib/stores/overviewOpen';
 
 // The all-slides grid in a DOM. The pure decisions (fit-scale, tile list, key
 // intent) are pinned in overviewCore.test.ts; what only a DOM can show is that the
@@ -48,6 +49,9 @@ beforeEach(() => vi.stubGlobal('ResizeObserver', FakeRO));
 afterEach(() => {
 	cleanup();
 	vi.unstubAllGlobals();
+	// The open state is a shared store now (so the tool-flyout can open the grid too), so it
+	// outlives a component's unmount — reset it, or one test's open grid leaks into the next.
+	overviewOpen.set(false);
 });
 
 const frames = () => [...document.querySelectorAll('iframe')];
@@ -56,11 +60,13 @@ const scrim = () => document.querySelector('.scrim');
 const openGrid = () => fireEvent.keyDown(window, { key: 'o' });
 
 describe('OverviewPage — closed by default', () => {
-	it('shows only its toggle: no grid, and not one document booted', () => {
+	it('shows NOTHING: no button, no grid, and not one document booted', () => {
 		stubObserver();
-		render(OverviewPageHost);
+		const { container } = render(OverviewPageHost);
 
-		expect(screen.getByRole('button', { name: /all slides/i })).toBeTruthy();
+		// The grid has no toggle — it is a keystroke (`o`), not a control in the corner. What
+		// it costs a slide it is not open on is therefore nothing at all.
+		expect(container.querySelector('button')).toBeNull();
 		expect(scrim()).toBeNull();
 		expect(frames().length).toBe(0);
 	});
@@ -86,13 +92,6 @@ describe('OverviewPage — opening it', () => {
 			'3'
 		]);
 		expect(screen.getByText('3 slides')).toBeTruthy();
-	});
-
-	it('opens from its button too, not only from the key', async () => {
-		stubObserver();
-		render(OverviewPageHost);
-		await fireEvent.click(screen.getByRole('button', { name: /all slides/i }));
-		expect(scrim()).not.toBeNull();
 	});
 
 	it('marks the slide we are standing on', async () => {

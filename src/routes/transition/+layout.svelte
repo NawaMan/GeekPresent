@@ -10,7 +10,7 @@
 <script lang="ts">
 	import SlideDeck     from '$lib/components/SlideDeck.svelte';
 	import AnimationBar  from '$lib/components/AnimationBar.svelte';
-	import { pages }    from './pages';
+	import { deck, pages } from './pages';
 	import { setPages, setViewTransitions } from '$lib/presentation';
 
 	// Theming: themes.css holds the base palettes, roles.css maps the semantic role
@@ -44,7 +44,7 @@
 	width={1920}
 	height={1080}
 	fill
-	deckClass="gp-deck theme-green"
+	deckClass={deck.deckClass}
 >
 	<slot />
 	<!-- One AnimationBar for the whole deck (it re-detects per navigation). It only

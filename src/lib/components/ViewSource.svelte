@@ -52,7 +52,12 @@
 	<CtrlBtn {chrome} {text} hoverText="View source" isSelected={expanded} on:click={() => (expanded = true)} />
 </div>
 
-<CodeBox code={source} {language} title={path} bind:expanded />
+<!-- The panel is a SIBLING of the button, so it needs the chrome markers in its own right —
+     the button's do not reach it. Unmarked, it is not merely an eyesore in a printout: a closed
+     CodeBox still mounts Monaco, whose internal scroll surface lays out tens of thousands of
+     pixels wide, and Chrome SHRINKS A PRINTED PAGE to fit its widest content. One un-marked
+     panel therefore printed every slide in the deck at three-quarter size. -->
+<CodeBox code={source} {language} title={path} bind:expanded class="gp-chrome no-print" />
 
 <style>
 	/* Bottom-right corner — the one piece of chrome not already taken (ToC is

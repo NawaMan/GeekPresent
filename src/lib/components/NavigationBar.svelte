@@ -4,7 +4,7 @@
 	import { browser }            from '$app/environment';
 	import { page }               from '$app/stores';
 	import { onMount, onDestroy } from 'svelte';
-	import { getMode, getViewTransitions, getPages } from '$lib/presentation';
+	import { getMode, getViewTransitions, getPages, getHandout } from '$lib/presentation';
 	import { navigate as pageNavigate } from '$lib/utils/deckNav';
 	import { presenterMode } from '$lib/stores/presenter';
 	import { activeSteps } from '$lib/stores/activeSteps';
@@ -30,6 +30,14 @@
 	// In a Text artifact there are no slides to page through; the bar collapses
 	// to a single TOP control that jumps back up the document.
 	const mode = getMode();
+
+	// In a HANDOUT (routes/handout/[deck].html) there is no bar at all. Not hidden — ABSENT,
+	// and the difference matters three times over. A handout holds every slide of the deck
+	// at once, so a rendered bar would be sixty-odd bars each arming its own global keydown
+	// listener, and one → keypress would be handled sixty times; it would emit sixty sets of
+	// paging links for the prerenderer to crawl; and "page to the next slide" is not a thing
+	// a document can do — the next slide is already there, below this one.
+	const handout = getHandout();
 
 	// Most decks page with a full-page load (route-per-slide, honest reload). A
 	// deck that opted into setViewTransitions(true) instead navigates client-side
@@ -124,7 +132,7 @@
 
 	onMount(() => {
 		// Arrow-key paging only makes sense between slides, not in a document.
-		if (browser && mode !== 'text') {
+		if (browser && mode !== 'text' && !handout) {
 			window.addEventListener('keydown', handleGlobalKeydown);
 			window.addEventListener('gp:continue', handleRelayedContinue);
 		}
@@ -158,7 +166,9 @@
 	}
 </style>
 
-{#if mode === 'text'}
+{#if handout}
+	<!-- Nothing. A document does not page. -->
+{:else if mode === 'text'}
 <div class="nav text gp-chrome no-print">
 	<CtrlBtn chrome text="TOP" on:click={onTop} />
 </div>
