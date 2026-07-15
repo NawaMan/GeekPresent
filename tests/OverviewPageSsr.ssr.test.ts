@@ -28,9 +28,14 @@ const html = (currentPath = 'intro.html') =>
 	render(OverviewPage, { props: { pages: deck, currentPath, width: 1920, height: 1080 } }).body;
 
 describe('OverviewPage (SSR)', () => {
-	it('prerenders the toggle, so the control exists before any JS runs', () => {
-		const body = html();
-		expect(body).toContain('OVERVIEW');
+	it('prerenders NO ELEMENT AT ALL — the grid is a keystroke, not a button', () => {
+		// There is no toggle any more. The grid is opened with `o` and closed with Esc, and a
+		// deck's corner is not the place to advertise a shortcut a speaker either knows or does
+		// not need. So a shut grid puts no ELEMENT in the prerendered page — only Svelte's own
+		// hydration anchors, which are comments and paint nothing — and that makes every negative
+		// below true by construction rather than by care.
+		const elements = html().replace(/<!--.*?-->/g, '').trim();
+		expect(elements).toBe('');
 	});
 
 	it('prerenders NO iframe — the whole deck is not embedded in every slide', () => {

@@ -1,5 +1,5 @@
 <!--
-  Note — a speaker note. Two homes for the same authored content:
+  Note — a speaker note. Three homes for the same authored content:
 
   - In a normal deck window, it renders just below the slide in the canvas
     coordinate space (so it scales with the slide), shown only in SCALED display
@@ -11,6 +11,10 @@
     visible. SlideDeck hides the whole slide with `visibility:hidden`; the note
     flips ITSELF back to visible (visibility is inherited and individually
     overridable), so no portal is needed to lift it out of the hidden slide.
+
+  - In a printable handout (routes/handout/[deck].html), it becomes the band of prose
+    below the printed slide — but only if the reader asked for notes. There the
+    display mode does not get a vote; see `handout` below.
 -->
 <script lang="ts">
 	import { browser } from '$app/environment';
@@ -20,6 +24,8 @@
 		presenterMode, deckKeyFromPath, loadChecks, saveChecks, publishHighlight
 	} from '$lib/stores/presenter';
 	import { setHighlight } from '$lib/stores/highlightTarget';
+	import { printNotes } from '$lib/stores/printNotes';
+	import { getHandout } from '$lib/presentation';
 
 	/** Inline style for the root element, applied last so it wins. */
 	export let style: string = '';
@@ -31,7 +37,18 @@
 	let klass: string = '';
 	export { klass as class };
 
-	$: visible = $displayMode === 'SCALED' || $presenterMode;
+	// The handout (routes/handout/[deck].html) is a third home for the same note, and it OVERRIDES
+	// the other two rather than adding to them: there, whether a note is in the document is
+	// the reader's decision, printed or not printed, and not a consequence of a display mode
+	// the speaker happened to leave on SCALED weeks ago. See presentation.ts.
+	const handout = getHandout();
+
+	// …and `?notes` on a single slide is the same request, made of the deck instead of the
+	// handout: print THIS slide with its note under it. It ADDS to the screen rules rather than
+	// replacing them, because it is a print instruction and the deck is still a deck.
+	$: visible = handout
+		? handout.notes
+		: $printNotes || $displayMode === 'SCALED' || $presenterMode;
 
 	// The deck + slide this note belongs to — the key its check states persist under.
 	$: slidePath = $page.url.pathname.replace(/\/+$/, '').split('/').pop() || '';

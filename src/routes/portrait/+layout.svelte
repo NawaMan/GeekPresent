@@ -2,8 +2,10 @@
   A portrait presentation deck — 1080x1920, for YouTube Shorts.
 
   This is a normal peer deck: same components, same templates, same navigation as
-  the landscape deck. The ONLY thing that makes it portrait is the width/height
-  passed to <SlideDeck> below. Each slide here is authored for this tall frame
+  the landscape deck. The ONLY thing that makes it portrait is the canvas — `deck`
+  in pages.ts, handed to <SlideDeck> below (it lives there, not here, so that the
+  printable handout can read it without mounting this layout). Each slide here is
+  authored for this tall frame
   (short, big, vertically-stacked) — orientation is fixed per deck, never toggled.
 
   baseFontSize is the per-deck typography lever, and it is the ONE knob that
@@ -15,9 +17,9 @@
   without touching any shared component. Keep Portrait slides to a few large words.
 -->
 <script lang="ts">
-	import SlideDeck    from '$lib/components/SlideDeck.svelte';
-	import { pages }    from './pages';
-	import { setPages } from '$lib/presentation';
+	import SlideDeck      from '$lib/components/SlideDeck.svelte';
+	import { deck, pages } from './pages';
+	import { setPages }   from '$lib/presentation';
 
 	// Publish this deck's slide list to its slides (nav + ToC read it). Must be
 	// set here, not in SlideDeck: the slotted slides read THIS layout's context.
@@ -28,9 +30,9 @@
 	{pages}
 	title="GeekPortrait"
 	description="GeekPortrait — a 1080×1920 portrait deck for YouTube Shorts and mobile, built from the same GeekPresent components in a taller frame."
-	width={1080}
-	height={1920}
-	baseFontSize="1.8em"
+	width={deck.width}
+	height={deck.height}
+	baseFontSize={deck.baseFontSize}
 	fill
 >
 	<slot />

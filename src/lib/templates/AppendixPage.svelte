@@ -135,10 +135,20 @@
 	// membership test is the second lock (appendixCore's syntax check is the first):
 	// an address that passes the pattern but names no slide in this deck would
 	// navigate to a 404, so treat it as no address at all and fall back to the deck.
-	$: returnTo = (() => {
-		const target = readReturnParam($page.url.searchParams);
-		return target && pages.some((p) => p.path === target) ? target : null;
-	})();
+	//
+	// `browser` guard: reading url.searchParams during PRERENDER is an error in SvelteKit,
+	// and rightly so — a prerendered file is one file, so it cannot depend on a query string
+	// that varies per visit. In the deck this never came up, because SlideDeck gates its slot
+	// on `initialized` and no slide has ever been server-rendered. The HANDOUT renders slides
+	// for real (routes/handout/[deck].html), which is what surfaced it. At prerender there IS no
+	// caller, so `null` is the honest answer and the exit falls back to the deck's first
+	// slide; hydration then reads the real `?return=` and the way out is restored.
+	$: returnTo = !browser
+		? null
+		: (() => {
+				const target = readReturnParam($page.url.searchParams);
+				return target && pages.some((p) => p.path === target) ? target : null;
+			})();
 
 	// The way out: back to the caller, or — lacking one — to the first slide of the
 	// linear order (never this appendix, when the appendix is hidden from that order).

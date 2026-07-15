@@ -36,10 +36,15 @@
 	import PresenterView  from '$lib/components/PresenterView.svelte';
 	import Seo            from '$lib/components/Seo.svelte';
 	import { SITE_DESCRIPTION } from '$lib/seo/config';
+	import { pageRule, sheetMetrics } from '$lib/handout/handoutCore';
+	import { applyPageRule } from '$lib/handout/pageRuleDom';
+	import { printNotes } from '$lib/stores/printNotes';
+	import { overviewOpen } from '$lib/stores/overviewOpen';
 
 	import { browser }    from '$app/environment';
 	import { page }       from '$app/stores';
-	import { onMount } from 'svelte';
+	import { base }       from '$app/paths';
+	import { onMount, tick } from 'svelte';
 	import { displayMode, displayFactor, clampFactor } from '$lib/stores/displayMode';
 	import type { DisplayMode } from '$lib/stores/displayMode';
 	import { layoutMode, canLayout, canSave, setLayoutOffered, applyLayoutParam } from '$lib/stores/layoutMode';
@@ -83,7 +88,18 @@
 	export let height = 1080;
 	/* Base font-size lever: every em-based size in the reused components scales
 	   from here in one place. The landscape canvas grew x1.5 from the original
-	   1280x720, hence 1.5em; a narrower portrait canvas wants a smaller base. */
+	   1280x720, hence 1.5em; a narrower portrait canvas wants a smaller base
+	   (routes/portrait sets its own).
+
+	   It is the ONE knob for the deck's text size: turn it and every em-sized
+	   component in every reused template moves together. What does NOT move is
+	   anything measured in canvas PIXELS — a <Block>'s x/y/width/height, an image, a
+	   Connector — because those are placements, not type. So turning it down shrinks a
+	   slide's prose INSIDE its Block while the Block stays where its author put it,
+	   which is why 1.2em was tried here and put back: the two stop agreeing.
+
+	   Keep it equal to handoutCore.DEFAULT_BASE_FONT (the handout cannot read this
+	   default, so it restates it; tests/SlideDeckPrint.test.ts pins the pair). */
 	export let baseFontSize = '1.5em';
 	/* Optional extra classes for the outer frame — the hook a deck uses to opt into
 	   a theme. Pass "gp-deck theme-green" (and import themes.css + roles.css in the
@@ -230,6 +246,31 @@
 	// too), and it is the one mode that deliberately does NOT fit the slide to the window —
 	// fitting is what a human wants and exactly what a screenshot must not do.
 	$: shot = browser && $page.url.searchParams.has('shot');
+
+	// PRINTING one slide. The deck is a viewport — a canvas scaled to whatever window it found —
+	// and paper is not a window: it has a fixed size, no scrollbars and no JS. Left alone, Ctrl+P
+	// photographs the viewport, which is how you get a slide chopped off down the right-hand side
+	// of a portrait sheet. So print takes the same deal the handout takes: the SHEET becomes the
+	// shape of the canvas (the @page rule in <svelte:head>) and the canvas is scaled onto it by
+	// `--print-scale`. Computed here, not in CSS, because CSS cannot divide inches by pixels —
+	// and taken from handoutCore so a printed slide and that slide inside a handout are the same
+	// size, necessarily rather than by coincidence.
+	//
+	// `?notes` prints the slide WITH its speaker note beneath it, on the one page — the same flag
+	// the handout takes, and the paper grows by the same three inches. It reaches the <Note>
+	// through a store rather than context: a slide is the LAYOUT's slot content, so it cannot see
+	// anything this shell sets (the same reason setPages() lives in each deck's +layout.svelte).
+	// See stores/printNotes.
+	// `?notes` in the URL, OR the PRINT menu's "this slide + notes" (which prints without
+	// navigating, so it drives a local override instead of the address bar).
+	let printNotesOverride = false;
+	$: wantsNotes = (browser && $page.url.searchParams.has('notes')) || printNotesOverride;
+	$: printNotes.set(wantsNotes);
+	$: printMetrics = sheetMetrics({ width, height }, wantsNotes);
+	// Written to the head, not declared in <svelte:head> — see pageRuleDom for why that is not a
+	// style choice: an {@html} in the head survives hydration unchanged, so `?notes` grew the
+	// frame and left the paper the size the SERVER thought it should be.
+	$: if (browser) applyPageRule(pageRule(printMetrics));
 	// Cross-window sync: whoever navigates publishes the new slide path; the other
 	// window follows. deckKey namespaces it per deck so /slides/ and /portrait/
 	// consoles never cross-drive. This deck's paging strategy is read once for the
@@ -309,6 +350,38 @@
 				captureTip = '';
 			}, 2600);
 		}
+	}
+
+	// PRINT — the flyout's left tool. It opens a little menu rather than printing straight away,
+	// because there are four honest destinations (this slide / the whole deck, each with or
+	// without notes) and the browser's own dialog cannot ask which. Each choice then does the one
+	// thing only a browser can: open the print dialog. The deck's `@media print` block does the
+	// rest — paper the shape of the canvas, chrome stripped, notes honoured.
+	let printMenuOpen = false;
+
+	// Print THIS slide, optionally with its <Note>. The notes toggle is a local override rather
+	// than a navigation, so it must be applied to the DOM/CSS BEFORE the (blocking) print opens —
+	// hence the `await tick()`. It is cleared when the dialog closes (onMount, below).
+	async function printThisSlide(withNotes: boolean) {
+		printMenuOpen = false;
+		printNotesOverride = withNotes;
+		await tick();
+		if (browser) window.print();
+	}
+
+	// The current deck's name, from the URL: `/slides/title.html` -> `slides`. The handout for it
+	// lives OUTSIDE the deck at `/handout/<deck>.html`, so these two options navigate there rather
+	// than printing in place — the handout is a different document (every slide at once).
+	$: deckName = ($page.url.pathname.replace(base, '').split('/').filter(Boolean)[0]) || '';
+	function openHandout(query: string) {
+		printMenuOpen = false;
+		// A FULL navigation, not a client-side goto. The handout is a separate top-level document
+		// (outside the deck's layout, rendering all 65 slides at once) — a hard load renders it
+		// exactly as visiting the URL does, where a client-side hop into that other layout came up
+		// blank. It is the printable document; landing on it fresh is the honest thing anyway.
+		// `query` selects the layout: '' pages, '?notes' pages+notes, '?grid' the thumbnail grid,
+		// '?grid&notes' the notes grid.
+		if (browser) window.location.assign(`${base}/handout/${deckName}.html${query}`);
 	}
 
 	// On a slide that INVITES you to use LAYOUT, the button is the SUBJECT, not backstage
@@ -513,6 +586,12 @@
 		const onResize = () => adjustSize(false);
 		window.addEventListener('resize', onResize);
 
+		// The PRINT menu's "this slide + notes" grows the paper only for the print; once the
+		// dialog closes, the deck goes back to its screen self. `afterprint` fires whether the
+		// user printed or cancelled.
+		const onAfterPrint = () => { printNotesOverride = false; };
+		window.addEventListener('afterprint', onAfterPrint);
+
 		// Follow the OTHER window: when it announces a different slide, page there.
 		// Guard on `path !== currentSlide` (our own echo / already-here) so the
 		// two-window ping-pong converges. Route through the shared navigate() so a
@@ -572,6 +651,7 @@
 			setHighlight(null); // don't leave a stale spotlight across a deck swap
 			// Ink is NOT cleared here — it is meant to survive. That is the whole point.
 			window.removeEventListener('resize', onResize);
+			window.removeEventListener('afterprint', onAfterPrint);
 		};
 	});
 </script>
@@ -592,6 +672,10 @@
 	{/if}
 </svelte:head>
 
+<!-- Escape closes the PRINT menu (and only when it is open, so it does not swallow the key the
+     TOC and the pen also listen for). -->
+<svelte:window on:keydown={(e) => { if (printMenuOpen && e.key === 'Escape') printMenuOpen = false; }} />
+
 <!-- .viewport is the screen-fixed pan area. It centres the frame when it fits and
      scrolls (top-left reachable, via `safe center`) when SCALED overflows it. -->
 <div class="viewport" class:zoom={!isFitted} class:shot bind:this={viewport} on:scroll={updateOverlay}>
@@ -603,7 +687,8 @@
 		class:present={present}
 		class:shot
 		class:fade-chrome={fadeChrome}
-		style="--canvas-w:{width}px; --canvas-h:{height}px; --aspect:{aspectRatio}; --base-font:{baseFontSize};{contentBackground ? ` --content-bg:${contentBackground};` : ''}{contentFont ? ` --content-font:${contentFont};` : ''}"
+		class:print-notes={wantsNotes}
+		style="--canvas-w:{width}px; --canvas-h:{height}px; --aspect:{aspectRatio}; --base-font:{baseFontSize}; --print-scale:{printMetrics.scale}; --print-w:{printMetrics.slideWidthPx}px; --print-h:{printMetrics.slideHeightPx}px; --print-notes-h:{printMetrics.notesHeightPx}px;{contentBackground ? ` --content-bg:${contentBackground};` : ''}{contentFont ? ` --content-font:${contentFont};` : ''}"
 		bind:this={container}
 	>
 		<div class="content" class:fill class:ready={initialized} bind:this={content}>
@@ -614,11 +699,11 @@
 			     the viewport-anchored DISPLAY control sits separately in the overlay below.
 			     Being a .content child placed BEFORE the slot, the slide's own blocks paint
 			     over it. Hidden by ?clean; PRESENT hides inside the console itself. -->
-			<!-- NOTE: ANNOTATE is NOT in this cluster. The pen's toggle lives in <Annotate>
-			     itself, top-centre and above the ink surface — because once the pen is armed
-			     the surface owns every pointer on the canvas and would bury a button placed
-			     here, leaving the speaker able to arm the pen but not to put it down. -->
-			{#if !clean && ($canLayout || canCapture || !$presenterMode)}
+			<!-- NOTE: ANNOTATE, PRINT and CAPTURE are NOT in this cluster. They live in
+			     <Annotate>'s top-centre flyout, above the ink surface, since an armed pen's
+			     surface would bury a button placed here. This cluster is LAYOUT/SAVE
+			     (authoring) and PRESENT (mode); the flyout is the per-slide output tools. -->
+			{#if !clean && ($canLayout || !$presenterMode)}
 			<div
 				class="slide-chrome gp-chrome no-print"
 				class:pinned={$layoutMode}
@@ -657,25 +742,8 @@
 					</span>
 				{/if}
 				{/if}
-				<!-- CAPTURE downloads the slide as a PNG at true canvas resolution — with the
-				     annotations, without this chrome (it wears `.no-print`, which is exactly the
-				     line capture strips along). It borrows SAVE's refusal: a slide holding a live
-				     <iframe> cannot be rasterised, and the button says so when pressed rather than
-				     sitting greyed out looking broken. -->
-				{#if canCapture}
-					<span class="capture-btn" class:refused={!!captureTip}>
-						<CtrlBtn
-							chrome
-							text={captureLabel}
-							hoverText={captureLabel}
-							isDisabled={capturing}
-							on:click={onCapture}
-						/>
-						{#if captureTip}
-							<span class="capture-tip" role="status">{captureTip}</span>
-						{/if}
-					</span>
-				{/if}
+				<!-- CAPTURE used to live here; it moved to Annotate's top-centre flyout, beside
+				     PRINT (both are per-slide output tools). See <Annotate> below. -->
 				<!-- PRESENT opens the presenter console; a text label like the other chrome
 				     buttons, hidden inside the console itself ($presenterMode). -->
 				<CtrlBtn chrome text="PRESENT" on:click={openPresenter} isVisible={!$presenterMode} />
@@ -696,7 +764,62 @@
 				{inkColors}
 				{levelHighlight}
 				chrome={!clean && !present}
-			/>
+			>
+				<!-- PRINT and CAPTURE ride in Annotate's top-centre flyout, behind the ANNOTATE
+				     toggle — they are per-slide OUTPUT tools (draw it / snapshot it / print it), and
+				     the toggle is the one thing already guaranteed to sit above the ink surface, so
+				     an armed pen cannot bury them. Their logic stays here; only their HOME moved.
+
+				     They are PLAIN buttons wearing `annot-tool`, not CtrlBtns, so Annotate can dress
+				     them in the toggle's own amber livery — the three read as one set. -->
+				<button
+					slot="print"
+					type="button"
+					class="annot-tool"
+					aria-haspopup="menu"
+					aria-expanded={printMenuOpen}
+					on:click={() => (printMenuOpen = !printMenuOpen)}
+				>PRINT</button>
+				<!-- The `slot=` element must be a direct child of <Annotate> (Svelte 5), so the
+				     span is always here and the `canCapture` gate lives INSIDE it — which is also
+				     exactly the empty, zero-size flank the flyout is built to tolerate. -->
+				<span slot="capture" class="capture-btn" class:refused={!!captureTip}>
+					{#if canCapture}
+						<button type="button" class="annot-tool" disabled={capturing} on:click={onCapture}>
+							{captureLabel}
+						</button>
+						{#if captureTip}
+							<span class="capture-tip" role="status">{captureTip}</span>
+						{/if}
+					{/if}
+				</span>
+				<!-- OVERVIEW opens the all-slides grid — the same grid the `o` key opens, through the
+				     shared `overviewOpen` store. It is per-slide navigation, a speaker's tool, so it
+				     joins the flyout rather than returning to a corner button of its own. -->
+				<button
+					slot="overview"
+					type="button"
+					class="annot-tool"
+					on:click={() => overviewOpen.set(true)}
+				>OVERVIEW</button>
+			</Annotate>
+
+			<!-- The PRINT menu. It is NOT inside the flyout (which collapses the moment the pointer
+			     leaves it) — it is a canvas-space popover of its own, so it survives the click that
+			     opened it. z above the ink surface, and `no-print` so it never prints itself. -->
+			{#if printMenuOpen}
+				<div class="print-scrim no-print" role="presentation" on:click={() => (printMenuOpen = false)}></div>
+				<div class="print-menu no-print" role="menu" aria-label="Print">
+					<button type="button" role="menuitem" on:click={() => printThisSlide(false)}>This slide</button>
+					<button type="button" role="menuitem" on:click={() => printThisSlide(true)}>This slide + notes</button>
+					<div class="print-menu-sep" role="separator"></div>
+					<button type="button" role="menuitem" on:click={() => openHandout('')}>Whole deck</button>
+					<button type="button" role="menuitem" on:click={() => openHandout('?notes')}>Whole deck + notes</button>
+					<div class="print-menu-sep" role="separator"></div>
+					<button type="button" role="menuitem" on:click={() => openHandout('?grid')}>Thumbnail grid</button>
+					<button type="button" role="menuitem" on:click={() => openHandout('?grid&notes')}>Notes grid</button>
+				</div>
+			{/if}
 			<TableOfContent {pages} {article} {articleText} {articleHref} />
 			<!-- The all-slides grid (press O). Canvas-space, like the ToC — its tiles are
 			     live `?clean` iframes of the real slides.
@@ -907,27 +1030,30 @@
 	   settles. The row moving there is fine — it moves BECAUSE of the click the audience
 	   just watched, so it reads as the answer, not as a glitch. */
 	.slide-chrome .save-btn :global(button),
-	.slide-chrome .capture-btn :global(button) {
+	.capture-btn :global(button) {
 		min-width: 4.6em;
 	}
 	/* The refusal has to be READ from the back of a room, so it doesn't get the muted
 	   chrome grey. Danger red, and the same token the demo slide's own prose uses, so
 	   the words in the chrome and the words on the slide are literally one colour. */
 	.slide-chrome .save-btn.refused :global(button),
-	.slide-chrome .capture-btn.refused :global(button) {
+	.capture-btn.refused :global(button) {
 		color: var(--ctrl-forbidden-fg, #E5484D);
 	}
 	/* The tooltip: why it refused, not just that it did. Anchored under the button and
 	   centred on it; `left: 50%` + translate keeps it centred as the button grows into
 	   the NOT ALLOWED label. Never intercepts the pointer. */
 	.slide-chrome .save-btn,
-	.slide-chrome .capture-btn {
+	.capture-btn {
 		position: relative;
 	}
 	/* CAPTURE wears the same refusal clothes as SAVE, deliberately: both are buttons that
-	   look ordinary, are pressable, and answer WHY when they cannot do the thing. */
+	   look ordinary, are pressable, and answer WHY when they cannot do the thing. (CAPTURE now
+	   lives in Annotate's flyout, not `.slide-chrome`, so its selectors stand alone — but this
+	   is still SlideDeck's scoped CSS: the button is SLOTTED content, compiled here, so the
+	   scope hash is here too, wherever the DOM ends up putting it.) */
 	.slide-chrome .save-tip,
-	.slide-chrome .capture-tip {
+	.capture-tip {
 		position: absolute;
 		top: calc(100% + 8px);
 		left: 50%;
@@ -943,6 +1069,55 @@
 		color: var(--tooltip-fg, #FFFFFF);
 		border: 1px solid var(--ctrl-forbidden-fg, #E5484D);
 	}
+
+	/* ── The PRINT menu ─────────────────────────────────────────────────────────────
+	   A canvas-space popover under the flyout. The scrim is the click-outside: it covers the
+	   whole canvas beneath the menu, so a click anywhere else dismisses. Both wear `no-print`. */
+	.print-scrim {
+		position: absolute;
+		inset: 0;
+		z-index: 58;
+	}
+	/* The PRINT sub-menu opens to the LEFT of the tool dropdown (which is centred), so the two
+	   panels sit side by side instead of overlapping. `right: calc(50% + 5.4em)` puts its right
+	   edge just past the dropdown's left edge (the dropdown is min-width 10em, half of that plus a
+	   gap); it then extends further left. Top-aligned with the PRINT row. */
+	.print-menu {
+		position: absolute;
+		top: 1.7em;
+		right: calc(50% + 5.4em);
+		z-index: 60;
+		display: flex;
+		flex-direction: column;
+		min-width: 12em;
+		padding: 0.35em;
+		border: 1px solid var(--annot-bar-edge, rgba(255, 255, 255, 0.16));
+		border-radius: 10px;
+		background: var(--annot-toggle-bg, rgba(20, 22, 26, 0.96));
+		box-shadow: 0 8px 26px rgba(0, 0, 0, 0.5);
+		font-size: calc(var(--base-font, 16px) * 0.6);
+	}
+	.print-menu button {
+		text-align: left;
+		cursor: pointer;
+		padding: 0.4em 0.7em;
+		border: 0;
+		border-radius: 6px;
+		background: transparent;
+		color: var(--annot-toggle-fg, #F0A33E);
+		font: inherit;
+		font-weight: bold;
+		white-space: nowrap;
+	}
+	.print-menu button:hover {
+		background: var(--annot-bar-hover, rgba(255, 255, 255, 0.1));
+	}
+	.print-menu-sep {
+		height: 1px;
+		margin: 0.3em 0.2em;
+		background: var(--annot-bar-edge, rgba(255, 255, 255, 0.16));
+	}
+
 	/* ── The featured LAYOUT button ────────────────────────────────────────────────
 	   On a slide that TEACHES layout, this button is the subject of the slide. Two
 	   forces work against it being seen, and both have to be answered:
@@ -1061,5 +1236,178 @@
 	   (adjustSize early-returns), so that fixed note tracks the viewport. */
 	.container.present {
 		visibility: hidden;
+	}
+
+	/* ── PRINT: one slide, one page ──────────────────────────────────────────────────
+	   Ctrl+P on a slide prints that slide, and it should print as a SLIDE — the whole
+	   canvas, edge to edge, on paper its own shape. The @page rule in <svelte:head> gave
+	   the paper that shape; this puts the slide on it.
+
+	   Everything here is `!important` for one reason, and it is not carelessness:
+	   adjustSize() writes the frame's width/height and the content's transform as INLINE
+	   styles, because on screen they must track the window. A print stylesheet cannot
+	   out-specify an inline style — it can only override it — so the deck's screen
+	   geometry has to be retracted by name and replaced with the paper's.
+
+	   The document itself has to be unwound too: `.viewport` is `position: fixed` (a
+	   window is one screenful, so a fixed pane is right there and useless here), and
+	   global.css centres `body` in a flex box for the same reason. On paper both must
+	   simply flow, or the sheet comes out empty and the slide comes out somewhere else. */
+	@media print {
+		/* The document, unwound: on screen `.viewport` is `position: fixed` (a window is one
+		   screenful) and global.css centres `body` in a flex box for the same reason. On paper
+		   both must simply FLOW, and flow to exactly the height of the frame — because anything
+		   taller than the page, by any amount, is not clipped: it becomes another SHEET.
+
+		   Which is what `min-height: 100vh` did here, and it is worth recording. It was meant to
+		   centre the slide vertically so that a browser overriding the page size would letterbox
+		   evenly. But `vh` in print is the page box, and a body forced to a full page tall, inside
+		   an html forced to a full page tall, with a frame centred inside THAT, comes out just over
+		   one page — so it printed as three sheets, blank / slide / blank. Chrome's own
+		   print-to-PDF happened to absorb it; other engines did not, which is exactly the kind of
+		   thing that must not be trusted to one renderer.
+
+		   So: no viewport units on paper. The frame is centred HORIZONTALLY with `margin: 0 auto`
+		   (which cannot add height), and vertical position is left to the page. */
+		:global(html),
+		:global(body) {
+			display: block !important;
+			width: auto !important;
+			height: auto !important;
+			min-height: 0 !important;
+			margin: 0 !important;
+			padding: 0 !important;
+			overflow: visible !important;
+		}
+
+		.viewport {
+			position: static !important;
+			overflow: visible !important;
+			display: block !important;
+			/* No height of its own: a print viewport is the page, and anything it adds beyond the
+			   frame below becomes a SHEET. */
+			height: auto !important;
+			min-height: 0 !important;
+		}
+
+		/* The frame at its printed size: the canvas, scaled to the paper. `overflow: hidden`
+		   crops the content box's own 50px bleed, exactly as the deck's viewport does.
+
+		   The two alignment lines are the ones that are easy to miss, and they cost a whole
+		   afternoon: on screen the frame CENTRES its content child (`.container.fit-mode`),
+		   because FITTED scales from the centre and letterboxes symmetrically about it. Print
+		   scales from the TOP-LEFT — so the centring has to go with it, or the canvas is laid
+		   out at a negative offset, scaled from a corner that is off the page, and the slide
+		   prints with its left edge sliced off. The two must always be changed together. */
+		.container {
+			/* The printed size in PIXELS, straight from handoutCore — not `canvas * scale`
+			   recomputed in CSS. Rounding the scale and multiplying back put the canvas a tenth
+			   of a pixel outside the paper, which is enough for a printer to call it an overflow
+			   and shrink the whole sheet. One number, computed once, used by both. */
+			width: var(--print-w) !important;
+			height: calc(var(--print-h) + var(--print-notes-h, 0px)) !important;
+			min-width: 0 !important;
+			min-height: 0 !important;
+			margin: 0 auto !important;
+			flex: none !important;
+			justify-content: flex-start !important;
+			align-items: flex-start !important;
+			overflow: hidden !important;
+			border: none !important;
+			box-shadow: none !important;
+		}
+
+		/* The canvas at 1:1, scaled from the top-left so it lands flush in the frame — the
+		   same move SCALED display makes, with the factor taken from the paper rather than
+		   from the window. `.ready` (the JS-applied opacity gate) is irrelevant on paper:
+		   printing happens in a browser, so JS has long since run. */
+		.container .content {
+			/* `flex: none` so the frame — now shorter than the canvas — cannot shrink the slide
+			   on its way to fitting it; the scale is what does the fitting. */
+			flex: none !important;
+			transform: scale(var(--print-scale)) !important;
+			transform-origin: top left !important;
+
+			/* A deck is light-on-dark, and a browser does not print background colours unless
+			   it is told to ("Background graphics", off by default) — which would hand the
+			   reader white paper with white text on it. Inherited, so the whole slide obeys. */
+			-webkit-print-color-adjust: exact;
+			print-color-adjust: exact;
+		}
+
+		/* The deck's own furniture is not the slide. `.no-print` and `.gp-chrome` are the
+		   existing markers for exactly this (captureCore's CHROME_SELECTOR strips the same
+		   two, for the same reason) — but a control whose own rule sets `display` outranks a
+		   single-class marker, so they are retracted here by force rather than by hint. */
+		:global(.no-print),
+		:global(.gp-chrome) {
+			display: none !important;
+		}
+
+		/* The screen-fixed chrome layer (DISPLAY control, minimap). It holds nothing that
+		   prints, and a `position: fixed` box is meaningless on paper — where there is no
+		   viewport for it to be fixed to. */
+		.overlay {
+			display: none !important;
+		}
+
+		/* The copyright watermark — and this one is worth reading, because it is a LANDMINE
+		   and it will be stepped on again.
+
+		   Chrome, when laying out for PRINT, measures an absolutely-positioned element inside
+		   a `transform: scale()`d ancestor WITHOUT applying the transform. The copyright is
+		   anchored to the canvas's right edge, so its unscaled left edge sits at 1674px; the
+		   paper is 1280px; Chrome concludes the page overflows and SHRINKS THE WHOLE SHEET to
+		   1280/1674 = 0.7645 to make it fit. Every slide in the deck then printed at
+		   three-quarter size, with white margins, and nothing in the DOM looked wrong —
+		   `scrollWidth` is 1280, and under `Emulation.setEmulatedMedia` the box measures
+		   correctly. Only the PDF was wrong. (`overflow: clip` and `contain: paint` on the
+		   frame do not help; the phantom overflow is computed before either applies.)
+
+		   So the copyright does not print — which is also simply right, and what the deck
+		   already does under `?clean`: the HANDOUT prints no watermark on its sheets either, so
+		   a printed slide and that slide inside a handout now agree, to the pixel.
+
+		   The rule for anything new: canvas-space chrome anchored with `right`/`bottom` is
+		   fine on screen and poison on paper. Anchor from the left, or don't print it. */
+		:global(.copyright) {
+			display: none !important;
+		}
+
+		/* ── `?notes`: the slide, and its speaker note under it, on the one page ───────────
+		   The frame above already grew by --print-notes-h; this fills the band.
+
+		   The note lives INSIDE the slide component, and so inside the scaled canvas — and a
+		   transformed element is the containing block for everything absolute within it, so
+		   there is no lifting it out. It is therefore left where it is and allowed to paint
+		   BELOW the canvas, into the band, exactly as the handout does it. It must stay
+		   ABSOLUTE: `.content` is a flex ROW, and a note made `static` becomes a flex sibling of
+		   the slide and sits BESIDE it, squeezing the slide to two-thirds of the page.
+
+		   The frame turns white for the band (the slide's own dark surface is painted by
+		   `.content`, which covers only the slide), and the note is stripped back from a beige
+		   card with its own scrollbar — right for a window — to plain prose that grows to its
+		   content, which is the only thing paper can do with it. */
+		.container.print-notes {
+			background: #fff !important;
+		}
+		.container.print-notes .content :global(.note) {
+			display: block !important;
+			position: absolute !important;
+			top: calc(100% + 30px) !important;
+			left: 0 !important;
+			width: 100% !important;
+			height: auto !important;
+			max-height: none !important;
+			min-height: 0 !important;
+			overflow: visible !important;
+			margin: 0 !important;
+			padding: 0 !important;
+			border: none !important;
+			border-radius: 0 !important;
+			background: transparent !important;
+			color: #222 !important;
+			font-size: 1em !important;
+		}
 	}
 </style>

@@ -2,9 +2,10 @@
   Example: CAPTURE — the slide as a PNG, demonstrated live.
   File: src/routes/slides/capture-slide.html/+page.svelte
 
-  Like layout-mode.html, this slide IS its own demo: the deck sets `capture`, so the button
-  in the top-right is real in the deployed build. Press it and you download *this slide* —
-  including anything you drew on it, and none of the chrome you drew it with.
+  Like layout-mode.html, this slide IS its own demo: the deck sets `capture`, so the button is
+  real in the deployed build. It rides ANNOTATE's top-centre flyout — hover ANNOTATE and CAPTURE
+  slides out beside it. Press it and you download *this slide* — including anything you drew on
+  it, and none of the chrome you drew it with.
 -->
 <script>
 	import ContentPage from '$lib/templates/ContentPage.svelte';
@@ -21,7 +22,8 @@
 <ContentPage title="Capture" subtitle="The slide as a PNG — at its true size, not your window's">
 	<div style="line-height: 1.55em;">
 		<p>
-			Press <b>CAPTURE</b> (top-right) and this slide downloads as
+			Hover <b>ANNOTATE</b> (top-centre) and press <b>CAPTURE</b> as it slides out; this slide
+			downloads as
 			<code>capture-slide.png</code>. Not a screenshot of the window &mdash; the canvas is
 			<i>re-rendered</i>, so the file is a full <b>1920&times;1080</b> whether you are
 			presenting on a projector or reading this on a laptop. Same PNG on every machine.

@@ -1,3 +1,9 @@
+// This deck's SURFACE — the green palette. Declared here rather than in +layout.svelte because
+// the printable handout (routes/handout/[deck].html) reads it from this module: it never mounts
+// the layout, so a deckClass passed to <SlideDeck> there would be invisible to it, and the deck
+// would print in GeekPresent's default colours instead of its own.
+export const deck = { deckClass: 'gp-deck theme-green' };
+
 export const pages = [
     // Each effect is a PAIR of slides; paging from "(from)" to "(to)" performs the
     // transition live. Going FORWARD (→) each effect plays exactly once, on its own

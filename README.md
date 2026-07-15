@@ -439,9 +439,39 @@ never stale and there's nothing to generate. They mount lazily as they scroll in
 a 65-slide deck boots the dozen you can see rather than all 65. Appendices (`hidden: true`) stay
 out, exactly as they do in the ToC. Neither key fires while you're typing in a text field.
 
-## Printing
+## Printing — and the handout
 
-The presentation is print-friendly — the navigation, Table of Contents, and mode toggle are hidden under `@media print`. Use your browser's print (Ctrl/Cmd-P) to print or export to PDF.
+Each slide is its own page, so **Ctrl/Cmd-P on a slide prints that one slide** — and it prints as a *slide*: the whole canvas on paper its own shape, inside a half-inch margin, centred (the deck's chrome drops out, and the dark background is printed rather than dropped).
+
+There's also a **PRINT button**, tucked in ANNOTATE's top-centre flyout — hover ANNOTATE and PRINT (with CAPTURE and OVERVIEW) drop down beneath it. It opens a small menu of destinations the browser's own dialog can't ask about:
+
+- **This slide** / **This slide + notes** — print here (the notes option grows the paper in place, no navigation).
+- **Whole deck** / **Whole deck + notes** — the handout, one slide per page.
+- **Thumbnail grid** — every slide as a small tile, contact-sheet style, on landscape paper.
+- **Notes grid** — one row per slide, thumbnail left and its `<Note>` right, on portrait paper.
+
+The grids are `/handout/<deck>.html?grid` and `?grid&notes`; like the handout they render the real slides (not screenshots) and let the browser paginate — as many tiles or rows as fit.
+
+| URL | What prints |
+| --- | --- |
+| *any slide* | That slide, one page. |
+| *any slide* `?notes` | That slide **and its `<Note>`** beneath it, still one page. |
+| `/handout/slides.html` | **The whole deck** — every slide, one per page. |
+| `/handout/slides.html?notes` | The same, with each slide's number, title and `<Note>` printed beneath it. |
+
+Then Ctrl/Cmd-P → *Save as PDF*. The browser is the PDF engine, so there is no export step and no dependency. Every deck has a handout (`/handout/<deck>.html`), a portrait deck prints on portrait paper, and a slide printed on its own is *exactly* the size it is inside the handout — both ask the same module.
+
+The slide is **centred inside a margin** rather than bled to the edge, and both of those are load-bearing: a real printer cannot reach the edge of the paper, and a browser that declines the custom page size (Chrome and Edge honour it) prints on A4 instead — centred, the leftover splits evenly rather than pooling at the bottom.
+
+The handout lives *outside* the deck on purpose: a deck is a folder of slides you own, so GeekPresent doesn't keep one of the names for itself. (It renders the slides as if it stood inside the deck — a `<base>` tag — so their relative links still work.)
+
+It renders the real slide components — not screenshots — so it cannot drift from the deck, and your annotations print with it. Its one honest limit is the same one CAPTURE has: a slide holding a live `<iframe>` (a `WebSite` or `WebPage` embed) cannot be printed, so the handout names the embed on the sheet rather than leaving you a blank rectangle to puzzle over.
+
+If your deck's canvas isn't 1920×1080, or it uses a theme, say so once in its `pages.ts` — the layout and the handout both read it, so they can't disagree:
+
+```js
+export const deck = { width: 1080, height: 1920, baseFontSize: '1.8em' };
+```
 
 ## Text view (long-form)
 

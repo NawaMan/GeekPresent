@@ -44,26 +44,26 @@
 </ContentPage>
 
 <!-- Demo objects, parked low on the canvas so they clear the title + text. -->
-<Block name="hero" x={90} y={740} width={520} height={200} grid={10}>
+<Block name="hero" x={60} y={890} width={520} height={140} grid={10}>
 	<div class="demo a"><b>Drag me</b><br/>snaps to 10px</div>
 </Block>
 
 <!-- bounds="none": drag/resize past the canvas edge (off-stage or bleeding over). -->
-<Block name="aside" x={1245} y={709} width={400} height={280} bounds="none">
+<Block name="aside" x={1249} y={854} width={393} height={165} bounds="none">
 	<div class="demo b"><b>Resize me</b><br/>or drag me off-edge</div>
 </Block>
 
 <!-- ImageBlock: the image fills the panel, so it takes whatever shape you drag
      the box into (fit="fill", the default). -->
-<ImageBlock name="cat" src={codecat} alt="Coding Booth cat" x={777} y={685} width={303} height={303} bounds="none" />
+<ImageBlock name="cat" src={codecat} alt="Coding Booth cat" x={786} y={798} width={249} height={249} bounds="none" />
 
 <!-- Stacking order: `front` comes FIRST in the markup, so DOM paint order alone
      would bury it — but z={1} lifts it over `back` (default z=0). Flip LAYOUT on
      and use the ⤒ / ⤓ buttons to reorder them; Copy/Save writes the z back. -->
-<Block name="front" x={1443} y={278} width={280} height={168} z={1}>
+<Block name="front" x={1216} y={298} width={280} height={168} z={1}>
 	<div class="demo c"><b>front</b><br/>z=1</div>
 </Block>
-<Block name="back" x={1580} y={344} width={280} height={168}>
+<Block name="back" x={1439} y={338} width={280} height={168}>
 	<div class="demo d"><b>back</b><br/>z=0 (default)</div>
 </Block>
 

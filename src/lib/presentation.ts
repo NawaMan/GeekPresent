@@ -43,6 +43,40 @@ export function getMode(): Mode {
 	return getContext<Mode>(MODE_KEY) ?? 'presentation';
 }
 
+// Handout mode.
+//
+// A third context a slide can find itself in, after the deck window and the presenter
+// console: the HANDOUT (routes/handout/[deck].html), where every slide of a deck is stacked
+// into one printable document. A slide does not change for it — the handout renders the
+// very same +page.svelte — but a component may need to know, because the rules of paper
+// are not the rules of a screen.
+//
+// <Note> is the one that does, and it is worth saying why it cannot simply read the
+// display mode instead. A note is shown in SCALED display and in the presenter window,
+// and hidden otherwise; but `displayMode` is PERSISTED, so a speaker who once zoomed
+// into a slide would carry SCALED into the handout and get notes they never asked for.
+// In the handout the question "print the notes?" has exactly one answer — the one the
+// reader asked for — so the handout states it, and Note obeys it instead of guessing
+// from a store that is about something else.
+export interface Handout {
+	/** Render <Note>s into the document. (Whether they are SHOWN is then CSS's business —
+	    the handout's notes toggle flips a class, so the DOM is the same either way and a
+	    prerendered handout hydrates without a mismatch.) */
+	notes: boolean;
+}
+
+const HANDOUT_KEY = Symbol('geekpresent.handout');
+
+/** Declare that these slides are being rendered into a printable handout. */
+export function setHandout(handout: Handout): void {
+	setContext(HANDOUT_KEY, handout);
+}
+
+/** The handout this slide is being printed into, or null in a normal deck. */
+export function getHandout(): Handout | null {
+	return getContext<Handout>(HANDOUT_KEY) ?? null;
+}
+
 // View-transition navigation.
 //
 // By default a deck pages between slides with a full-page load (window.location)

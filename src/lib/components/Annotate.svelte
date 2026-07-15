@@ -305,17 +305,39 @@
      `browser &&` because a pen is nothing without JS: prerendering the button would ship a
      control that does nothing until hydration, and it would put authoring chrome into the
      static HTML of every deck built on a dev machine (where canAnnotate defaults on). -->
+<!-- The top-centre tool cluster. ANNOTATE is the always-visible anchor; PRINT and CAPTURE hide
+     BEHIND it and fly out to either side on hover/focus. They come in through slots so their
+     logic stays in SlideDeck (capture already lived there) — but they live HERE, in the cluster,
+     for the same reason the toggle does: once the pen is armed the ink surface swallows every
+     pointer on the canvas, so anything meant to stay clickable has to sit above it. A button in
+     the deck's other chrome cluster would be buried the moment someone drew.
+
+     The cluster is anchored to ANNOTATE (`$canAnnotate`), which is the honest shape of "behind
+     ANNOTATE": a deck that offers CAPTURE but not the pen would not get the flyout. None do today
+     — the docs deck enables both — so the coupling costs nothing; if one ever needs capture
+     without the pen, that is the moment to give the cluster its own anchor. -->
 {#if browser && chrome && $canAnnotate}
-	<button
-		type="button"
-		class="annot-toggle no-print"
-		class:on={$annotationMode}
-		aria-pressed={$annotationMode}
-		title={$annotationMode ? 'Put the pen down (Esc)' : 'Draw on this slide'}
-		onclick={() => annotationMode.update((v) => !v)}
-	>
-		{$annotationMode ? '✎ ANNOTATE on' : '✎ ANNOTATE'}
-	</button>
+	<div class="annot-tools no-print">
+		<button
+			type="button"
+			class="annot-toggle"
+			class:on={$annotationMode}
+			aria-pressed={$annotationMode}
+			title={$annotationMode ? 'Put the pen down (Esc)' : 'Draw on this slide'}
+			onclick={() => annotationMode.update((v) => !v)}
+		>
+			{$annotationMode ? '✎ ANNOTATE on' : '✎ ANNOTATE'}
+		</button>
+
+		<!-- The other tools DROP DOWN from under ANNOTATE on hover/focus: PRINT, CAPTURE, OVERVIEW.
+		     A column rather than the old left/right pair, because three-plus tools want a menu, not
+		     a see-saw. CAPTURE is empty (zero-height) on a deck that does not offer it. -->
+		<div class="annot-drop">
+			<slot name="print" />
+			<slot name="capture" />
+			<slot name="overview" />
+		</div>
+	</div>
 {/if}
 
 <!-- Old ink, found on arrival. The reason a persisted pen needs a conscience: without this,
@@ -450,22 +472,116 @@
 		filter: none;
 	}
 
-	/* ── The ANNOTATE toggle: top-centre, flush to the edge ─────────────────────────── */
-	.annot-toggle {
+	/* ── The top-centre tool cluster ────────────────────────────────────────────────
+	   The whole cluster is anchored here, flush to the top edge and centred. It is the
+	   one region that must survive an armed pen — z-index above the ink surface (40) and
+	   the bar (41) — because it holds the toggle that puts the pen back down, and now the
+	   PRINT/CAPTURE flyout too. */
+	.annot-tools {
 		position: absolute;
 		top: 0;
 		left: 50%;
 		transform: translateX(-50%);
-		/* Above the ink surface (40) AND the bar (41) — it is the one control that must
-		   survive an armed pen, since it is how the pen gets put down. */
 		z-index: 42;
+		display: flex;
+		align-items: flex-start;
+	}
+
+	/* The tools DROP DOWN as one panel, flush under the toggle. It is ABSOLUTE, so it adds no size
+	   to the cluster — the cluster stays exactly the toggle's box and stays centred, and the panel
+	   hangs below it.
+
+	   `top: 100%` seats the panel's top edge exactly on the toggle's bottom edge — no gap — which
+	   is the whole trick to it being usable: the panel is a descendant of `.annot-tools`, so
+	   hovering it keeps the cluster `:hover`, and because the two edges touch, moving the pointer
+	   down from the toggle into the panel never crosses dead space that would drop the hover and
+	   snap the panel shut. The rest state only LIFTS it (translateY) and fades it, so the reveal
+	   slides down from behind the toggle. */
+	.annot-drop {
+		position: absolute;
+		top: 100%;
+		left: 50%;
+		z-index: 1;
+		min-width: 10em;
+		display: flex;
+		flex-direction: column;
+		padding: 0.3em;
+		border: 1px solid var(--annot-bar-edge, rgba(255, 255, 255, 0.16));
+		border-top: none;
+		border-radius: 0 0 10px 10px;
+		background: var(--annot-toggle-bg, rgba(20, 22, 26, 0.96));
+		box-shadow: 0 8px 26px rgba(0, 0, 0, 0.5);
+		opacity: 0;
+		pointer-events: none;
+		transform: translateX(-50%) translateY(-8px);
+		transition: opacity 150ms ease, transform 150ms ease;
+	}
+	.annot-tools:hover .annot-drop,
+	.annot-tools:focus-within .annot-drop {
+		opacity: 1;
+		pointer-events: auto;
+		transform: translateX(-50%) translateY(0);
+	}
+
+	/* The tools are rows in that panel — same amber-on-dark as the toggle, but flat menu items
+	   rather than pills, so the panel reads as one dropdown. They arrive as slotted buttons
+	   carrying `.annot-tool`; `:global` reaches across the slot boundary to dress them (CAPTURE
+	   arrives wrapped in `.capture-btn`, which must stretch to a full row too). */
+	.annot-drop :global(.capture-btn) {
+		display: block;
+		width: 100%;
+	}
+	.annot-drop :global(.annot-tool) {
+		display: block;
+		width: 100%;
+		text-align: center;
 		cursor: pointer;
 		font: inherit;
-		font-size: calc(var(--base-font, 16px) * 0.8);
+		font-size: calc(var(--base-font, 16px) * 0.6);
 		font-weight: bold;
 		letter-spacing: 0.04em;
+		padding: 0.4em 0.9em;
+		border: 0;
+		border-radius: 6px;
+		background: transparent;
+		color: var(--annot-toggle-fg, #F0A33E);
+	}
+	.annot-drop :global(.annot-tool:hover:not(:disabled)) {
+		background: var(--annot-bar-hover, rgba(255, 255, 255, 0.1));
+	}
+	.annot-drop :global(.annot-tool:disabled) {
+		cursor: default;
+		opacity: 0.7;
+	}
+
+	/* With the panel open, the toggle squares its bottom so it merges into the panel as its
+	   header, and it stays fully lit while the pointer is anywhere in the cluster (not only on the
+	   toggle itself — otherwise it would dim the moment you moved down onto a tool). */
+	.annot-tools:hover .annot-toggle,
+	.annot-tools:focus-within .annot-toggle {
+		opacity: 1;
+		border-bottom-left-radius: 0;
+		border-bottom-right-radius: 0;
+	}
+
+	/* ── The ANNOTATE toggle: the cluster's anchor, flush to the edge ────────────────── */
+	.annot-toggle {
+		position: relative;
+		/* Above the flanks (z 1), so at rest they hide behind it. */
+		z-index: 2;
+		cursor: pointer;
+		font: inherit;
+		/* Three-quarter size, and half faded: the pen is a speaker's tool that spends the whole
+		   talk NOT being used, so at rest it should read as available rather than as part of the
+		   slide. It comes back to full strength the moment it is reached for (hover) or armed
+		   (.on) — a control the eye can find but does not have to look at. */
+		font-size: calc(var(--base-font, 16px) * 0.6);
+		font-weight: bold;
+		letter-spacing: 0.04em;
+		opacity: 0.5;
+		transition: opacity 120ms ease;
 		/* Flush to the top edge: square there, rounded below. */
-		padding: 0.3em 1.1em;
+		padding: 0.225em 0.825em;
 		border: 1px solid var(--annot-bar-edge, rgba(255, 255, 255, 0.16));
 		border-top: none;
 		border-radius: 0 0 10px 10px;
@@ -473,12 +589,17 @@
 		color: var(--annot-toggle-fg, #F0A33E);
 		box-shadow: 0 3px 14px rgba(0, 0, 0, 0.4);
 	}
+	.annot-toggle:hover,
+	.annot-toggle:focus-visible {
+		opacity: 1;
+	}
 	.annot-toggle:hover {
 		background: var(--annot-bar-hover, rgba(255, 255, 255, 0.1));
 	}
 	/* Armed, it stops being a suggestion and starts being a state — filled, so the speaker can
 	   see at a glance that the next click will DRAW rather than do whatever the slide does. */
 	.annot-toggle.on {
+		opacity: 1;
 		background: var(--annot-pen, #F0A33E);
 		color: var(--annot-bar-on-fg, #1A1206);
 		border-color: transparent;

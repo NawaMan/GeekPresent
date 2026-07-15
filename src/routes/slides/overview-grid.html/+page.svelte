@@ -2,9 +2,9 @@
   Example: OVERVIEW — the all-slides grid, demonstrated live.
   File: src/routes/slides/overview-grid.html/+page.svelte
 
-  Like capture-slide.html and layout-mode.html, this slide IS its own demo: the OVERVIEW
-  button under the ToC is real in the deployed build, and so is the `O` key. Press either
-  one while reading this and the deck you are standing in opens as a grid.
+  Like capture-slide.html and layout-mode.html, this slide IS its own demo: the `O` key is real
+  in the deployed build. Press it while reading this and the deck you are standing in opens as
+  a grid.
 -->
 <script>
 	import ContentPage from '$lib/templates/ContentPage.svelte';
@@ -21,18 +21,18 @@
 <ContentPage title="Overview Page" subtitle="The whole deck at once — press O">
 	<div style="line-height: 1.55em;">
 		<p>
-			Press <Kbd>O</Kbd> (or the <b>OVERVIEW PAGE</b> button, under the Table of Contents) and every
-			slide in this deck appears at once. Click one to jump there; <Kbd>Esc</Kbd> closes.
-			Finding slide 40 stops being a matter of paging to it, or of reading a list of titles
-			and guessing.
+			Press <Kbd>O</Kbd> and every slide in this deck appears at once. Click one to jump
+			there; <Kbd>Esc</Kbd> closes. Finding slide 40 stops being a matter of paging to it, or
+			of reading a list of titles and guessing.
 		</p>
 		<p style="margin-top: 0.7em;">
-			It comes with the deck. There is no prop to set and nothing to import.
+			It comes with the deck. There is no prop to set and nothing to import — and
+			<b>no button</b>: a shut grid puts nothing in the corner and nothing on the page.
 		</p>
 		<QuickCode
 			style="margin-top: 0.7em;"
 			lang="svelte"
-			code={`<SlideDeck {pages} />   <!-- OVERVIEW PAGE is already there -->`}
+			code={`<SlideDeck {pages} />   <!-- press O — the grid is already there -->`}
 		/>
 	</div>
 </ContentPage>

@@ -176,6 +176,53 @@ linking to the sample Text (`/text.html`) and the two presentations.
 - To add another standalone Text, copy `src/routes/text.html/` to a new route (e.g.
   `src/routes/my-text/`); the root stays the landing.
 
+### And a third, which nobody authors: the handout
+
+`/handout/<deck>.html` (`src/routes/handout/[deck].html/`) is every slide of a deck stacked
+into one printable document — `Ctrl+P → Save as PDF` — with `?notes` adding a band of speaker
+notes under each. Two compact OVERVIEW layouts share the route: **`?grid`** (a landscape
+thumbnail contact-sheet) and **`?grid&notes`** (a portrait list, thumbnail left / `<Note>` right).
+All three are **derived**: they glob the real slide components out of the routes
+(`$lib/handout/handoutDecks.ts`), so there is nothing to author and they cannot drift from the
+deck. The layout is read at `onMount` (not init) so SSR/hydration start on the `pages` layout and
+then flip — a query param can't change a prerendered file. The notes grid renders each slide
+TWICE (a thumbnail with notes off, and a note-only pass) via `HandoutFrame`, because the `<Note>`
+lives inside the slide's scaled canvas and CSS can't lift it out to full size. Four more things
+are load-bearing when you touch anything nearby:
+
+- **It renders slides into the prerendered HTML — the only page that does.** `SlideDeck` gates
+  its slot on `initialized`, so a built *slide* is an empty shell until the browser arrives; a
+  document must not be, so the handout mounts no shell and calls `setPages` itself. This means
+  **every slide must survive a server render**. (`AppendixPage` did not, and reaching for
+  `url.searchParams` at prerender is exactly the way to break it again.)
+- **A deck's SURFACE lives in its `pages.ts`**, not in its `+layout.svelte`:
+  `export const deck = { width, height, baseFontSize, deckClass, background, font }` — all of
+  them `<SlideDeck>` props. The layout reads it *and so does the handout*, which never mounts
+  the layout. A deck that is not a 1920×1080 dark canvas must declare it or it will print as
+  one. See `routes/portrait/pages.ts` and `routes/geeklight/pages.ts`.
+- **It lives OUTSIDE the decks, and reserves no slide name.** A deck is a folder of slides its
+  author owns. It renders them under a **`<base href="…/<deck>/">`** so their relative links
+  (`./appendix-detail.html`, `../`) still resolve into the deck — the browser honours it and so
+  does SvelteKit's prerender crawler, which is what keeps the crawl off a wall of 404s. Don't
+  add relative URLs to that page; the base tag would move them too.
+- The printed page's arithmetic is pure and tested (`$lib/handout/handoutCore.ts`) — and
+  `SlideDeck`'s own `@media print` block **reuses it**, so `Ctrl+P` on one slide prints it at the
+  same size that slide has inside a handout, and `?notes` on a slide prints it with its `<Note>`
+  on the one page. A slide that cannot print (a live `<iframe>`) is **named on the sheet**, the
+  same bargain CAPTURE makes, reusing `captureCore.findBlockers`.
+- Three traps live here, and each was invisible until a PDF was measured:
+  - **The `@page` rule cannot live in `<svelte:head>`.** An `{@html}` there is server-rendered and
+    then *adopted unchanged* at hydration, so the paper stays whatever the server thought — the
+    frame grows its notes band and the note lands on a second page. It is written to the head
+    imperatively (`$lib/handout/pageRuleDom.ts`).
+  - **Canvas-space chrome anchored with `right`/`bottom` is poison on paper.** Chrome, laying out
+    for print, measures an absolutely-positioned element inside a `transform: scale()`d ancestor
+    *without applying the transform* — so a right-anchored `Copyright` looked like overflow and
+    shrank every sheet to 0.76×. Anchor from the left, or don't print it.
+  - **Round the printed box, then derive the scale from it** — never the reverse. A rounded scale
+    multiplied back put the canvas a tenth of a pixel outside the paper, which a printer answers by
+    shrinking the whole deck.
+
 ## Rules you must follow
 
 1. **Keep `pages.ts` in sync.** Any time you add, remove, or rename a slide folder, update *that
@@ -446,8 +493,14 @@ Nothing to place: `SlideDeck` mounts `<Annotate>` once, like `Spotlight`. One pr
 
 ### "Save this slide as an image (CAPTURE)"
 
-One prop, and a **CAPTURE** button joins LAYOUT/PRESENT in the slide chrome. It downloads the
-current slide as a PNG.
+One prop, and a **CAPTURE** button appears in **ANNOTATE's top-centre flyout** — hover ANNOTATE
+and CAPTURE (and PRINT) slide out beside it. It downloads the current slide as a PNG. (CAPTURE is
+grouped with ANNOTATE/PRINT as the per-slide *output* tools; LAYOUT/SAVE/PRESENT stay in the
+top-right authoring cluster.) **PRINT** sits on ANNOTATE's other side and opens a small menu —
+This slide / This slide + notes (print in place; the notes toggle is a local override, no
+navigation), and Whole deck / + notes (a full nav to `/handout/<deck>.html`). The whole flyout is
+anchored to ANNOTATE (`$canAnnotate`): a deck must offer the pen to get PRINT/CAPTURE, which every
+real deck that wants them does.
 
 ```svelte
 <SlideDeck {pages} capture captureScale={2} />

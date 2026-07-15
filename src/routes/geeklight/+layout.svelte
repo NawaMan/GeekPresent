@@ -5,17 +5,17 @@
   passed to SlideDeck as props, so there is no duplicated scaling logic here.
 -->
 <script lang="ts">
-	import SlideDeck    from '$lib/components/SlideDeck.svelte';
-	import { pages }    from './pages';
-	import { setPages } from '$lib/presentation';
+	import SlideDeck       from '$lib/components/SlideDeck.svelte';
+	import { deck, pages } from './pages';
+	import { setPages }    from '$lib/presentation';
 
 	// Theming: themes.css holds the base palettes, roles.css maps the semantic role
 	// tokens onto them. The deckClass below picks the light palette.
 	import '$lib/themes/themes.css';
 	import '$lib/themes/roles.css';
 
-	// Watercolor background for the content surface (Vite resolves to a URL).
-	import bg from './bg.png';
+	// The surface (theme class, watercolor background, serif) lives in pages.ts, beside the
+	// slide list, so the printable handout reads the same one — see the note there.
 
 	// Publish this presentation's slide list to its slides (nav + ToC read it).
 	setPages(pages);
@@ -31,9 +31,9 @@
 	description="GeekLight — a light-theme GeekPresent deck: the same components on a soft watercolor background."
 	width={1920}
 	height={1080}
-	deckClass="gp-deck theme-light"
-	contentBackground={`url(${bg}) center / cover no-repeat, var(--surface-bg)`}
-	contentFont="'Merriweather', Georgia, serif"
+	deckClass={deck.deckClass}
+	contentBackground={deck.background}
+	contentFont={deck.font}
 >
 	<slot />
 </SlideDeck>
