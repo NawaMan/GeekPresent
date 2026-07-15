@@ -820,7 +820,7 @@
 					<button type="button" role="menuitem" on:click={() => openHandout('?grid&notes')}>Notes grid</button>
 				</div>
 			{/if}
-			<TableOfContent {pages} {article} {articleText} {articleHref} />
+			<TableOfContent {pages} deck={deckName} {article} {articleText} {articleHref} />
 			<!-- The all-slides grid (press O). Canvas-space, like the ToC — its tiles are
 			     live `?clean` iframes of the real slides.
 

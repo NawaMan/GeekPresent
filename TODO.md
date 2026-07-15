@@ -967,21 +967,55 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
 
 ## Tier 2 — on-brand tech-talk polish
 
-- [ ] **Full-deck search** — a filter box that searches every slide's text and jumps to the hit.
-  - There is no search anywhere in the deck. Every `search` hit in the repo is something else:
-    `DataTable`'s `SearchBox` (scoped to one table's rows), `URLSearchParams` plumbing, or SEO prose
-    about search *engines*. Neither TOC has a filter input. So "which slide mentioned backpressure?"
-    is answered by paging. The pain grows with the deck — this project's own is ~65 slides.
-  - Approach: build the index at build time from the slide *sources*, via an `import.meta.glob` with
-    `?raw` — the same trick `ViewSource` already uses, and the reason it uses it applies here too:
-    a raw import of the real file **cannot drift** from what's on screen, whereas a hand-kept index
-    would. Strip tags/script blocks to text, key by the `pages.ts` path, and let the existing TOC
-    overlay grow a filter input (it already owns `Escape`-to-close, `TableOfContent.svelte:39`).
-  - Index at build time, not runtime: it must survive prerender, and a static site has no server to
-    ask. No dependency — this is a `.filter()` over a few dozen strings, not a search engine.
-  - Open questions: does it search the `<Note>` speaker text too (findable by the speaker, invisible
-    to the audience — probably yes, and probably worth flagging in the result), and does a hit
-    highlight the term on arrival or merely land you on the slide?
+- [x] **Full-deck search** — a filter box that searches every slide's text and jumps to the hit.
+  - Done: a **Search slides…** box grown into the Table of Contents overlay (`TableOfContent.svelte`).
+    Type a word and the list narrows to the slides that mention it — title matches and body matches,
+    each body hit carrying a snippet of the line it was found on. Empty box → the plain TOC list, so
+    an untouched menu is unchanged. Clicking a hit navigates by the same relative `./path` link the
+    list already uses.
+  - **The index is built from the slide *sources* at build time**, exactly as pitched: an eager
+    `import.meta.glob('/src/routes/*/*/+page.svelte', { query: '?raw' })` in
+    `src/lib/utils/searchIndex.ts` — the same drift-proof trick `ViewSource` uses (a raw import of the
+    real file cannot drift from what's on screen), and it survives prerender / needs no server. The
+    glob's two-directory shape means a deck's own `+page.svelte` redirect (one directory) is not swept
+    in.
+  - **All the logic is a pure, total core** (`src/lib/utils/searchCore.ts`, the
+    `drawCore`/`connectorCore` discipline): `stripToText` (drops `<script>`/`<style>` blocks so
+    imports and component names are not searched, then comments, mustaches, and every tag — leaving
+    prose), `buildDeckIndex` (glob keys → deck→path→text), `snippetAround`, and `searchDocs` (a
+    case-insensitive substring filter over title + body, in deck order). Junk in — a non-string
+    source, a null doc, a missing field — yields a defined answer, never a throw.
+  - **Wiring:** `SlideDeck` passes the `deckName` it already derives from the URL
+    (`SlideDeck.svelte:375`) as `TableOfContent`'s new `deck` prop; the TOC looks that deck's slide
+    text out of the index (`deckSearchDocs`). A `docs` prop is the test seam — production derives from
+    the index, tests inject deterministic text. Search covers exactly what the TOC lists (appendices
+    stay out, same as the list).
+  - **Open question settled — yes, it searches `<Note>` speaker text.** A note's words live in the
+    source between `<Note>…</Note>`, so `stripToText` keeps them: a speaker can find their own note
+    though the audience never sees it. The demo slide *is* the proof — it plants "watermelon" in a
+    speaker note and nowhere on screen, and a DOM test searches the real index for it end to end.
+  - **Open question settled — a hit shows a snippet, not an arrival-highlight.** The snippet in the
+    result already answers "which slide mentioned backpressure?" before you click; cross-slide
+    term-highlighting was cut as out of scope (it needs state plumbed across a full-document
+    navigation for little gain over the snippet).
+  - **The filter box had to swallow its own keystrokes.** `NavigationBar` pages on the arrow keys
+    from a `window` listener with **no input-focus guard** (only Space is guarded, via
+    `spaceIntent`/`isInteractiveTarget`), so a bare cursor-move in the box would flip the slide.
+    `handleSearchKeydown` `stopPropagation`s every keystroke typed in the box and handles `Escape`
+    locally: Escape clears the query first, and only an already-empty box closes the menu — so Escape
+    never yanks the menu shut mid-search. The box autofocuses on open (`use:focusOnMount`), so the
+    menu is type-to-search.
+  - The TOC is a light chrome panel whatever the deck theme, so the new `--toc-search-*` /
+    `--toc-snippet-fg` tokens track the panel's own **light** fallbacks (`#CCC`/`#555`), not the
+    dark-deck convention the slide roles follow.
+  - Demo `full-deck-search.html` (route + `+layout.js` + `pages.ts` entry, beside Navigation/Overview
+    as the fourth way to get around a deck) — it explains the feature and *is* the fixture, planting
+    the "watermelon" note the tests key off. Tests: `tests/searchCore.test.ts` (the pure core — strip,
+    index, snippet, filter, totality), `tests/DeckSearch.test.ts` (DOM — open/type/filter, title-vs-body
+    snippet, relative links, no-matches, the Escape ladder, the key-swallowing guard, and a real-index
+    end-to-end search for "watermelon"), and `tests/DeckSearchSsr.ssr.test.ts` (svelte/server — the
+    closed menu prerenders the toggle but neither the search box nor any indexed slide-body text leaks
+    into the static page).
 - [ ] **Presenter pacing — are you ahead or behind?** — a per-slide time budget, so the console can
       say "3 minutes behind" instead of just showing a clock.
   - The two halves already exist and *never talk to each other*: a durable elapsed timer with

@@ -15,6 +15,9 @@ export const pages = [
     // to move around a deck, after paging and the ToC. The slide IS its own demo — press
     // O while reading it and this deck opens as a grid of itself.
     { path: "overview-grid.html",     title: "Overview Page — The All-Slides Grid" },
+    // Also beside Navigation: full-deck search is the fourth way to get around a deck.
+    // The slide IS its own demo — open the ToC while reading it and search its own words.
+    { path: "full-deck-search.html",  title: "Full-Deck Search" },
     { path: "appendix-page.html",     title: "AppendixPage" },
     // `hidden: true` — an APPENDIX: real, prerendered, linkable slides that are NOT in
     // the deck's linear order. →/Space step over them and the Table of Contents doesn't
