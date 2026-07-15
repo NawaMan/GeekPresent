@@ -6,7 +6,12 @@
 // ContentPage) read it with getPages() — so navigation and the Table of
 // Contents are scoped to whichever presentation the slide belongs to.
 import { getContext, setContext } from 'svelte';
+import { derived, type Readable } from 'svelte/store';
+import { page } from '$app/stores';
 import type { Page } from '$lib/utils/navigate';
+import { currentSlidePath, progressOf, type Progress } from '$lib/utils/progressCore';
+
+export type { Progress } from '$lib/utils/progressCore';
 
 const PAGES_KEY = Symbol('geekpresent.pages');
 
@@ -18,6 +23,24 @@ export function setPages(pages: Array<Page>): void {
 /** Read the current presentation's slide list (empty if none was published). */
 export function getPages(): Array<Page> {
 	return getContext<Array<Page>>(PAGES_KEY) ?? [];
+}
+
+/** Where THIS slide sits in its deck, as a reactive store — index, 1-based position,
+    the visible-slide total, and a 0..1 fraction — for a page or component that wants to
+    draw its own progress (a bar along the bottom, a "3 / 7" chip) without re-deriving it
+    from the DOM. It combines the slide list getPages() already publishes with the live
+    route, so it updates as the deck pages; the arithmetic (and its NaN-safety) lives in
+    progressCore. Call during component init — it reads context — then subscribe:
+
+      <script>
+        import { getProgress } from '$lib/presentation';
+        const progress = getProgress();
+      </script>
+      <p>Slide {$progress.position} of {$progress.total}</p>
+*/
+export function getProgress(): Readable<Progress> {
+	const pages = getPages();
+	return derived(page, ($page) => progressOf(pages, currentSlidePath($page.url.pathname)));
 }
 
 // Artifact mode.

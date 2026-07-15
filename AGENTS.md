@@ -41,6 +41,10 @@ than misleading the next agent.
   `setPages(pages)` (from `$lib/presentation`); `TitlePage` / `ContentPage` read it via `getPages()`.
   So navigation and the Table of Contents are **scoped per presentation** — multiple presentations coexist,
   each with its own list. (Nothing imports a single global `pages.ts` anymore.)
+  A slide can also read **where it sits** with **`getProgress()`** (same module): a reactive store of
+  `{ index, position, total, fraction, present }` over the *visible* slides, combining that list with the
+  live route — for a page that wants to draw its own progress bar or a "3 / 7" chip. `ProgressBar` (below)
+  is the ready-made bar; the pure maths is `$lib/utils/progressCore`.
   An entry may carry **`hidden: true`** to make it an **appendix**: still a real, prerendered,
   linkable slide, but out of the deck's linear order — →/Space step over it and the TOC doesn't
   list it. **Contiguous** hidden entries are ONE appendix (a chapter you page through). You jump
@@ -111,6 +115,9 @@ than misleading the next agent.
   a `-QR.png`, and note `YouTube`'s `qr` prop is now optional for exactly that reason),
   `AppendixLink` (the call *into* an appendix — `<AppendixLink to="appendix-gc.html">how the GC
   marks</AppendixLink>`; it stamps the current slide as the return address, so you never type one),
+  `ProgressBar` (a thin "how far through the deck" bar that fills as you page — it reads `getProgress()`,
+  so it needs no props; drop it in a deck's `+layout.svelte` after `setPages`, tagged `gp-chrome no-print`
+  so it bows out of captures and printouts. geeklight wears one deck-wide),
   plus two canvas-level **singletons** `SlideDeck` mounts for you — no slide places them:
   `Spotlight` (dims the canvas and rings a *named* `Block`, driven by a `<Note>` line the
   speaker covers in the console) and `Annotate` (the speaker's **pen** — freehand ink on the
