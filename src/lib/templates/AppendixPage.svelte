@@ -226,7 +226,7 @@
 
 <!-- The page root IS the ContentPage, so the three pass-throughs go through it — an
      appendix's own root would be a second box. -->
-<ContentPage {title} {subtitle} {rule} {align} {style} {id} class={klass} nav={false}>
+<ContentPage {title} {subtitle} {rule} {align} {style} {id} class={klass}>
 	<slot />
 </ContentPage>
 

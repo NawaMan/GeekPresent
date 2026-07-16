@@ -49,6 +49,10 @@
 	/** Show the extra link above the slide list. Off by default — only decks that
 	    want it (e.g. a text.html article view, or a "back to home" link) enable it. */
 	export let article = false;
+	/** Hosted in SlideDeck's bottom ControlBar rather than the slide's top-left corner.
+	    The trigger then sits inline in the bar and its flyout opens UPWARD, bounded to the
+	    viewport (not the slide canvas, whose --canvas-h isn't defined in the overlay). */
+	export let bar = false;
 	/** Label for that link. */
 	export let articleText = 'View as article';
 	/** Href for that link. Relative to the current slide URL (e.g. `../text.html`
@@ -125,7 +129,7 @@
 	});
 </script>
 
-<div class="toc gp-chrome no-print" class:expanded={$isContentVisible} bind:this={tocRef}>
+<div class="toc gp-chrome no-print" class:expanded={$isContentVisible} class:bar bind:this={tocRef}>
 	<CtrlBtn chrome text="Table of Contents" hoverText="Table of Contents" on:click={toggleTableOfContent} isSelected={$isContentVisible} />
 
 	{#if $isContentVisible}
@@ -198,6 +202,24 @@
 		display: flex;
 		flex-direction: column;
 		max-height: calc(var(--canvas-h, 1080px) - var(--ctrl-top, 12px) - 12px);
+	}
+
+	/* Hosted in the bottom ControlBar: the trigger sits inline in the bar's flex row and
+	   the flyout opens UPWARD out of it. Bounded to the viewport — the slide's --canvas-h
+	   is undefined in the window-fixed overlay, so it would fall back to the wrong 1080. */
+	.toc.bar {
+		position: relative;
+		top: auto;
+		left: auto;
+		max-height: none;
+	}
+	.toc.bar .content {
+		position: absolute;
+		bottom: 100%;
+		left: 0;
+		margin-left: 0;
+		margin-bottom: 4px;
+		max-height: calc(100vh - 4em);
 	}
 
 	.toc .content {

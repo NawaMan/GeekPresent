@@ -14,28 +14,24 @@
 
     <WebPage src="https://svelte.dev" title="svelte.dev" />
 
-  It renders its own NavigationBar (like TitlePage / ContentPage do), so paging
-  still works with the site on screen. Composing it INSIDE a page template would
-  give you two nav bars — pass `nav={false}` there.
+  Paging still works with the site on screen: the deck's pager lives in SlideDeck's
+  ControlBar (the bottom-centre chrome bar), not on this component, so a full-bleed
+  site and a nested one behave the same and there is no second bar to suppress.
 
   Layering: the frame is absolutely positioned and carries no z-index, so it paints
   in DOM order — the deck's own chrome (ADJUST toggle, Table of Contents, speaker
-  Notes) and this component's own nav bar all stay above it and stay clickable. The
-  site behind them is inert anyway until you click the shield.
+  Notes) stays above it and stays clickable. The site behind them is inert anyway
+  until you click the shield.
 
   Props: `src`, `title`, `zoom`, `zoomLevels`, `chrome`, `controls`, `interactive`,
   `lazy`, `sandbox`, `allow` all pass straight through to WebSite. Plus:
-    nav    — render the NavigationBar (default true). False when nesting in a template.
     height — text mode only: the embed's height there (a text artifact has no canvas).
 
   In `text` mode there is no canvas to fill, so the embed drops out of the absolute
   layer and renders as a plain, full-width block `height` tall, with no nav bar.
 -->
 <script lang="ts">
-	import { getPageNavigation, type PageNavigation } from '$lib/utils/navigate';
-	import { getMode, getPages } from '$lib/presentation';
-	import { page } from '$app/stores';
-	import NavigationBar from '$lib/components/NavigationBar.svelte';
+	import { getMode } from '$lib/presentation';
 	import WebSite from '$lib/components/WebSite.svelte';
 
 	/** The URL to embed. */
@@ -60,8 +56,6 @@
 	export let sandbox: string | false = 'allow-scripts allow-same-origin allow-popups allow-forms';
 	/** Iframe permission policy, e.g. 'fullscreen; clipboard-write'. */
 	export let allow: string = '';
-	/** Render the NavigationBar. False when nesting inside a page template. */
-	export let nav: boolean = true;
 	/** Text mode only: how tall the embed renders where there is no canvas. */
 	export let height: string = '640px';
 	/** Inline style for the root element, applied last so it wins. */
@@ -75,10 +69,6 @@
 	export { klass as class };
 
 	const isText = getMode() === 'text';
-	const pages = getPages();
-
-	let navigation: PageNavigation;
-	$: navigation = getPageNavigation(pages, $page.url.pathname.split('/').pop() || '', './');
 </script>
 
 <div class="webpage {klass}" class:text-mode={isText} id={id || undefined} style={style || undefined}>
@@ -96,15 +86,6 @@
 		height={isText ? height : '100%'}
 	/>
 </div>
-
-{#if nav && !isText}
-	<NavigationBar
-		firstLink={navigation.first}
-		prevLink={navigation.prev}
-		nextLink={navigation.next}
-		lastLink={navigation.last}
-	/>
-{/if}
 
 <style>
 	/* Absolute against the deck's .container (the only positioned ancestor), so this

@@ -18,9 +18,9 @@
       { at: '1:14', tag: 'BOOTH', label: 'It builds.' },
     ]} />
 
-  It renders its own NavigationBar (like TitlePage / ContentPage / WebPage do), so
-  paging still works with the video on screen. Composing it INSIDE a page template
-  would give you two nav bars — pass `nav={false}` there.
+  Paging still works with the video on screen: the deck's pager lives in SlideDeck's
+  ControlBar (the bottom-centre chrome bar), not on this component — so a full-bleed
+  video and a nested one behave the same and there is no second bar to suppress.
 
   `keys="global"` is worth more here than on a mixed slide: when the video IS the
   content, Space walking chapter to chapter and then paging on is exactly the deck's
@@ -28,23 +28,19 @@
 
   Layering: the player is absolutely positioned and carries no z-index, so it paints
   in DOM order — the deck's own chrome (ADJUST toggle, Table of Contents, speaker
-  Notes) and this component's nav bar are later siblings and stay above it. A
-  <video> takes no keys of its own, so nothing here competes for the deck's.
+  Notes) are later siblings and stay above it. A <video> takes no keys of its own,
+  so nothing here competes for the deck's.
 
   Props: `src`, `poster`, `bookmarks`, `chapters`, `controls`, `native`, `keys`,
   `continueKey`, `start`, `autoplay`, `loop`, `muted`, `playsinline`, `preload` all
   pass straight through to Video. Plus:
-    nav    — render the NavigationBar (default true). False when nesting in a template.
     height — text mode only: the player's height there (a text artifact has no canvas).
 
   In `text` mode there is no canvas to fill, so the player drops out of the absolute
   layer into normal flow at `height`, with no nav bar.
 -->
 <script lang="ts">
-	import { getPageNavigation, type PageNavigation } from '$lib/utils/navigate';
-	import { getMode, getPages } from '$lib/presentation';
-	import { page } from '$app/stores';
-	import NavigationBar from '$lib/components/NavigationBar.svelte';
+	import { getMode } from '$lib/presentation';
 	import Video from '$lib/components/Video.svelte';
 	import type { Bookmark } from '$lib/utils/videoCore';
 
@@ -76,8 +72,6 @@
 	export let playsinline: boolean = true;
 	/** How much to fetch up front. */
 	export let preload: 'none' | 'metadata' | 'auto' = 'metadata';
-	/** Render the NavigationBar. False when nesting inside a page template. */
-	export let nav: boolean = true;
 	/** Text mode only: how tall the player renders where there is no canvas. */
 	export let height: string = '640px';
 	/** Inline style for the root element, applied last so it wins. */
@@ -91,10 +85,6 @@
 	export { klass as class };
 
 	const isText = getMode() === 'text';
-	const pages = getPages();
-
-	let navigation: PageNavigation;
-	$: navigation = getPageNavigation(pages, $page.url.pathname.split('/').pop() || '', './');
 </script>
 
 <div class="videopage {klass}" class:text-mode={isText} id={id || undefined} style={style || undefined}>
@@ -116,15 +106,6 @@
 		height={isText ? height : '100%'}
 	/>
 </div>
-
-{#if nav && !isText}
-	<NavigationBar
-		firstLink={navigation.first}
-		prevLink={navigation.prev}
-		nextLink={navigation.next}
-		lastLink={navigation.last}
-	/>
-{/if}
 
 <style>
 	/* Absolute against the deck's .container (the only positioned ancestor), so this

@@ -70,22 +70,16 @@ describe('ContentPage header (SSR)', () => {
 	});
 });
 
-// The pager is part of the template — a slide should not have to remember to add one.
-// The exception is a slide with no neighbours to page to, which supplies its own way
-// out instead: an AppendixPage builds on ContentPage and drops the bar to do exactly
-// that (see templates/AppendixPage.svelte). Without this seam it would have had to
-// reimplement the page, or ship two nav bars.
+// The pager is NO LONGER the template's concern. It lives once in SlideDeck's ControlBar
+// (the bottom-centre chrome bar) for every slide, so a ContentPage renders only its own
+// header + content — no FIRST/PREV/NEXT/LAST. (An AppendixPage still brings its own RETURN
+// pager on top of ContentPage — see templates/AppendixPage.svelte.)
 describe('ContentPage nav (SSR)', () => {
-	it('carries the pager by default', () => {
+	it('carries NO pager — the deck-level ControlBar owns it now', () => {
 		const { body } = render(ContentPage, { props: { title: 'T' } });
-		expect(body).toContain('>NEXT<');
-		expect(body).toContain('>PREV<');
-	});
-
-	it('nav={false} drops it, keeping the page itself intact', () => {
-		const { body } = render(ContentPage, { props: { title: 'T', nav: false } });
 		expect(body).not.toContain('>NEXT<');
 		expect(body).not.toContain('>PREV<');
+		// The page itself is intact.
 		expect(body).toContain('>T</h1>');
 		expect(body).toContain('class="content');
 	});
