@@ -375,7 +375,7 @@
 	}
 
 	// The current deck's name, from the URL: `/slides/title.html` -> `slides`. The handout for it
-	// lives OUTSIDE the deck at `/handout/<deck>.html`, so these two options navigate there rather
+	// lives OUTSIDE the deck at `/_handout/<deck>.html`, so these two options navigate there rather
 	// than printing in place — the handout is a different document (every slide at once).
 	$: deckName = ($page.url.pathname.replace(base, '').split('/').filter(Boolean)[0]) || '';
 	function openHandout(query: string) {
@@ -386,7 +386,7 @@
 		// blank. It is the printable document; landing on it fresh is the honest thing anyway.
 		// `query` selects the layout: '' pages, '?notes' pages+notes, '?grid' the thumbnail grid,
 		// '?grid&notes' the notes grid.
-		if (browser) window.location.assign(`${base}/handout/${deckName}.html${query}`);
+		if (browser) window.location.assign(`${base}/_handout/${deckName}.html${query}`);
 	}
 
 	// "Save" writes the slide's moved Blocks back to source. It only reaches a source

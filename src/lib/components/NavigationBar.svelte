@@ -41,7 +41,7 @@
 	// to a single TOP control that jumps back up the document.
 	const mode = getMode();
 
-	// In a HANDOUT (routes/handout/[deck].html) there is no bar at all. Not hidden — ABSENT,
+	// In a HANDOUT (routes/_handout/[deck].html) there is no bar at all. Not hidden — ABSENT,
 	// and the difference matters three times over. A handout holds every slide of the deck
 	// at once, so a rendered bar would be sixty-odd bars each arming its own global keydown
 	// listener, and one → keypress would be handled sixty times; it would emit sixty sets of

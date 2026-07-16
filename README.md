@@ -451,16 +451,16 @@ There's also a **PRINT** entry, in the top-centre tool bar's hamburger (☰) men
 - **Thumbnail grid** — every slide as a small tile, contact-sheet style, on landscape paper.
 - **Notes grid** — one row per slide, thumbnail left and its `<Note>` right, on portrait paper.
 
-The grids are `/handout/<deck>.html?grid` and `?grid&notes`; like the handout they render the real slides (not screenshots) and let the browser paginate — as many tiles or rows as fit.
+The grids are `/_handout/<deck>.html?grid` and `?grid&notes`; like the handout they render the real slides (not screenshots) and let the browser paginate — as many tiles or rows as fit.
 
 | URL | What prints |
 | --- | --- |
 | *any slide* | That slide, one page. |
 | *any slide* `?notes` | That slide **and its `<Note>`** beneath it, still one page. |
-| `/handout/slides.html` | **The whole deck** — every slide, one per page. |
-| `/handout/slides.html?notes` | The same, with each slide's number, title and `<Note>` printed beneath it. |
+| `/_handout/slides.html` | **The whole deck** — every slide, one per page. |
+| `/_handout/slides.html?notes` | The same, with each slide's number, title and `<Note>` printed beneath it. |
 
-Then Ctrl/Cmd-P → *Save as PDF*. The browser is the PDF engine, so there is no export step and no dependency. Every deck has a handout (`/handout/<deck>.html`), a portrait deck prints on portrait paper, and a slide printed on its own is *exactly* the size it is inside the handout — both ask the same module.
+Then Ctrl/Cmd-P → *Save as PDF*. The browser is the PDF engine, so there is no export step and no dependency. Every deck has a handout (`/_handout/<deck>.html`), a portrait deck prints on portrait paper, and a slide printed on its own is *exactly* the size it is inside the handout — both ask the same module.
 
 The slide is **centred inside a margin** rather than bled to the edge, and both of those are load-bearing: a real printer cannot reach the edge of the paper, and a browser that declines the custom page size (Chrome and Edge honour it) prints on A4 instead — centred, the leftover splits evenly rather than pooling at the bottom.
 

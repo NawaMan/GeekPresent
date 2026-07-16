@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { afterEach, describe, expect, it } from 'vitest';
-import Handout from '../src/routes/handout/[deck].html/+page.svelte';
+import Handout from '../src/routes/_handout/[deck].html/+page.svelte';
 import { setPageUrl, resetPageUrl } from './stubs/app-stores';
 
 // The half of the handout that only exists in a browser: the notes toggle and the paper size
@@ -96,7 +96,7 @@ describe('Handout — the overview layouts', () => {
 		// The layout is read at onMount (not init), so it starts as `pages` — matching prerender —
 		// then flips. After a tick the grid is up: one tile per slide, and the paper turned
 		// landscape.
-		setPageUrl('/handout/portrait.html?grid');
+		setPageUrl('/_handout/portrait.html?grid');
 		const { container } = mount();
 		await tick();
 		expect(container.querySelectorAll('.gtile')).toHaveLength(3);
@@ -105,7 +105,7 @@ describe('Handout — the overview layouts', () => {
 	});
 
 	it('?grid&notes switches to the notes grid, on a portrait page', async () => {
-		setPageUrl('/handout/portrait.html?grid&notes');
+		setPageUrl('/_handout/portrait.html?grid&notes');
 		const { container } = mount();
 		await tick();
 		expect(container.querySelectorAll('.nrow')).toHaveLength(3);

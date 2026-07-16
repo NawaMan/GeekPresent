@@ -185,7 +185,7 @@ linking to the sample Text (`/text.html`) and the two presentations.
 
 ### And a third, which nobody authors: the handout
 
-`/handout/<deck>.html` (`src/routes/handout/[deck].html/`) is every slide of a deck stacked
+`/_handout/<deck>.html` (`src/routes/_handout/[deck].html/`) is every slide of a deck stacked
 into one printable document — `Ctrl+P → Save as PDF` — with `?notes` adding a band of speaker
 notes under each. Two compact OVERVIEW layouts share the route: **`?grid`** (a landscape
 thumbnail contact-sheet) and **`?grid&notes`** (a portrait list, thumbnail left / `<Note>` right).
@@ -507,7 +507,7 @@ current slide as a PNG. (The bar itself is `PRESENT │ ANNOTATE │ ADJUST SAVE
 ANNOTATE / ADJUST toggles sit in the open, while OVERVIEW / CAPTURE / PRINT — the *navigation and
 output* tools — live behind the hamburger.) **PRINT** opens a small submenu — This slide / This
 slide + notes (print in place; the notes toggle is a local override, no navigation), and Whole
-deck / + notes (a full nav to `/handout/<deck>.html`). CAPTURE only appears when the deck offers it
+deck / + notes (a full nav to `/_handout/<deck>.html`). CAPTURE only appears when the deck offers it
 (`capture`), and the whole bar is hidden under `?clean` / `?present`.
 
 ```svelte

@@ -656,7 +656,7 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
     care, and `OverviewPageSsr.ssr.test.ts` says so.
 - [x] **Handout — the whole deck as one printable document / PDF** — one page per slide, notes
       optional, so `Ctrl+P → Save as PDF` exports the talk.
-  - Done: `src/routes/handout/[deck].html/` (the route: `+page.js` prerenders one per deck from
+  - Done: `src/routes/_handout/[deck].html/` (the route: `+page.js` prerenders one per deck from
     `entries()`, `+page.svelte` stacks them), with the arithmetic in
     `src/lib/handout/handoutCore.ts` (pure, total — `drawCore`/`captureCore` discipline: a junk
     canvas yields the 1920×1080 default, because every number here ends up inside a CSS
@@ -698,13 +698,13 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
     the handout never mounts the layout, so props passed to `<SlideDeck>` there are invisible to
     it — and a light deck (`geeklight`) would have printed on GeekPresent's black, a `portrait` at
     two-thirds text size. Declared once, they cannot drift.
-  - **It RESERVES NO SLIDE NAME**, and that is why it lives at `/handout/<deck>.html` rather than
+  - **It RESERVES NO SLIDE NAME**, and that is why it lives at `/_handout/<deck>.html` rather than
     inside the deck. A deck is a folder of slides its author owns. The reason inside is tempting is
     that a slide's links are relative (`./appendix-detail.html`, `../`), so from outside they would
     all point into a directory that does not exist — a wall of 404s in the crawl. `<base
     href="…/<deck>/">` is the mechanism built for exactly that, and SvelteKit's prerender crawler
     honours it (`kit/src/core/postbuild/crawl.js` reads BASE), so the crawl walks into the real
-    slides. `.html` is not decoration either: a bare `/handout/slides` loads from a dumb static
+    slides. `.html` is not decoration either: a bare `/_handout/slides` loads from a dumb static
     host but the CLIENT ROUTER cannot match the url it lands on, and hydrates the document into
     nothing — a blank page after a perfect prerender.
   - Two things paper needed that the screen never did: `print-color-adjust: exact` (a browser does

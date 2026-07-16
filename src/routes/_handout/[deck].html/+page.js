@@ -4,13 +4,13 @@ import { deckNames, isDeck } from '$lib/handout/handoutDecks';
 export const prerender = true;
 export const trailingSlash = 'never';
 
-// `/handout/slides.html` — outside the deck, and RESERVING NOTHING. A handout that lived at
+// `/_handout/slides.html` — outside the deck, and RESERVING NOTHING. A handout that lived at
 // `/slides/handout.html` would have taken that name away from the deck's author forever, and a
 // deck is a folder of slides they own; GeekPresent does not get to keep one of the names.
 //
 // What makes the inside tempting is that a slide's links are RELATIVE — `./appendix-detail.html`
 // from an <AppendixLink>, `../` from the title slide's way home. The handout renders those very
-// slides, so wherever it sits, their links resolve against ITS url; and from `/handout/slides.html`
+// slides, so wherever it sits, their links resolve against ITS url; and from `/_handout/slides.html`
 // every one of them would point into a directory that does not exist. A wall of 404s in the
 // prerenderer's crawl, and a dead link for anyone who clicks one on screen.
 //
@@ -23,7 +23,7 @@ export const trailingSlash = 'never';
 // exactly the slide links it exists to fix.
 //
 // `.html` is not decoration: the built site is plain files on a dumb static host, so a URL is a
-// FILE. A bare `/handout/slides` would need the host to invent the extension — and where it does
+// FILE. A bare `/_handout/slides` would need the host to invent the extension — and where it does
 // not, the file still loads but the CLIENT ROUTER cannot match the url it finds itself on, and
 // hydrates the whole document into nothing. A blank page after a perfect prerender.
 //

@@ -19,7 +19,7 @@
   slides out of the built HTML (SlideDeck gates its slot on `initialized`). The handout is a
   DOCUMENT: it must exist in the prerendered file, so it imports the components for real.
 
-  The slide glob below excludes `/src/routes/handout/**` — the handout's own route, which is
+  The slide glob below excludes `/src/routes/_handout/**` — the handout's own route, which is
   shaped like a slide folder (`[deck].html/`) and would otherwise be handed to the handout to
   render, once per deck, as a module importing itself. Note what this exclusion is NOT: it is
   not a reserved slide NAME. The handout deliberately lives outside the decks so that no name
@@ -39,7 +39,7 @@ const pageModules = import.meta.glob<{ pages: Array<Page>; deck?: DeckMeta }>(
 
 /** Every slide component in the site, keyed by module path — minus the handout's own route. */
 const slideModules = import.meta.glob<{ default: ComponentType }>(
-	['/src/routes/*/*.html/+page.svelte', '!/src/routes/handout/**'],
+	['/src/routes/*/*.html/+page.svelte', '!/src/routes/_handout/**'],
 	{ eager: true }
 );
 

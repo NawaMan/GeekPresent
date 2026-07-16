@@ -15,7 +15,7 @@
 // server-rendering at all.
 import { render } from 'svelte/server';
 import { describe, expect, it } from 'vitest';
-import Handout from '../src/routes/handout/[deck].html/+page.svelte';
+import Handout from '../src/routes/_handout/[deck].html/+page.svelte';
 import { pageRule, sheetMetrics } from '../src/lib/handout/handoutCore';
 import { pages as portraitPages, deck as portraitDeck } from '../src/routes/portrait/pages';
 import { pages as slidePages } from '../src/routes/slides/pages';

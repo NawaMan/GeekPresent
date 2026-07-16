@@ -1,6 +1,6 @@
 /*
   Handout — the pure decision layer behind the whole deck as one printable document
-  (see routes/handout/[deck].html, which owns the impure half: the globs, the DOM scan and
+  (see routes/_handout/[deck].html, which owns the impure half: the globs, the DOM scan and
   window.print()).
 
   The premise is that the browser is already a PDF engine, so a handout needs no

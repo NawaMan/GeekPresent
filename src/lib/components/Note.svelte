@@ -12,7 +12,7 @@
     flips ITSELF back to visible (visibility is inherited and individually
     overridable), so no portal is needed to lift it out of the hidden slide.
 
-  - In a printable handout (routes/handout/[deck].html), it becomes the band of prose
+  - In a printable handout (routes/_handout/[deck].html), it becomes the band of prose
     below the printed slide — but only if the reader asked for notes. There the
     display mode does not get a vote; see `handout` below.
 -->
@@ -37,7 +37,7 @@
 	let klass: string = '';
 	export { klass as class };
 
-	// The handout (routes/handout/[deck].html) is a third home for the same note, and it OVERRIDES
+	// The handout (routes/_handout/[deck].html) is a third home for the same note, and it OVERRIDES
 	// the other two rather than adding to them: there, whether a note is in the document is
 	// the reader's decision, printed or not printed, and not a consequence of a display mode
 	// the speaker happened to leave on SCALED weeks ago. See presentation.ts.
