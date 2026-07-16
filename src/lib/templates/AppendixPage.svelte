@@ -140,7 +140,7 @@
 	// and rightly so — a prerendered file is one file, so it cannot depend on a query string
 	// that varies per visit. In the deck this never came up, because SlideDeck gates its slot
 	// on `initialized` and no slide has ever been server-rendered. The HANDOUT renders slides
-	// for real (routes/handout/[deck].html), which is what surfaced it. At prerender there IS no
+	// for real (routes/_handout/[deck].html), which is what surfaced it. At prerender there IS no
 	// caller, so `null` is the honest answer and the exit falls back to the deck's first
 	// slide; hydration then reads the real `?return=` and the way out is restored.
 	$: returnTo = !browser

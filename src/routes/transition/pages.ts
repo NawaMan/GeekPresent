@@ -1,5 +1,5 @@
 // This deck's SURFACE — the green palette. Declared here rather than in +layout.svelte because
-// the printable handout (routes/handout/[deck].html) reads it from this module: it never mounts
+// the printable handout (routes/_handout/[deck].html) reads it from this module: it never mounts
 // the layout, so a deckClass passed to <SlideDeck> there would be invisible to it, and the deck
 // would print in GeekPresent's default colours instead of its own.
 export const deck = { deckClass: 'gp-deck theme-green' };

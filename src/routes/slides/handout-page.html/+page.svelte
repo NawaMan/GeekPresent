@@ -30,15 +30,15 @@
 		<QuickCode
 			style="margin-top: 0.7em;"
 			lang="text"
-			code={`/handout/slides.html          the whole deck — one page per slide
-/handout/slides.html?notes    the same, with the speaker notes under each
-/handout/slides.html?grid     a thumbnail contact-sheet (landscape)
-/handout/slides.html?grid&notes   slide + note per row (portrait)
+			code={`/_handout/slides.html          the whole deck — one page per slide
+/_handout/slides.html?notes    the same, with the speaker notes under each
+/_handout/slides.html?grid     a thumbnail contact-sheet (landscape)
+/_handout/slides.html?grid&notes   slide + note per row (portrait)
 this-slide.html?notes         just this slide, and its note, on one page`}
 		/>
 		<p style="margin-top: 0.7em;">
-			Open <a href="{base}/handout/slides.html"><b>this deck's handout</b></a> (or
-			<a href="{base}/handout/slides.html?notes">with notes</a>), then press
+			Open <a href="{base}/_handout/slides.html"><b>this deck's handout</b></a> (or
+			<a href="{base}/_handout/slides.html?notes">with notes</a>), then press
 			<Kbd>Ctrl</Kbd>+<Kbd>P</Kbd>. The browser is the PDF engine, so there is no export step
 			and no dependency — <code>Save as PDF</code> is the feature.
 		</p>

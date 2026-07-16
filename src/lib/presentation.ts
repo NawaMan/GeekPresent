@@ -69,7 +69,7 @@ export function getMode(): Mode {
 // Handout mode.
 //
 // A third context a slide can find itself in, after the deck window and the presenter
-// console: the HANDOUT (routes/handout/[deck].html), where every slide of a deck is stacked
+// console: the HANDOUT (routes/_handout/[deck].html), where every slide of a deck is stacked
 // into one printable document. A slide does not change for it — the handout renders the
 // very same +page.svelte — but a component may need to know, because the rules of paper
 // are not the rules of a screen.
