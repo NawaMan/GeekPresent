@@ -1,0 +1,141 @@
+<!--
+  ControlBar — the bottom-centre control bar, the mirror of the top PRESENT tool bar.
+
+  Where <SlideToolbar> gathers the AUTHORING tools (PRESENT / ANNOTATE / ADJUST / DISPLAY),
+  this gathers the NAVIGATION controls that used to be scattered inside the scaled slide: the
+  Table of Contents (was top-left) and the FIRST/PREV/CONTINUE/NEXT/LAST pager (was re-mounted
+  bottom-left by every page template). SlideDeck mounts it in the same viewport-fixed overlay, so
+  it sticks to the WINDOW's bottom edge at a constant size no matter how the slide is scaled or
+  panned.
+
+  Like the tool bar it is a SHELL: SlideDeck supplies the contents as snippets (`tocItem`,
+  `navGroup`) and owns their logic.
+
+  It AUTO-HIDES downward — the exact mirror of the tool bar's upward tuck at the top: tucked so
+  only a peek strip shows at the bottom of the window, seating flush on the edge on hover or when
+  keyboard focus reaches a control inside (it never floats fully clear of the edge).
+
+  `browser &&` because these are live controls: prerendering would ship dead chrome and bake it
+  into the static HTML of every deck built on a dev machine (matches <SlideToolbar> / <Annotate>).
+-->
+<script lang="ts">
+	import { browser } from '$app/environment';
+	import type { Snippet } from 'svelte';
+
+	interface Props {
+		/** The Table of Contents flyout (SlideDeck supplies <TableOfContent bar />). */
+		tocItem?: Snippet;
+		/** The deck's ONE pager (SlideDeck supplies <NavigationBar deckLevel />). */
+		navGroup?: Snippet;
+	}
+
+	let { tocItem, navGroup }: Props = $props();
+</script>
+
+{#if browser}
+	<div class="ctrl-bar no-print" role="group" aria-label="Slide controls">
+		<!-- TABLE OF CONTENTS — the searchable slide list, its flyout opening UPWARD out of the bar. -->
+		{@render tocItem?.()}
+
+		<span class="ctrl-bar-sep" aria-hidden="true"></span>
+
+		<!-- NAV — the deck's single FIRST / PREV / CONTINUE / NEXT / LAST pager. -->
+		{@render navGroup?.()}
+	</div>
+{/if}
+
+<style>
+	/* ── The bottom-centre control bar ──────────────────────────────────────────────
+	   One horizontal pill, attached to the WINDOW's bottom edge and centred — the mirror of
+	   the top tool bar. Its parent (SlideDeck's .overlay) is position:fixed at z-index 50, so
+	   the bar stays put over any pan/zoom.
+
+	   THEMING — shared with <SlideToolbar> so the two bars restyle TOGETHER by default, yet can
+	   be peeled APART. Each surface reads its own `--ctrl-bar-*` override FIRST, then falls back
+	   to the tool bar's `--annot-*` token, then to the hardcoded dark default:
+	     • set `--annot-toggle-bg` / `--annot-bar-edge` / `--annot-toggle-fg` / `--annot-bar-hover`
+	       → restyles BOTH bars at once;
+	     • set `--ctrl-bar-bg` / `--ctrl-bar-edge` / `--ctrl-bar-fg` / `--ctrl-bar-hover`
+	       → restyles only THIS bar. */
+	.ctrl-bar {
+		position: absolute;
+		bottom: 0;
+		left: 50%;
+		/* Auto-hide, like the tool bar's upward tuck: at rest the bar tucks DOWN so a peek strip
+		   shows at the window's bottom edge, and hover / focus seats it flush on that edge. Tucked
+		   a touch LESS than the tool bar's -72% so a bit more of it shows at rest (~40% peek). */
+		transform: translateX(-50%) translateY(60%);
+		transition: transform 160ms ease;
+		display: flex;
+		align-items: center;
+		/* Thickness lever: the bar scales from this one font-size, matching <SlideToolbar>. */
+		font-size: calc(var(--base-font, 16px) * 0.5);
+		padding: 5px 0.2em;
+		/* Attached to the window's bottom edge (mirror of the tool bar at the top): full border
+		   and rounded corners on top, none on the edge it sits against, shadow cast upward. */
+		border: 3px solid var(--ctrl-bar-edge, var(--annot-bar-edge, rgba(255, 255, 255, 0.35)));
+		border-bottom: none;
+		border-radius: 10px 10px 0 0;
+		background: var(--ctrl-bar-bg, var(--annot-toggle-bg, rgba(20, 22, 26, 0.92)));
+		box-shadow: 0 -3px 14px rgba(0, 0, 0, 0.4);
+
+		/* Dress the CtrlBtn controls (TOC trigger, pager) like the tool bar's word buttons, from
+		   the SAME shared tokens — so theming the tool bar carries here. */
+		--ctrl-bg: transparent;
+		--ctrl-fg: var(--ctrl-bar-fg, var(--annot-toggle-fg, #f0a33e));
+		--ctrl-hover-bg: var(--ctrl-bar-hover, var(--annot-bar-hover, rgba(255, 255, 255, 0.1)));
+		--ctrl-selected-bg: var(--ctrl-bar-hover, var(--annot-bar-hover, rgba(255, 255, 255, 0.14)));
+		--ctrl-strong-bg: var(--ctrl-bar-fg, var(--annot-toggle-fg, #f0a33e));
+		--on-accent: var(--ctrl-bar-fg, var(--annot-toggle-fg, #f0a33e));
+	}
+
+	/* Revealed on hover / focus: it rises to sit FLUSH on the bottom edge — attached, never
+	   floating fully clear of the window's lip. */
+	.ctrl-bar:hover,
+	.ctrl-bar:focus-within {
+		transform: translateX(-50%) translateY(0);
+	}
+
+	/* The bar owns visibility through its own tuck, so its slotted controls must NOT also
+	   independently ghost via the overlay's fadeChrome rule — they ride the bar at full
+	   strength. (The tool bar's slotted buttons aren't gp-chrome for the same reason.) */
+	.ctrl-bar :global(.gp-chrome) {
+		opacity: 1 !important;
+	}
+
+	/* Slotted controls sit in the flex row rather than at their old canvas-absolute anchor.
+	   Each control carries its own in-bar styling (TableOfContent `bar`, NavigationBar
+	   `deckLevel`); this just guarantees they flow inline here. */
+	.ctrl-bar :global(.toc),
+	.ctrl-bar :global(.nav) {
+		position: static;
+	}
+
+	/* Sit the pager's buttons dead-centre in the row. As a plain block <div> the pager
+	   lays its buttons out as inline-blocks on the line-box BASELINE, which rides a couple
+	   of pixels below the TOC trigger (whose .toc host is a flex column that centres its
+	   button exactly). Making the pager a centred flex row anchors both the same way, so
+	   TABLE OF CONTENTS and FIRST/PREV/… share one baseline. */
+	.ctrl-bar :global(.nav) {
+		display: flex;
+		align-items: center;
+	}
+
+	/* One uniform word-button row: the pager labels are typed in caps (FIRST / PREV / …)
+	   but the TOC trigger's label is Title Case, so side by side they read as two different
+	   fonts. Force every trigger/pager button in the bar to uppercase so the row is one
+	   consistent typeface. The DOM text stays as authored (e.g. "Table of Contents"), so the
+	   accessible name is unaffected; and the TOC flyout lists slide titles as plain <a>/<li>,
+	   not buttons, so those keep their real casing. */
+	.ctrl-bar :global(button) {
+		text-transform: uppercase;
+	}
+
+	/* Thin vertical divider between the bar's groups (TOC | nav). */
+	.ctrl-bar-sep {
+		width: 1px;
+		align-self: stretch;
+		margin: 0.35em 0.15em;
+		background: var(--ctrl-bar-edge, var(--annot-bar-edge, rgba(255, 255, 255, 0.16)));
+	}
+</style>

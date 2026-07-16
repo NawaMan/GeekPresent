@@ -8,6 +8,7 @@
 	import { navigate as pageNavigate } from '$lib/utils/deckNav';
 	import { presenterMode } from '$lib/stores/presenter';
 	import { activeSteps } from '$lib/stores/activeSteps';
+	import { localNav, registerNav, unregisterNav } from '$lib/stores/localChrome';
 	import { spaceIntent } from '$lib/utils/stepKeys';
 
 	export let firstLink = '';
@@ -15,6 +16,15 @@
 	export let nextLink  = '';
 	export let lastLink  = '';
 	export let onContinue: (() => void) | null = null;
+	/** The ONE deck-level pager, mounted once by SlideDeck's ControlBar rather than
+	    per-slide by a template. It reads the current slide's neighbours from SlideDeck
+	    and owns arrow/Space paging for every ordinary slide — but it must never fight a
+	    slide that brings its OWN NavigationBar (an AppendixPage's RETURN pager, a bespoke
+	    route). So a NON-deckLevel bar REGISTERS itself in `localNav` while it lives, and
+	    the deckLevel bar goes DORMANT (hidden, and its key handler inert) while any such
+	    registration stands. It stays mounted while dormant — not conditionally unmounted —
+	    so a client-side slide change can't flicker it in and out. */
+	export let deckLevel = false;
 	/** Override the view transition used when paging FORWARD (NEXT / → / Space) and
 	    BACKWARD (PREV / ←) from this slide.
 
@@ -99,7 +109,12 @@
 		target.scrollTo({ top: 0, behavior: 'smooth' });
 	}
 
+	// A deckLevel pager yields the keys entirely while a slide owns its own bar — the
+	// slide-local one handles paging (and the appendix its RETURN keys) instead.
+	$: dormant = deckLevel && $localNav.size > 0;
+
 	function handleGlobalKeydown(event: KeyboardEvent) {
+		if (dormant) return;
 		if (event.key === 'ArrowLeft' && prevLink) {
 			event.preventDefault();
 			navigate(prevLink, 'back');
@@ -130,18 +145,25 @@
 		onContinue?.();
 	}
 
+	// A slide-local pager (NOT the deckLevel one) publishes itself so the deck-level
+	// pager can yield to it. Only where it actually renders a bar — never in a handout,
+	// which draws no pager at all (and would otherwise register sixty of them).
+	const navOwner = Symbol('nav');
+
 	onMount(() => {
 		// Arrow-key paging only makes sense between slides, not in a document.
 		if (browser && mode !== 'text' && !handout) {
 			window.addEventListener('keydown', handleGlobalKeydown);
 			window.addEventListener('gp:continue', handleRelayedContinue);
 		}
+		if (browser && !deckLevel && !handout) registerNav(navOwner);
 	});
 
 	onDestroy(() => {
 		if (browser) {
 			window.removeEventListener('keydown', handleGlobalKeydown);
 			window.removeEventListener('gp:continue', handleRelayedContinue);
+			if (!deckLevel && !handout) unregisterNav(navOwner);
 		}
 	});
 </script>
@@ -153,6 +175,18 @@
 		/* Vertical position knob: negative = lower, positive = higher. */
 		bottom: -10px;
 		left: 0px;
+	}
+	/* The deckLevel pager rides SlideDeck's ControlBar (a viewport-fixed flex row), not
+	   the slide's bottom-left corner — so it drops its canvas-absolute anchor and flows
+	   inline. `dormant` hides it (a slide owns its own pager) while it stays mounted, so
+	   its window key listener can go inert rather than be torn down and re-armed. */
+	.nav.bar {
+		position: static;
+		bottom: auto;
+		left: auto;
+	}
+	.nav.bar.dormant {
+		display: none;
 	}
 	.nav.text {
 		/* Pinned to the viewport so it stays reachable while scrolling. */
@@ -173,7 +207,7 @@
 	<CtrlBtn chrome text="TOP" on:click={onTop} />
 </div>
 {:else}
-<div class="nav gp-chrome no-print">
+<div class="nav gp-chrome no-print" class:bar={deckLevel} class:dormant>
 	<CtrlBtn chrome text="FIRST"    on:click={onFirst}    isDisabled={!firstLink} />
 	<CtrlBtn chrome text="PREV"     on:click={onPrev}     isDisabled={!prevLink} />
 	<CtrlBtn chrome text="CONTINUE" on:click={doContinue} isDisabled={!canContinue} />

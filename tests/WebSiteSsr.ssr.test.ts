@@ -89,16 +89,11 @@ describe('WebSite (SSR)', () => {
 });
 
 describe('WebPage (SSR)', () => {
-	it('renders the embed plus its own nav bar, so the slide can still page', () => {
+	it('renders the embed; paging is the deck ControlBar\'s job, not a bar of its own', () => {
 		const { body } = render(WebPage, { props: { src: SRC } });
 		expect(body).toContain('class="webpage');
 		expect(body).toContain(`href="${SRC}"`); // the lazy placeholder's link
-		expect(body).toContain('NEXT');
-	});
-
-	it('nav={false} drops the nav bar, for nesting inside a page template', () => {
-		const { body } = render(WebPage, { props: { src: SRC, nav: false } });
-		expect(body).toContain('class="webpage');
+		// The pager moved to SlideDeck's ControlBar — WebPage no longer ships one.
 		expect(body).not.toContain('NEXT');
 	});
 });

@@ -31,6 +31,8 @@
 	import TableOfContent from '$lib/components/TableOfContent.svelte';
 	import OverviewPage  from '$lib/components/OverviewPage.svelte';
 	import SlideToolbar   from '$lib/components/SlideToolbar.svelte';
+	import ControlBar     from '$lib/components/ControlBar.svelte';
+	import NavigationBar  from '$lib/components/NavigationBar.svelte';
 	import SlideMap       from '$lib/components/SlideMap.svelte';
 	import PresenterView  from '$lib/components/PresenterView.svelte';
 	import Seo            from '$lib/components/Seo.svelte';
@@ -223,6 +225,11 @@
 	// site default (app.html) and any presentation favicon set in the deck's layout.
 	$: currentSlide   = $page.url.pathname.replace(/\/+$/, '').split('/').pop();
 	$: currentIndex   = pages.findIndex((p) => p.path === currentSlide);
+	// The current slide's neighbours in the linear order, for the ControlBar's ONE
+	// deck-level pager — the same helper each template used to call for its own bar,
+	// now computed once here. Hidden/appendix slides resolve to all-undefined links
+	// (and their own template keeps its RETURN pager, so this one goes dormant anyway).
+	$: deckNavigation = getPageNavigation(pages, currentSlide ?? '', './');
 	$: currentFavicon = pages.find((p) => p.path === currentSlide)?.favicon;
 	// `?clean` hides all shell chrome (ToC, display-mode control, copyright, nav bar,
 	// minimap) for an unobstructed screen capture — e.g. the /tests calibration
@@ -690,7 +697,6 @@
 			     until there is ink or the pen is armed — so it is inert (and SSR-inert) on
 			     every deck that never offers it. -->
 				<Annotate canvasWidth={width} canvasHeight={height} {inkColors} {levelHighlight} />
-			<TableOfContent {pages} deck={deckName} {article} {articleText} {articleHref} />
 			<!-- The all-slides grid (press O). Canvas-space, like the ToC — its tiles are
 			     live `?clean` iframes of the real slides.
 
@@ -811,6 +817,25 @@
 			<button type="button" class="annot-tool" on:click={() => overviewOpen.set(true)}>OVERVIEW</button>
 		{/snippet}
 	</SlideToolbar>
+
+	<!-- ControlBar — the bottom-centre mirror of the tool bar, holding the navigation controls
+	     lifted out of the scaled slide: the Table of Contents (its flyout opening upward), the
+	     deck's ONE FIRST/PREV/CONTINUE/NEXT/LAST pager (fed the current slide's neighbours), and
+	     — portaled in from a slide that opts in — its animation scrubber. -->
+	<ControlBar>
+		{#snippet tocItem()}
+			<TableOfContent bar {pages} deck={deckName} {article} {articleText} {articleHref} />
+		{/snippet}
+		{#snippet navGroup()}
+			<NavigationBar
+				deckLevel
+				firstLink={deckNavigation.first ?? ''}
+				prevLink={deckNavigation.prev ?? ''}
+				nextLink={deckNavigation.next ?? ''}
+				lastLink={deckNavigation.last ?? ''}
+			/>
+		{/snippet}
+	</ControlBar>
 
 	<!-- The PRINT menu. It is NOT inside the flyout (which collapses the moment the pointer
 	     leaves it) — it is a canvas-space popover of its own, so it survives the click that

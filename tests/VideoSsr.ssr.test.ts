@@ -87,17 +87,12 @@ describe('Video (SSR)', () => {
 });
 
 describe('VideoPage (SSR)', () => {
-	it('renders the player plus its own nav bar, so the slide can still page', () => {
+	it('renders the player; paging is the deck ControlBar\'s job, not a bar of its own', () => {
 		const { body } = render(VideoPage, { props: { src: SRC, bookmarks: BOOKMARKS } });
 		expect(body).toContain('class="videopage');
 		expect(body).toContain('<video');
 		expect(body).toContain('>0:03</button>'); // the chapters, prerendered
-		expect(body).toContain('NEXT');
-	});
-
-	it('nav={false} drops the nav bar, for nesting inside a page template', () => {
-		const { body } = render(VideoPage, { props: { src: SRC, nav: false } });
-		expect(body).toContain('class="videopage');
+		// The pager moved to SlideDeck's ControlBar — VideoPage no longer ships one.
 		expect(body).not.toContain('NEXT');
 	});
 

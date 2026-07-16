@@ -27,9 +27,11 @@
                header at all and the content starts at the top.
     align    — 'left' (default) | 'center'. Centers the title and subtitle; the
                rule spans the header either way, so it needs no alignment.
-    nav      — the FIRST/PREV/CONTINUE/NEXT/LAST pager (default true).
-               `nav={false}` for a slide outside the deck's linear order, which
-               brings its own way out — see templates/AppendixPage.svelte.
+
+  The FIRST/PREV/CONTINUE/NEXT/LAST pager is no longer this template's concern — it
+  lives once in SlideDeck's ControlBar (the bottom-centre chrome bar) for every slide.
+  A slide outside the linear order that needs its own way out (an appendix) still
+  brings one — see templates/AppendixPage.svelte.
 
   The content area keeps its own styling (justified, slightly smaller than the
   header) regardless of `align` — `align` is the HEADER's alignment.
@@ -50,11 +52,6 @@
     --page-content-gap   header → content gap    (1em)
 -->
 <script lang="ts">
-	import { getPageNavigation, type PageNavigation } from '$lib/utils/navigate';
-	import { getPages } from '$lib/presentation';
-	import { page } from "$app/stores";
-	import NavigationBar from '$lib/components/NavigationBar.svelte';
-
 	/** Heading text; '' drops the <h1>. */
 	export let title = "";
 	/** Line under the title; '' drops it and pulls the rule up. */
@@ -63,14 +60,6 @@
 	export let rule = true;
 	/** Header alignment: 'left' (default) or 'center'. */
 	export let align: 'left' | 'center' = 'left';
-	/** Render the FIRST/PREV/CONTINUE/NEXT/LAST pager (default true).
-
-	    `nav={false}` is for a slide that is not part of the deck's linear order and
-	    so has no neighbours to page to — an appendix, which supplies its own RETURN
-	    control instead (templates/AppendixPage.svelte). Everything else about the
-	    page — header, content box, styling — is unchanged, which is the point:
-	    an appendix is a normal slide that is left in a different way. */
-	export let nav = true;
 
 	/** Inline style for the page root, applied last so it wins. */
 	export let style: string = '';
@@ -82,10 +71,6 @@
 	let klass: string = '';
 	export { klass as class };
 
-	const pages = getPages();
-	let currentPath: string | null = null;
-	let navigation: PageNavigation;
-
 	// An unknown `align` falls back to the default rather than emitting a class
 	// that matches nothing (which would silently render as left anyway, but via
 	// a lie in the markup).
@@ -93,11 +78,6 @@
 	// Nothing to show → no header element, so no margins of its own survive and
 	// the content starts at the top of the canvas.
 	$: hasHeader = Boolean(title) || Boolean(subtitle) || rule;
-
-	$: {
-		currentPath    = $page.url.pathname.split("/").pop() || null;
-		navigation = getPageNavigation(pages, currentPath || "", "./");
-	}
 </script>
 
 <div class="page {klass}" id={id || undefined} style={style || undefined}>
@@ -112,15 +92,6 @@
         <slot />
     </div>
 </div>
-
-{#if nav}
-<NavigationBar
-	firstLink={navigation.first}
-	prevLink={navigation.prev}
-	nextLink={navigation.next}
-	lastLink={navigation.last}
-/>
-{/if}
 
 <style>
     .page {
