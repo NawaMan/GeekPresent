@@ -3,6 +3,7 @@ export const pages = [
     // Playback primitives — the timeline the rest build on.
     { path: "animation-bar.html",     title: "AnimationBar Component" },
     { path: "animation-scene.html",   title: "AnimationScene Component" },
+    { path: "two-scenes.html",        title: "Two Scenes, Two Bars" },
     // Authoring a flying element with the SpriteStudio wrapper.
     { path: "keyframe-studio.html",   title: "Sprite Studio" },
     { path: "keyframe-multi.html",    title: "SpriteStudio × Many" },
