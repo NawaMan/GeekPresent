@@ -19,13 +19,21 @@
   `.content` (its own controls are excluded; CSS *transitions* like Box/WideDiv and
   infinite-loop animations are ignored — neither has a meaningful "progress").
 
-  By default it shows a low-profile "ANIMATION" chrome button (like MODE / the nav
+  By default it shows a low-profile "ANIMATE" chrome button (like MODE / the nav
   controls); clicking it reveals the full control bar. The reveal is one-way — the
   bar stays once shown (there is no control to fold it back to the button).
 
+  PLACEMENT: a PLAIN deck-level bar (default scope `.content`, no `driven` clock, no
+  explicit `host`) is the slide's ONE central control, so it is HOSTED in the deck's
+  bottom ControlBar — portaled out of the scaled canvas into the bar, beside the TOC and
+  pager (see the `barHosted` prop, utils/portal, stores/localChrome). A SCOPED bar
+  (`scope=".set-*"` / <AnimationScene>), a `driven` rail or a `host`-set bar governs a
+  region and stays in the slide, anchored just past the nav. `barHosted={false}` forces a
+  plain bar back into the slide.
+
   Usage — drop it anywhere inside a slide that animates:
       <AnimationBar />
-  It renders NOTHING — not even the ANIMATION button — on a slide with no finite,
+  It renders NOTHING — not even the ANIMATE button — on a slide with no finite,
   seekable @keyframes animation, so it is safe to leave in a shared template and
   cannot interfere with a static slide.
 -->
@@ -35,6 +43,8 @@
 	import { afterNavigate }      from '$app/navigation';
 	import { onMount, onDestroy, tick } from 'svelte';
 	import { pauseGroup, playGroup } from '$lib/utils/slideAnim';
+	import { portal }             from '$lib/utils/portal';
+	import { animBarSlot, registerHostedAnim, unregisterHostedAnim } from '$lib/stores/localChrome';
 
 	/* Selector for the element whose subtree is searched for animations. Defaults
 	   to the slide canvas `.content`; an author can narrow it (e.g. ".page") to a
@@ -66,6 +76,16 @@
 	   Implies "shown" (like startExpanded) but also pauses + seeks to 0, so the
 	   slide opens on the animation's initial state rather than running it. */
 	export let startPaused = false;
+	/* HOST this bar's scrubber in the deck's bottom ControlBar instead of floating it
+	   just past the nav inside the scaled slide. `undefined` (the default) AUTO-DETECTS:
+	   a plain deck-level bar — default scope `.content`, no external `driven` clock and no
+	   explicit `host` element — is the slide's ONE central control, so it hosts; a scoped
+	   bar (`.set-*` / `.anim-scene`), a `driven` rail or a `host`-set bar governs a region
+	   and stays in the slide. Pass `barHosted={false}` to keep a plain bar in the slide, or
+	   `barHosted` to force hosting. When hosted, the bar portals its `.anim-bar` node into
+	   the ControlBar (see utils/portal + stores/localChrome); the zero-footprint
+	   `anim-anchor` stays behind, so scope resolution still finds `.content`. */
+	export let barHosted: boolean | undefined = undefined;
 
 	/* Seek the whole group to a 0..1 fraction of its envelope. The public hook for
 	   scroll-/pointer-driven scrubbing from a parent — pair it with `driven`. */
@@ -107,16 +127,36 @@
 	let topInset: number | null = null;   // canvas-px top that centres the collapsed button on the nav row
 	let positioned = false;
 
-	$: barStyle =
-		(leftPos !== null ? `left:${leftPos}px;` : '') +
-		(topInset !== null && !expanded ? `top:${topInset}px;bottom:auto;` : '') +
-		(positioned ? '' : 'visibility:hidden;');
+	// Does this bar belong in the bottom ControlBar? Auto: a plain deck-level bar hosts;
+	// a scoped / driven / host-set bar stays in the slide. `barHosted` overrides either way.
+	$: hosted = barHosted ?? (!driven && !host && scope === '.content');
+	// The live portal target — the ControlBar's slot element once it has mounted, else null
+	// (which parks the bar at its authored position). Only hosted bars chase it.
+	$: hostTarget = hosted ? $animBarSlot : null;
+
+	// Register this bar as a live hosted animation while it is hosted AND has something to
+	// play, so the ControlBar reveals its animation segment (divider + slot) only then.
+	const animOwner = Symbol('hostedAnim');
+	$: if (browser) {
+		if (hosted && hasAnim) registerHostedAnim(animOwner);
+		else                   unregisterHostedAnim(animOwner);
+	}
+
+	// When hosted, the ControlBar owns placement — no canvas-px left/top anchoring. Hold the
+	// bar hidden until the slot exists (it flashing in-slide for a frame before the portal
+	// lands would be worse than a beat of nothing). Otherwise: the nav-anchored inline style.
+	$: barStyle = hosted
+		? (hostTarget ? '' : 'visibility:hidden;')
+		: (leftPos !== null ? `left:${leftPos}px;` : '') +
+			(topInset !== null && !expanded ? `top:${topInset}px;bottom:auto;` : '') +
+			(positioned ? '' : 'visibility:hidden;');
 
 	// Measure the nav and anchor the bar's LEFT edge just past it, so the collapsed
 	// button sits after LAST and the expanded bar grows rightward. A bar that
 	// starts expanded (embedded/driven) has no nav to anchor to and stays centred.
 	function positionBar() {
-		if (!browser || !root || expanded) { positioned = true; return; }
+		// Hosted bars are placed by the ControlBar, not anchored to the in-canvas nav.
+		if (!browser || !root || expanded || hosted) { positioned = true; return; }
 		const parent = root.offsetParent as HTMLElement | null;
 		const nav = (parent?.querySelector('.nav') ?? null) as HTMLElement | null;
 		if (parent && nav) {
@@ -292,7 +332,7 @@
 			(document as unknown as { fonts: FontFaceSet }).fonts.ready.then(() => positionBar());
 	});
 	afterNavigate(refresh);
-	onDestroy(stopLoop);
+	onDestroy(() => { stopLoop(); unregisterHostedAnim(animOwner); });
 </script>
 
 <!-- Zero-footprint marker that is ALWAYS in the DOM at the bar's position, so the
@@ -300,12 +340,20 @@
 <span class="anim-anchor" bind:this={anchor} aria-hidden="true"></span>
 
 {#if hasAnim}
-<div class="anim-bar no-print" class:expanded class:centered={leftPos === null} style={barStyle} bind:this={root}>
+<div
+	class="anim-bar no-print"
+	class:expanded
+	class:centered={!hosted && leftPos === null}
+	class:hosted
+	style={barStyle}
+	bind:this={root}
+	use:portal={hostTarget}
+>
 	{#if !expanded}
 	<!-- Low-profile reveal button (chrome, like MODE / the nav controls). One-way:
 	     pressing it shows the bar for good. -->
 	<span class="toggle">
-		<CtrlBtn chrome={!highlight} text="ANIMATION" on:click={expand} />
+		<CtrlBtn chrome={!highlight} text="ANIMATE" on:click={expand} />
 	</span>
 	{:else}
 	{#if !driven}
@@ -382,7 +430,49 @@
 		width: 54%;
 		max-width: 810px;
 	}
-	/* The ANIMATION button is rendered in this bar's enlarged (1.5em) context, so
+
+	/* ── HOSTED: portaled into the bottom ControlBar ──────────────────────────────────
+	   When the bar rides the ControlBar (see the `barHosted` prop), it is no longer the
+	   canvas-absolute pill anchored past the nav — it flows INLINE in the bar's row. So
+	   drop the absolute positioning and the enlarged 1.5em scale, and shrink back to the
+	   bar's own (smaller) scale so the collapsed ANIMATE button reads like the TOC / pager
+	   buttons beside it. The portaled node keeps this scoped styling (Svelte's scope hash
+	   rides with the element wherever the DOM moves it). */
+	.anim-bar.hosted {
+		position: static;
+		left: auto;
+		right: auto;
+		top: auto;
+		bottom: auto;
+		transform: none;
+		font-size: 1em;            /* inherit the ControlBar's row scale, not the 1.5em canvas one */
+		width: auto;
+		gap: 0.4em;
+	}
+	.anim-bar.hosted.expanded {
+		width: auto;               /* the bar sizes to its content — the rail carries a fixed width */
+		min-height: 0;
+	}
+	/* Collapsed ANIMATE button: no longer in a 1.5em context, so it needs no scale-down. */
+	.anim-bar.hosted .toggle {
+		font-size: 1em;
+	}
+	/* Compact transport for the slimmer bar: smaller icon buttons and a fixed-width rail
+	   (a bar that sizes to its content gives `flex:1` nothing to fill). */
+	.anim-bar.hosted .icon-btn {
+		width: 2em;
+		height: 2em;
+	}
+	.anim-bar.hosted .icon-btn svg {
+		width: 1.4em;
+		height: 1.4em;
+	}
+	.anim-bar.hosted .track {
+		flex: none;
+		width: 15.6em;   /* the hosted rail, lengthened 30% from the original 12em */
+	}
+
+	/* The ANIMATE button is rendered in this bar's enlarged (1.5em) context, so
 	   scale it back down to read like the MODE / nav chrome buttons. */
 	.toggle {
 		flex: none;

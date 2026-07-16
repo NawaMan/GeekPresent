@@ -20,11 +20,12 @@
   one AnimationBar governing every sprite, with per-sprite ADJUST editing.
 
   ONE CAVEAT WORTH SEEING: each SpriteStudio also bundles an <AnimationBar/>, and
-  that bar defaults to scope `.content` — the whole slide. So the three bars overlap
-  at the bottom and the visible one scrubs ALL three objects together on the shared
-  slide timeline. The AUTHORING is independent (three panels); the PLAYBACK is shared.
-  That shared-timeline behaviour is exactly what one <Draw> + <Sprite>s makes
-  first-class (one bar, on purpose) — the point of the "Sprites × Many" slide.
+  that bar defaults to scope `.content` — the whole slide. Each is a plain deck-level
+  bar, so all three HOST in the deck's bottom ControlBar (three ANIMATE controls, side
+  by side), and every one scrubs ALL three objects together on the shared slide
+  timeline. The AUTHORING is independent (three panels); the PLAYBACK is shared. That
+  shared-timeline behaviour is exactly what one <Draw> + <Sprite>s makes first-class
+  (one bar, on purpose) — the point of the "Sprites × Many" slide.
 
     1. Open with `?adjust` (or toggle ADJUST, top-right, in dev).
     2. Click an object, drag its ghosts to re-pose it; swing a grip to rotate.
@@ -79,10 +80,11 @@
 			<code>&lt;Sprite/&gt;</code>s instead.
 		</p>
 		<p style="margin-top: 0.6em; opacity: 0.8;">
-			Note the bottom bars overlap: every studio bundles an
-			<code>&lt;AnimationBar/&gt;</code> scoped to the whole slide, so playback is
-			<b>shared</b> while authoring stays <b>separate</b>. Making that shared
-			timeline first-class (one bar, on purpose) is what one <b>Draw</b> +
+			Note the <b>ANIMATE</b> controls that collect into the bottom bar: every studio
+			bundles an <code>&lt;AnimationBar/&gt;</code> scoped to the whole slide, so each
+			hosts in the deck's ControlBar and all scrub the <b>one shared</b> slide timeline
+			&mdash; playback is <b>shared</b> while authoring stays <b>separate</b>. Making
+			that shared timeline first-class (one bar, on purpose) is what one <b>Draw</b> +
 			<b>Sprites</b> is for &mdash; see <i>Sprites × Many</i>.
 		</p>
 	</div>

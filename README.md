@@ -331,7 +331,7 @@ Read-only code viewers built on the Monaco editor:
 
 ### Animation controls
 
-`AnimationBar` adds in-slide playback controls — a progress bar plus pause/play and restart — for a slide's own keyframe (`@keyframes`) animation. It drives the animations through the [Web Animations API](https://developer.mozilla.org/docs/Web/API/Web_Animations_API) (`getAnimations`), so you can pause to detach the animation from wall-clock time, drag the bar to scrub to any point, and restart from the top. It governs only the *in-page* CSS animations on the slide — page-to-page view transitions are untouched.
+`AnimationBar` adds playback controls — a progress bar plus pause/play and restart — for a slide's own keyframe (`@keyframes`) animation. It drives the animations through the [Web Animations API](https://developer.mozilla.org/docs/Web/API/Web_Animations_API) (`getAnimations`), so you can pause to detach the animation from wall-clock time, drag the bar to scrub to any point, and restart from the top. It governs only the *in-page* CSS animations on the slide — page-to-page view transitions are untouched.
 
 ```svelte
 <script>
@@ -345,8 +345,9 @@ Read-only code viewers built on the Monaco editor:
 ```
 
 - **Self-gating.** It renders *nothing* on a slide with no finite, seekable `@keyframes` animation (CSS *transitions* and infinite loops are ignored), so it's safe to leave in a shared template — it simply won't appear where there's nothing to control.
-- **Collapsed by default.** It first shows a low-profile **ANIMATION** button; clicking it reveals the bar (a one-way reveal).
-- Props: `scope` (CSS selector for the subtree it searches, default `.content`), `highlight` (emphasize the ANIMATION button with the accent look), and `startExpanded` (skip the button and show the controls straight away). In a view-transition deck it re-detects on every navigation, so one bar in the deck layout serves every slide. The `slides/animation-bar.html` slide is a live demo; `transition/*-from.html` use it to scrub an in-page re-creation of each transition effect.
+- **Hosted in the ControlBar.** A plain deck-level bar (default `scope=".content"`, no `driven`/`host`) is the slide's one central control, so it's lifted out of the scaled slide and *portaled* into the deck's bottom ControlBar, next to the Table of Contents and pager. A **scoped** bar (`scope=".set-a"`, `<AnimationScene>`), a `driven` rail, or a `host`-set bar governs a region and stays in the slide. Pass `barHosted={false}` to force a plain bar back into the slide, or `barHosted` to force hosting.
+- **Collapsed by default.** It first shows a low-profile **ANIMATE** button; clicking it reveals the bar (a one-way reveal).
+- Props: `scope` (CSS selector for the subtree it searches, default `.content`), `highlight` (emphasize the ANIMATE button with the accent look), `startExpanded` (skip the button and show the controls straight away), and `barHosted` (override the auto host/in-slide placement). In a view-transition deck it re-detects on every navigation, so one bar in the deck layout serves every slide. The `slides/animation-bar.html` slide is a live demo; `transition/*-from.html` use it to scrub an in-page re-creation of each transition effect.
 
 ### Local assets
 
