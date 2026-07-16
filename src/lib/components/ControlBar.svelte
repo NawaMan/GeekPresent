@@ -20,7 +20,8 @@
 -->
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import type { Snippet } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
+	import { animBarSlot, hostedAnim } from '$lib/stores/localChrome';
 
 	interface Props {
 		/** The Table of Contents flyout (SlideDeck supplies <TableOfContent bar />). */
@@ -30,6 +31,20 @@
 	}
 
 	let { tocItem, navGroup }: Props = $props();
+
+	// The portal target for a deck-level AnimationBar (see stores/localChrome + utils/portal).
+	// A plain <AnimationBar> in the live slide moves its `.anim-bar` node in here, so the
+	// central animation control rides the bottom bar instead of floating in the canvas.
+	let animSlot: HTMLElement | undefined = $state();
+	onMount(() => {
+		if (animSlot) animBarSlot.set(animSlot);
+		return () => animBarSlot.set(null);
+	});
+
+	// Reveal the animation segment (its divider + slot) only while a hosted bar has a LIVE
+	// animation, so a slide with none shows no dangling divider. The slot element itself is
+	// always mounted (the portal needs a stable target); only the divider is gated.
+	let hasAnim = $derived($hostedAnim.size > 0);
 </script>
 
 {#if browser}
@@ -41,6 +56,14 @@
 
 		<!-- NAV — the deck's single FIRST / PREV / CONTINUE / NEXT / LAST pager. -->
 		{@render navGroup?.()}
+
+		<!-- ANIMATE — a deck-level AnimationBar portals its scrubber in here. The divider is
+		     shown only while a hosted bar has a live animation; the slot is always present so
+		     the portal has a stable target to land in. -->
+		{#if hasAnim}
+			<span class="ctrl-bar-sep" aria-hidden="true"></span>
+		{/if}
+		<div class="ctrl-anim" class:has-anim={hasAnim} bind:this={animSlot}></div>
 	</div>
 {/if}
 
@@ -129,6 +152,15 @@
 	   not buttons, so those keep their real casing. */
 	.ctrl-bar :global(button) {
 		text-transform: uppercase;
+	}
+
+	/* The portal landing zone for a deck-level AnimationBar's scrubber. Empty (and so
+	   zero-width) on a slide with no hosted animation; a flex row so the moved-in
+	   `.anim-bar` sits centred on the same baseline as the TOC / pager. The bar carries
+	   its own `.hosted` styling (AnimationBar's scoped CSS), so this only owns placement. */
+	.ctrl-anim {
+		display: flex;
+		align-items: center;
 	}
 
 	/* Thin vertical divider between the bar's groups (TOC | nav). */

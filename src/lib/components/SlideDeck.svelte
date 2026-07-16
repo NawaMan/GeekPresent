@@ -821,7 +821,9 @@
 	<!-- ControlBar — the bottom-centre mirror of the tool bar, holding the navigation controls
 	     lifted out of the scaled slide: the Table of Contents (its flyout opening upward), the
 	     deck's ONE FIRST/PREV/CONTINUE/NEXT/LAST pager (fed the current slide's neighbours), and
-	     — portaled in from a slide that opts in — its animation scrubber. -->
+	     — portaled in from the live slide's plain (deck-level) AnimationBar — the central ANIMATE
+	     scrubber. The ControlBar publishes its own portal target (stores/localChrome.animBarSlot),
+	     so nothing needs wiring here; a scoped/driven bar stays in the slide. -->
 	<ControlBar>
 		{#snippet tocItem()}
 			<TableOfContent bar {pages} deck={deckName} {article} {articleText} {articleHref} />
