@@ -28,7 +28,8 @@ import {
 	segmentAngle,
 	shorten,
 	shortenShape,
-	snapToAngles
+	snapToAngles,
+	uniformLengthParams
 } from '../src/lib/draw/drawCore';
 import type { PathSegment, PathShape, Point } from '../src/lib/draw/types';
 
@@ -685,5 +686,46 @@ describe('unwrapAngles (shortest-path rotation keyframes)', () => {
 		expect(unwrapAngles([])).toEqual([]);
 		expect(unwrapAngles(undefined as unknown as number[])).toEqual([]);
 		expect(unwrapAngles([NaN, NaN]).every(Number.isFinite)).toBe(true);
+	});
+});
+
+describe('uniformLengthParams', () => {
+	const dist = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+	/** Consecutive point-to-point distances along the shape at the given params. */
+	const steps = (shape: PathShape, ts: number[]) => {
+		const out: number[] = [];
+		for (let k = 1; k < ts.length; k++) out.push(dist(pointAt(shape, ts[k - 1]), pointAt(shape, ts[k])));
+		return out;
+	};
+
+	it('pins the endpoints and returns samples+1 monotonic params', () => {
+		const cubic: PathShape = { kind: 'cubic', from: [0, 0], c1: [10, 0], c2: [20, 0], to: [1000, 0] };
+		const ts = uniformLengthParams(cubic, 10);
+		expect(ts).toHaveLength(11);
+		expect(ts[0]).toBe(0);
+		expect(ts[10]).toBe(1);
+		for (let k = 1; k < ts.length; k++) expect(ts[k]).toBeGreaterThan(ts[k - 1]);
+	});
+
+	it('a line is already uniform: params ≈ k/n', () => {
+		const line: PathShape = { kind: 'line', from: [0, 0], to: [800, 600] };
+		const ts = uniformLengthParams(line, 8);
+		ts.forEach((t, k) => expect(t).toBeCloseTo(k / 8, 3));
+	});
+
+	it('equalises travel on a parameter-skewed cubic (what syncs a rider to the pen tip)', () => {
+		// Control points bunched at the start: uniform-t samples crawl early and
+		// sprint late. Uniform-length samples must stride evenly instead.
+		const skewed: PathShape = { kind: 'cubic', from: [0, 0], c1: [1, 0], c2: [2, 0], to: [1900, 0] };
+		const before = steps(skewed, Array.from({ length: 11 }, (_, k) => k / 10));
+		const after = steps(skewed, uniformLengthParams(skewed, 10));
+		const spread = (d: number[]) => Math.max(...d) / Math.min(...d);
+		expect(spread(before)).toBeGreaterThan(3); // the problem is real on this shape
+		expect(spread(after)).toBeLessThan(1.05); // and the reparameterization removes it
+	});
+
+	it('a degenerate zero-length shape falls back to uniform t', () => {
+		const dot: PathShape = { kind: 'line', from: [50, 50], to: [50, 50] };
+		expect(uniformLengthParams(dot, 4)).toEqual([0, 0.25, 0.5, 0.75, 1]);
 	});
 });

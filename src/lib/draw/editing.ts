@@ -84,7 +84,8 @@ export function lerpPointAt(a: Point | undefined, b: Point | undefined, frac: nu
 export function playheadPercent(
 	el: Element | undefined,
 	animName: string,
-	durationSec: number | null
+	durationSec: number | null,
+	delaySec = 0
 ): number | null {
 	if (!el || !durationSec || typeof el.getAnimations !== 'function') return null;
 	const anims = el.getAnimations();
@@ -92,7 +93,9 @@ export function playheadPercent(
 		anims.find((x) => (x as CSSAnimation).animationName === animName) ?? anims[0];
 	const t = a?.currentTime;
 	if (typeof t !== 'number') return null;
-	return Math.max(0, Math.min(100, (t / (durationSec * 1000)) * 100));
+	// currentTime spans delay + duration; the keyframe pct only spans the
+	// duration, so a delayed animation's playhead starts after the hold.
+	return Math.max(0, Math.min(100, ((t - delaySec * 1000) / (durationSec * 1000)) * 100));
 }
 
 /** A box shape's opening tag in EXACTLY the format the hosted Block's Copy

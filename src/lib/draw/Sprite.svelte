@@ -23,10 +23,19 @@
   the AnimationBar scrubs it exactly like every other shape's animation —
   no Web Animations API, unlike the standalone KeyframeStudio.
 
-  ADJUST-mode editing: each stop grows a ghost box with a MOVE handle (drag to
-  reposition), a RESIZE handle (bottom-right corner) and a ROTATE handle; the
-  keyframe panel retimes / adds / removes stops and sets per-stop easing, just
-  like the path shapes. Geometry is edited by DRAGGING (the Draw convention),
+  PATH MODE: `path={PathShape}` replaces the discrete stops with a real curve
+  (line/quadratic/cubic/arc). The sprite SAMPLES it internally — pointAt for
+  its centre, angleAt for the tangent it banks to (`orient`), `samples` frames,
+  angle-unwrapped so the glyph never spin-flips — and everything downstream is
+  the same generated CSS. In ADJUST the EDITOR is the curve itself: from/to +
+  control handles like a <Curve>'s (apex grip for an arc), re-routing the
+  flight live; no per-stop ghosts, no keyframe panel, and Copy/SAVE carry the
+  literal points.
+
+  ADJUST-mode editing (stop mode): each stop grows a ghost box with a MOVE
+  handle (drag to reposition), a RESIZE handle (bottom-right corner) and a
+  ROTATE handle; the keyframe panel retimes / adds / removes stops and sets
+  per-stop easing, just like the path shapes. Geometry is edited by DRAGGING (the Draw convention),
   so the panel needs no l/t/w/h fields. Edits are finder state — Copy → paste
   is the only persistence — and every completed drag records to ADJUST undo.
 
@@ -40,18 +49,30 @@
 	import DrawHandle from './DrawHandle.svelte';
 	import {
 		fmtNum,
+		fmtPoint,
 		neighborsAt,
 		newEditorId,
 		playheadPercent,
 		sanitizeEase,
 		widestGapMid
 	} from './editing';
-	import { finite, round } from './drawCore';
+	import {
+		angleAt,
+		arcPath,
+		bendFromApex,
+		curvePath,
+		finite,
+		linePath,
+		pointAt,
+		round,
+		uniformLengthParams
+	} from './drawCore';
 	import {
 		DRAW_CONTEXT_KEY,
 		SPRITE_ISOLATION_KEY,
 		type AnimEditor,
 		type DrawContext,
+		type PathShape,
 		type Point,
 		type ShapeEditor,
 		type SpriteIsolation,
@@ -60,10 +81,50 @@
 
 	interface Props {
 		/** Geometry keyframes: the box (x/y/w/h + rot) per percent. Needs ≥2 to
-		 *  animate; a single stop renders a static element. */
-		stops: SpriteStop[];
+		 *  animate; a single stop renders a static element. Ignored when `path`
+		 *  is set. */
+		stops?: SpriteStop[];
+		/** Follow a real CURVE instead of discrete stops: the sprite samples this
+		 *  shape internally (`pointAt` for its centre, `angleAt` for the tangent)
+		 *  into generated keyframes, so the flight is smooth and the slide never
+		 *  sees a stop. In ADJUST the EDITOR is the curve itself — endpoint /
+		 *  control-point handles like a <Curve>'s, no per-stop ghosts — and the
+		 *  flight re-routes live as the curve is dragged. Takes precedence over
+		 *  `stops`.
+		 *
+		 *  Also takes a NAME (`path="road"`): the sprite then rides the named
+		 *  Line/Curve/Arc in the same <Draw>, sharing its live geometry — one
+		 *  curve authored once, flight and stroke always in step. The named
+		 *  shape must come EARLIER in the markup (Connector's rule); an unknown
+		 *  name renders no flight, never a broken one. In this mode the sprite
+		 *  grows NO editor of its own — drag the named shape's handles, and its
+		 *  tag is the single source of truth for Copy/SAVE. */
+		path?: PathShape | string;
+		/** Box size (canvas px) while riding `path`: one number = square, or
+		 *  [w, h]. The box's CENTRE rides the path. */
+		size?: number | [number, number];
+		/** Bank to the path's tangent as it travels (path mode default). false =
+		 *  keep the glyph upright. */
+		orient?: boolean;
+		/** Extra rotation (deg) on top of the tangent in path mode — aligns a
+		 *  glyph whose artwork doesn't point "up" (🚀 ≈ -45, a left-facing 🚗 ≈ 90). */
+		rotate?: number;
+		/** How many keyframes to sample `path` into. More = smoother polyline,
+		 *  bigger generated CSS. */
+		samples?: number;
 		/** Seconds for one pass through `stops` (ease-in-out, fill both). */
 		animate?: number;
+		/** Seconds to HOLD the start pose before the flight begins (CSS
+		 *  animation-delay) — the sprite counterpart of a shape's `drawDelay`,
+		 *  for staggering several objects on one timeline. The AnimationBar's
+		 *  timeline simply extends to delay + animate, and scrubbing passes
+		 *  through the wait. */
+		delay?: number;
+		/** CSS timing function for the WHOLE flight (default ease-in-out). Use
+		 *  "linear" when position must be proportional to time — e.g. staggered
+		 *  objects that should hold formation while their windows overlap. In
+		 *  stops mode a per-stop `ease` still overrides its own segment. */
+		ease?: string;
 		/** When set, emit `font-size: h*fontScale` on every frame so a glyph
 		 *  grows with its box as it travels (the rocket case uses 0.84). */
 		fontScale?: number | null;
@@ -79,6 +140,11 @@
 		 *  — and edit the nested shapes; Esc / click-outside exits. Off by default,
 		 *  so a plain glyph sprite keeps its simple select-and-fly behavior. */
 		group?: boolean;
+		/** Hide this sprite from ADJUST entirely: no ghost boxes, no handles, no
+		 *  keyframe panel, not selectable — it just flies. For GENERATED stops
+		 *  (e.g. sampled from a curve) that aren't meant to be hand-edited, where
+		 *  dozens of ghosts would only bury the shapes that ARE editable. */
+		lock?: boolean;
 		children?: Snippet;
 		/** Inline style for the root element, applied last so it wins. */
 		style?: string;
@@ -92,12 +158,20 @@
 
 	let {
 		stops,
+		path,
+		size = 64,
+		orient = true,
+		rotate = 0,
+		samples = 40,
 		animate,
+		delay = 0,
+		ease = 'ease-in-out',
 		fontScale = null,
 		origin = '50% 50%',
 		name = '',
 		grid = 1,
 		group = false,
+		lock = false,
 		children,
 		style = '',
 		id = '',
@@ -110,7 +184,119 @@
 	type IdStop = SpriteStop & { id: number };
 	let liveStops = $state<IdStop[] | null>(null);
 	let stopSeq = 0;
-	const S = $derived<SpriteStop[]>(liveStops ?? stops ?? []);
+
+	// --- Path mode ------------------------------------------------------------
+	// The path's points as currently edited — the same finder-state model as
+	// liveStops: drags mutate these locals, Copy/SAVE is the persistence.
+	let livePathFrom = $state<Point | null>(null);
+	let livePathTo = $state<Point | null>(null);
+	let livePathC1 = $state<Point | null>(null);
+	let livePathC2 = $state<Point | null>(null);
+	let livePathBend = $state<number | null>(null);
+	/** path="name" — the sprite rides a shape it does not own. */
+	const isRef = $derived(typeof path === 'string');
+	/** The `path` prop resolved: a literal shape as-is; a NAME through the Draw
+	 *  context's live path sources (the named shape must appear earlier in the
+	 *  markup; unknown name → no flight, never a broken one). `ctx` is declared
+	 *  further down — safe, deriveds evaluate lazily after init. */
+	const sourcePath = $derived.by<PathShape | null>(() => {
+		if (!path) return null;
+		return typeof path === 'string' ? (ctx?.pathSource(path) ?? null) : path;
+	});
+	/** The path with live edits folded in (literal mode only — a NAMED shape
+	 *  owns its geometry and is edited by its own handles); null when not in
+	 *  path mode. */
+	const P = $derived.by<PathShape | null>(() => {
+		if (!sourcePath) return null;
+		if (isRef) return sourcePath;
+		const f = livePathFrom ?? sourcePath.from;
+		const t = livePathTo ?? sourcePath.to;
+		switch (sourcePath.kind) {
+			case 'line':
+				return { kind: 'line', from: f, to: t };
+			case 'quadratic':
+				return { kind: 'quadratic', from: f, to: t, c1: livePathC1 ?? sourcePath.c1 };
+			case 'cubic':
+				return {
+					kind: 'cubic',
+					from: f,
+					to: t,
+					c1: livePathC1 ?? sourcePath.c1,
+					c2: livePathC2 ?? sourcePath.c2
+				};
+			case 'arc':
+				return { kind: 'arc', from: f, to: t, bend: livePathBend ?? sourcePath.bend };
+		}
+	});
+	const boxW = $derived(Math.max(1, finite(Array.isArray(size) ? size[0] : size)));
+	const boxH = $derived(Math.max(1, finite(Array.isArray(size) ? size[1] : size)));
+
+	// Sample the path into ordinary stops: centre from pointAt, rotation from
+	// the tangent. Samples are spaced by ARC LENGTH, not by the bézier
+	// parameter — constant travel speed, and (sharing ease-in-out with the
+	// draw-on stroke) the sprite stays glued to a same-duration `draw`'s pen
+	// tip. Tangent angles are UNWRAPPED against the previous sample so the
+	// glyph turns the short way instead of snapping 360° where atan2 crosses
+	// ±π. Everything downstream (keyframes, base pose, scrubbing) then works
+	// untouched — a path sprite IS a stops sprite, it just never shows the
+	// stops to anyone.
+	const pathStops = $derived.by<SpriteStop[]>(() => {
+		if (!P) return [];
+		const n = Math.max(2, Math.round(finite(samples)) || 2);
+		const ts = uniformLengthParams(P, n);
+		const out: SpriteStop[] = [];
+		let prev = 0;
+		for (let k = 0; k <= n; k++) {
+			const t = ts[k];
+			const [px, py] = pointAt(P, t);
+			let rot = finite(rotate);
+			if (orient) {
+				let a = angleAt(P, t);
+				if (k > 0) {
+					while (a - prev > Math.PI) a -= 2 * Math.PI;
+					while (a - prev < -Math.PI) a += 2 * Math.PI;
+				}
+				prev = a;
+				// angleAt is atan2 from +x; Sprite rot 0 points "up", hence +90.
+				rot += (a * 180) / Math.PI + 90;
+			}
+			out.push({
+				// pct is animation PROGRESS (uniform), t is the path parameter that
+				// puts the k-th frame at arc-length fraction k/n — the two differ by
+				// exactly the reparameterization.
+				pct: Math.round((k / n) * 10000) / 100,
+				x: Math.round(px - boxW / 2),
+				y: Math.round(py - boxH / 2),
+				w: boxW,
+				h: boxH,
+				rot: Math.round(rot)
+			});
+		}
+		return out;
+	});
+
+	// The path itself, as an SVG d — the editing ghost/hit geometry.
+	const pathD = $derived.by(() => {
+		if (!P) return '';
+		switch (P.kind) {
+			case 'line':
+				return linePath(P.from, P.to);
+			case 'quadratic':
+				return curvePath(P.from, P.to, P.c1);
+			case 'cubic':
+				return curvePath(P.from, P.to, P.c1, P.c2);
+			case 'arc':
+				return arcPath(P.from, P.to, P.bend);
+		}
+	});
+	// --------------------------------------------------------------------------
+
+	/** `path` was given but resolves to nothing (an unknown name, or a name
+	 *  registered later in the markup): render NOTHING — a missing flight,
+	 *  never a glyph stranded at a fallback pose. Connector's rule. */
+	const unresolved = $derived(!!path && !P);
+
+	const S = $derived<SpriteStop[]>(P ? pathStops : (liveStops ?? stops ?? []));
 
 	// Clone the prop stops into editable id-carrying state on first edit.
 	function materializeStops(): IdStop[] {
@@ -139,6 +325,12 @@
 	const animSecs = $derived(
 		animate && Number.isFinite(animate) && animate > 0 && RS.length >= 2 ? animate : null
 	);
+	// Start-pose hold before the flight (see `delay`); 0 when not animating.
+	const delaySecs = $derived(
+		animSecs && Number.isFinite(delay) && delay > 0 ? delay : 0
+	);
+	// Whole-flight timing function (see `ease`), sanitized like a stop's.
+	const easeFn = $derived(sanitizeEase(ease) || 'ease-in-out');
 
 	const uid = newEditorId();
 	const animName = `draw-sprite-${uid}`;
@@ -171,7 +363,7 @@
 			`width:${round(base.w)}px; height:${round(base.h)}px; ` +
 			`transform-origin:${origin}; transform:rotate(${round(base.rot)}deg);` +
 			`${fontFor(base.h) != null ? ` font-size:${fontFor(base.h)}px;` : ''}` +
-			`${animSecs ? ` animation:${animName} ${animSecs}s ease-in-out both;` : ''}`
+			`${animSecs ? ` animation:${animName} ${animSecs}s ${easeFn}${delaySecs ? ` ${delaySecs}s` : ''} both;` : ''}`
 	);
 
 	// --- ADJUST-mode editing chrome ------------------------------------------
@@ -196,10 +388,42 @@
 	const tagFor = (list: Array<Parameters<typeof stopLiteral>[0]>) =>
 		`<Sprite${name ? ` name="${name}"` : ''}` +
 		`${animate ? ` animate={${fmtNum(animate)}}` : ''}` +
+		`${delay ? ` delay={${fmtNum(delay)}}` : ''}` +
+		`${easeFn !== 'ease-in-out' ? ` ease="${easeFn}"` : ''}` +
 		`${fontScale != null ? ` fontScale={${fmtNum(fontScale)}}` : ''}` +
 		`${origin !== '50% 50%' ? ` origin="${origin}"` : ''}` +
 		`${group ? ' group' : ''}` +
+		`${lock ? ' lock' : ''}` +
 		` stops={[${list.map(stopLiteral).join(', ')}]}>`;
+
+	// Path-mode serialization: the tag carries the curve's LITERAL points, so
+	// Copy round-trips and SAVE's literal tag swap has real bytes to match —
+	// unlike a path fed from a shared const, which can only be copied by hand.
+	const pathLiteral = (s: PathShape) =>
+		s.kind === 'line'
+			? `{ kind: "line", from: ${fmtPoint(s.from)}, to: ${fmtPoint(s.to)} }`
+			: s.kind === 'quadratic'
+				? `{ kind: "quadratic", from: ${fmtPoint(s.from)}, c1: ${fmtPoint(s.c1)}, to: ${fmtPoint(s.to)} }`
+				: s.kind === 'cubic'
+					? `{ kind: "cubic", from: ${fmtPoint(s.from)}, c1: ${fmtPoint(s.c1)}, c2: ${fmtPoint(s.c2)}, to: ${fmtPoint(s.to)} }`
+					: `{ kind: "arc", from: ${fmtPoint(s.from)}, to: ${fmtPoint(s.to)}, bend: ${fmtNum(s.bend)} }`;
+
+	// Takes the serialized attr value — `{${pathLiteral(shape)}}` or `"name"`.
+	const pathTagFor = (pathAttr: string) =>
+		`<Sprite${name ? ` name="${name}"` : ''}` +
+		` path=${pathAttr}` +
+		`${animate ? ` animate={${fmtNum(animate)}}` : ''}` +
+		`${delay ? ` delay={${fmtNum(delay)}}` : ''}` +
+		`${easeFn !== 'ease-in-out' ? ` ease="${easeFn}"` : ''}` +
+		`${Array.isArray(size) ? ` size={[${fmtNum(size[0])}, ${fmtNum(size[1])}]}` : size !== 64 ? ` size={${fmtNum(size)}}` : ''}` +
+		`${orient ? '' : ' orient={false}'}` +
+		`${finite(rotate) ? ` rotate={${fmtNum(rotate)}}` : ''}` +
+		`${samples !== 40 ? ` samples={${fmtNum(samples)}}` : ''}` +
+		`${fontScale != null ? ` fontScale={${fmtNum(fontScale)}}` : ''}` +
+		`${origin !== '50% 50%' ? ` origin="${origin}"` : ''}` +
+		`${group ? ' group' : ''}` +
+		`${lock ? ' lock' : ''}` +
+		`>`;
 
 	// Source (prop) stops resolved the same way, for the "Copy changed" OLD side.
 	const sourceStops = $derived(
@@ -213,8 +437,20 @@
 			ease: sanitizeEase(s.ease)
 		}))
 	);
-	const snippet = $derived(tagFor(RS));
-	const sourceSnippet = $derived(tagFor(sourceStops));
+	const snippet = $derived(
+		typeof path === 'string'
+			? pathTagFor(`"${path}"`)
+			: P
+				? pathTagFor(`{${pathLiteral(P)}}`)
+				: tagFor(RS)
+	);
+	const sourceSnippet = $derived(
+		typeof path === 'string'
+			? pathTagFor(`"${path}"`)
+			: path
+				? pathTagFor(`{${pathLiteral(path)}}`)
+				: tagFor(sourceStops)
+	);
 
 	const editor: ShapeEditor = {
 		id: uid,
@@ -223,7 +459,10 @@
 			return name;
 		},
 		get readout() {
-			return `${RS.length} stops · ${finite(animate ?? 0)}s`;
+			// A path sprite reads as its curve, not its (generated) stop count.
+			return P
+				? `${P.kind} path · ${finite(animate ?? 0)}s`
+				: `${RS.length} stops · ${finite(animate ?? 0)}s`;
 		},
 		get snippet() {
 			return snippet;
@@ -235,7 +474,9 @@
 			return snippet !== sourceSnippet;
 		},
 		get anim() {
-			return animSecs ? animApi : null;
+			// No keyframe panel in path mode: the stops are generated, so rows of
+			// them would be noise — the curve handles are the whole editor.
+			return animSecs && !P ? animApi : null;
 		},
 		get chrome() {
 			return chrome;
@@ -250,7 +491,10 @@
 	const isHoisted = $derived(ctx?.hoisted === editor);
 	const select = () => ctx?.select(editor);
 	$effect(() => {
-		if (!ctx?.registerShape) return;
+		// A locked sprite never registers: it cannot be selected, listed or
+		// copied — ADJUST simply doesn't know it exists. Nor does a path="name"
+		// rider: the NAMED shape is the editor and the single source of truth.
+		if (!ctx?.registerShape || lock || isRef) return;
 		// untrack: registering reads+writes Draw's shape list (see Rect.svelte).
 		return untrack(() => ctx.registerShape(editor));
 	});
@@ -259,8 +503,9 @@
 	});
 
 	// Materialize eagerly while the panel is up so its rows carry real ids.
+	// (Stop mode only — path mode has no panel and ignores liveStops.)
 	$effect(() => {
-		if (editing && isSelected && animSecs && !liveStops) materializeStops();
+		if (editing && isSelected && animSecs && !P && !liveStops) materializeStops();
 	});
 
 	// --- Per-stop geometry editing (drag the ghost). Live drags mutate the
@@ -273,6 +518,11 @@
 		const s = RS[i];
 		return { pct: s.pct, x: s.x, y: s.y, w: s.w, h: s.h, rot: s.rot, ease: s.ease };
 	};
+	// Path-mode handle commits: same record() shape the path shapes use.
+	function commitPath(apply: (p: Point) => void, before: Point, after: Point) {
+		record({ undo: () => apply(before), redo: () => apply(after) });
+	}
+
 	let dragBefore: { i: number; box: SpriteStop } | null = null;
 	function beginDrag(i: number) {
 		select();
@@ -424,7 +674,7 @@
 			const asc = [...list].sort((a, b) => finite(a.pct) - finite(b.pct));
 			// Insert at the AnimationBar playhead if readable, else the widest gap;
 			// geometry is lerped between the bracketing stops so it lands on the path.
-			const ph = playheadPercent(spriteEl, animName, animSecs);
+			const ph = playheadPercent(spriteEl, animName, animSecs, delaySecs);
 			const target = ph != null ? Math.round(ph) : widestGapMid(asc);
 			const { a, b, frac } = neighborsAt(asc, target);
 			const lerp = (p: number, q: number) => Math.round(p + (q - p) * frac);
@@ -467,7 +717,7 @@
 			liveStops = materializeStops().map((s) => (s.id === id ? { ...s, [key]: v } : s));
 		},
 		preview() {
-			const pct = playheadPercent(spriteEl, animName, animSecs);
+			const pct = playheadPercent(spriteEl, animName, animSecs, delaySecs);
 			if (pct == null) return null;
 			return { pct: Math.round(pct), drawn: null };
 		}
@@ -475,6 +725,7 @@
 </script>
 
 <g id={id || undefined} class="draw-sprite {klass}" style={style || undefined}>
+	{#if !unresolved}
 	{#if animSecs}
 		<!-- Generated keyframes — a real <style>, so it prerenders and scrubs. -->
 		{@html `<style>${keyframesCss}</style>`}
@@ -505,8 +756,24 @@
 			</div>
 		</div>
 	</foreignObject>
+	{/if}
 
-	{#if editing && !entered}
+	{#if editing && !entered && !lock && P && !isRef}
+		<!-- Path-mode chrome: the flight path ITSELF is the editor. One dashed
+		     ghost of the curve (no per-stop boxes — the stops are generated),
+		     with a wide hit stroke to select; when selected, the chrome snippet
+		     grows endpoint/control handles like a <Curve>'s, and dragging them
+		     re-routes the flight live. -->
+		{#if isSelected}
+			<path class="draw-selglow" d={pathD} />
+		{/if}
+		<path class="sprite-path" class:selected={isSelected} d={pathD} />
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<path class="draw-hit" d={pathD} onpointerdown={select} ondblclick={enterIsolation} />
+		{#if !isHoisted}{@render chrome()}{/if}
+	{/if}
+
+	{#if editing && !entered && !lock && !P}
 		<!-- One ghost per stop: an axis-aligned dashed box (the grab/geometry
 		     box) with the stop's percent, plus a short tick showing its rotation.
 		     Clicking a box selects the sprite; DOUBLE-clicking enters isolation
@@ -562,7 +829,72 @@
 	     <g> moves nothing. Self-guarding: an UNSELECTED sprite has no handles at
 	     all, so this renders nothing while it merely holds the hoist through
 	     another shape's drag. -->
-	{#if isSelected && !entered}
+	{#if isSelected && !entered && P}
+		<!-- Path-mode handles: the curve's own points, exactly a <Curve>'s editor
+		     — solid endpoints, hollow control points with guide lines, an apex
+		     grip for an arc's bend. Dragging any of them re-samples the flight. -->
+		<g class="draw-chrome" data-shape={name || 'Sprite'}>
+			{#if P.kind === 'quadratic' || P.kind === 'cubic'}
+				<path class="draw-guide" d={linePath(P.c1, P.from)} />
+				<path class="draw-guide" d={P.kind === 'cubic' ? linePath(P.c2, P.to) : linePath(P.c1, P.to)} />
+			{/if}
+			<DrawHandle
+				point={P.from}
+				{grid}
+				title="from"
+				onselect={select}
+				onmove={(p) => (livePathFrom = p)}
+				oncommit={(b, a) => commitPath((p) => (livePathFrom = p), b, a)}
+			/>
+			<DrawHandle
+				point={P.to}
+				{grid}
+				title="to"
+				onselect={select}
+				onmove={(p) => (livePathTo = p)}
+				oncommit={(b, a) => commitPath((p) => (livePathTo = p), b, a)}
+			/>
+			{#if P.kind === 'quadratic' || P.kind === 'cubic'}
+				<DrawHandle
+					point={P.c1}
+					{grid}
+					kind="control"
+					title="c1"
+					onselect={select}
+					onmove={(p) => (livePathC1 = p)}
+					oncommit={(b, a) => commitPath((p) => (livePathC1 = p), b, a)}
+				/>
+			{/if}
+			{#if P.kind === 'cubic'}
+				<DrawHandle
+					point={P.c2}
+					{grid}
+					kind="control"
+					title="c2"
+					onselect={select}
+					onmove={(p) => (livePathC2 = p)}
+					oncommit={(b, a) => commitPath((p) => (livePathC2 = p), b, a)}
+				/>
+			{/if}
+			{#if P.kind === 'arc'}
+				{@const AF = P.from}
+				{@const AT = P.to}
+				<DrawHandle
+					point={pointAt(P, 0.5)}
+					{grid}
+					kind="bend"
+					title="bend"
+					onselect={select}
+					onmove={(p) => (livePathBend = bendFromApex(AF, AT, p))}
+					oncommit={(b, a) =>
+						record({
+							undo: () => (livePathBend = bendFromApex(AF, AT, b)),
+							redo: () => (livePathBend = bendFromApex(AF, AT, a))
+						})}
+				/>
+			{/if}
+		</g>
+	{:else if isSelected && !entered}
 		<g class="draw-chrome" data-shape={name || 'Sprite'}>
 			{#each RS as s, i (i)}
 				<DrawHandle
@@ -642,6 +974,41 @@
 		pointer-events: none;
 		user-select: none;
 	}
+	/* Path-mode chrome (ADJUST only): the flight path is the editor. Same
+	   vocabulary as the path shapes' own chrome (Line/Curve/Arc). */
+	.sprite-path {
+		fill: none;
+		stroke: rgba(255, 255, 255, 0.35);
+		stroke-width: 2;
+		stroke-dasharray: 8 6;
+		pointer-events: none;
+	}
+	.sprite-path.selected {
+		stroke: var(--ctrl-selected-bg, #00b356);
+		stroke-opacity: 0.8;
+	}
+	.draw-hit {
+		fill: none;
+		stroke: transparent;
+		stroke-width: 24;
+		pointer-events: stroke;
+		cursor: pointer;
+	}
+	.draw-selglow {
+		fill: none;
+		stroke: var(--ctrl-selected-bg, #00b356);
+		stroke-opacity: 0.35;
+		stroke-width: 14;
+		stroke-linecap: round;
+	}
+	.draw-guide {
+		fill: none;
+		stroke: var(--ctrl-strong-bg, #2980b9);
+		stroke-opacity: 0.6;
+		stroke-width: 1.5;
+		stroke-dasharray: 4 4;
+	}
+
 	/* Isolation affordances. */
 	.iso-frame {
 		fill: none;

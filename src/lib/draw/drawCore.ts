@@ -243,6 +243,46 @@ export function samplePath(shape: PathShape, segments = 64): string {
 	return d;
 }
 
+/** `samples + 1` parameter values t₀…tₙ whose points are uniformly spaced by
+ *  ARC LENGTH along the shape (t₀ = 0, tₙ = 1). A bézier's parameter t is not
+ *  proportional to distance — a rider sampled uniformly in t sprints where the
+ *  control points stretch the parameterization and dawdles where they bunch
+ *  it. Uniform-length spacing gives constant travel speed, which is also what
+ *  locks a Sprite to a draw-on stroke's pen tip: `stroke-dashoffset` reveals
+ *  by arc length, so with a shared duration + timing function the two meet at
+ *  every frame. Built from a dense chord-length table (`resolution` segments,
+ *  linearly interpolated); a degenerate (zero-length) shape falls back to
+ *  uniform t. */
+export function uniformLengthParams(shape: PathShape, samples: number, resolution = 256): number[] {
+	const n = Math.max(1, Math.floor(finite(samples, 1)));
+	const res = Math.max(n, Math.floor(finite(resolution, 256)));
+	// Cumulative chord lengths over `res` uniform-t segments.
+	const cum = new Array<number>(res + 1);
+	cum[0] = 0;
+	let prev = pointAt(shape, 0);
+	for (let i = 1; i <= res; i++) {
+		const p = pointAt(shape, i / res);
+		cum[i] = cum[i - 1] + Math.hypot(p[0] - prev[0], p[1] - prev[1]);
+		prev = p;
+	}
+	const total = cum[res];
+	if (!(total > 0)) return Array.from({ length: n + 1 }, (_, k) => k / n);
+	// Walk the table once: for each target fraction, interpolate t within the
+	// bracketing segment. Both sequences are monotonic, so `i` never rewinds.
+	const out = new Array<number>(n + 1);
+	out[0] = 0;
+	let i = 1;
+	for (let k = 1; k < n; k++) {
+		const target = (k / n) * total;
+		while (i < res && cum[i] < target) i++;
+		const span = cum[i] - cum[i - 1];
+		const frac = span > 0 ? (target - cum[i - 1]) / span : 0;
+		out[k] = (i - 1 + frac) / res;
+	}
+	out[n] = 1;
+	return out;
+}
+
 // ─── Shape evaluators (Phase 2) ─────────────────────────────────────────────
 // pointAt/angleAt over the PathShape union power label placement and curved
 // arrow tangents now, and Phase 3's bend handle later. All t are clamped to

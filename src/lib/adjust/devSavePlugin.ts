@@ -86,9 +86,10 @@ async function handleSave(server: ViteDevServer, body: string) {
 		payload: {
 			file: path.relative(root, file),
 			patched: patched.length,
-			unmatched: unmatched.map(
-				(c) => c.name || (c.before ? `${c.kind}@${c.before.x},${c.before.y}` : c.kind)
-			)
+			unmatched: unmatched.map((c) => ({
+				label: c.name || (c.before ? `${c.kind}@${c.before.x},${c.before.y}` : c.kind),
+				reason: c.reason
+			}))
 		}
 	};
 }

@@ -34,6 +34,15 @@ export function portal(node: HTMLElement, target: HTMLElement | null | undefined
 
 	return {
 		update(t: HTMLElement | null | undefined) { place(t); },
-		destroy() { home.remove(); }, // Svelte removes `node` itself when the block closes
+		destroy() {
+			home.remove();
+			// A node parked at home sits inside its component's subtree, and Svelte's
+			// own teardown removes it. A node still PORTALED lives OUTSIDE that
+			// subtree, where anchor-range teardown (block close, HMR replacement —
+			// e.g. the reload a SAVE triggers) can no longer see it: it would strand
+			// in the target for the remounted component to double up against. Evict
+			// it ourselves — if Svelte also removes it, the second remove is a no-op.
+			if (current) node.remove();
+		},
 	};
 }

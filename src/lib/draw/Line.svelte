@@ -296,6 +296,10 @@
 	const ctx = getContext<DrawContext | undefined>(DRAW_CONTEXT_KEY);
 	const editing = $derived(ctx?.editing ?? false);
 
+	// Publish the live geometry under our name so a <Sprite path="<name>"> can
+	// ride this line (see Curve.svelte — same contract).
+	if (name && ctx) onDestroy(ctx.registerPathSource(name, () => ({ kind: 'line', from: F, to: T })));
+
 	const stopsAttrFor = (list: LineStop[] | undefined) =>
 		list && list.length
 			? ` stops={[${list
