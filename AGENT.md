@@ -4,8 +4,10 @@ Guidance for an AI agent (Claude Code or similar) asked to **add GeekPresent to 
 project** so the user can build docs / slides / a promo site that deploy to GitHub Pages.
 
 This is the *adoption* manual. Once GeekPresent lives inside the project, the day-to-day
-**authoring** manual is the `AGENTS.md` that ships *inside* the adopted folder (e.g.
-`docs-site/AGENTS.md`) — read that for slide/deck playbooks. Don't confuse the two.
+**authoring / operator** manual is the `AGENTS.md` that ships *inside* the adopted folder (e.g.
+`docs-site/AGENTS.md`) — CodingBooth how-to-run, worktree→branch for PRs, slide playbooks, rules.
+Don't confuse the two. If you are working **on GeekPresent itself** (this repo), read **`AGENTS.md`
+first** — especially *Quick start for agents*.
 
 ---
 
