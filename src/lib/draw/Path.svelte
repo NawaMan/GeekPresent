@@ -83,6 +83,7 @@
 		type PathShape,
 		type PathStop,
 		type Point,
+		type SegmentShape,
 		type ShapeEditor,
 		type ShapeStyleProps
 	} from './types';
@@ -200,7 +201,7 @@
 
 	// Trim ONLY the last shape's tail and the first shape's start behind their
 	// heads, so the single `d` never pokes past a tip — middle joins untouched.
-	function shaftShapesOf(list: PathShape[]): PathShape[] {
+	function shaftShapesOf(list: SegmentShape[]): SegmentShape[] {
 		if (list.length === 0) return list;
 		const out = [...list];
 		const last = out.length - 1;
