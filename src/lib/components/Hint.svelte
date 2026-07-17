@@ -106,7 +106,10 @@
 		   A positive z-index beats the copyright's `auto`, so the cue stays legible and
 		   the copyright reads as sitting behind it. */
 		z-index: 2;
-		font-size: 1.5em;
+		/* 1.1em of .content's 24px --base-font → ~26px bold — quiet enough for a
+		   cue, still large-text for WCAG's 3:1 bar. Was 1.5em (36px); slides that
+		   wanted the quieter size had been overriding with style="font-size:1.1em". */
+		font-size: 1.1em;
 		font-weight: bold;
 		/* Rests semi-transparent (0.4), sharpens to full on hover/focus below.
 		   `--hint-dim` (from the `dim` prop) overrides the rest value when set. */
@@ -138,9 +141,10 @@
 	   GROUP opacity here: it multiplies the 62% fill and 28% rule down before either
 	   lands on the backdrop. At rest the composite text-on-pill is a deliberately
 	   faint ~2.3:1 (worst case, over black) — a cue, not content. Hover/focus lifts
-	   the group to full, where the composite reaches >= 4.1:1: AA for the 36px bold
-	   this renders at, over every backdrop in the deck (letterbox, terminal, QR
-	   plate, chart). Faint until looked at, fully legible the moment it is. */
+	   the group to full, where the composite reaches >= 4.1:1: AA for the ~26px bold
+	   this renders at (large text), over every backdrop in the deck (letterbox,
+	   terminal, QR plate, chart). Faint until looked at, fully legible the moment
+	   it is. */
 	.text.boxed {
 		bottom: 6px;
 		padding: 0.15em 0.7em;
