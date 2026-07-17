@@ -45,7 +45,7 @@ this-slide.html?notes         just this slide, and its note, on one page`}
 	</div>
 </ContentPage>
 
-<Block name="two-artifacts" x={54} y={564} width={882} height={433}>
+<Block name="two-artifacts" x={61} y={658} width={881} height={394}>
 	<Callout kind="tip" title="Two documents, one page" style="font-size:0.9em">
 		<p>
 			<b>Without notes</b> the sheet <i>is</i> the slide, inside a half-inch margin — a real
@@ -69,7 +69,7 @@ this-slide.html?notes         just this slide, and its note, on one page`}
 </Block>
 
 <!-- The bargain, stated on the slide rather than buried in the source. -->
-<Block name="what-wont-print" x={974} y={561} width={835} height={446}>
+<Block name="what-wont-print" x={971} y={659} width={886} height={355}>
 	<Callout kind="warn" title="What paper cannot hold">
 		<p>
 			A <code>&lt;WebSite&gt;</code>, <code>&lt;WebPage&gt;</code> or <code>&lt;YouTube&gt;</code>

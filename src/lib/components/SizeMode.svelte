@@ -47,6 +47,9 @@
 	$: isFitted = $displayMode === 'FITTED';
 	$: factor   = $displayFactor;
 	$: label    = isFitted ? 'FITTED' : pct(factor);
+	// Inline tool-bar: key in parentheses at the end — "FITTED (Z)" / "100% (Z)" (Zoom).
+	// hoverText must match text so CtrlBtn's hover swap does not drop the key chip.
+	$: barLabel = inline ? `${label} (Z)` : label;
 
 	function chooseFitted() {
 		displayMode.set('FITTED');
@@ -85,7 +88,13 @@
 <div class="mode gp-chrome no-print" class:expanded={open} class:inline bind:this={rootRef}>
 	<!-- The ADJUST toggle used to live here; it moved into SlideDeck's content layer
 	     so slide blocks can render on top of it (see SlideDeck `.layout-ctrl`). -->
-	<CtrlBtn chrome text={label} hoverText={label} on:click={() => (open = !open)} isSelected={open} />
+	<CtrlBtn
+		chrome
+		text={barLabel}
+		hoverText={barLabel}
+		on:click={() => (open = !open)}
+		isSelected={open}
+	/>
 
 	{#if open}
 	<div class="menu">

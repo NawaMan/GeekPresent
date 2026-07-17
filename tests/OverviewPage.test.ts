@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import OverviewPageHost from './OverviewPageHost.svelte';
 import OverviewPageDeckHost from './OverviewPageDeckHost.svelte';
 import { overviewOpen } from '$lib/stores/overviewOpen';
+import { canEditDeck, overviewEditMode } from '$lib/stores/pageEdit';
 
 // The all-slides grid in a DOM. The pure decisions (fit-scale, tile list, key
 // intent) are pinned in overviewCore.test.ts; what only a DOM can show is that the
@@ -45,13 +46,19 @@ class FakeRO {
 	disconnect() {}
 }
 
-beforeEach(() => vi.stubGlobal('ResizeObserver', FakeRO));
+beforeEach(() => {
+	vi.stubGlobal('ResizeObserver', FakeRO);
+	// Dev-like default: EDIT is allowed unless a test forces the built-site refusal.
+	canEditDeck.set(true);
+	overviewEditMode.set(false);
+});
 afterEach(() => {
 	cleanup();
 	vi.unstubAllGlobals();
-	// The open state is a shared store now (so the tool-flyout can open the grid too), so it
-	// outlives a component's unmount — reset it, or one test's open grid leaks into the next.
+	// Shared stores outlive a component's unmount — reset or one test leaks into the next.
 	overviewOpen.set(false);
+	overviewEditMode.set(false);
+	canEditDeck.set(true);
 });
 
 const frames = () => [...document.querySelectorAll('iframe')];
@@ -226,6 +233,115 @@ describe('OverviewPage — Escape, with the rest of the deck listening too', () 
 		// state, never on whether another listener got there first.
 		await fireEvent.keyDown(window, { key: 'Escape' });
 		expect(scrim()).toBeNull();
+	});
+});
+
+describe('OverviewPage — EDIT deck mode', () => {
+	it('shows an EDIT control when the grid is open', async () => {
+		stubObserver();
+		render(OverviewPageHost);
+		await openGrid();
+		// Accessible name includes the E shortcut chip ("EDIT E").
+		expect(screen.getByRole('button', { name: /EDIT/i })).toBeTruthy();
+		// Browse mode has no dashed add tile and no remove chrome.
+		expect(document.querySelector('.add-tile')).toBeNull();
+		expect(document.querySelector('.tile-remove')).toBeNull();
+	});
+
+	it('enters EDIT mode and shows ADD, gutters, and remove chrome', async () => {
+		stubObserver();
+		render(OverviewPageHost);
+		await openGrid();
+		await fireEvent.click(screen.getByRole('button', { name: /EDIT/i }));
+		await tick();
+
+		expect(screen.getByRole('button', { name: /DONE/i })).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'ADD' })).toBeTruthy();
+		// One between-page + after each listed tile (not a corner badge / end tile).
+		expect(document.querySelectorAll('.gutter-add').length).toBe(3);
+		expect(document.querySelectorAll('.tile-remove').length).toBe(3);
+		expect(document.querySelector('.add-tile')).toBeNull();
+		expect(document.querySelector('.head-title')?.textContent).toBe('EDIT DECK');
+	});
+
+	it('toggles EDIT deck mode with the E key while the grid is open', async () => {
+		stubObserver();
+		render(OverviewPageHost);
+		await openGrid();
+		await fireEvent.keyDown(window, { key: 'e' });
+		await tick();
+		expect(document.querySelector('.gutter-add')).not.toBeNull();
+		expect(document.querySelector('.head-title')?.textContent).toBe('EDIT DECK');
+
+		await fireEvent.keyDown(window, { key: 'E' });
+		await tick();
+		expect(document.querySelector('.gutter-add')).toBeNull();
+		expect(document.querySelector('.head-title')?.textContent).toBe('OVERVIEW PAGE');
+	});
+
+	it('answers NOT ALLOWED when the environment cannot write source', async () => {
+		// Built-site path: same store pattern as ADJUST SAVE / canSave.
+		canEditDeck.set(false);
+		stubObserver();
+		render(OverviewPageHost);
+		await openGrid();
+		await fireEvent.click(screen.getByRole('button', { name: /EDIT/i }));
+		await tick();
+
+		expect(screen.getByRole('button', { name: /NOT ALLOWED/i })).toBeTruthy();
+		// Did not enter edit mode.
+		expect(document.querySelector('.gutter-add')).toBeNull();
+		let mode = true;
+		const unsub = overviewEditMode.subscribe((v) => (mode = v));
+		unsub();
+		expect(mode).toBe(false);
+	});
+
+	it('Esc leaves EDIT before closing the grid', async () => {
+		stubObserver();
+		render(OverviewPageHost);
+		await openGrid();
+		await fireEvent.click(screen.getByRole('button', { name: /EDIT/i }));
+		await tick();
+		expect(document.querySelector('.gutter-add')).not.toBeNull();
+
+		await fireEvent.keyDown(window, { key: 'Escape' });
+		// Still open, but no longer editing.
+		expect(scrim()).not.toBeNull();
+		expect(document.querySelector('.gutter-add')).toBeNull();
+		expect(screen.getByRole('button', { name: /EDIT/i })).toBeTruthy();
+
+		await fireEvent.keyDown(window, { key: 'Escape' });
+		expect(scrim()).toBeNull();
+	});
+
+	it('opens the add form from the header ADD button', async () => {
+		stubObserver();
+		render(OverviewPageHost);
+		await openGrid();
+		await fireEvent.click(screen.getByRole('button', { name: /EDIT/i }));
+		await fireEvent.click(screen.getByRole('button', { name: 'ADD' }));
+		await tick();
+
+		const form = document.querySelector('.add-form');
+		expect(form).not.toBeNull();
+		expect(form?.querySelector('.add-form-title')?.textContent).toBe('Add slide');
+	});
+
+	it('opens the add form from a between-page + gutter', async () => {
+		stubObserver();
+		render(OverviewPageHost);
+		await openGrid();
+		await fireEvent.click(screen.getByRole('button', { name: /EDIT/i }));
+		await fireEvent.click(screen.getByRole('button', { name: /Add slide after Intro/i }));
+		await tick();
+
+		const form = document.querySelector('.add-form');
+		expect(form).not.toBeNull();
+		const after = form?.querySelector('select') as HTMLSelectElement | null;
+		// Template select is first; After is the second select.
+		const selects = form?.querySelectorAll('select') ?? [];
+		expect((selects[1] as HTMLSelectElement | undefined)?.value).toBe('intro.html');
 	});
 });
 
