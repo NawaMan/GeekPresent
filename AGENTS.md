@@ -6,6 +6,79 @@ framework. The user will usually ask in plain language ("help me add a YouTube l
 
 Read the `README.md` first for the user-facing overview. This file is the *operator's manual*.
 
+---
+
+## Quick start for agents (read this first)
+
+Get the environment and git shape right before editing. Wrong port / wrong host / wrong branch
+wastes a whole session.
+
+### CodingBooth — how to run things
+
+This repo ships a **CodingBooth** wrapper (`./booth` + `.booth/`). Prefer it whenever `./booth`
+exists: install, test, and build run *inside* the container so host Node/pnpm drift does not
+matter. Details also live in `dev-run.sh` and `.booth/config.toml` — this section is the agent
+summary.
+
+| Goal | Command |
+| --- | --- |
+| Dev server (user owns this — see Rule 6) | `./booth exec --run -- ./dev-run.sh` |
+| Dev on a non-default host port | `GEEKPRESENT_PORT=32000 ./booth exec --run -- ./dev-run.sh` |
+| One-shot in the booth (tests, scripts, …) | `./booth exec --run -- <command>` |
+| Run the test suite | `./booth exec --run -- pnpm test` |
+| Static build (into `docs/` via vite, or a folder) | `./booth exec --run -- pnpm build` or `./booth exec --run -- ./build-static.sh ./dist` |
+| Host-only fallback (no booth / no Docker) | `pnpm install` then `pnpm test` / `pnpm build` — prefix with `npm_config_verify_deps_before_run=false` if pnpm nags about deps |
+
+**Ports (easy to get wrong):**
+
+- Inside the booth, Vite listens on **container** port **5173**.
+- On the **host**, that is published as **`${GEEKPRESENT_PORT:-31173}`** (see `.booth/config.toml`).
+- Open slides at `http://localhost:<host-port>/slides/<name>.html` (e.g. default
+  `http://localhost:31173/slides/title.html`, or `:32000` if the user set `GEEKPRESENT_PORT=32000`).
+- `GEEKPRESENT_PORT` is applied when the booth container is **created**. It cannot re-bind `-p` on a
+  live container — if the user already has a booth running on a port, use *that* URL; do not start a
+  second dev server to "fix" the port.
+- **Booth name = folder name.** CodingBooth names the container after the project directory
+  (e.g. worktree `…/sticky-bars` → booth name around `sticky-bars`). If you need to *create* a
+  booth and the default host port is **already occupied** (another booth, another process, or
+  `bind: address already in use` on publish), pick a free `GEEKPRESENT_PORT` (e.g. `32000`,
+  `32001`, …) and start with that:
+  `GEEKPRESENT_PORT=<free> ./booth exec --run -- ./dev-run.sh`.
+  **Tell the user the port you chose** (and the full URL) so they open the right host — do not
+  silently leave them on `:31173`. Still do **not** kill someone else's booth or the user's
+  running dev to free a port (Rule 6).
+
+**If `./booth` is missing**, fall back to host `pnpm` and treat the default dev URL as whatever the
+user said (often `http://localhost:5173` for bare `pnpm dev`).
+
+### Worktree / feature checkout → create a branch for the PR
+
+If this checkout is an **isolated line of work** (not the user's long-lived main clone), create a
+**feature branch early** so they can push and open a PR without fighting `main`.
+
+How to tell (any one is enough):
+
+- Linked git worktree: `git rev-parse --git-dir` and `git rev-parse --git-common-dir` resolve to
+  different paths.
+- Path looks like a worktree session: `…/worktrees/<name>/…` (e.g. Grok/agent worktrees).
+- The user said they are in a worktree, or the session/workspace is named for a feature.
+
+Then, **before the first substantive edit** (or as soon as you notice you are still on `main` /
+`master` with work pending):
+
+1. Name the branch after the worktree folder or the task (e.g. path `…/worktrees/sticky-bars` →
+   branch `sticky-bars`, or `feat/chrome-pin` if the user named the task). Prefer an existing
+   local branch of that name over inventing a second one.
+2. `git checkout -b <branch>` if it does not exist yet; if it already exists, check it out.
+3. Tell the user the branch name so they can push / open the PR when ready.
+
+Still **do not** `git commit`, `git push`, or open the PR unless the user asks (Rule 8). Creating
+the branch is the exception — it only sets up the line of work; it does not publish anything.
+
+If you are on a normal day-to-day clone of `main` (no worktree path, no feature session), do
+**not** invent a branch unless the user asks or the change is clearly a long-lived feature they
+want isolated.
+
 ## Skills — the executable half of this file
 
 The recurring jobs are also shipped as **skills** in `.claude/skills/`, each a checklist that ends in a
@@ -133,8 +206,9 @@ than misleading the next agent.
   pure `utils/overviewPageCore.ts`),
   `SizeMode`, `Seo` (renders SEO/social metadata
   into `<svelte:head>` — see the SEO note under *Gotchas*).
-- Package manager is **pnpm** (`pnpm dev` / `build` / `deploy`). The **user** runs the dev server —
-  `http://localhost:31173` by default — not you (Rule 6).
+- Package manager is **pnpm**. Prefer **`./booth exec --run -- …`** when CodingBooth is present
+  (see *Quick start for agents*). The **user** runs the dev server — default host URL
+  `http://localhost:31173` — not you (Rule 6).
 
 ## Two kinds of artifact: presentations and texts
 
@@ -244,18 +318,26 @@ are load-bearing when you touch anything nearby:
    respect any base path — hardcoded `/foo.png` breaks under a subpath deploy.
 5. **The presentation folder(s) under `src/routes/` are the source of truth** (`slides/` is the
    default one). There is no `example/` folder anymore; don't recreate one.
-6. **The user runs the dev server — you don't.** The user keeps `pnpm dev` running themselves, on
-   **port 31173** by default. Never start, restart, or kill it. To see how a change looks, *ask the
-   user* to load the page (`http://localhost:31173/slides/<name>.html`) and tell you what they see.
-   What you *can* do unprompted: a static build
-   (`npm_config_verify_deps_before_run=false pnpm exec vite build`) and the tests (`pnpm test`) —
-   those don't touch the dev server.
+6. **The user runs the dev server — you don't.** They typically keep
+   `./booth exec --run -- ./dev-run.sh` (or bare `pnpm dev`) running themselves. **Never** start,
+   restart, or kill the dev server, `dev-run.sh`, or the booth container that hosts it. Default
+   host URL is `http://localhost:${GEEKPRESENT_PORT:-31173}/…` (container Vite is always `:5173` —
+   see *Quick start for agents*). To see how a change looks, *ask the user* to load the page (e.g.
+   `http://localhost:31173/slides/<name>.html`, or whatever host port they told you) and tell you
+   what they see. What you *can* do unprompted: tests and a static build **in the booth** when
+   present (`./booth exec --run -- pnpm test`, `./booth exec --run -- pnpm build` /
+   `./build-static.sh …`); host fallbacks are fine if booth is unavailable
+   (`npm_config_verify_deps_before_run=false pnpm test` / `pnpm exec vite build`). Those do not
+   touch the dev server.
 7. **Verify before declaring done.** Cover the change with a test (`tests/*.test.ts`, or
    `tests/*.ssr.test.ts` for prerender behavior) and/or have the user check the slide in dev. The
    build is static, so also sanity-check it isn't relying on any server feature.
-8. **Never commit unless the user explicitly says so.** Leave your work in the working tree. Don't
-   `git add`, `git commit`, `git push`, or create branches on your own initiative — "the change is
-   done" is not permission to commit it. When the user asks for a commit message, use `/commit-msg`.
+8. **Never commit or push unless the user explicitly says so.** Leave your work in the working
+   tree. Don't `git add`, `git commit`, or `git push` on your own initiative — "the change is done"
+   is not permission to commit it. When the user asks for a commit message, use `/commit-msg`.
+   **Exception — worktrees:** if this checkout is a git worktree, **do** create/switch to a
+   feature branch early (see *Git worktree → create a branch for the PR* above) so the user can
+   push and open a PR; still do not commit or push that branch unless asked.
 
 ---
 
@@ -459,7 +541,7 @@ There are two distinct causes, and the tooltip tells the one that actually happe
    <ImageBlock src={photo} alt="…" x={760} y={560} width={320} height={320} />
    ```
 2. Have the user open the slide in their dev server. The top-centre tool bar
-   (`PRESENT │ ANNOTATE │ ADJUST │ DISPLAY │ ☰`) now shows an **ADJUST** toggle — turn it on. A dashed
+   (`📌 │ PRESENT │ ANNOTATE │ ADJUST │ DISPLAY │ ☰`) now shows an **ADJUST** toggle — turn it on. A dashed
    outline appears around each `Block`.
 3. **Drag** the body to move, **drag the bottom-right grip** to resize. Snap to a
    grid with the `grid` prop; hold **Alt** to break an aspect lock; **Esc** cancels
@@ -529,13 +611,34 @@ Nothing to place: `SlideDeck` mounts `<Annotate>` once, like `Spotlight`. One pr
 >
 > Demo: `annotate-component.html` → `annotate-persistence.html` → `annotate-setup.html`.
 
+### "Keep a chrome bar visible (PIN)"
+
+The top tool bar (`SlideToolbar`) and bottom control bar (`ControlBar`) both **auto-hide** —
+tucked to a peek strip at the window edge, sliding fully open on hover or keyboard focus so they
+stay out of the audience's way. A speaker who is actively using one often wants *that* bar to
+**stay** open rather than re-tuck every time the pointer leaves. **PIN** is that latch.
+
+- **One pin per bar, independent.** The pushpin icon sits at the **front** of each bar. Pin the
+  bottom pager open for a talk while leaving the top tools tucked (or the reverse). There is no
+  deck-wide shared flag — `toolBarPinned` and `controlBarPinned` in `src/lib/stores/chromePin.ts`
+  are separate `persisted` booleans (`sync: false`, same bargain as `displayMode` / `adjustMode`).
+- **Default is auto-hide.** Offered is not active: a first visit still tucks. Click the pin to
+  seat the bar fully open (`class="pinned"` forces `translateY(0)`); click again to return to
+  auto-hide. The choice survives a slide change and a reload.
+- **Not the same as `fadeChrome`.** `fadeChrome` ghosts `.gp-chrome` opacity until pointed at;
+  PIN is the tuck/untuck of the two window-edge bars. They compose: a pinned bar is fully seated
+  even when fade would otherwise dim other chrome.
+- **TOC height.** The bar-hosted Table of Contents flyout opens upward and is capped at roughly
+  half the viewport (`min(42vh, calc(100vh - 10em))`) so a long deck scrolls inside the panel
+  instead of covering the whole slide when the control bar is pinned open.
+
 ### "Save this slide as an image (CAPTURE)"
 
 One prop, and a **CAPTURE** entry appears in the top-centre tool bar's **hamburger (☰) menu** —
 hover the ☰ at the bar's right end and OVERVIEW / CAPTURE / PRINT drop down. It downloads the
-current slide as a PNG. (The bar itself is `PRESENT │ ANNOTATE │ ADJUST SAVE │ ☰`: PRESENT and the
-ANNOTATE / ADJUST toggles sit in the open, while OVERVIEW / CAPTURE / PRINT — the *navigation and
-output* tools — live behind the hamburger.) **PRINT** opens a small submenu — This slide / This
+current slide as a PNG. (The bar itself is `📌 │ PRESENT │ ANNOTATE │ ADJUST SAVE │ ☰`: the pin
+and PRESENT / ANNOTATE / ADJUST sit in the open, while OVERVIEW / CAPTURE / PRINT — the *navigation
+and output* tools — live behind the hamburger.) **PRINT** opens a small submenu — This slide / This
 slide + notes (print in place; the notes toggle is a local override, no navigation), and Whole
 deck / + notes (a full nav to `/_handout/<deck>.html`). CAPTURE only appears when the deck offers it
 (`capture`), and the whole bar is hidden under `?clean` / `?present`.
