@@ -15,69 +15,145 @@ wastes a whole session.
 
 ### CodingBooth — how to run things
 
-This repo ships a **CodingBooth** wrapper (`./booth` + `.booth/`). Prefer it whenever `./booth`
-exists: install, test, and build run *inside* the container so host Node/pnpm drift does not
-matter. Details also live in `dev-run.sh` and `.booth/config.toml` — this section is the agent
-summary.
+This repo ships a **CodingBooth** wrapper (`./booth` + `.booth/`). **Agents run everything
+through the booth** — install, test, build, and the **dev server**. Many hosts have no Node or
+pnpm; the booth image does. Never assume host `pnpm` / `node` / bare `vite` exist. Details also
+live in `dev-run.sh` and `.booth/config.toml` — this section is the agent summary.
 
 | Goal | Command |
 | --- | --- |
-| Dev server (user owns this — see Rule 6) | `./booth exec --run -- ./dev-run.sh` |
-| Dev on a non-default host port | `GEEKPRESENT_PORT=32000 ./booth exec --run -- ./dev-run.sh` |
+| Dev server (**booth only** — see Rule 6) | `./booth exec --run -- ./dev-run.sh` |
 | One-shot in the booth (tests, scripts, …) | `./booth exec --run -- <command>` |
 | Run the test suite | `./booth exec --run -- pnpm test` |
 | Static build (into `docs/` via vite, or a folder) | `./booth exec --run -- pnpm build` or `./booth exec --run -- ./build-static.sh ./dist` |
-| Host-only fallback (no booth / no Docker) | `pnpm install` then `pnpm test` / `pnpm build` — prefix with `npm_config_verify_deps_before_run=false` if pnpm nags about deps |
 
-**Ports (easy to get wrong):**
+**No host pnpm / Node fallback for agents.** Do not run `pnpm …`, `npm …`, or `vite …` on the host
+for this project — not for dev, not for tests, not for builds, not “just this once”. If Docker or
+booth is broken, stop and tell the user; do not invent a host toolchain path.
 
-- Inside the booth, Vite listens on **container** port **5173**.
-- On the **host**, that is published as **`${GEEKPRESENT_PORT:-31173}`** (see `.booth/config.toml`).
-- Open slides at `http://localhost:<host-port>/slides/<name>.html` (e.g. default
-  `http://localhost:31173/slides/title.html`, or `:32000` if the user set `GEEKPRESENT_PORT=32000`).
-- `GEEKPRESENT_PORT` is applied when the booth container is **created**. It cannot re-bind `-p` on a
-  live container — if the user already has a booth running on a port, use *that* URL; do not start a
-  second dev server to "fix" the port.
-- **Booth name = folder name.** CodingBooth names the container after the project directory
-  (e.g. worktree `…/sticky-bars` → booth name around `sticky-bars`). If you need to *create* a
-  booth and the default host port is **already occupied** (another booth, another process, or
-  `bind: address already in use` on publish), pick a free `GEEKPRESENT_PORT` (e.g. `32000`,
-  `32001`, …) and start with that:
-  `GEEKPRESENT_PORT=<free> ./booth exec --run -- ./dev-run.sh`.
-  **Tell the user the port you chose** (and the full URL) so they open the right host — do not
-  silently leave them on `:31173`. Still do **not** kill someone else's booth or the user's
-  running dev to free a port (Rule 6).
+**Two different ports (easy to mix up):**
 
-**If `./booth` is missing**, fall back to host `pnpm` and treat the default dev URL as whatever the
-user said (often `http://localhost:5173` for bare `pnpm dev`).
+| Port | What it is | How to set it |
+| --- | --- | --- |
+| **Booth control** | Host → container **10000** (CodingBooth's own port; shown in `./booth list`) | `.booth/config.toml` → **`port = "NEXT"`** (recommended). CodingBooth picks a free host port when the booth is **created**. |
+| **Vite / slides** | Host → container **5173** (the slide site) | `run-args` in `.booth/config.toml`: `"--publish", "<host>:5173"` (stock default is **31173:5173**) |
 
-### Worktree / feature checkout → create a branch for the PR
+**Control port = `NEXT`.** That is enough for concurrent booths — no `CB_PORT`, no CLI `--port` in the
+usual recipe. A hard-coded `port = "31000"` collides when another booth already holds it; prefer
+`NEXT`. (CodingBooth still accepts CLI / env pin if someone needs a fixed number; agents should
+not.) There is **no** `GEEKPRESENT_PORT`; that name is obsolete. `exec` does **not** take `--port`.
 
-If this checkout is an **isolated line of work** (not the user's long-lived main clone), create a
-**feature branch early** so they can push and open a PR without fighting `main`.
+```bash
+# usual: config has port = "NEXT" → free control port; Vite host from run-args publish
+./booth exec --run -- ./dev-run.sh
+```
 
-How to tell (any one is enough):
+**Avoid port conflicts before creating a booth (local config only):**
 
-- Linked git worktree: `git rev-parse --git-dir` and `git rev-parse --git-common-dir` resolve to
-  different paths.
-- Path looks like a worktree session: `…/worktrees/<name>/…` (e.g. Grok/agent worktrees).
-- The user said they are in a worktree, or the session/workspace is named for a feature.
+1. Check what is already running: `./booth list` (and note main GeekPresent stock **31000** /
+   Vite **31173** if present).
+2. Edit **this checkout’s** `.booth/config.toml` only:
+   - set `port = "NEXT"` (free control port on create — not a fixed `31000`);
+   - set `"--publish", "<free-host>:5173"` in `run-args` so Vite is not still `31173:5173`
+     (e.g. `32000:5173` for a worktree beside the main booth).
+3. **Do not `git add`, stage, or commit that `config.toml` change.** It is machine/worktree-local
+   until CodingBooth can reassign Vite expose properly. Leave it dirty in the working tree.
+4. Then create/start: `./booth exec --run -- ./dev-run.sh`.
 
-Then, **before the first substantive edit** (or as soon as you notice you are still on `main` /
-`master` with work pending):
+Ports are fixed at container **create** time; they cannot re-bind on a live container. If this
+project’s booth is already up, use *that* URL from `./booth list` — do not start a second one to
+"fix" the port (Rule 6).
 
-1. Name the branch after the worktree folder or the task (e.g. path `…/worktrees/sticky-bars` →
-   branch `sticky-bars`, or `feat/chrome-pin` if the user named the task). Prefer an existing
-   local branch of that name over inventing a second one.
-2. `git checkout -b <branch>` if it does not exist yet; if it already exists, check it out.
-3. Tell the user the branch name so they can push / open the PR when ready.
+Open slides at `http://localhost:<vite-host-port>/slides/<name>.html` (e.g. stock
+`http://localhost:31173/slides/title.html`, or the publish host you set above). After create, read
+the control port from the booth banner / `./booth list` and the Vite URL from config’s publish
+mapping; **tell the user** both when they are not the stock defaults.
+
+**Booth name = folder name.** CodingBooth names the container after the project directory (e.g.
+worktree `…/worktree/view-source` → booth `view-source`). Check with `./booth list`. Still do
+**not** kill someone else's booth or the user's running dev to free a port (Rule 6).
+
+> **Known gap (CodingBooth):** reassigning the Vite expose per concurrent booth without editing
+> `config.toml` is not clean yet. Relative `+OFFSET:5173` publish forms and/or config-driven expose
+> are the proper fix on the CodingBooth side — until then, agents edit local publish as above and
+> **never commit** those port picks.
+
+### Session = linked worktree + branch (GitKraken-visible)
+
+**This is the only setup for isolated agent sessions on this project.** One session folder, one
+branch, registered with the main clone so GitKraken lists it.
+
+```bash
+# from the main clone root, e.g. ~/dev/git/GeekPresent
+mkdir -p worktree
+git worktree add worktree/<name> -b <name>    # branch + linked checkout in one step
+cd worktree/<name>
+grok                                          # start the session HERE — do NOT use grok -w / --worktree
+```
+
+| Piece | Value | Notes |
+| --- | --- | --- |
+| Working tree | `<repo>/worktree/<name>/` | Open this in the editor / Grok / GitKraken |
+| Branch | `<name>` (same as the folder) | Created by `-b <name>`; already checked out |
+| Git bookkeeping | `<repo>/.git/worktrees/<name>/` | Auto; **never** open or check out files here |
+| Gitignore | `/worktree/` in `.gitignore` | Nested under main → must be ignored (already present) |
+
+Check that GitKraken will see it (open the **main** repo, not only the worktree path):
+
+```bash
+git worktree list
+# …/GeekPresent                      […] [main]
+# …/GeekPresent/worktree/<name>      […] [<name>]
+```
+
+A healthy linked worktree has a **file** `.git` pointing at the main repo (not a `.git/` directory):
+
+```text
+gitdir: /…/GeekPresent/.git/worktrees/<name>
+```
+
+**Do not** use `grok --worktree=…` / `grok -w` / Ctrl+W to create the isolation for this project.
+Those often produce a **standalone clone** under `~/.grok/worktrees/…` (full `.git/` directory).
+Standalone clones are **invisible** to GitKraken’s worktree list for the main repo. If one already
+exists and the user wants GitKraken: move work aside, `git worktree add worktree/<name> <branch>`
+from main, re-apply any uncommitted edits, delete the standalone.
+
+Optional: Grok’s home-dir bucket can still be redirected so accidental Grok paths resolve under
+the repo (does **not** make a standalone into a linked worktree):
+
+```bash
+# from main clone — only if you want the path alias
+ln -sfn "$(pwd)/worktree" ~/.grok/worktrees/git-geekpresent
+```
+
+When the user asks for “a session”, “a worktree”, or a feature checkout: run the recipe above
+(or confirm `worktree/<name>` already exists and is linked), then work **inside** that folder.
+Keep `/worktree/` in `.gitignore`.
+
+### Already in a worktree → stay on the feature branch
+
+If this checkout is an **isolated line of work** (not the long-lived main clone), the branch
+should already match the folder (`git worktree add … -b <name>`). If you are still on `main` /
+`master` inside `worktree/<name>/`, fix that **before the first substantive edit**:
+
+How to tell you are in a worktree (any one is enough):
+
+- Path is `…/worktree/<name>/…`, or `.git` is a file with `gitdir: …/.git/worktrees/…`
+- `git rev-parse --git-dir` and `--git-common-dir` resolve to different paths
+- The user said this is a worktree / feature session
+
+Then:
+
+1. Prefer branch name = folder name (`…/worktree/view-source` → `view-source`). Reuse that
+   branch if it exists; otherwise `git checkout -b <name>`.
+2. Tell the user the branch name so they can push / open the PR when ready.
 
 Still **do not** `git commit`, `git push`, or open the PR unless the user asks (Rule 8). Creating
-the branch is the exception — it only sets up the line of work; it does not publish anything.
+or switching the branch is the exception.
 
-If you are on a normal day-to-day clone of `main` (no worktree path, no feature session), do
-**not** invent a branch unless the user asks or the change is clearly a long-lived feature they
-want isolated.
+If you are on a normal day-to-day clone of `main` (no `worktree/<name>` path, no feature
+session), do **not** invent a branch unless the user asks or the change is clearly a long-lived
+feature they want isolated.
 
 ## Skills — the executable half of this file
 
@@ -167,10 +243,12 @@ than misleading the next agent.
   `keys="global"` lets Space run it one command at a time and then page the deck. Don't put an
   `<AnimationBar />` on a Terminal slide — both would drive the same clock; pass
   `controls={false}` if you want the bar to own it),
-  `ViewSource` (corner `</> Source` button that shows a page's
-  own `?raw` source in a `CodeBox`) and `SourceView` (the same control, Shiki instead of Monaco —
-  use it on any slide reached by a CLIENT-SIDE navigation, i.e. a View-Transition deck or an
-  appendix with `transition`, because Monaco's CDN loader renders blank after a `goto`),
+  `ViewSource` (registers a page's own `?raw` source for the top tool bar's ☰ → **SOURCE**
+  menu item, which opens it in a `CodeBox`; on a Text, which has no tool bar, it keeps the
+  classic corner `</> Source` button) and `SourceView` (the same control, Shiki instead of
+  Monaco — use it on any slide reached by a CLIENT-SIDE navigation, i.e. a View-Transition
+  deck or an appendix with `transition`, because Monaco's CDN loader renders blank after a
+  `goto`),
   `Block` / `ImageBlock` (absolutely-positioned
   wrappers you place at exact canvas pixels — drag/resize them in **ADJUST mode**,
   see that playbook), `Connector` (an arrow auto-routed between two *named* `Block`s —
@@ -206,9 +284,8 @@ than misleading the next agent.
   pure `utils/overviewPageCore.ts`),
   `SizeMode`, `Seo` (renders SEO/social metadata
   into `<svelte:head>` — see the SEO note under *Gotchas*).
-- Package manager is **pnpm**. Prefer **`./booth exec --run -- …`** when CodingBooth is present
-  (see *Quick start for agents*). The **user** runs the dev server — default host URL
-  `http://localhost:31173` — not you (Rule 6).
+- Package manager is **pnpm**, but **only inside the booth** — always
+  **`./booth exec --run -- …`** (see *Quick start for agents*). The host may not have pnpm at all.
 
 ## Two kinds of artifact: presentations and texts
 
@@ -318,17 +395,15 @@ are load-bearing when you touch anything nearby:
    respect any base path — hardcoded `/foo.png` breaks under a subpath deploy.
 5. **The presentation folder(s) under `src/routes/` are the source of truth** (`slides/` is the
    default one). There is no `example/` folder anymore; don't recreate one.
-6. **The user runs the dev server — you don't.** They typically keep
-   `./booth exec --run -- ./dev-run.sh` (or bare `pnpm dev`) running themselves. **Never** start,
-   restart, or kill the dev server, `dev-run.sh`, or the booth container that hosts it. Default
-   host URL is `http://localhost:${GEEKPRESENT_PORT:-31173}/…` (container Vite is always `:5173` —
-   see *Quick start for agents*). To see how a change looks, *ask the user* to load the page (e.g.
-   `http://localhost:31173/slides/<name>.html`, or whatever host port they told you) and tell you
-   what they see. What you *can* do unprompted: tests and a static build **in the booth** when
-   present (`./booth exec --run -- pnpm test`, `./booth exec --run -- pnpm build` /
-   `./build-static.sh …`); host fallbacks are fine if booth is unavailable
-   (`npm_config_verify_deps_before_run=false pnpm test` / `pnpm exec vite build`). Those do not
-   touch the dev server.
+6. **Dev server runs only via booth — never host pnpm/Node.** When a live dev server is needed
+   (user asks you to run it, or you must verify in the browser yourself), start it with
+   **`./booth exec --run -- ./dev-run.sh`** (see *Quick start for agents*). Check `./booth list`
+   first: if this project's booth already has Vite up, use that URL — do not start a second one,
+   and **never** kill someone else's booth or their running dev. Vite is always container
+   `:5173`; the host URL is the `"--publish", "HOST:5173"` mapping in `.booth/config.toml` (stock
+   `http://localhost:31173/…`). Tell the user the full URL. Tests and static builds also go
+   **only** through the booth (`./booth exec --run -- pnpm test`, `./booth exec --run -- pnpm build`
+   / `./build-static.sh …`) — not host `pnpm`.
 7. **Verify before declaring done.** Cover the change with a test (`tests/*.test.ts`, or
    `tests/*.ssr.test.ts` for prerender behavior) and/or have the user check the slide in dev. The
    build is static, so also sanity-check it isn't relying on any server feature.
@@ -336,7 +411,7 @@ are load-bearing when you touch anything nearby:
    tree. Don't `git add`, `git commit`, or `git push` on your own initiative — "the change is done"
    is not permission to commit it. When the user asks for a commit message, use `/commit-msg`.
    **Exception — worktrees:** if this checkout is a git worktree, **do** create/switch to a
-   feature branch early (see *Git worktree → create a branch for the PR* above) so the user can
+   feature branch early (see *Session = linked worktree + branch* above) so the user can
    push and open a PR; still do not commit or push that branch unless asked.
 
 ---

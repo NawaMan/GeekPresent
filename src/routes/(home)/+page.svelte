@@ -166,8 +166,8 @@
 		GeekPresent gives you a fixed pixel coordinate space and does the scaling for you.
 	</li>
 	<li>
-		<b>Slides that are their own documentation.</b> A
-		<Label style="color: #7fd9ff;">&lt;/&gt; Source</Label> button pops a slide's
+		<b>Slides that are their own documentation.</b> The top bar's
+		<Label style="color: #7fd9ff;">☰ → SOURCE</Label> menu item pops a slide's
 		<i>own</i> source into a Monaco viewer titled with its file path &mdash; pulled
 		straight from the file, so it can never drift from what you see.
 	</li>
