@@ -28,6 +28,8 @@
 	import { browser } from '$app/environment';
 	import { annotationMode, canAnnotate } from '$lib/stores/annotation';
 	import { toolBarPinned } from '$lib/stores/chromePin';
+	import { chromeArmed, moreMenuHeldClosed, releaseMoreMenuHold } from '$lib/stores/chromeArm';
+	import { overviewOpen } from '$lib/stores/overviewOpen';
 	import SizeMode from './SizeMode.svelte';
 	import type { Snippet } from 'svelte';
 
@@ -57,6 +59,14 @@
 		printBtn,
 		sourceItem
 	}: Props = $props();
+
+	// When OVERVIEW opens, force-close the ☰ drop: CSS :hover/:focus-within would otherwise
+	// keep it painted over the grid (the toolbar sits above the overview scrim).
+	$effect(() => {
+		if (browser && $overviewOpen && document.activeElement instanceof HTMLElement) {
+			document.activeElement.blur();
+		}
+	});
 </script>
 
 {#if browser}
@@ -68,6 +78,7 @@
 	<div
 		class="annot-tools no-print"
 		class:pinned={$toolBarPinned}
+		class:armed={$chromeArmed}
 		role="group"
 		aria-label="Slide tools"
 	>
@@ -117,7 +128,7 @@
 					? 'ANNOTATE — drawing (click to put the pen down)'
 					: 'ANNOTATE — draw on this slide'}
 			onclick={() => annotationMode.update((v) => !v)}
-		>ANNOTATE</button>
+		>ANNOTATE (A)</button>
 
 		<!-- ADJUST + SAVE, slotted from SlideDeck (which owns the layout store). The snippet carries
 		     the separator before them, so a deck that doesn't offer ADJUST leaves no dangling
@@ -133,21 +144,30 @@
 
 		<span class="annot-bar-sep" aria-hidden="true"></span>
 
-		<!-- The hamburger menu — OVERVIEW / CAPTURE / PRINT / SOURCE. A focusable button so the
-		     panel reveals on hover AND on focus (keyboard / a tap that focuses it); the dropdown
-		     is its child, so it hangs off the ☰ at the bar's right edge rather than off PRESENT. -->
-		<div class="annot-menu">
+		<!-- The hamburger menu. Groups: navigate (OVERVIEW) · export (CAPTURE, PRINT) ·
+		     source (SOURCE, EDIT). Separators sit between groups; empty capture leaves a
+		     zero-height row so the sep still reads as "navigate | export | source". -->
+		<!-- svelte-ignore a11y_no_static_element_interactions — mouseenter only clears Esc's
+		     "hold ☰ closed" latch so hover can open the menu again; no keyboard role needed. -->
+		<div
+			class="annot-menu"
+			class:menu-suppressed={$overviewOpen || $moreMenuHeldClosed}
+			role="presentation"
+			onmouseenter={() => releaseMoreMenuHold()}
+		>
 			<button
 				type="button"
 				class="annot-hamburger"
 				aria-haspopup="menu"
-				aria-label="More tools"
+				aria-label="More tools (M)"
 				title="More — Overview, Capture, Print, Source, Edit"
-			>☰</button>
+			>☰ (M)</button>
 			<div class="annot-drop" role="menu" aria-label="More tools">
 				{@render overviewBtn?.()}
+				<div class="menu-sep" role="separator"></div>
 				{@render captureItem?.()}
 				{@render printBtn?.()}
+				<div class="menu-sep" role="separator"></div>
 				{@render sourceItem?.()}
 			</div>
 		</div>
@@ -189,8 +209,15 @@
 	   speaker unpins, without needing continuous hover/focus. */
 	.annot-tools:hover,
 	.annot-tools:focus-within,
-	.annot-tools.pinned {
+	.annot-tools.pinned,
+	.annot-tools.armed {
 		transform: translateX(-50%) translateY(0);
+	}
+	/* Keyboard arm (Alt+.) — soft halo so the speaker sees chrome is "live" for mnemonics. */
+	.annot-tools.armed {
+		box-shadow:
+			0 3px 14px rgba(0, 0, 0, 0.4),
+			0 0 0 2px color-mix(in srgb, var(--annot-toggle-fg, #F0A33E) 55%, transparent);
 	}
 
 	/* The hamburger + its dropdown. position:relative anchors the panel under the ☰ at the bar's
@@ -204,6 +231,20 @@
 
 	/* PRESENT — a plain bar button (slotted from SlideDeck, dressed via :global). Half-faded at
 	   rest, full on its own hover; a click opens the console. It owns no menu now. */
+	/* ☰ menu-row mnemonics (O/C/P/S/E) keep underlines; bar labels use "NAME (K)" form. */
+	.annot-drop :global(.tool-mn) {
+		text-decoration: underline;
+		text-underline-offset: 0.18em;
+		text-decoration-thickness: 1px;
+	}
+	/* Key chip at the end of "☰ (M)" — slightly quieter than the glyph. */
+	.annot-hamburger {
+		gap: 0.2em;
+		letter-spacing: 0.02em;
+		font-weight: bold;
+		white-space: nowrap;
+	}
+
 	.annot-tools :global(.annot-anchor) {
 		cursor: pointer;
 		font: inherit;
@@ -246,19 +287,20 @@
 		background: var(--annot-bar-hover, rgba(255, 255, 255, 0.1));
 	}
 
-	/* The dropdown — OVERVIEW / CAPTURE / PRINT / SOURCE — hangs under the ☰, revealed on hover/
-	   focus of the menu. `right: 0` aligns its right edge to the hamburger and it opens LEFTWARD,
-	   so it stays inside the bar's right edge. `top: 100%` seats it on the bar's bottom edge with
-	   no dead gap, so moving the pointer down from the ☰ into the panel never drops the hover. */
+	/* The dropdown hangs under the ☰, revealed on hover/focus of the menu. `right: 0` aligns
+	   its right edge to the hamburger and it opens LEFTWARD. `top: 100%` seats it on the bar's
+	   bottom edge with no dead gap, so the pointer can move from ☰ into the panel without
+	   dropping hover. */
 	.annot-drop {
 		position: absolute;
 		top: 100%;
 		right: 0;
 		z-index: 1;
-		min-width: 10em;
+		min-width: 13.5em;
 		display: flex;
 		flex-direction: column;
-		padding: 0.3em;
+		padding: 0.35em;
+		gap: 0.1em;
 		border: 1px solid var(--annot-bar-edge, rgba(255, 255, 255, 0.16));
 		border-top: none;
 		border-radius: 0 0 10px 10px;
@@ -275,22 +317,41 @@
 		pointer-events: auto;
 		transform: translateY(0);
 	}
+	/* OVERVIEW is open — keep the drop closed even if the pointer is still over ☰. */
+	.annot-menu.menu-suppressed .annot-drop,
+	.annot-menu.menu-suppressed:hover .annot-drop,
+	.annot-menu.menu-suppressed:focus-within .annot-drop {
+		opacity: 0;
+		pointer-events: none;
+		transform: translateY(-8px);
+	}
 
-	/* Dropdown rows: OVERVIEW / CAPTURE / PRINT / SOURCE arrive as slotted `.annot-tool` buttons
-	   (CAPTURE wrapped in `.capture-btn`), dressed via :global into flat full-width menu items. */
+	/* Group dividers: navigate | export | source. */
+	.menu-sep {
+		height: 1px;
+		margin: 0.3em 0.45em;
+		background: var(--annot-bar-edge, rgba(255, 255, 255, 0.16));
+		flex: none;
+	}
+
+	/* Dropdown rows: icon · label (mnemonic underline) · trail (kbd / chevron / external).
+	   CAPTURE may wrap the button in `.capture-btn` for the refusal tip. */
 	.annot-drop :global(.capture-btn) {
 		display: block;
 		width: 100%;
+		position: relative;
 	}
 	.annot-drop :global(.annot-tool) {
-		display: block;
+		display: flex;
+		align-items: center;
+		gap: 0.55em;
 		width: 100%;
-		text-align: center;
+		text-align: left;
 		cursor: pointer;
 		font: inherit;
 		font-weight: bold;
 		letter-spacing: 0.04em;
-		padding: 0.4em 0.9em;
+		padding: 0.42em 0.65em;
 		border: 0;
 		border-radius: 6px;
 		background: transparent;
@@ -302,6 +363,126 @@
 	.annot-drop :global(.annot-tool:disabled) {
 		cursor: default;
 		opacity: 0.7;
+	}
+	.annot-drop :global(.tool-ico) {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.15em;
+		height: 1.15em;
+		flex: none;
+		opacity: 0.9;
+	}
+	.annot-drop :global(.tool-ico svg) {
+		display: block;
+		width: 1em;
+		height: 1em;
+	}
+	.annot-drop :global(.tool-label) {
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+
+	.annot-drop :global(.tool-kbd) {
+		flex: none;
+		font: inherit;
+		font-size: 0.78em;
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		opacity: 0.55;
+		border: 1px solid var(--annot-bar-edge, rgba(255, 255, 255, 0.28));
+		border-radius: 3px;
+		padding: 0.05em 0.35em;
+		line-height: 1.3;
+	}
+	.annot-drop :global(.tool-trail) {
+		flex: none;
+		opacity: 0.5;
+		font-size: 0.85em;
+		line-height: 1;
+	}
+	.annot-drop :global(.tool-ext) {
+		display: flex;
+		align-items: center;
+		opacity: 0.55;
+	}
+	.annot-drop :global(.tool-ext svg) {
+		display: block;
+		width: 0.95em;
+		height: 0.95em;
+	}
+
+	/* PRINT nested submenu — left of the row, part of the ☰ panel. */
+	.annot-drop :global(.print-flyout) {
+		position: relative;
+		width: 100%;
+	}
+	.annot-drop :global(.print-sub) {
+		position: absolute;
+		right: calc(100% + 0.2em);
+		top: -0.35em;
+		z-index: 5;
+		display: flex;
+		flex-direction: column;
+		min-width: 13.5em;
+		padding: 0.35em;
+		gap: 0.1em;
+		border: 1px solid var(--annot-bar-edge, rgba(255, 255, 255, 0.16));
+		border-radius: 10px;
+		background: var(--annot-toggle-bg, rgba(20, 22, 26, 0.98));
+		box-shadow: 0 8px 26px rgba(0, 0, 0, 0.55);
+	}
+	/* Invisible bridge so the pointer can travel from PRINT into the submenu
+	   without dropping mouseleave on the flyout. */
+	.annot-drop :global(.print-sub::after) {
+		content: '';
+		position: absolute;
+		left: 100%;
+		top: 0;
+		width: 0.45em;
+		height: 100%;
+	}
+	.annot-drop :global(.print-sub button) {
+		display: flex;
+		align-items: center;
+		gap: 0.6em;
+		width: 100%;
+		text-align: left;
+		cursor: pointer;
+		padding: 0.42em 0.65em;
+		border: 0;
+		border-radius: 6px;
+		background: transparent;
+		color: var(--annot-toggle-fg, #F0A33E);
+		font: inherit;
+		font-weight: bold;
+		letter-spacing: 0.03em;
+		white-space: nowrap;
+	}
+	.annot-drop :global(.print-sub button:hover) {
+		background: var(--annot-bar-hover, rgba(255, 255, 255, 0.1));
+	}
+	.annot-drop :global(.print-sub-label) {
+		flex: 1 1 auto;
+	}
+	.annot-drop :global(.print-sub-kbd) {
+		flex: none;
+		font: inherit;
+		font-size: 0.78em;
+		font-weight: 600;
+		opacity: 0.55;
+		border: 1px solid var(--annot-bar-edge, rgba(255, 255, 255, 0.28));
+		border-radius: 3px;
+		padding: 0.05em 0.4em;
+		line-height: 1.3;
+		min-width: 1.2em;
+		text-align: center;
+	}
+	.annot-drop :global(.print-menu-sep) {
+		height: 1px;
+		margin: 0.3em 0.45em;
+		background: var(--annot-bar-edge, rgba(255, 255, 255, 0.16));
+		flex: none;
 	}
 
 	/* Thin vertical divider between the bar's groups (PRESENT | pen | adjust | display). :global so

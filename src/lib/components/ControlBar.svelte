@@ -25,6 +25,7 @@
 	import { onMount, type Snippet } from 'svelte';
 	import { animBarSlot, hostedAnim } from '$lib/stores/localChrome';
 	import { controlBarPinned } from '$lib/stores/chromePin';
+	import { chromeArmed } from '$lib/stores/chromeArm';
 
 	interface Props {
 		/** The Table of Contents flyout (SlideDeck supplies <TableOfContent bar />). */
@@ -54,6 +55,7 @@
 	<div
 		class="ctrl-bar no-print"
 		class:pinned={$controlBarPinned}
+		class:armed={$chromeArmed}
 		role="group"
 		aria-label="Slide controls"
 	>
@@ -147,11 +149,18 @@
 
 	/* Revealed on hover / focus: it rises to sit FLUSH on the bottom edge — attached, never
 	   floating fully clear of the window's lip. `.pinned` is the sticky latch (see
-	   stores/chromePin): the bar stays fully out until the speaker unpins. */
+	   stores/chromePin): the bar stays fully out until the speaker unpins. `.armed` is the
+	   temporary keyboard raise (Alt+.). */
 	.ctrl-bar:hover,
 	.ctrl-bar:focus-within,
-	.ctrl-bar.pinned {
+	.ctrl-bar.pinned,
+	.ctrl-bar.armed {
 		transform: translateX(-50%) translateY(0);
+	}
+	.ctrl-bar.armed {
+		box-shadow:
+			0 -3px 14px rgba(0, 0, 0, 0.4),
+			0 0 0 2px color-mix(in srgb, var(--ctrl-bar-fg, var(--annot-toggle-fg, #F0A33E)) 55%, transparent);
 	}
 
 	/* PIN — icon toggle matching the tool bar's pin look, dressed for this bar's shared

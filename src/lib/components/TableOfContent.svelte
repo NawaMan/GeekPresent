@@ -12,6 +12,7 @@
 	import { currentSlidePath } from '$lib/utils/progressCore';
 	import { searchDocs, type SearchDoc } from '$lib/utils/searchCore';
 	import { deckSearchDocs } from '$lib/utils/searchIndex';
+	import { tocOpenRequest } from '$lib/stores/chromeArm';
 
 
     export let pages: Array<Page> = [];
@@ -61,6 +62,11 @@
 
 	let tocRef: HTMLElement;
 	let isContentVisible = writable(false);
+
+	// Alt+. then t — chrome arm requests the TOC open (state is local; this is the channel).
+	const unsubTocReq = tocOpenRequest.subscribe((n) => {
+		if (n > 0) isContentVisible.set(true);
+	});
 
 	function toggleTableOfContent() {
 		isContentVisible.update(value => !value);
@@ -122,6 +128,7 @@
 	});
 
 	onDestroy(() => {
+		unsubTocReq();
 		if (browser) {
 			window.removeEventListener('keydown', handleGlobalKeydown);
 			document.removeEventListener('click', handleClickOutside);
@@ -130,7 +137,13 @@
 </script>
 
 <div class="toc gp-chrome no-print" class:expanded={$isContentVisible} class:bar bind:this={tocRef}>
-	<CtrlBtn chrome text="Table of Contents" hoverText="Table of Contents" on:click={toggleTableOfContent} isSelected={$isContentVisible} />
+	<CtrlBtn
+		chrome
+		text="Table of Contents (T)"
+		hoverText="Table of Contents (T)"
+		on:click={toggleTableOfContent}
+		isSelected={$isContentVisible}
+	/>
 
 	{#if $isContentVisible}
 	<div class="content">

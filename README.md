@@ -31,7 +31,7 @@ HTML-based slides aren't new — reveal.js, Slidev, Spectacle and Marp all exist
 
 - **One slide = one route = one folder.** Slides aren't sections of a single giant document or fenced blocks in one markdown file — each slide is its own SvelteKit route folder (`src/routes/<name>.html/`). So slides diff cleanly one file at a time, each slide can **colocate its own assets** (images, QR codes) right next to it, and every slide is independently URL-addressable and prerendered to its own HTML.
 - **A fixed 1920×1080 canvas with pixel-exact positioning *and* auto-scaling.** You design against one fixed size — `left: 960px` means the same thing on every screen — and the framework scales the whole canvas to fit any window (FITTED) or shows it at an exact zoom you can pan (SCALED), with speaker notes below when zoomed out. Most HTML-slide tools push you toward responsive flow; GeekPresent deliberately gives you a fixed pixel coordinate space and does the scaling math for you.
-- **Slides that are their own documentation — and editable under `pnpm dev`.** Drop `ViewSource` on a slide and the top tool bar's ☰ menu gains **SOURCE** (view the slide's *own* `?raw` source in a Monaco `CodeBox` on the canvas) and **EDIT** (open that file in an *unscaled* popup window at `/_source-edit`, so Monaco's caret is not under the slide's CSS scale). The CodeBox title bar also has **EDIT**. In the popup, **SAVE** writes the full `+page.svelte` through a vite-dev endpoint (same family as ADJUST SAVE; on a static host it answers **NOT ALLOWED**), **REFRESH** reloads from disk (warns if the buffer differs — picks up ADJUST SAVE and IDE edits), and **CLOSE** leaves the window open across slide HMR. (`SourceView` is the same idea with Shiki instead of Monaco for the in-slide panel — use it on any slide reached by a *client-side* navigation, i.e. a View-Transition deck or an appendix with `transition`; its panel also offers **EDIT** into the same popup.)
+- **Slides that are their own documentation — and editable under `pnpm dev`.** Under **`pnpm dev`**, ☰ → **SOURCE** and **EDIT** work on **every** slide (the shell loads `+page.svelte` via a vite-dev endpoint). Drop `ViewSource` when you also want SOURCE on a *built* site, or the classic Text-mode corner control: it registers `?raw` bytes for the in-slide Monaco `CodeBox`. **EDIT** opens an *unscaled* popup at `/_source-edit` (Monaco's caret is not under the slide's CSS scale). **SAVE** / **REFRESH** / **CLOSE** as before — SAVE answers **NOT ALLOWED** on a static host. (`SourceView` is the same idea with Shiki for client-side-navigation decks; its panel also offers **EDIT** into the same popup.)
 - **Appendices — a slide you jump *into* and return *from*.** The deep-dive a talk only sometimes needs: a proof, a full API table, a backup demo. `AppendixLink` jumps in and stamps the calling slide into the URL as the return address, so the same appendix returns to whichever slide asked; `AppendixPage` gives it its way back. It behaves like a real book's appendix — several contiguous slides are one chapter you page through, and walking forward off the end *is* the return. Mark it `hidden` and it leaves the deck's forward march entirely (→/Space step over it, the TOC omits it); leave `hidden` off and it is ordinary back matter you can also page into.
 - **Two artifact types from one component set.** The same `$lib` components compile into either a click-through **presentation** or a long-form, scrollable **Text** — give the talk, then publish the reader-friendly version with no rewrite. A mode flag (`setMode`) lets shared components adapt (e.g. the nav bar collapses to a single TOP button).
 - **Multiple independent presentations in one project.** Navigation and the Table of Contents are scoped *per presentation* via Svelte context (`setPages` / `getPages`), not a single global config. Sibling route folders (`slides/`, `portrait/`, `geeklight/`) each carry their own slide list, theme, fonts, background, and favicon, and coexist without interfering.
@@ -42,7 +42,7 @@ HTML-based slides aren't new — reveal.js, Slidev, Spectacle and Marp all exist
 - **…and every slide to a PNG, offline.** `utils/capture-slides.sh` renders the whole deck to images (thumbnails, a contact sheet) by driving a headless Chrome against a `?shot` URL — a render mode that puts the canvas at exactly 1:1 with no frame, no chrome and no letterbox, so the viewport *is* the slide and the PNG needs no cropping. Because a real browser does the drawing, this path captures what the in-app button can't: iframes, video, Monaco code blocks, all of it.
 - **Social cards that are the actual slide.** Share a slide's URL and the preview *is that slide*, not a generic site card. `utils/capture-slides.sh --og` captures every slide into `static/og/` and wires the PNGs into the deck's `pages.ts` `image:` field — and CI does it for you on every deploy (build → capture → build, since `og:image` is baked into each slide's prerendered HTML). The PNGs are gitignored build output, so nothing bloats the repo, and a slide added since the last run gets its card automatically. It never overwrites an `image` you set by hand.
 - **Presenting-specific touches.** A helper (`utils/prepare-youtube.sh`) fetches a video's thumbnail and generates a QR code into a slide folder, so the `YouTube` component shows a scannable QR overlay linking to the video.
-- **Chrome bars that tuck away — until you pin them.** The top tool bar (PRESENT / ANNOTATE / ADJUST / …) and bottom control bar (TOC / pager) auto-hide to a peek strip so they stay out of the audience's way; hover or focus brings them back. A **pin** on each bar (independent, remembered across reloads) locks that bar fully open when you need it stuck — pin just the pager for a talk, leave the top tools tucked, or pin both.
+- **Chrome bars that tuck away — until you pin them (or raise them from the keyboard).** The top tool bar (PRESENT / ANNOTATE / ADJUST / …) and bottom control bar (TOC / pager) auto-hide to a peek strip; hover, focus, or **Alt+.** (**⌥.** on macOS) brings both fully up for a few seconds so letter mnemonics work (**a**/**j**/**z**/**p**/**m**/**t**). A **pin** on each bar (independent, remembered) locks that bar open. Opt out of a whole bar with `<SlideDeck toolBar={false}>` or `controlBar={false}`.
 
 > **The design note:** slide-to-slide navigation is a full page load, not client-side routing. Animations live *within* a slide — and *cross-slide* transitions work too, via the platform's cross-document **View Transitions API** (`@view-transition { navigation: auto; }`), which is possible precisely *because* each slide is its own document (see the `transition/` deck: slide, flip, zoom, cross-fade, and shared-element morph). The route-per-slide design paying off rather than costing.
 
@@ -312,7 +312,7 @@ Read-only code viewers built on the Monaco editor:
 
 ### View source (and edit in dev)
 
-Mount `ViewSource` on a slide to offer that page's *own* source. The component registers with the deck and supplies the bytes; the open controls live in chrome.
+Under **`pnpm dev`**, **☰ → SOURCE** and **EDIT** are available on **every** slide (no `ViewSource` required): the shell loads the current route's `+page.svelte` through `/__geekpresent/source-load`. On a **built** site, mount `ViewSource` (or `SourceView`) so SOURCE still has bytes without a server:
 
 ```svelte
 <script>
@@ -325,12 +325,11 @@ Mount `ViewSource` on a slide to offer that page's *own* source. The component r
 <ViewSource {source} path="src/routes/slides/title.html/+page.svelte" />
 ```
 
-- **☰ → SOURCE** opens an in-slide read-only Monaco `CodeBox` titled with the file path. On a Text (no tool bar) the classic corner **`</> Source`** button still opens that panel.
-- **☰ → EDIT**, or **EDIT** on the CodeBox title bar, opens a separate browser window at `/_source-edit`. Editing lives there on purpose: the slide canvas is CSS-scaled, and Monaco's caret metrics do not follow that scale (typing in the panel drifts the cursor). The popup is 1:1.
-- In the edit window: **SAVE** writes the full `+page.svelte` via a vite-dev endpoint (same refusal language as ADJUST SAVE — **NOT ALLOWED** on a static host, never pre-disabled); **REFRESH** reloads from disk and warns if the buffer differs (use it after ADJUST SAVE or an IDE edit); **CLOSE** leaves the window (SAVE does not close it — the slide may HMR-reload).
-- The source comes from Vite's `?raw` import, so what's shown can never drift from the real file until you change the file.
-- The path can't be auto-derived inside the component, so each page passes its own `source` (the `?raw` import) and `path` string — one import plus one line per slide.
-- Props: `source` (required), `path`, `language` (defaults to `html` — Monaco has no native `svelte` mode, so a `.svelte` file reads best as HTML; the text itself is exact), `text` / `chrome` (label and look of the Text-mode corner button only; defaults `</> Source` and muted chrome).
+- **☰ → SOURCE** opens a read-only Monaco `CodeBox` on the canvas (ViewSource's panel, or a deck-level fallback in dev). On a Text (no tool bar) the classic corner **`</> Source`** button still opens that panel when ViewSource is mounted.
+- **☰ → EDIT**, or **EDIT** on the CodeBox title bar, opens a separate browser window at `/_source-edit`. Editing lives there on purpose: the slide canvas is CSS-scaled, and Monaco's caret metrics do not follow that scale. The popup is 1:1.
+- In the edit window: **SAVE** writes the full `+page.svelte` via a vite-dev endpoint (same refusal language as ADJUST SAVE — **NOT ALLOWED** on a static host, never pre-disabled); **REFRESH** reloads from disk and warns if the buffer differs; **CLOSE** leaves the window (SAVE does not close it — the slide may HMR-reload).
+- With ViewSource, the source comes from Vite's `?raw` import so the panel cannot drift until you change the file; the path is still passed per page (`source` + `path`).
+- Props: `source` (required when using ViewSource), `path`, `language` (defaults to `html`), `text` / `chrome` (Text-mode corner button only).
 - Worked demo in the stock deck: `slides/viewsource-edit.html`.
 
 ### Animation controls
@@ -425,15 +424,18 @@ Add notes with the `Note` component (shown below the slide in SCALED mode; hidde
 
 ## Navigation & keyboard shortcuts
 
-The nav bar (FIRST / PREV / NEXT / LAST), the **Table of Contents** (top-left button) and the **Overview Page** grid (the button just below it) are added to every slide automatically.
+The nav bar (FIRST / PREV / NEXT / LAST), the **Table of Contents**, and the **Overview Page** grid are added automatically (window-edge chrome; opt out with `toolBar={false}` / `controlBar={false}` on `<SlideDeck>`).
 
 | Key         | Action                       |
 |-------------|------------------------------|
 | Arrow Left  | Previous slide               |
 | Arrow Right | Next slide                   |
 | Space       | Next step, else next slide   |
-| O           | Open the Overview Page grid       |
-| Escape      | Close Overview Page / ToC / Box   |
+| O           | Open the Overview Page grid  |
+| E           | Toggle Overview **EDIT** deck (while Overview is open; dev) |
+| Alt+. (⌥. on Mac) | Raise both chrome bars briefly for letter mnemonics |
+| a / j / z / p / m / t | While bars raised: ANNOTATE / ADJUST / zoom / PRESENT / ☰ / TOC |
+| Escape      | Close Overview / ToC / Box / ☰; disarm chrome raise |
 
 `Space` advances a `<Steps>` build while one is running and pages the deck once it's spent, so a
 build simply inserts sub-steps into the deck's forward march (`Shift+Space` reverses).
@@ -442,18 +444,19 @@ build simply inserts sub-steps into the deck's forward march (`Shift+Space` reve
 slides (each is the prerendered page in an `<iframe>`, scaled to fit), not screenshots, so they're
 never stale and there's nothing to generate. They mount lazily as they scroll into view, so opening
 a 65-slide deck boots the dozen you can see rather than all 65. Appendices (`hidden: true`) stay
-out, exactly as they do in the ToC. Neither key fires while you're typing in a text field.
+out, exactly as they do in the ToC. In **`pnpm dev`**, Overview **EDIT** (or **E**) adds/unlists
+slides via the vite-dev endpoints (production refuses with **NOT ALLOWED**). Letter shortcuts do
+not fire while you're typing in a text field.
 
 ## Printing — and the handout
 
 Each slide is its own page, so **Ctrl/Cmd-P on a slide prints that one slide** — and it prints as a *slide*: the whole canvas on paper its own shape, inside a half-inch margin, centred (the deck's chrome drops out, and the dark background is printed rather than dropped).
 
-There's also a **PRINT** entry, in the top-centre tool bar's hamburger (☰) menu — hover the ☰ at the bar's right end and OVERVIEW / CAPTURE / PRINT drop down. (The pin at the front of each chrome bar is independent of PRINT: it only latches that bar out of auto-hide.) It opens a small menu of destinations the browser's own dialog can't ask about:
+There's also a **PRINT** entry in the top tool bar's hamburger (☰) menu — groups are Overview · Capture/Print · Source/Edit. Hover **PRINT** for a nested flyout (keys **cCwWtT** while open):
 
-- **This slide** / **This slide + notes** — print here (the notes option grows the paper in place, no navigation).
-- **Whole deck** / **Whole deck + notes** — the handout, one slide per page.
-- **Thumbnail grid** — every slide as a small tile, contact-sheet style, on landscape paper.
-- **Notes grid** — one row per slide, thumbnail left and its `<Note>` right, on portrait paper.
+- **Current slide** / **Current + notes** (**c** / **C**) — print here (notes grows the paper in place).
+- **Whole deck** / **Whole + notes** (**w** / **W**) — the handout, one slide per page.
+- **Thumbnail grid** / **Notes grid** (**t** / **T**) — contact sheet or thumbnail + notes rows.
 
 The grids are `/_handout/<deck>.html?grid` and `?grid&notes`; like the handout they render the real slides (not screenshots) and let the browser paginate — as many tiles or rows as fit.
 

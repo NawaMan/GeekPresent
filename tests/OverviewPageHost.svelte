@@ -10,6 +10,7 @@
 	setViewTransitions(true);
 
 	export let currentPath = 'intro.html';
+	export let deck = 'slides';
 	export let pages: Array<Page> = [
 		{ path: 'title.html', title: 'Title' },
 		{ path: 'intro.html', title: 'Intro' },
@@ -18,4 +19,4 @@
 	];
 </script>
 
-<OverviewPage {pages} {currentPath} width={1920} height={1080} />
+<OverviewPage {pages} {currentPath} {deck} width={1920} height={1080} />
