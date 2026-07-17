@@ -81,8 +81,10 @@ Both auto-insert the nav bar. Slides are authored on a fixed **1920×1080** canv
 
 ## Verify
 
-- **You do not run the dev server. The user does**, on port 31173. Never start, restart or kill it.
-  To see how it looks, ask the user to open `http://localhost:31173/<deck>/<name>.html`.
+- **The dev server is usually already up** (the user keeps it running, default port 31173) — assume it
+  exists and just ask them to open `http://localhost:31173/<deck>/<name>.html`. If it isn't up you *may*
+  start one **via the booth** (`./booth exec --run -- ./dev-run.sh`) and tell them the URL — but never
+  kill or restart a server you didn't start, and don't reach for a host `pnpm`. See AGENTS.md Rule 6.
 - What you *can* run unprompted:
   ```bash
   npm_config_verify_deps_before_run=false pnpm exec vite build   # static build
