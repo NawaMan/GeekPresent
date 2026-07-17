@@ -5,7 +5,8 @@ import {
 	pageSourceOpen,
 	registerPageSource,
 	unregisterPageSource,
-	openPageSource
+	openPageSource,
+	openPageSourceEdit
 } from '$lib/stores/pageSource';
 
 describe('pageSource store', () => {
@@ -63,5 +64,16 @@ describe('pageSource store', () => {
 		unregisterPageSource(Symbol('ghost'));
 		expect(get(pageSourceAvailable)).toBe(true);
 		unregisterPageSource(owner);
+	});
+
+	it('openPageSourceEdit invokes the registered opener', () => {
+		const calls: number[] = [];
+		const owner = Symbol('vs');
+		registerPageSource(owner, () => calls.push(1));
+		openPageSourceEdit();
+		expect(calls).toEqual([1]);
+		unregisterPageSource(owner);
+		openPageSourceEdit(); // no opener left
+		expect(calls).toEqual([1]);
 	});
 });
