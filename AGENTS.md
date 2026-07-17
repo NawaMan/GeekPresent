@@ -167,10 +167,12 @@ than misleading the next agent.
   `keys="global"` lets Space run it one command at a time and then page the deck. Don't put an
   `<AnimationBar />` on a Terminal slide — both would drive the same clock; pass
   `controls={false}` if you want the bar to own it),
-  `ViewSource` (corner `</> Source` button that shows a page's
-  own `?raw` source in a `CodeBox`) and `SourceView` (the same control, Shiki instead of Monaco —
-  use it on any slide reached by a CLIENT-SIDE navigation, i.e. a View-Transition deck or an
-  appendix with `transition`, because Monaco's CDN loader renders blank after a `goto`),
+  `ViewSource` (registers a page's own `?raw` source for the top tool bar's ☰ → **SOURCE**
+  menu item, which opens it in a `CodeBox`; on a Text, which has no tool bar, it keeps the
+  classic corner `</> Source` button) and `SourceView` (the same control, Shiki instead of
+  Monaco — use it on any slide reached by a CLIENT-SIDE navigation, i.e. a View-Transition
+  deck or an appendix with `transition`, because Monaco's CDN loader renders blank after a
+  `goto`),
   `Block` / `ImageBlock` (absolutely-positioned
   wrappers you place at exact canvas pixels — drag/resize them in **ADJUST mode**,
   see that playbook), `Connector` (an arrow auto-routed between two *named* `Block`s —
