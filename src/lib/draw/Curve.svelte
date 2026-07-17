@@ -337,6 +337,9 @@
 	// Publish the live geometry under our name so a <Sprite path="<name>"> can
 	// ride this curve. Init-time (not an effect) so it exists during prerender;
 	// the getter reads the live points, so dragging a handle re-routes the rider.
+	// The initial-value capture of `name` is deliberate: a shape's name is its
+	// identity, not reactive state (see DrawContext.registerPathSource).
+	// svelte-ignore state_referenced_locally
 	if (name && ctx) onDestroy(ctx.registerPathSource(name, () => base));
 
 	const stopsAttrFor = (list: CurveStop[] | undefined) =>

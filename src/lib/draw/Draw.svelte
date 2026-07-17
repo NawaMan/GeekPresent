@@ -197,6 +197,9 @@
 	// --- Floating Copy toolbar for the selected shape (the KeyframeStudio
 	// panel pattern): draggable by its header, offset persisted in canvas px
 	// per `name`. Nothing else is saved — the editor is a coordinate finder.
+	// `name` is the canvas's identity, fixed for its lifetime — the init-time
+	// capture is deliberate.
+	// svelte-ignore state_referenced_locally
 	const PANEL_KEY = `drawPanel:${name}`;
 	function loadPanel(): { dx: number; dy: number } {
 		if (!browser) return { dx: 0, dy: 0 };

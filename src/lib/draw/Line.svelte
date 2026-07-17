@@ -297,7 +297,9 @@
 	const editing = $derived(ctx?.editing ?? false);
 
 	// Publish the live geometry under our name so a <Sprite path="<name>"> can
-	// ride this line (see Curve.svelte — same contract).
+	// ride this line (see Curve.svelte — same contract, incl. the deliberate
+	// init-time capture of `name`).
+	// svelte-ignore state_referenced_locally
 	if (name && ctx) onDestroy(ctx.registerPathSource(name, () => ({ kind: 'line', from: F, to: T })));
 
 	const stopsAttrFor = (list: LineStop[] | undefined) =>
