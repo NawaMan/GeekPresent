@@ -64,7 +64,7 @@ import source     from './+page.svelte?raw';
 	</Callout>
 </Block>
 
-<Hint text="☰ → SOURCE to view · EDIT (menu or CodeBox) for the unscaled editor · SAVE · CLOSE" style="font-size:1.1em" />
+<Hint text="☰ → SOURCE to view · EDIT (menu or CodeBox) for the unscaled editor · SAVE · CLOSE" />
 
 <ViewSource {source} {path} />
 
