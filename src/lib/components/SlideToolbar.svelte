@@ -16,7 +16,7 @@
   returns both to auto-hide.
 
   The ANNOTATE pen toggle is OWNED here (it reads the shared annotation stores directly);
-  everything else — PRESENT, ADJUST/SAVE, OVERVIEW/CAPTURE/PRINT — arrives as a snippet from
+  everything else — PRESENT, ADJUST/SAVE, OVERVIEW/CAPTURE/PRINT/SOURCE — arrives as a snippet from
   SlideDeck, which owns that logic. The pen toggle MUST out-rank the armed ink surface, or a
   speaker could arm the pen and never put it down: the overlay sits at z-index 50, the surface
   at 40, so being in the overlay guarantees this for free (it used to need an explicit z 42).
@@ -36,14 +36,15 @@
 		width?: number;
 		height?: number;
 		/** The cluster's contents, supplied by SlideDeck (which owns their logic): the PRESENT
-		 *  anchor, the ADJUST/SAVE group, and the OVERVIEW/CAPTURE/PRINT menu items. The ANNOTATE
-		 *  toggle is NOT slotted — it is owned here, because the pen's state lives in a store this
-		 *  component reads directly. */
+		 *  anchor, the ADJUST/SAVE group, and the OVERVIEW/CAPTURE/PRINT/SOURCE menu items. The
+		 *  ANNOTATE toggle is NOT slotted — it is owned here, because the pen's state lives in a
+		 *  store this component reads directly. */
 		presentBtn?: Snippet;
 		overviewBtn?: Snippet;
 		adjustGroup?: Snippet;
 		captureItem?: Snippet;
 		printBtn?: Snippet;
+		sourceItem?: Snippet;
 	}
 
 	let {
@@ -53,7 +54,8 @@
 		overviewBtn,
 		adjustGroup,
 		captureItem,
-		printBtn
+		printBtn,
+		sourceItem
 	}: Props = $props();
 </script>
 
@@ -131,21 +133,22 @@
 
 		<span class="annot-bar-sep" aria-hidden="true"></span>
 
-		<!-- The hamburger menu — OVERVIEW / CAPTURE / PRINT. A focusable button so the panel reveals
-		     on hover AND on focus (keyboard / a tap that focuses it); the dropdown is its child, so
-		     it hangs off the ☰ at the bar's right edge rather than off PRESENT. -->
+		<!-- The hamburger menu — OVERVIEW / CAPTURE / PRINT / SOURCE. A focusable button so the
+		     panel reveals on hover AND on focus (keyboard / a tap that focuses it); the dropdown
+		     is its child, so it hangs off the ☰ at the bar's right edge rather than off PRESENT. -->
 		<div class="annot-menu">
 			<button
 				type="button"
 				class="annot-hamburger"
 				aria-haspopup="menu"
 				aria-label="More tools"
-				title="More — Overview, Capture, Print"
+				title="More — Overview, Capture, Print, Source"
 			>☰</button>
 			<div class="annot-drop" role="menu" aria-label="More tools">
 				{@render overviewBtn?.()}
 				{@render captureItem?.()}
 				{@render printBtn?.()}
+				{@render sourceItem?.()}
 			</div>
 		</div>
 	</div>
@@ -243,10 +246,10 @@
 		background: var(--annot-bar-hover, rgba(255, 255, 255, 0.1));
 	}
 
-	/* The dropdown — OVERVIEW / CAPTURE / PRINT — hangs under the ☰, revealed on hover/focus of the
-	   menu. `right: 0` aligns its right edge to the hamburger and it opens LEFTWARD, so it stays
-	   inside the bar's right edge. `top: 100%` seats it on the bar's bottom edge with no dead gap,
-	   so moving the pointer down from the ☰ into the panel never drops the hover. */
+	/* The dropdown — OVERVIEW / CAPTURE / PRINT / SOURCE — hangs under the ☰, revealed on hover/
+	   focus of the menu. `right: 0` aligns its right edge to the hamburger and it opens LEFTWARD,
+	   so it stays inside the bar's right edge. `top: 100%` seats it on the bar's bottom edge with
+	   no dead gap, so moving the pointer down from the ☰ into the panel never drops the hover. */
 	.annot-drop {
 		position: absolute;
 		top: 100%;
@@ -273,8 +276,8 @@
 		transform: translateY(0);
 	}
 
-	/* Dropdown rows: OVERVIEW / CAPTURE / PRINT arrive as slotted `.annot-tool` buttons (CAPTURE
-	   wrapped in `.capture-btn`), dressed via :global into flat full-width menu items. */
+	/* Dropdown rows: OVERVIEW / CAPTURE / PRINT / SOURCE arrive as slotted `.annot-tool` buttons
+	   (CAPTURE wrapped in `.capture-btn`), dressed via :global into flat full-width menu items. */
 	.annot-drop :global(.capture-btn) {
 		display: block;
 		width: 100%;
