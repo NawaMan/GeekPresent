@@ -13,7 +13,9 @@
 
   It AUTO-HIDES downward — the exact mirror of the tool bar's upward tuck at the top: tucked so
   only a peek strip shows at the bottom of the window, seating flush on the edge on hover or when
-  keyboard focus reaches a control inside (it never floats fully clear of the edge).
+  keyboard focus reaches a control inside (it never floats fully clear of the edge). PIN latches
+  it fully out (and the top tool bar with it — one shared preference) until the speaker unpins
+  and returns both to auto-hide.
 
   `browser &&` because these are live controls: prerendering would ship dead chrome and bake it
   into the static HTML of every deck built on a dev machine (matches <SlideToolbar> / <Annotate>).
@@ -22,6 +24,7 @@
 	import { browser } from '$app/environment';
 	import { onMount, type Snippet } from 'svelte';
 	import { animBarSlot, hostedAnim } from '$lib/stores/localChrome';
+	import { controlBarPinned } from '$lib/stores/chromePin';
 
 	interface Props {
 		/** The Table of Contents flyout (SlideDeck supplies <TableOfContent bar />). */
@@ -48,7 +51,37 @@
 </script>
 
 {#if browser}
-	<div class="ctrl-bar no-print" role="group" aria-label="Slide controls">
+	<div
+		class="ctrl-bar no-print"
+		class:pinned={$controlBarPinned}
+		role="group"
+		aria-label="Slide controls"
+	>
+		<!-- PIN — latch THIS bar fully out of its auto-hide tuck. Independent of the top tool
+		     bar's pin (see stores/chromePin). Icon-only (pushpin SVG); aria-label + title
+		     carry the name. Filled when on. -->
+		<button
+			type="button"
+			class="ctrl-pin"
+			class:on={$controlBarPinned}
+			aria-pressed={$controlBarPinned}
+			aria-label={$controlBarPinned ? 'PIN on' : 'PIN off'}
+			title={$controlBarPinned
+				? 'PIN — this bar stays visible (click to auto-hide again)'
+				: 'PIN — keep this bar visible'}
+			onclick={() => controlBarPinned.update((v) => !v)}
+		>
+			<svg class="pin-icon" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false">
+				<!-- Classic pushpin (Material-style): head + shaft + needle. currentColor tracks the tab. -->
+				<path
+					fill="currentColor"
+					d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"
+				/>
+			</svg>
+		</button>
+
+		<span class="ctrl-bar-sep" aria-hidden="true"></span>
+
 		<!-- TABLE OF CONTENTS — the searchable slide list, its flyout opening UPWARD out of the bar. -->
 		{@render tocItem?.()}
 
@@ -113,10 +146,46 @@
 	}
 
 	/* Revealed on hover / focus: it rises to sit FLUSH on the bottom edge — attached, never
-	   floating fully clear of the window's lip. */
+	   floating fully clear of the window's lip. `.pinned` is the sticky latch (see
+	   stores/chromePin): the bar stays fully out until the speaker unpins. */
 	.ctrl-bar:hover,
-	.ctrl-bar:focus-within {
+	.ctrl-bar:focus-within,
+	.ctrl-bar.pinned {
 		transform: translateX(-50%) translateY(0);
+	}
+
+	/* PIN — icon toggle matching the tool bar's pin look, dressed for this bar's shared
+	   `--ctrl-bar-*` / `--annot-*` tokens so both PINs read as the same control. */
+	.ctrl-pin {
+		cursor: pointer;
+		font: inherit;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.25em 0.45em;
+		margin: 0.2em 0.1em;
+		min-width: 1.7em;
+		border: 1px solid transparent;
+		border-radius: 999px;
+		background: transparent;
+		color: var(--ctrl-bar-fg, var(--annot-toggle-fg, #f0a33e));
+		opacity: 0.62;
+		transition: opacity 120ms ease, background 120ms ease;
+	}
+	.ctrl-pin:hover {
+		opacity: 1;
+		background: var(--ctrl-bar-hover, var(--annot-bar-hover, rgba(255, 255, 255, 0.1)));
+	}
+	.ctrl-pin.on {
+		opacity: 1;
+		background: var(--ctrl-bar-fg, var(--annot-pen, #f0a33e));
+		color: var(--annot-bar-on-fg, #1a1206);
+		border-color: transparent;
+	}
+	.ctrl-pin .pin-icon {
+		display: block;
+		width: 1.15em;
+		height: 1.15em;
 	}
 
 	/* The bar owns visibility through its own tuck, so its slotted controls must NOT also

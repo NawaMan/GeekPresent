@@ -11,7 +11,9 @@
 
   It AUTO-HIDES: tucked up so only a peek strip shows at the top of the window, sliding fully
   down on hover or when keyboard focus reaches a button inside it — out of the audience's way
-  while presenting, one flick of the mouse away when the speaker wants it.
+  while presenting, one flick of the mouse away when the speaker wants it. PIN latches it fully
+  out (and the bottom ControlBar with it — one shared preference) until the speaker unpins and
+  returns both to auto-hide.
 
   The ANNOTATE pen toggle is OWNED here (it reads the shared annotation stores directly);
   everything else — PRESENT, ADJUST/SAVE, OVERVIEW/CAPTURE/PRINT — arrives as a snippet from
@@ -25,6 +27,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { annotationMode, canAnnotate } from '$lib/stores/annotation';
+	import { toolBarPinned } from '$lib/stores/chromePin';
 	import SizeMode from './SizeMode.svelte';
 	import type { Snippet } from 'svelte';
 
@@ -55,13 +58,42 @@
 </script>
 
 {#if browser}
-	<!-- The tool bar: PRESENT, then the ANNOTATE and ADJUST word toggles (SAVE beside ADJUST while
-	     it's on), then DISPLAY (the zoom control), then a hamburger (☰) whose dropdown holds
-	     OVERVIEW / CAPTURE / PRINT. The mode toggles are direct bar buttons, so arming the pen or
-	     entering ADJUST is one click and never leaves a panel over the slide; the dropdown hangs off
-	     the hamburger — NOT off PRESENT — so those items don't read as sub-options of PRESENT.
-	     role="group" names the bar. -->
-	<div class="annot-tools no-print" role="group" aria-label="Slide tools">
+	<!-- The tool bar: PIN first (this bar only — independent of the bottom ControlBar),
+	     then PRESENT, ANNOTATE / ADJUST (+ SAVE), DISPLAY, and the ☰ menu (OVERVIEW /
+	     CAPTURE / PRINT). Mode toggles are direct bar buttons so arming the pen or entering
+	     ADJUST is one click; the dropdown hangs off the hamburger — NOT off PRESENT — so
+	     those items don't read as sub-options of PRESENT. role="group" names the bar. -->
+	<div
+		class="annot-tools no-print"
+		class:pinned={$toolBarPinned}
+		role="group"
+		aria-label="Slide tools"
+	>
+		<!-- PIN — latch THIS bar fully out of its auto-hide tuck. Independent of the bottom
+		     ControlBar's pin (see stores/chromePin). Icon-only (pushpin SVG); aria-label +
+		     title carry the name. Filled when on. -->
+		<button
+			type="button"
+			class="annot-tab pin-tab"
+			class:on={$toolBarPinned}
+			aria-pressed={$toolBarPinned}
+			aria-label={$toolBarPinned ? 'PIN on' : 'PIN off'}
+			title={$toolBarPinned
+				? 'PIN — this bar stays visible (click to auto-hide again)'
+				: 'PIN — keep this bar visible'}
+			onclick={() => toolBarPinned.update((v) => !v)}
+		>
+			<svg class="pin-icon" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false">
+				<!-- Classic pushpin (Material-style): head + shaft + needle. currentColor tracks the tab. -->
+				<path
+					fill="currentColor"
+					d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"
+				/>
+			</svg>
+		</button>
+
+		<span class="annot-bar-sep" aria-hidden="true"></span>
+
 		<!-- PRESENT — a plain button (opens/focuses the presenter console); no menu of its own. -->
 		{@render presentBtn?.()}
 
@@ -121,10 +153,11 @@
 
 <style>
 	/* ── The top-centre tool bar ────────────────────────────────────────────────────
-	   One horizontal pill, flush to the WINDOW's top edge and centred: PRESENT, the ANNOTATE /
-	   ADJUST word toggles (+ SAVE), DISPLAY, and the ☰ menu. Its parent (SlideDeck's .overlay)
-	   is position:fixed at z-index 50 — above the ink surface (40) — so the bar always out-ranks
-	   an armed pen, which is what keeps the ANNOTATE toggle reachable to put the pen back down. */
+	   One horizontal pill, flush to the WINDOW's top edge and centred: PIN, PRESENT, the
+	   ANNOTATE / ADJUST word toggles (+ SAVE), DISPLAY, and the ☰ menu. Its parent
+	   (SlideDeck's .overlay) is position:fixed at z-index 50 — above the ink surface (40) —
+	   so the bar always out-ranks an armed pen, which is what keeps the ANNOTATE toggle
+	   reachable to put the pen back down. */
 	.annot-tools {
 		position: absolute;
 		top: 0;
@@ -148,9 +181,12 @@
 		box-shadow: 0 3px 14px rgba(0, 0, 0, 0.4);
 	}
 
-	/* Bring the tucked bar fully into view on hover, or when a click/tab moves focus into it. */
+	/* Bring the tucked bar fully into view on hover, or when a click/tab moves focus into it.
+	   `.pinned` is the sticky latch (see stores/chromePin): the bar stays fully out until the
+	   speaker unpins, without needing continuous hover/focus. */
 	.annot-tools:hover,
-	.annot-tools:focus-within {
+	.annot-tools:focus-within,
+	.annot-tools.pinned {
 		transform: translateX(-50%) translateY(0);
 	}
 
@@ -328,5 +364,19 @@
 	}
 	:global(.annot-act:hover) {
 		background: var(--annot-bar-hover, rgba(255, 255, 255, 0.1));
+	}
+
+	/* PIN is icon-only: square-ish pill so the pushpin sits centred without word-button padding. */
+	.pin-tab {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.25em 0.45em;
+		min-width: 1.7em;
+	}
+	.pin-icon {
+		display: block;
+		width: 1.15em;
+		height: 1.15em;
 	}
 </style>

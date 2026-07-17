@@ -459,7 +459,7 @@ There are two distinct causes, and the tooltip tells the one that actually happe
    <ImageBlock src={photo} alt="…" x={760} y={560} width={320} height={320} />
    ```
 2. Have the user open the slide in their dev server. The top-centre tool bar
-   (`PRESENT │ ANNOTATE │ ADJUST │ DISPLAY │ ☰`) now shows an **ADJUST** toggle — turn it on. A dashed
+   (`📌 │ PRESENT │ ANNOTATE │ ADJUST │ DISPLAY │ ☰`) now shows an **ADJUST** toggle — turn it on. A dashed
    outline appears around each `Block`.
 3. **Drag** the body to move, **drag the bottom-right grip** to resize. Snap to a
    grid with the `grid` prop; hold **Alt** to break an aspect lock; **Esc** cancels
@@ -529,13 +529,34 @@ Nothing to place: `SlideDeck` mounts `<Annotate>` once, like `Spotlight`. One pr
 >
 > Demo: `annotate-component.html` → `annotate-persistence.html` → `annotate-setup.html`.
 
+### "Keep a chrome bar visible (PIN)"
+
+The top tool bar (`SlideToolbar`) and bottom control bar (`ControlBar`) both **auto-hide** —
+tucked to a peek strip at the window edge, sliding fully open on hover or keyboard focus so they
+stay out of the audience's way. A speaker who is actively using one often wants *that* bar to
+**stay** open rather than re-tuck every time the pointer leaves. **PIN** is that latch.
+
+- **One pin per bar, independent.** The pushpin icon sits at the **front** of each bar. Pin the
+  bottom pager open for a talk while leaving the top tools tucked (or the reverse). There is no
+  deck-wide shared flag — `toolBarPinned` and `controlBarPinned` in `src/lib/stores/chromePin.ts`
+  are separate `persisted` booleans (`sync: false`, same bargain as `displayMode` / `adjustMode`).
+- **Default is auto-hide.** Offered is not active: a first visit still tucks. Click the pin to
+  seat the bar fully open (`class="pinned"` forces `translateY(0)`); click again to return to
+  auto-hide. The choice survives a slide change and a reload.
+- **Not the same as `fadeChrome`.** `fadeChrome` ghosts `.gp-chrome` opacity until pointed at;
+  PIN is the tuck/untuck of the two window-edge bars. They compose: a pinned bar is fully seated
+  even when fade would otherwise dim other chrome.
+- **TOC height.** The bar-hosted Table of Contents flyout opens upward and is capped at roughly
+  half the viewport (`min(42vh, calc(100vh - 10em))`) so a long deck scrolls inside the panel
+  instead of covering the whole slide when the control bar is pinned open.
+
 ### "Save this slide as an image (CAPTURE)"
 
 One prop, and a **CAPTURE** entry appears in the top-centre tool bar's **hamburger (☰) menu** —
 hover the ☰ at the bar's right end and OVERVIEW / CAPTURE / PRINT drop down. It downloads the
-current slide as a PNG. (The bar itself is `PRESENT │ ANNOTATE │ ADJUST SAVE │ ☰`: PRESENT and the
-ANNOTATE / ADJUST toggles sit in the open, while OVERVIEW / CAPTURE / PRINT — the *navigation and
-output* tools — live behind the hamburger.) **PRINT** opens a small submenu — This slide / This
+current slide as a PNG. (The bar itself is `📌 │ PRESENT │ ANNOTATE │ ADJUST SAVE │ ☰`: the pin
+and PRESENT / ANNOTATE / ADJUST sit in the open, while OVERVIEW / CAPTURE / PRINT — the *navigation
+and output* tools — live behind the hamburger.) **PRINT** opens a small submenu — This slide / This
 slide + notes (print in place; the notes toggle is a local override, no navigation), and Whole
 deck / + notes (a full nav to `/_handout/<deck>.html`). CAPTURE only appears when the deck offers it
 (`capture`), and the whole bar is hidden under `?clean` / `?present`.

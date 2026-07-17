@@ -7,12 +7,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { get } from 'svelte/store';
 import SlideToolbarHost from './SlideToolbarHost.svelte';
 import { annotationMode, canAnnotate, resetAllInk } from '../src/lib/stores/annotation';
+import { toolBarPinned } from '../src/lib/stores/chromePin';
 
 beforeEach(() => {
 	localStorage.clear();
 	resetAllInk();
 	canAnnotate.set(true);
 	annotationMode.set(false);
+	toolBarPinned.set(false);
 });
 
 afterEach(cleanup);
@@ -48,5 +50,20 @@ describe('SlideToolbar', () => {
 		expect(display).toBeTruthy();
 		// FITTED is the default label (no persisted mode in a cleared localStorage).
 		expect(display?.textContent).toContain('FITTED');
+	});
+
+	it('pins the bar fully open and unpins back to auto-hide', async () => {
+		render(SlideToolbarHost);
+		const bar = document.querySelector('.annot-tools');
+		expect(bar?.classList.contains('pinned')).toBe(false);
+
+		await fireEvent.click(screen.getByLabelText('PIN off'));
+		expect(get(toolBarPinned)).toBe(true);
+		expect(bar?.classList.contains('pinned')).toBe(true);
+		expect(screen.getByLabelText('PIN on')).toBeTruthy();
+
+		await fireEvent.click(screen.getByLabelText('PIN on'));
+		expect(get(toolBarPinned)).toBe(false);
+		expect(bar?.classList.contains('pinned')).toBe(false);
 	});
 });
