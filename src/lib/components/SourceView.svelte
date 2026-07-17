@@ -8,10 +8,11 @@
   first one. (See the project memory "monaco-breaks-on-spa-nav".) Everything else —
   a deck that pages with full loads — can keep using ViewSource.
 
-  Same control, same corner, same Box: only the highlighter differs. Shiki is plain
-  ESM behind a shared singleton highlighter ($lib/utils/highlight), so it survives
-  navigation. Highlighting is lazy — done the first time the viewer is opened, with
-  the plain source showing until (and if) it resolves.
+  Same control, same trigger placement (☰ SOURCE on a presentation; corner button
+  on a Text), same Box: only the highlighter differs. Shiki is plain ESM behind a
+  shared singleton highlighter ($lib/utils/highlight), so it survives navigation.
+  Highlighting is lazy — done the first time the viewer is opened, with the plain
+  source showing until (and if) it resolves.
 
   Each page passes its own source via Vite's ?raw import; the file path shown in the
   title bar is derived from the current route unless `path` overrides it.
@@ -23,10 +24,17 @@
     <SourceView {source} />
 -->
 <script lang="ts">
+	import { onMount, onDestroy } from 'svelte';
 	import CtrlBtn from '$lib/components/CtrlBtn.svelte';
 	import Box     from '$lib/components/Box.svelte';
 	import { page } from '$app/stores';
 	import { highlightToHtml } from '$lib/utils/highlight';
+	import { getMode } from '$lib/presentation';
+	import {
+		registerPageSource,
+		unregisterPageSource,
+		pageSourceOpen
+	} from '$lib/stores/pageSource';
 
 	/** The page source, typically `import source from './+page.svelte?raw'`. */
 	export let source: string;
@@ -44,11 +52,21 @@
 	let klass: string = '';
 	export { klass as class };
 
+	// Presentations host the trigger in the tool bar's ☰; Texts keep the corner button.
+	const cornerButton = getMode() === 'text';
+
 	let expanded = false;
 	let html = '';
 	let requested = false;
 
 	$: filePath = path || `src/routes${$page.route.id}/+page.svelte`;
+
+	// Keep the panel and the shared store in step (hamburger opens; Box closes).
+	const unsubOpen = pageSourceOpen.subscribe((v) => {
+		if (expanded !== v) expanded = v;
+	});
+	$: if (expanded !== $pageSourceOpen) pageSourceOpen.set(expanded);
+	onDestroy(unsubOpen);
 
 	// Highlight lazily the first time the viewer is opened; plain source shows until
 	// (and if) it resolves.
@@ -56,10 +74,18 @@
 		requested = true;
 		highlightToHtml(source, 'svelte').then((out) => (html = out)).catch(() => {});
 	}
+
+	onMount(() => {
+		const owner = Symbol('source-view');
+		registerPageSource(owner);
+		return () => unregisterPageSource(owner);
+	});
 </script>
 
-<div class="view-source no-print {klass}" id={id || undefined} style={style || undefined}>
-	<CtrlBtn {chrome} text="</> Source" hoverText="View this slide's source" isSelected={expanded} on:click={() => (expanded = true)} />
+<div class="view-source no-print {klass}" class:corner={cornerButton} id={id || undefined} style={style || undefined}>
+	{#if cornerButton}
+		<CtrlBtn {chrome} text="</> Source" hoverText="View this slide's source" isSelected={expanded} on:click={() => (expanded = true)} />
+	{/if}
 </div>
 
 <!-- The panel is a SIBLING of the button, so it carries the print marker in its own right; the
@@ -77,8 +103,9 @@
 </Box>
 
 <style>
-	/* Bottom-right corner — matches the framework's ViewSource placement. */
-	.view-source {
+	/* Bottom-right corner — only used on a Text, where there is no tool-bar ☰.
+	   On a presentation the wrapper is a zero-size host for style/id/class. */
+	.view-source.corner {
 		position: absolute;
 		bottom: 0px;
 		right: 5px;
