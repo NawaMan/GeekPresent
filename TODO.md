@@ -970,8 +970,9 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     either lands on the backdrop, so the numbers worth judging are never the ones written
     in the stylesheet. Measured on the composite, text-on-pill is **≥ 3.63:1 everywhere**
     (worst: `theme-light` over `Video`'s letterbox; then `3.84` over `Terminal`, `4.11` for
-    the dark themes over a white site). The cue renders at **36px bold** — 1.5em of
-    `.content`'s 24px `--base-font` — so 3:1 is the bar, and every combination clears it.
+    the dark themes over a white site). The cue renders at **~26px bold** — 1.1em of
+    `.content`'s 24px `--base-font` (was 1.5em / 36px; reduced to match the quieter size
+    slides were already overriding to) — so 3:1 is the bar, and every combination clears it.
     Nothing reaches the 4.5:1 normal-text bar, which is the correct trade for a *cue*.
   - **On the deck surface the fill is invisible** (~1.1:1 against it) and the hairline alone
     (1.6–2.1:1) draws the pill. That is the design working, not failing: quiet at home,
