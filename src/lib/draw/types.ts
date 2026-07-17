@@ -172,7 +172,20 @@ export type PathShape =
 	| { kind: 'line'; from: Point; to: Point }
 	| { kind: 'quadratic'; from: Point; to: Point; c1: Point }
 	| { kind: 'cubic'; from: Point; to: Point; c1: Point; c2: Point }
-	| { kind: 'arc'; from: Point; to: Point; bend: number };
+	| { kind: 'arc'; from: Point; to: Point; bend: number }
+	// The Polyline's geometry: waypoints instead of from/to. Evaluators expand
+	// it to a segment chain (straight lines, or Catmull-Rom cubics when
+	// `smooth`) and delegate — see drawCore's polylineSegments. Note a sharp
+	// corner has no continuous tangent: an orienting rider SNAPS its heading
+	// there (angle-unwrapped, so it turns the short way, but abruptly) —
+	// `smooth` is the fix when that looks wrong.
+	| { kind: 'polyline'; points: Point[]; close?: boolean; smooth?: boolean };
+
+/** A PathShape that runs from → to — every kind EXCEPT polyline. This is what
+ *  endpoint-generic code (chained Path segments, arrowhead trims, endpoint
+ *  handles) works over; a polyline reaches it only after expanding to its
+ *  segment chain (drawCore's polylineSegments). */
+export type SegmentShape = Exclude<PathShape, { kind: 'polyline' }>;
 
 /** What a selected shape exposes to Draw's Copy toolbar (Phase 3). All
  *  getters, created by the shape over its live geometry, so the toolbar's

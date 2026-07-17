@@ -24,13 +24,17 @@
   no Web Animations API, unlike the standalone KeyframeStudio.
 
   PATH MODE: `path={PathShape}` replaces the discrete stops with a real curve
-  (line/quadratic/cubic/arc). The sprite SAMPLES it internally — pointAt for
-  its centre, angleAt for the tangent it banks to (`orient`), `samples` frames,
-  angle-unwrapped so the glyph never spin-flips — and everything downstream is
-  the same generated CSS. In ADJUST the EDITOR is the curve itself: from/to +
-  control handles like a <Curve>'s (apex grip for an arc), re-routing the
-  flight live; no per-stop ghosts, no keyframe panel, and Copy/SAVE carry the
-  literal points.
+  (line/quadratic/cubic/arc/polyline). The sprite SAMPLES it internally —
+  pointAt for its centre, angleAt for the tangent it banks to (`orient`),
+  `samples` frames, angle-unwrapped so the glyph never spin-flips — and
+  everything downstream is the same generated CSS. In ADJUST the EDITOR is the
+  curve itself: from/to + control handles like a <Curve>'s (apex grip for an
+  arc, one handle per waypoint for a polyline), re-routing the flight live; no
+  per-stop ghosts, no keyframe panel, and Copy/SAVE carry the literal points.
+
+  `orient` banks the glyph to the tangent (great for a nose-up 🚀/▲). For a
+  SIDE-VIEW glyph (🚚/🚗) that would flip upside down on right-to-left stretches,
+  `upright` instead keeps it level and MIRRORS it to face travel — see the prop.
 
   ADJUST-mode editing (stop mode): each stop grows a ghost box with a MOVE
   handle (drag to reposition), a RESIZE handle (bottom-right corner) and a
@@ -64,7 +68,9 @@
 		finite,
 		linePath,
 		pointAt,
+		polylinePath,
 		round,
+		smoothPath,
 		uniformLengthParams
 	} from './drawCore';
 	import {
@@ -92,8 +98,13 @@
 		 *  flight re-routes live as the curve is dragged. Takes precedence over
 		 *  `stops`.
 		 *
+		 *  A `polyline` kind rides waypoints — straight segments (the heading
+		 *  SNAPS at each corner; angle-unwrapped, but abrupt by nature) or, with
+		 *  `smooth: true`, a Catmull-Rom through every point. Bump `samples` on
+		 *  long many-cornered routes so corners don't round off in the sampling.
+		 *
 		 *  Also takes a NAME (`path="road"`): the sprite then rides the named
-		 *  Line/Curve/Arc in the same <Draw>, sharing its live geometry — one
+		 *  Line/Curve/Arc/Polyline in the same <Draw>, sharing its live geometry — one
 		 *  curve authored once, flight and stroke always in step. The named
 		 *  shape must come EARLIER in the markup (Connector's rule); an unknown
 		 *  name renders no flight, never a broken one. In this mode the sprite
@@ -104,10 +115,25 @@
 		 *  [w, h]. The box's CENTRE rides the path. */
 		size?: number | [number, number];
 		/** Bank to the path's tangent as it travels (path mode default). false =
-		 *  keep the glyph upright. */
+		 *  keep the glyph at its fixed `rotate`, no banking. */
 		orient?: boolean;
+		/** UPRIGHT mode (path mode; opt-in, default off). For a SIDE-VIEW glyph —
+		 *  a vehicle, a runner — that must never roll onto its roof. `orient`
+		 *  banks a glyph by pure rotation, which flips a side glyph UPSIDE DOWN
+		 *  wherever the path heads right-to-left (no rotation both points the nose
+		 *  backward AND keeps the roof up — that needs a mirror). `upright` instead
+		 *  keeps the glyph LEVEL and MIRRORS it (`scaleX(-1)`) to face its
+		 *  direction of travel, flipping at each turnaround. It OVERRIDES `orient`
+		 *  (upright never banks). CONVENTION: the glyph faces LEFT at `rotate` 0
+		 *  (as 🚚/🚗/🏎️ commonly do), so it is mirrored while travelling rightward;
+		 *  a right-facing glyph rides facing backward (swap it for a left-facing
+		 *  one). CSS-only, so it still prerenders and scrubs; the mirror tweens
+		 *  over one sample at a turnaround, a brief flip while the glyph is
+		 *  near-vertical. No effect outside path mode. */
+		upright?: boolean;
 		/** Extra rotation (deg) on top of the tangent in path mode — aligns a
-		 *  glyph whose artwork doesn't point "up" (🚀 ≈ -45, a left-facing 🚗 ≈ 90). */
+		 *  glyph whose artwork doesn't point "up" (🚀 ≈ -45, a left-facing 🚗 ≈ 90).
+		 *  Under `upright` it is a level tilt on top of the (un-banked) glyph. */
 		rotate?: number;
 		/** How many keyframes to sample `path` into. More = smoother polyline,
 		 *  bigger generated CSS. */
@@ -161,6 +187,7 @@
 		path,
 		size = 64,
 		orient = true,
+		upright = false,
 		rotate = 0,
 		samples = 40,
 		animate,
@@ -182,6 +209,9 @@
 	// mutate these locals (reset on reload), never the props; Copy → paste is
 	// the only persistence.
 	type IdStop = SpriteStop & { id: number };
+	// A sampled path stop carries an internal `flip` (horizontal mirror) that
+	// `upright` mode sets; authors never write it (path stops are generated).
+	type FlipStop = SpriteStop & { flip?: boolean };
 	let liveStops = $state<IdStop[] | null>(null);
 	let stopSeq = 0;
 
@@ -193,6 +223,9 @@
 	let livePathC1 = $state<Point | null>(null);
 	let livePathC2 = $state<Point | null>(null);
 	let livePathBend = $state<number | null>(null);
+	// Polyline mode: the whole waypoint list is the edit state (one handle per
+	// point), so a single array replaces the from/to/control locals.
+	let livePathPoints = $state<Point[] | null>(null);
 	/** path="name" — the sprite rides a shape it does not own. */
 	const isRef = $derived(typeof path === 'string');
 	/** The `path` prop resolved: a literal shape as-is; a NAME through the Draw
@@ -209,6 +242,10 @@
 	const P = $derived.by<PathShape | null>(() => {
 		if (!sourcePath) return null;
 		if (isRef) return sourcePath;
+		// A polyline folds in the whole edited waypoint list — it has no
+		// from/to of its own, so it steps aside before the endpoint locals.
+		if (sourcePath.kind === 'polyline')
+			return { ...sourcePath, points: livePathPoints ?? sourcePath.points };
 		const f = livePathFrom ?? sourcePath.from;
 		const t = livePathTo ?? sourcePath.to;
 		switch (sourcePath.kind) {
@@ -240,17 +277,26 @@
 	// ±π. Everything downstream (keyframes, base pose, scrubbing) then works
 	// untouched — a path sprite IS a stops sprite, it just never shows the
 	// stops to anyone.
-	const pathStops = $derived.by<SpriteStop[]>(() => {
+	const pathStops = $derived.by<FlipStop[]>(() => {
 		if (!P) return [];
 		const n = Math.max(2, Math.round(finite(samples)) || 2);
 		const ts = uniformLengthParams(P, n);
-		const out: SpriteStop[] = [];
+		const out: FlipStop[] = [];
 		let prev = 0;
 		for (let k = 0; k <= n; k++) {
 			const t = ts[k];
 			const [px, py] = pointAt(P, t);
 			let rot = finite(rotate);
-			if (orient) {
+			let flip = false;
+			if (upright) {
+				// UPRIGHT: never bank (overrides `orient`) — a side-view glyph does
+				// not roll, it just turns to face the way it's going. The glyph is
+				// kept level (rot = the `rotate` offset only) and MIRRORED to face
+				// travel. Convention: it faces LEFT at rot 0 (🚚/🚗), so mirror it
+				// while heading RIGHTWARD (tangent's x-component ≥ 0). No unwrap
+				// needed — the mirror, not a rotation, carries the direction.
+				flip = Math.cos(angleAt(P, t)) >= 0;
+			} else if (orient) {
 				let a = angleAt(P, t);
 				if (k > 0) {
 					while (a - prev > Math.PI) a -= 2 * Math.PI;
@@ -260,7 +306,7 @@
 				// angleAt is atan2 from +x; Sprite rot 0 points "up", hence +90.
 				rot += (a * 180) / Math.PI + 90;
 			}
-			out.push({
+			const stop: FlipStop = {
 				// pct is animation PROGRESS (uniform), t is the path parameter that
 				// puts the k-th frame at arc-length fraction k/n — the two differ by
 				// exactly the reparameterization.
@@ -270,7 +316,9 @@
 				w: boxW,
 				h: boxH,
 				rot: Math.round(rot)
-			});
+			};
+			if (flip) stop.flip = true;
+			out.push(stop);
 		}
 		return out;
 	});
@@ -287,6 +335,8 @@
 				return curvePath(P.from, P.to, P.c1, P.c2);
 			case 'arc':
 				return arcPath(P.from, P.to, P.bend);
+			case 'polyline':
+				return P.smooth ? smoothPath(P.points, P.close) : polylinePath(P.points, P.close);
 		}
 	});
 	// --------------------------------------------------------------------------
@@ -296,7 +346,7 @@
 	 *  never a glyph stranded at a fallback pose. Connector's rule. */
 	const unresolved = $derived(!!path && !P);
 
-	const S = $derived<SpriteStop[]>(P ? pathStops : (liveStops ?? stops ?? []));
+	const S = $derived<FlipStop[]>(P ? pathStops : (liveStops ?? stops ?? []));
 
 	// Clone the prop stops into editable id-carrying state on first edit.
 	function materializeStops(): IdStop[] {
@@ -315,12 +365,13 @@
 			w: Math.max(1, finite(s.w)),
 			h: Math.max(1, finite(s.h)),
 			rot: finite(s.rot ?? 0),
-			ease: sanitizeEase(s.ease)
+			ease: sanitizeEase(s.ease),
+			flip: !!s.flip
 		}))
 	);
 	// Sorted by percent — drives the @keyframes and the base (0%) pose.
 	const sorted = $derived([...RS].sort((a, b) => a.pct - b.pct));
-	const base = $derived(sorted[0] ?? { pct: 0, x: 0, y: 0, w: 100, h: 100, rot: 0, ease: '' });
+	const base = $derived(sorted[0] ?? { pct: 0, x: 0, y: 0, w: 100, h: 100, rot: 0, ease: '', flip: false });
 
 	const animSecs = $derived(
 		animate && Number.isFinite(animate) && animate > 0 && RS.length >= 2 ? animate : null
@@ -347,7 +398,7 @@
 				const fs = fontFor(s.h);
 				return (
 					`${s.pct}% { left:${round(s.x)}px; top:${round(s.y)}px; ` +
-					`width:${round(s.w)}px; height:${round(s.h)}px; transform:rotate(${round(s.rot)}deg);` +
+					`width:${round(s.w)}px; height:${round(s.h)}px; transform:rotate(${round(s.rot)}deg)${s.flip ? ' scaleX(-1)' : ''};` +
 					`${fs != null ? ` font-size:${fs}px;` : ''}` +
 					`${s.ease ? ` animation-timing-function:${s.ease};` : ''} }`
 				);
@@ -361,7 +412,7 @@
 	const baseStyle = $derived(
 		`left:${round(base.x)}px; top:${round(base.y)}px; ` +
 			`width:${round(base.w)}px; height:${round(base.h)}px; ` +
-			`transform-origin:${origin}; transform:rotate(${round(base.rot)}deg);` +
+			`transform-origin:${origin}; transform:rotate(${round(base.rot)}deg)${base.flip ? ' scaleX(-1)' : ''};` +
 			`${fontFor(base.h) != null ? ` font-size:${fontFor(base.h)}px;` : ''}` +
 			`${animSecs ? ` animation:${animName} ${animSecs}s ${easeFn}${delaySecs ? ` ${delaySecs}s` : ''} both;` : ''}`
 	);
@@ -406,7 +457,10 @@
 				? `{ kind: "quadratic", from: ${fmtPoint(s.from)}, c1: ${fmtPoint(s.c1)}, to: ${fmtPoint(s.to)} }`
 				: s.kind === 'cubic'
 					? `{ kind: "cubic", from: ${fmtPoint(s.from)}, c1: ${fmtPoint(s.c1)}, c2: ${fmtPoint(s.c2)}, to: ${fmtPoint(s.to)} }`
-					: `{ kind: "arc", from: ${fmtPoint(s.from)}, to: ${fmtPoint(s.to)}, bend: ${fmtNum(s.bend)} }`;
+					: s.kind === 'polyline'
+						? `{ kind: "polyline", points: [${s.points.map(fmtPoint).join(', ')}]` +
+							`${s.close ? ', close: true' : ''}${s.smooth ? ', smooth: true' : ''} }`
+						: `{ kind: "arc", from: ${fmtPoint(s.from)}, to: ${fmtPoint(s.to)}, bend: ${fmtNum(s.bend)} }`;
 
 	// Takes the serialized attr value — `{${pathLiteral(shape)}}` or `"name"`.
 	const pathTagFor = (pathAttr: string) =>
@@ -417,6 +471,7 @@
 		`${easeFn !== 'ease-in-out' ? ` ease="${easeFn}"` : ''}` +
 		`${Array.isArray(size) ? ` size={[${fmtNum(size[0])}, ${fmtNum(size[1])}]}` : size !== 64 ? ` size={${fmtNum(size)}}` : ''}` +
 		`${orient ? '' : ' orient={false}'}` +
+		`${upright ? ' upright' : ''}` +
 		`${finite(rotate) ? ` rotate={${fmtNum(rotate)}}` : ''}` +
 		`${samples !== 40 ? ` samples={${fmtNum(samples)}}` : ''}` +
 		`${fontScale != null ? ` fontScale={${fmtNum(fontScale)}}` : ''}` +
@@ -521,6 +576,13 @@
 	// Path-mode handle commits: same record() shape the path shapes use.
 	function commitPath(apply: (p: Point) => void, before: Point, after: Point) {
 		record({ undo: () => apply(before), redo: () => apply(after) });
+	}
+	// Polyline mode: move ONE waypoint, materializing the editable list from
+	// the current path on first touch (the liveStops pattern).
+	function setPathPoint(i: number, p: Point) {
+		if (P?.kind !== 'polyline') return;
+		const pts = livePathPoints ?? P.points.map((q): Point => [q[0], q[1]]);
+		livePathPoints = pts.map((q, k) => (k === i ? p : q));
 	}
 
 	let dragBefore: { i: number; box: SpriteStop } | null = null;
@@ -834,6 +896,22 @@
 		     — solid endpoints, hollow control points with guide lines, an apex
 		     grip for an arc's bend. Dragging any of them re-samples the flight. -->
 		<g class="draw-chrome" data-shape={name || 'Sprite'}>
+			{#if P.kind === 'polyline'}
+				<!-- One handle per waypoint — drag any vertex and the flight
+				     re-samples through the moved point (smooth included: the
+				     Catmull-Rom passes THROUGH every point, so the handle stays
+				     on the curve). -->
+				{#each P.points as pt, i (i)}
+					<DrawHandle
+						point={pt}
+						{grid}
+						title={`p${i}`}
+						onselect={select}
+						onmove={(p) => setPathPoint(i, p)}
+						oncommit={(b, a) => commitPath((p) => setPathPoint(i, p), b, a)}
+					/>
+				{/each}
+			{:else}
 			{#if P.kind === 'quadratic' || P.kind === 'cubic'}
 				<path class="draw-guide" d={linePath(P.c1, P.from)} />
 				<path class="draw-guide" d={P.kind === 'cubic' ? linePath(P.c2, P.to) : linePath(P.c1, P.to)} />
@@ -892,6 +970,7 @@
 							redo: () => (livePathBend = bendFromApex(AF, AT, a))
 						})}
 				/>
+			{/if}
 			{/if}
 		</g>
 	{:else if isSelected && !entered}
