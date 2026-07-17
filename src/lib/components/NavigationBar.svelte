@@ -9,7 +9,7 @@
 	import { presenterMode } from '$lib/stores/presenter';
 	import { activeSteps } from '$lib/stores/activeSteps';
 	import { localNav, registerNav, unregisterNav } from '$lib/stores/localChrome';
-	import { spaceIntent } from '$lib/utils/stepKeys';
+	import { spaceIntent, isInteractiveTarget } from '$lib/utils/stepKeys';
 
 	export let firstLink = '';
 	export let prevLink  = '';
@@ -115,6 +115,10 @@
 
 	function handleGlobalKeydown(event: KeyboardEvent) {
 		if (dormant) return;
+		// While the user is typing (Monaco textarea, an input, …) ←/→ must not page
+		// the deck out from under the caret. Space already ignores interactive
+		// targets via spaceIntent → isInteractiveTarget; arrows need the same check.
+		if (isInteractiveTarget(event.target)) return;
 		if (event.key === 'ArrowLeft' && prevLink) {
 			event.preventDefault();
 			navigate(prevLink, 'back');

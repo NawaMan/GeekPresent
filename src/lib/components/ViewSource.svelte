@@ -7,9 +7,11 @@
 
   On a presentation slide the trigger lives in the top tool bar's ☰ menu as
   SOURCE (next to OVERVIEW / CAPTURE / PRINT) — this component registers the
-  source with the deck and renders the panel; it no longer places a corner
-  button. On a Text (no tool bar) the classic corner "</> Source" button is kept
-  as the open control.
+  source with the deck and renders the panel. ☰ → EDIT (and the CodeBox title
+  bar's EDIT) opens a SEPARATE unscaled window (`/_source-edit`) for real
+  editing — Monaco inside the CSS-scaled canvas drifts the caret, so typing
+  never happens here. On a Text (no tool bar) the classic corner "</> Source"
+  button is kept as the open control.
 
   Usage (per page — the ?raw import and path can't be auto-derived here, so each
   page passes its own):
@@ -26,6 +28,7 @@
 -->
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { get } from 'svelte/store';
 	import CtrlBtn from '$lib/components/CtrlBtn.svelte';
 	import CodeBox from '$lib/components/CodeBox.svelte';
 	import { getMode } from '$lib/presentation';
@@ -34,6 +37,8 @@
 		unregisterPageSource,
 		pageSourceOpen
 	} from '$lib/stores/pageSource';
+	import { canSave } from '$lib/stores/adjustMode';
+	import { openSourceEditor } from '$lib/stores/sourceEditWindow';
 
 	/** The page source, typically `import source from './+page.svelte?raw'`. */
 	export let source: string;
@@ -61,6 +66,23 @@
 
 	let expanded = false;
 
+	/** Open the unscaled editor popup (☰ → EDIT or CodeBox EDIT). */
+	function openEdit() {
+		if (typeof location === 'undefined') return;
+		const win = openSourceEditor({
+			route: location.pathname,
+			path,
+			source,
+			language,
+			canSave: get(canSave)
+		});
+		if (!win) {
+			console.warn(
+				'[ViewSource] popup blocked — allow popups for this origin to edit source in a separate window'
+			);
+		}
+	}
+
 	// Keep the panel and the shared store in step: the hamburger opens via the store;
 	// CodeBox closes via bind:expanded. Either direction must update the other.
 	const unsubOpen = pageSourceOpen.subscribe((v) => {
@@ -71,7 +93,7 @@
 
 	onMount(() => {
 		const owner = Symbol('view-source');
-		registerPageSource(owner);
+		registerPageSource(owner, openEdit);
 		return () => unregisterPageSource(owner);
 	});
 </script>
@@ -90,8 +112,18 @@
      the button's do not reach it. Unmarked, it is not merely an eyesore in a printout: a closed
      CodeBox still mounts Monaco, whose internal scroll surface lays out tens of thousands of
      pixels wide, and Chrome SHRINKS A PRINTED PAGE to fit its widest content. One un-marked
-     panel therefore printed every slide in the deck at three-quarter size. -->
-<CodeBox code={source} {language} title={path} bind:expanded class="gp-chrome no-print" />
+     panel therefore printed every slide in the deck at three-quarter size.
+     Read-only here; EDIT opens the unscaled popup for typing + SAVE. -->
+<CodeBox
+	code={source}
+	{language}
+	title={path}
+	bind:expanded
+	readOnly
+	edit
+	on:edit={openEdit}
+	class="gp-chrome no-print"
+/>
 
 <style>
 	/* Bottom-right corner — only used on a Text, where there is no tool-bar ☰.
