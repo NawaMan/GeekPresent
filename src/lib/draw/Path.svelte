@@ -68,7 +68,6 @@
 		round,
 		sampleMultiPath,
 		shortenShape,
-		snapToAngles,
 		unwrapAngles
 	} from './drawCore';
 	import {
@@ -689,8 +688,7 @@
 					selected={isSelected}
 					point={START}
 					{grid}
-					title="start · Shift = H/V/45°"
-					shiftSnap={(p) => snapToAngles(p, shapes[0].to)}
+					title="start · Shift = H/V"
 					onselect={select}
 					onmove={(p) => setStart(p)}
 					oncommit={(b, a) => commitStart(b, a)}
@@ -711,8 +709,7 @@
 							selected={isSelected}
 							point={shape.from}
 							{grid}
-							title={`segment ${i + 1} · from (sub-path) · Shift = H/V/45°`}
-							shiftSnap={(p) => snapToAngles(p, shape.to)}
+							title={`segment ${i + 1} · from (sub-path) · Shift = H/V`}
 							onselect={select}
 							onmove={(p) => setSeg(i, 'from', p)}
 							oncommit={(b, a) => commitSeg(i, 'from', b, a)}
@@ -722,8 +719,7 @@
 						selected={isSelected}
 						point={shape.to}
 						{grid}
-						title={`segment ${i + 1} · to · Shift = H/V/45°`}
-						shiftSnap={(p) => snapToAngles(p, shape.from)}
+						title={`segment ${i + 1} · to · Shift = H/V`}
 						onselect={select}
 						onmove={(p) => setSeg(i, 'to', p)}
 						oncommit={(b, a) => commitSeg(i, 'to', b, a)}

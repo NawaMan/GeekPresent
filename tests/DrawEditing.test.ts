@@ -3,10 +3,12 @@
 // PointerEvent/getBoundingClientRect layout, so the live scale falls back to
 // 1 (screen px == canvas px) — which is exactly what the math expects here.
 import { render } from '@testing-library/svelte';
+import { get } from 'svelte/store';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import DrawHandle from '../src/lib/draw/DrawHandle.svelte';
 import type { Point } from '../src/lib/draw/types';
+import { shapeChanges } from '../src/lib/stores/adjustChanges';
 import { redo, undo } from '../src/lib/stores/adjustHistory';
 import { canAdjust, adjustMode } from '../src/lib/stores/adjustMode';
 import DrawEditHost from './DrawEditHost.svelte';
@@ -656,6 +658,11 @@ describe('Rect/Ellipse editing via Block (ADJUST mode)', () => {
 			m.querySelector('.readout')?.textContent?.includes(name)
 		)!;
 
+	// A Draw-hosted Rect/Ellipse writes back through the shape save-patch registry
+	// (its Block wrapper is track={false}), so its live opening tag lives there.
+	const newTagOf = (name: string) =>
+		[...get(shapeChanges).values()].find((e) => e.name === name)?.newTag;
+
 	it('Draw hosts one editing Block per box shape, aligned to it', async () => {
 		const { container } = render(DrawEditHost);
 		await tick(); // registrations land in a post-render effect
@@ -693,12 +700,7 @@ describe('Rect/Ellipse editing via Block (ADJUST mode)', () => {
 		expect(rect.getAttribute('y')).toBe('100');
 	});
 
-	it('a draw-on Rect/Ellipse gets draw-on fields in its Block toolbar, live + copyable', async () => {
-		const writeText = vi.fn().mockResolvedValue(undefined);
-		Object.defineProperty(navigator, 'clipboard', {
-			value: { writeText },
-			configurable: true
-		});
+	it('a draw-on Rect/Ellipse gets draw-on fields in its Block toolbar, live + saved', async () => {
 		const { container } = render(DrawEditHost);
 		await tick();
 		const block = blockOf(container, 'revealbox');
@@ -719,27 +721,16 @@ describe('Rect/Ellipse editing via Block (ADJUST mode)', () => {
 		);
 		expect(rect).toBeTruthy();
 
-		// Copy (the Block's own button) emits the updated draw timing
-		(block.querySelector('button.copy') as HTMLButtonElement).click();
-		await tick();
-		expect(writeText.mock.calls[0][0]).toBe(
+		// the shape's save-patch tag carries the updated draw timing
+		expect(newTagOf('revealbox')).toBe(
 			'<Rect name="revealbox" draw={3} drawDelay={0.5} x={1100} y={100} width={220} height={120} />'
 		);
 	});
 
-	it("Copy emits the shape's OWN tag with live geometry and extra attrs", async () => {
-		const writeText = vi.fn().mockResolvedValue(undefined);
-		Object.defineProperty(navigator, 'clipboard', {
-			value: { writeText },
-			configurable: true
-		});
-		const { container } = render(DrawEditHost);
+	it("the save patch carries the shape's OWN tag with live geometry and extra attrs", async () => {
+		render(DrawEditHost);
 		await tick();
-		const copyBtn = blockOf(container, 'ring').querySelector('button.copy')!;
-		(copyBtn as HTMLButtonElement).click();
-		await tick();
-		expect(writeText).toHaveBeenCalledTimes(1);
-		expect(writeText.mock.calls[0][0]).toBe(
+		expect(newTagOf('ring')).toBe(
 			'<Ellipse name="ring" x={700} y={400} width={200} height={100} />'
 		);
 	});

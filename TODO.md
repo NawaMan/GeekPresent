@@ -1070,6 +1070,73 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
   - Open questions: partial budgets (most decks will annotate a few key slides, not all 65) — treat
     an unbudgeted slide as zero, or spread the remaining time evenly across them?
 
+- [ ] **Keyboard mnemonics in the presenter console — TOC, reset checks, reset annotation** — the
+  console's buttons are pointer-only; give the three navigational/destructive ones a key each.
+  - Why: on stage the speaker drives from the keyboard, and reaching for the mouse to open the TOC or
+    clear last run's ink and check-offs is exactly the fumble the console exists to spare. All three
+    already sit on `PresenterView.svelte` — the TOC, the note-tick reset, and the ink RESET /
+    RESET ALL beside it (line ~523).
+  - Approach: a window `keydown` on the console window only (it already owns `?present`), guarded so
+    it never fires while a text field has focus; act on the SAME shared stores the buttons do — the
+    `inkBook` reset, the `presenter` check-off store, `TableOfContent`'s open state — so audience and
+    console stay in step for free. Underline the mnemonic letter in each button label rather than
+    inventing a legend.
+  - Open questions: which letters, and whether a destructive key (reset ink/checks) wants a confirm
+    or leans on the "re-arms next visit" softness the RESET menu already has.
+
+- [ ] **Arrow keys and Space page the deck from the presenter console** — the console window should
+  advance/retreat on →/← and Space like the audience deck does.
+  - Why: the console is where the speaker's eyes and hands are, but the paging keys live on the
+    audience deck's `NavigationBar`, which the console window doesn't host — so today advancing means
+    clicking, or focusing the other window. `?present` already mirrors navigation across windows via
+    `localStorage`, so the console needs to *drive* that channel, not grow a second deck.
+  - Approach: the same window `keydown` as the mnemonics above, text-field-guarded, writing the
+    shared navigation store / firing the `gp:continue`-style pulse the CONTINUE button already uses —
+    so Space still obeys the one-build-per-slide `spaceIntent` handoff a `Steps`/`Video` build relies
+    on rather than blindly paging past an unfinished build.
+  - Open questions: Shift+Space to walk back (as Video's chapters do), and whether Space should defer
+    to an armed build the console can't see.
+
+- [ ] **Drop the below-the-slide speaker Note once the PRESENT console carries it** — when the deck
+  is zoomed out far enough, the Note printed under the canvas is redundant: the presenter console now
+  shows notes in their own pane.
+  - Why: the below-page Note was the notes surface *before* the console existed; with `?present`
+    showing them properly it's duplicated text eating vertical space exactly when the slide is
+    already small.
+  - Approach: gate the below-canvas Note on `displayMode` / the fit scale — hide it once the deck is
+    zoomed out past a threshold (or whenever a `?present` console is live), leaving the console as the
+    single notes surface. No new machinery: `displayMode` is already a store and notes already render
+    in the console.
+  - Open questions: the trigger — a fixed zoom-out threshold, "hide whenever a `?present` window is
+    open", or a deck prop — and whether the below-page Note stays as a no-console fallback.
+
+- [ ] **ANNOTATE pen — Shift snaps a stroke to the X/Y axis** — hold Shift and the pen lays a dead-
+  horizontal or dead-vertical line, whichever the gesture favours, instead of following the wrist's
+  wobble.
+  - Why: underlining a line of code or dropping a plumb line down a column is the common ANNOTATE
+    move, and freehand can't hold a straight edge on stage — the same reason `levelPoints` already
+    pins a *highlighter* swipe to one y. The pen has no such discipline yet.
+  - Approach: extend `annotateCore` — while Shift is down, reduce the live stroke to two points
+    (press point → current point projected onto whichever axis the delta favours), recomputed every
+    `pointermove` exactly as `levelHighlight` runs, so releasing Shift returns to freehand and a test
+    can pin it against gesture prefixes. Pure and SSR-inert; no new store or token.
+  - Open questions: 45° diagonals too (snap to the nearest of 4/8 headings), or axis-only to start.
+
+- [ ] **`Toast` — a transient on-slide message, optionally spotlighting what it names** — a short
+  banner the speaker (or a build) raises over the live slide that fades itself out, and can dim the
+  slide around a named target at the same moment.
+  - Why: "look here" is two actions today — say it and point at it — and no primitive does both in
+    one gesture. A toast that carries a `highlight` turns "Deployed!" plus a spotlight on the
+    `deploy` box into one call, on one timeline.
+  - Approach: reuse what already points at components — `highlight="deploy"` resolves through
+    `stores/blockAnchors.ts` exactly as `Connector`/`Spotlight` do, and the dimming is
+    `spotlightCore`'s existing geometry, so the toast adds only the message chrome and the auto-
+    dismiss. Colours/timing as `--toast-*` role tokens in `roles.css`; the reveal opt-in and
+    SSR-inert. Done = `Toast.svelte` + a `toastCore.ts` for the timing + a demo slide + DOM and SSR
+    tests.
+  - Open questions: author-placed (a `<Toast>` firing on a build step) or speaker-raised from the
+    console mid-talk — or both; and whether two firing at once stack.
+
 - [x] **`Terminal`** — fake console: typed command + output, riding the `AnimationBar` keyframe clock.
   - Done: `src/lib/components/Terminal.svelte`, with the schedule in
     `src/lib/utils/terminalCore.ts` (pure, total — `drawCore`/`videoCore` discipline:
@@ -1848,6 +1915,18 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     no-render). No new role tokens — it reuses the `--draw-*` family.
 
 ## Authoring / LAYOUT mode
+
+- [ ] **Ctrl+S saves while in ADJUST mode** — trap the browser's Save shortcut and route it to
+  ADJUST's SAVE instead of the "save this webpage" dialog.
+  - Why: SAVE is the whole point of an ADJUST session and it's a mouse trip to the chrome; Ctrl+S is
+    the reflex every author already has, and today it pops the browser's page-save dialog — worse
+    than useless mid-edit.
+  - Approach: a `keydown` that `preventDefault()`s Ctrl/Cmd+S only while `canLayout && layoutMode`
+    are both true (the gate `Block`/`Draw` already read), then calls the exact SAVE path the button
+    does — inheriting SAVE's own NOT-ALLOWED / partial-save handling rather than a second code path.
+    Inert whenever ADJUST isn't active, so it never shadows the browser shortcut on a normal slide.
+  - Open questions: Cmd+S on mac in the same handler (yes), and whether to flash SAVE's existing
+    confirmation so the keypress isn't silent.
 
 - [x] **LAYOUT visible in production (demo mode)** — let a deployed deck *show* LAYOUT so a
       talk can demonstrate the authoring workflow live, with SAVE reading **NOT ALLOWED**.

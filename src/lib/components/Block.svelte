@@ -14,12 +14,14 @@
   The wrapped content fills the box in both axes by default (a resize rubber-bands
   it) — pass `fill={false}` for pure positioning, where the content keeps its
   natural size. When ADJUST mode is ON, the wrapper grows a drag body + a bottom-right
-  resize handle + a small toolbar. Dragging updates x/y/width/height live; the
-  COPY button writes the updated OPENING tag — just `<Block … x={…} y={…} …>` —
-  to the clipboard, so you paste that one line over your element's existing open
-  tag (its children and closing tag stay put). A self-closing wrapper (ImageBlock)
-  copies as `<Tag … />`. (Snippet-emit, not live source rewrite: what you copy is
-  the element's own current props — robust and decoupled from the page text.)
+  resize handle + an id/location bar carrying the send-to-back / bring-to-front
+  buttons. Dragging updates x/y/width/height live, and the box publishes its updated
+  OPENING tag — just
+  `<Block … x={…} y={…} …>`, or `<Tag … />` for a self-closing wrapper (ImageBlock) —
+  to the ADJUST change registry, so SAVE writes that one line back over the element's
+  existing open tag (its children and closing tag stay put). (Snippet-emit, not live
+  source rewrite: what SAVE writes is the element's own current props — robust and
+  decoupled from the page text.)
 
   The drag math divides screen-pixel pointer deltas by the element's LIVE rendered
   scale (getBoundingClientRect().width / offsetWidth), so a drag tracks the cursor
@@ -106,10 +108,10 @@
 	export let bounds: 'canvas' | 'none' = 'canvas';
 	/** Smallest size you can resize down to. */
 	export let minSize = 24;
-	/** Snippet shape for the Copy button. A wrapper (e.g. ImageBlock) overrides
-	    `tag` + `attrs` so Copy emits ITS tag, not the inner Block. `attrs` is a
-	    pre-rendered attribute string (with a leading space); `selfClose` emits
-	    `<Tag ... />` instead of an open/close pair with a slot placeholder. */
+	/** Snippet shape for the emitted save-patch tag. A wrapper (e.g. ImageBlock)
+	    overrides `tag` + `attrs` so the patch carries ITS tag, not the inner Block.
+	    `attrs` is a pre-rendered attribute string (with a leading space); `selfClose`
+	    emits `<Tag ... />` instead of an open/close pair with a slot placeholder. */
 	export let tag = 'Block';
 	export let attrs = '';
 	export let selfClose = false;
@@ -147,7 +149,6 @@
 	export { klass as class };
 
 	let el: HTMLElement;
-	let copied = false;
 
 	const snap = (n: number) => (grid > 1 ? Math.round(n / grid) * grid : Math.round(n));
 	const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
@@ -181,8 +182,19 @@
 			scaleFrom: el,
 			onMove: (dx, dy, e) => {
 				if (mode === 'move') {
-					x = snap(free ? startX + dx : clamp(startX + dx, 0, canvasWidth - width));
-					y = snap(free ? startY + dy : clamp(startY + dy, 0, canvasHeight - height));
+					// Hold Shift to lock the move to a single axis — whichever the pointer
+					// has travelled furthest along, from the drag's START. Re-evaluated on
+					// every move (like the aspect-lock below), so swinging the drag past the
+					// diagonal — or pressing/releasing Shift mid-gesture — switches the
+					// locked axis live. A tie keeps the horizontal, matching line ~192.
+					let mx = dx;
+					let my = dy;
+					if (e.shiftKey) {
+						if (Math.abs(dx) >= Math.abs(dy)) my = 0;
+						else mx = 0;
+					}
+					x = snap(free ? startX + mx : clamp(startX + mx, 0, canvasWidth - width));
+					y = snap(free ? startY + my : clamp(startY + my, 0, canvasHeight - height));
 				} else if (ratio && !e.altKey) {
 					// Aspect-locked: drive from the axis the pointer moved most, derive the
 					// other from `ratio`, then clamp to canvas + minSize without skewing —
@@ -314,7 +326,7 @@
 	$: zAttr = z ? ` z={${Math.round(z)}}` : '';
 
 	// The author's own pass-through props. ADJUST neither reads nor edits them — but
-	// Copy/Save replaces the WHOLE opening tag, so anything not emitted here is DELETED
+	// SAVE replaces the WHOLE opening tag, so anything not emitted here is DELETED
 	// from the author's source the moment they drag the Block. They are echoed back
 	// verbatim, and a value carrying a double quote is single-quoted so the line still
 	// parses when it is pasted in.
@@ -323,7 +335,7 @@
 	// `attrs`. So the two paths never double-emit.)
 	const quoted = (n: string, v: string) => (v.includes('"') ? ` ${n}='${v}'` : ` ${n}="${v}"`);
 	// NOTE: the ORIGINAL `style` is echoed, not the guarded one. Reserving a
-	// property changes what RENDERS, never what the author wrote — Copy/Save hand
+	// property changes what RENDERS, never what the author wrote — SAVE hands
 	// the source string back byte-for-byte, and a stray `left: 40px` survives in
 	// source as an inert declaration for the author to delete. ADJUST never edits
 	// inside an author's attribute value.
@@ -345,8 +357,8 @@
 	$: openTag =
 		`<${tag}${name ? ` name="${name}"` : ''}${attrs}${passAttrs} x={${Math.round(x)}} y={${Math.round(y)}}` +
 		` width={${Math.round(width)}} height={${Math.round(height)}}${aspectAttr}${zAttr}`;
-	// COPY emits only the OPENING tag with the live geometry — that's the single
-	// line you paste over your element's existing open tag to update its position.
+	// The save-patch tag is only the OPENING tag with the live geometry — that's the
+	// single line SAVE writes over your element's existing open tag to update its position.
 	// (A self-closing wrapper like ImageBlock has no children, so it stays `<Tag … />`.)
 	$: snippet = selfClose ? `${openTag} />` : `${openTag}>`;
 
@@ -405,18 +417,6 @@
 		reportAnchor(name, { x, y, width, height });
 	}
 	onDestroy(() => withdrawAnchor(anchor.name));
-
-	async function copy() {
-		try {
-			await navigator.clipboard.writeText(snippet);
-			copied = true;
-			setTimeout(() => (copied = false), 1200);
-		} catch {
-			// Clipboard blocked (insecure context / permission) — fall back to a prompt
-			// so the author can still grab the text by hand.
-			window.prompt('Copy this snippet:', snippet);
-		}
-	}
 </script>
 
 <!-- svelte-ignore a11y-no-static-element-interactions a11y-no-noninteractive-element-interactions -->
@@ -437,6 +437,14 @@
 	{#if editing}
 		<div class="readout">
 			{name ? name + ' · ' : ''}{Math.round(x)},{Math.round(y)} · {Math.round(width)}×{Math.round(height)}{z ? ' · z' + Math.round(z) : ''}
+			<button
+				class="zbtn" type="button" title="Send to back" aria-label="Send to back"
+				on:pointerdown|stopPropagation on:click|stopPropagation={sendToBack}
+			>⤓</button>
+			<button
+				class="zbtn" type="button" title="Bring to front" aria-label="Bring to front"
+				on:pointerdown|stopPropagation on:click|stopPropagation={bringToFront}
+			>⤒</button>
 		</div>
 		{#if ignoredGeometry.length || displacedBy.length}
 			<!-- The style/geometry collision, said out loud — ADJUST-mode only, so it
@@ -453,20 +461,6 @@
 				{/if}
 			</div>
 		{/if}
-		<!-- svelte-ignore a11y-no-static-element-interactions -->
-		<div class="toolbar" on:pointerdown|stopPropagation>
-			<button
-				class="zbtn" type="button" title="Send to back" aria-label="Send to back"
-				on:pointerdown|stopPropagation on:click|stopPropagation={sendToBack}
-			>⤓</button>
-			<button
-				class="zbtn" type="button" title="Bring to front" aria-label="Bring to front"
-				on:pointerdown|stopPropagation on:click|stopPropagation={bringToFront}
-			>⤒</button>
-			<button class="copy" type="button" on:pointerdown|stopPropagation on:click|stopPropagation={copy}>
-				{copied ? 'Copied!' : 'Copy'}
-			</button>
-		</div>
 		{#if drawEdit}
 			<!-- Draw-on reveal editor for a wrapped Draw shape (Rect/Ellipse):
 			     retime the self-draw + its delay. stopPropagation so editing the
@@ -534,8 +528,8 @@
 		outline-style: solid;
 	}
 
-	/* Grips + toolbar float above other Blocks' bodies (z 35), so you can click to
-	   select — or hit Front/Back — even when overlapped. This is the ONE stacking
+	/* Grip + id/location bar float above other Blocks' bodies (z 35), so you can click
+	   to select — or hit Front/Back — even when overlapped. This is the ONE stacking
 	   value still in CSS; the wrapper's own z-index (the author z plus the
 	   drag/select/hover lift) is computed inline (see `displayZ`), because it now
 	   carries the author's real-time stacking order and a class rule could not.
@@ -543,18 +537,25 @@
 	   Box modal (z 1000). An idle or z=0 Block keeps z-index:auto (no stacking
 	   context), so a grip can still float across a neighbour. */
 	.movable.editing .handle,
-	.movable.editing .toolbar {
+	.movable.editing .readout {
 		z-index: 35;
 	}
 
+	/* The id/location bar: name · x,y · w×h · z, with the stacking buttons folded in
+	   on its right (⤓ send-to-back / ⤒ bring-to-front). One flex pill: the bar itself
+	   is pointer-events:none (a drag can start on the text), and the buttons re-enable
+	   pointer events (see `.readout .zbtn`). */
 	.movable .readout {
 		position: absolute;
 		left: 0;
 		top: -1.7em;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.2em;
 		font-size: 0.55em;
 		font-family: 'Fira Code', monospace;
 		white-space: nowrap;
-		padding: 0 0.4em;
+		padding: 0 0.2em 0 0.4em;
 		background: var(--ctrl-strong-bg, #2980b9);
 		color: var(--on-accent, #ffffff);
 		border-radius: 3px;
@@ -562,17 +563,15 @@
 	}
 
 	/* The style/geometry collision badge — the TOP row of the chrome above the box:
-	   badge, then toolbar, then readout, then the box itself.
+	   badge, then the id/location bar, then the box itself.
 	   Two things this has to get right, both learned the hard way:
-	   1. UNIT BASIS. The offset is in the BLOCK's font-size, not the badge's, because
-	      that is the basis `.toolbar` uses (the toolbar row sets no font-size — only
-	      its buttons shrink), so its `top: -1.7em` rides far higher than the 0.55em
-	      readout's. Sizing this row at 0.55em and then offsetting it by `1.7em` would
-	      measure the gap in units ~3x smaller and land the badge straight under the
-	      toolbar. The pills carry the font-size instead, so the two rows can't drift.
-	   2. STACKING. Above the toolbar/handle band (35), so a caution is never buried by
-	      the buttons it sits beside — still well under the KeyframeStudio panel (50).
-	   Bottom-anchored, so a second line grows upward rather than down into the toolbar.
+	   1. UNIT BASIS. The offset is in the BLOCK's font-size, not the badge's (this row
+	      sets no font-size — the pills below carry the 0.55em), so `bottom: 100% + 1.9em`
+	      clears the id/location bar (which sits at `top: -1.7em` in its OWN 0.55em) with
+	      room to spare, instead of landing on top of it.
+	   2. STACKING. Above the bar/handle band (35), so a caution is never buried by the
+	      buttons it sits beside — still well under the KeyframeStudio panel (50).
+	   Bottom-anchored, so a second line grows upward rather than down into the bar.
 	   Warm, not blue: a caution, not a status. pointer-events:none so it can never eat
 	   a drag that starts near the top edge of the box. */
 	.movable .style-warn {
@@ -631,37 +630,25 @@
 		padding: 0.1em 0.3em;
 	}
 
-	/* Edit toolbar hanging above the box's top-right: Back / Front / Copy. */
-	.movable .toolbar {
-		position: absolute;
-		right: 0;
-		top: -1.7em;
+	/* Bring-to-front / send-to-back, folded into the id/location bar. Glyph buttons
+	   in the deck's control palette (no new role tokens: dev-only ADJUST chrome).
+	   They re-enable the pointer events the bar switches off, and read as chips on
+	   the bar via a translucent fill that brightens on hover. */
+	.movable .readout .zbtn {
+		pointer-events: auto;
 		display: inline-flex;
-		align-items: stretch;
-		gap: 3px;
-	}
-	.movable .copy {
-		font-size: 0.55em;
-		font-weight: bold;
-		cursor: pointer;
-		padding: 0.1em 0.6em;
-		border: 0;
-		border-radius: 3px;
-		background: var(--ctrl-selected-bg, #00b356);
-		color: var(--on-accent, #ffffff);
-	}
-	/* Bring-to-front / send-to-back. Glyph buttons in the deck's control palette,
-	   reusing the --ctrl-* tokens the Copy button and resize grip already do (no
-	   new role tokens: this is dev-only ADJUST chrome, not themeable slide surface). */
-	.movable .zbtn {
-		font-size: 0.7em;
+		align-items: center;
+		font-size: 1.15em;
 		line-height: 1;
 		cursor: pointer;
-		padding: 0 0.35em;
+		padding: 0.1em 0.25em;
 		border: 0;
-		border-radius: 3px;
-		background: var(--ctrl-strong-bg, #2980b9);
-		color: var(--on-accent, #ffffff);
+		border-radius: 2px;
+		background: rgba(255, 255, 255, 0.14);
+		color: inherit;
+	}
+	.movable .readout .zbtn:hover {
+		background: rgba(255, 255, 255, 0.3);
 	}
 
 	/* Bottom-right resize grip. */

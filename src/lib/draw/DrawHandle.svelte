@@ -4,7 +4,7 @@
 
   An SVG knob bound to a Point in canvas units (it scales with the deck,
   exactly like Block's chrome) and draggable via the shared trackPointer
-  helper: grid snapping, an optional Shift-snap hook (H/V/45° for endpoints),
+  helper: grid snapping, Shift to lock the drag to H/V from the grab point,
   Esc-cancel restoring the drag's start point, and a commit callback that
   fires only when the point actually moved (the caller records undo/redo).
 
@@ -18,6 +18,7 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
 	import { trackPointer } from '$lib/utils/drag';
+	import { snapToAngles } from './drawCore';
 	import { DRAW_CONTEXT_KEY, type DrawContext, type Point } from './types';
 
 	interface Props {
@@ -40,8 +41,6 @@
 		playhead?: number | null;
 		/** Tooltip (SVG <title>). */
 		title?: string;
-		/** Applied to the already-grid-snapped point while Shift is held. */
-		shiftSnap?: (p: Point) => Point;
 		/** Live position during the drag. */
 		onmove: (p: Point) => void;
 		/** Gesture committed with a net change — record undo/redo here. */
@@ -55,7 +54,6 @@
 		grid = 1,
 		kind = 'point',
 		title,
-		shiftSnap,
 		onmove,
 		oncommit,
 		onselect,
@@ -106,7 +104,12 @@
 			},
 			onMove: (dx, dy, e) => {
 				let p: Point = [snap(sx + dx), snap(sy + dy)];
-				if (e.shiftKey && shiftSnap) p = shiftSnap(p);
+				// Shift locks the point to a single axis from the GRAB point — X or Y,
+				// whichever the pointer moved further (the same feel as Block's Shift).
+				// snapToAngles' default 90° detents project onto that axis. Deliberately
+				// relative to the grab point, NOT the shape's other end: a near-horizontal
+				// line's endpoint must still be draggable straight up/down.
+				if (e.shiftKey) p = snapToAngles(p, [sx, sy]);
 				current = p;
 				onmove(p);
 			},

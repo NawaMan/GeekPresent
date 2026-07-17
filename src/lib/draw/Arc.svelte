@@ -52,7 +52,6 @@
 		round,
 		samplePath,
 		shortenShape,
-		snapToAngles,
 		unwrapAngles
 	} from './drawCore';
 	import {
@@ -605,8 +604,7 @@
 			<DrawHandle selected={isSelected}
 				point={F}
 				{grid}
-				title="from · Shift = H/V/45°"
-				shiftSnap={(p) => snapToAngles(p, T)}
+				title="from · Shift = H/V"
 				onselect={select}
 				onmove={(p) => (liveFrom = p)}
 				oncommit={(b, a) => commit((p) => (liveFrom = p), b, a)}
@@ -616,8 +614,7 @@
 			<DrawHandle selected={isSelected}
 				point={T}
 				{grid}
-				title="to · Shift = H/V/45°"
-				shiftSnap={(p) => snapToAngles(p, F)}
+				title="to · Shift = H/V"
 				onselect={select}
 				onmove={(p) => (liveTo = p)}
 				oncommit={(b, a) => commit((p) => (liveTo = p), b, a)}

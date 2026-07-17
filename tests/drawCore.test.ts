@@ -585,8 +585,15 @@ describe('snapToAngles', () => {
 		expect(snapToAngles([10, 100], [0, 0])).toEqual([0, 100]);
 	});
 
-	it('snaps to the 45° diagonal by projection', () => {
-		const [x, y] = snapToAngles([60, 50], [0, 0]);
+	it('defaults to 90° detents — a near-diagonal drag locks to the dominant axis, not a diagonal', () => {
+		// [60, 50] is past 45° toward horizontal → pure X (y pinned), no diagonal.
+		expect(snapToAngles([60, 50], [0, 0])).toEqual([60, 0]);
+		// A hair steeper than 45° → pure Y (x pinned).
+		expect(snapToAngles([50, 60], [0, 0])).toEqual([0, 60]);
+	});
+
+	it('still offers 45° diagonals when a caller opts in with stepDeg=45', () => {
+		const [x, y] = snapToAngles([60, 50], [0, 0], 45);
 		expect(x).toBeCloseTo(55, 5);
 		expect(y).toBeCloseTo(55, 5);
 	});

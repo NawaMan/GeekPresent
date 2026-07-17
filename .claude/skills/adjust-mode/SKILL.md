@@ -84,6 +84,10 @@ Ask the user to open the slide in *their* dev server — you never run it. The t
 outline appears around each `Block`.
 
 - **Drag** the body to move, **drag the bottom-right grip** to resize.
+- **Shift** while dragging locks the move to one axis — X or Y, whichever the pointer has moved
+  further along, measured from the grab point (re-evaluated live, so swinging past the diagonal
+  flips it). This holds for a `Block`, a Draw box (`Rect`/`Ellipse`), and a point-shape handle
+  (`Line`/`Arc`/`Curve`/`Path` endpoint) alike. No diagonal detent.
 - **Alt** breaks an aspect lock; **Esc** cancels the gesture; **Ctrl/Cmd+Z** undoes and
   **Ctrl/Cmd+Shift+Z** / **Ctrl+Y** redoes, globally across every `Block` on the page.
 - **Copy** puts the current tag, with live coordinates, on the clipboard — paste it over the original tag.

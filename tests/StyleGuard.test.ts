@@ -1,8 +1,10 @@
 import { render } from '@testing-library/svelte';
+import { get } from 'svelte/store';
 import { tick } from 'svelte';
 import { beforeEach, describe, expect, it } from 'vitest';
 import Block from '../src/lib/components/Block.svelte';
 import DrawHost from './StyleIdClassDrawHost.svelte';
+import { adjustChanges } from '../src/lib/stores/adjustChanges';
 import { adjustMode, canAdjust } from '../src/lib/stores/adjustMode';
 
 const box = (container: HTMLElement) => container.querySelector('.movable') as HTMLElement;
@@ -175,20 +177,15 @@ describe('Draw shapes — the props own the geometry there too', () => {
 });
 
 describe('Block — the author’s source is not touched', () => {
-	it('Copy still emits the style verbatim, reserved declaration and all', async () => {
-		// Reserving changes what RENDERS, never what the author wrote. The copied tag
+	it('the save patch emits the style verbatim, reserved declaration and all', async () => {
+		// Reserving changes what RENDERS, never what the author wrote. The emitted tag
 		// hands the original string back, so a drag can never silently delete it.
-		const { container } = render(Block, {
+		render(Block, {
 			props: { name: 'db', x: 200, y: 300, width: 400, height: 160, style: 'left: 40px; color: red' }
 		});
 		await enterLayoutMode();
-		let copied = '';
-		Object.assign(navigator, {
-			clipboard: { writeText: (t: string) => ((copied = t), Promise.resolve()) }
-		});
-		(container.querySelector('.copy') as HTMLButtonElement).click();
-		await tick();
-		expect(copied).toContain('style="left: 40px; color: red"');
-		expect(copied).toContain('x={200}');
+		const tag = [...get(adjustChanges).values()].find((e) => e.name === 'db')?.newTag ?? '';
+		expect(tag).toContain('style="left: 40px; color: red"');
+		expect(tag).toContain('x={200}');
 	});
 });

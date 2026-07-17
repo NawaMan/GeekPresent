@@ -12,8 +12,8 @@
   polygons inherit the shape's color reliably everywhere.
 
   ADJUST-mode editing (Phase 3): with the deck's ADJUST control on, each
-  endpoint grows a drag handle (Shift snaps to H/V/45° relative to the other
-  endpoint, `grid` quantizes) and clicking the stroke or a handle selects
+  endpoint grows a drag handle (Shift locks the drag to H/V from the grab
+  point, `grid` quantizes) and clicking the stroke or a handle selects
   the shape into Draw's Copy toolbar. Edits are local finder state — Copy →
   paste is the only persistence — and every completed gesture records to
   the global ADJUST undo/redo.
@@ -52,7 +52,6 @@
 		round,
 		segmentAngle,
 		shorten,
-		snapToAngles
 	} from './drawCore';
 	import {
 		DRAW_CONTEXT_KEY,
@@ -593,8 +592,7 @@
 			<DrawHandle selected={isSelected}
 				point={F}
 				{grid}
-				title="from · Shift = H/V/45°"
-				shiftSnap={(p) => snapToAngles(p, T)}
+				title="from · Shift = H/V"
 				onselect={select}
 				onmove={(p) => (liveFrom = p)}
 				oncommit={(b, a) => commit((p) => (liveFrom = p), b, a)}
@@ -604,8 +602,7 @@
 			<DrawHandle selected={isSelected}
 				point={T}
 				{grid}
-				title="to · Shift = H/V/45°"
-				shiftSnap={(p) => snapToAngles(p, F)}
+				title="to · Shift = H/V"
 				onselect={select}
 				onmove={(p) => (liveTo = p)}
 				oncommit={(b, a) => commit((p) => (liveTo = p), b, a)}
@@ -624,7 +621,6 @@
 						pct={finite(s.pct)}
 						{playhead}
 						title={`from · ${finite(s.pct)}%`}
-						shiftSnap={(p) => snapToAngles(p, s.to ?? T)}
 						onselect={select}
 						onmove={(p) => setStop(i, 'from', p, i === lowestStopFor('from'))}
 						oncommit={(b, a) => commitStop(i, 'from', i === lowestStopFor('from'), b, a)}
@@ -638,7 +634,6 @@
 						pct={finite(s.pct)}
 						{playhead}
 						title={`to · ${finite(s.pct)}%`}
-						shiftSnap={(p) => snapToAngles(p, s.from ?? F)}
 						onselect={select}
 						onmove={(p) => setStop(i, 'to', p, i === lowestStopFor('to'))}
 						oncommit={(b, a) => commitStop(i, 'to', i === lowestStopFor('to'), b, a)}

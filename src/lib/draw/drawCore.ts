@@ -214,11 +214,13 @@ export function bendFromApex(from: Point, to: Point, apex: Point): number {
 	return clampBend(Math.round(bend * 1000) / 1000 + 0);
 }
 
-/** Snap a dragged point to the nearest angular detent (default 45°: gives
- *  horizontal / vertical / diagonals) relative to `ref`, by PROJECTING onto
- *  the snapped ray — a horizontal snap keeps the dragged x and pins y to
- *  ref's, the drawing-tool behavior. Coincident points return unchanged. */
-export function snapToAngles(p: Point, ref: Point, stepDeg = 45): Point {
+/** Snap a dragged point to the nearest angular detent (default 90°: horizontal
+ *  or vertical only — no diagonal, matching Block's Shift axis-lock) relative to
+ *  `ref`, by PROJECTING onto the snapped ray — a horizontal snap keeps the
+ *  dragged x and pins y to ref's, the drawing-tool behavior. Pass `stepDeg=45`
+ *  for a shape that wants diagonal detents too. Coincident points return
+ *  unchanged. */
+export function snapToAngles(p: Point, ref: Point, stepDeg = 90): Point {
 	const [px, py] = finitePoint(p);
 	const [rx, ry] = finitePoint(ref);
 	const dx = px - rx;
