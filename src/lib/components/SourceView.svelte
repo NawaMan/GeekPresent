@@ -14,6 +14,9 @@
   Highlighting is lazy — done the first time the viewer is opened, with the plain
   source showing until (and if) it resolves.
 
+  ☰ → EDIT (and the title-bar EDIT) opens the same unscaled `/_source-edit` popup
+  as ViewSource — typing never happens in this scaled panel.
+
   Each page passes its own source via Vite's ?raw import; the file path shown in the
   title bar is derived from the current route unless `path` overrides it.
 
@@ -25,6 +28,7 @@
 -->
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { get } from 'svelte/store';
 	import CtrlBtn from '$lib/components/CtrlBtn.svelte';
 	import Box     from '$lib/components/Box.svelte';
 	import { page } from '$app/stores';
@@ -35,6 +39,8 @@
 		unregisterPageSource,
 		pageSourceOpen
 	} from '$lib/stores/pageSource';
+	import { canSave } from '$lib/stores/adjustMode';
+	import { openSourceEditor } from '$lib/stores/sourceEditWindow';
 
 	/** The page source, typically `import source from './+page.svelte?raw'`. */
 	export let source: string;
@@ -61,6 +67,22 @@
 
 	$: filePath = path || `src/routes${$page.route.id}/+page.svelte`;
 
+	function openEdit() {
+		if (typeof location === 'undefined') return;
+		const win = openSourceEditor({
+			route: location.pathname,
+			path: filePath,
+			source,
+			language: 'html',
+			canSave: get(canSave)
+		});
+		if (!win) {
+			console.warn(
+				'[SourceView] popup blocked — allow popups for this origin to edit source in a separate window'
+			);
+		}
+	}
+
 	// Keep the panel and the shared store in step (hamburger opens; Box closes).
 	const unsubOpen = pageSourceOpen.subscribe((v) => {
 		if (expanded !== v) expanded = v;
@@ -77,7 +99,7 @@
 
 	onMount(() => {
 		const owner = Symbol('source-view');
-		registerPageSource(owner);
+		registerPageSource(owner, openEdit);
 		return () => unregisterPageSource(owner);
 	});
 </script>
@@ -93,7 +115,16 @@
      load-bearing — see the note there.) -->
 <Box bind:expanded width={1500} height={975} scrollable class="gp-chrome no-print">
 	<div class="src">
-		<div class="src-title">{filePath}</div>
+		<div class="src-title">
+			<span class="src-path">{filePath}</span>
+			<button
+				type="button"
+				class="src-edit"
+				aria-label="Edit source in a separate window"
+				title="EDIT — open this file in an unscaled editor window"
+				on:click|stopPropagation={openEdit}
+			>EDIT</button>
+		</div>
 		{#if html}
 			{@html html}
 		{:else}
@@ -116,6 +147,10 @@
 		position: sticky;
 		top: 0;
 		z-index: 1;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.8em;
 		padding: 0.7em 1.1em;
 		font-family: 'Fira Code', monospace;
 		font-weight: bold;
@@ -123,6 +158,29 @@
 		color: var(--code-title-fg, #FFFFFF);
 		background: var(--code-title-bg, #1E1E1E);
 		border-bottom: 1.5px solid var(--code-title-border, #333333);
+	}
+	.src-path {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.src-edit {
+		flex: 0 0 auto;
+		appearance: none;
+		border: 1px solid var(--code-title-border, #333333);
+		border-radius: 6px;
+		padding: 0.25em 0.75em;
+		font: inherit;
+		font-size: 0.85em;
+		font-weight: bold;
+		letter-spacing: 0.04em;
+		cursor: pointer;
+		color: var(--annot-toggle-fg, #F0A33E);
+		background: rgba(255, 255, 255, 0.06);
+	}
+	.src-edit:hover {
+		background: rgba(255, 255, 255, 0.12);
 	}
 	.src-code {
 		margin: 0;

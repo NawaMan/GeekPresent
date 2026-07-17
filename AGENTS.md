@@ -244,11 +244,16 @@ than misleading the next agent.
   `<AnimationBar />` on a Terminal slide — both would drive the same clock; pass
   `controls={false}` if you want the bar to own it),
   `ViewSource` (registers a page's own `?raw` source for the top tool bar's ☰ → **SOURCE**
-  menu item, which opens it in a `CodeBox`; on a Text, which has no tool bar, it keeps the
-  classic corner `</> Source` button) and `SourceView` (the same control, Shiki instead of
-  Monaco — use it on any slide reached by a CLIENT-SIDE navigation, i.e. a View-Transition
-  deck or an appendix with `transition`, because Monaco's CDN loader renders blank after a
-  `goto`),
+  and **EDIT** menu items: SOURCE opens a read-only in-slide `CodeBox`; EDIT — also on the
+  CodeBox title bar — opens an unscaled popup at `/_source-edit` for typing, because Monaco's
+  caret drifts under the canvas CSS scale. The popup has **SAVE** / **REFRESH** / **CLOSE**:
+  SAVE writes the full `+page.svelte` via the vite-dev endpoint family (NOT ALLOWED on a static
+  host); REFRESH reloads from disk and warns if the buffer differs; SAVE does not close the
+  window. On a Text, which has no tool bar, it keeps the classic corner `</> Source` button)
+  and `SourceView` (the same control, Shiki instead of Monaco for the in-slide panel — use it
+  on any slide reached by a CLIENT-SIDE navigation, i.e. a View-Transition deck or an appendix
+  with `transition`, because Monaco's CDN loader renders blank after a `goto`; EDIT still opens
+  the same unscaled popup),
   `Block` / `ImageBlock` (absolutely-positioned
   wrappers you place at exact canvas pixels — drag/resize them in **ADJUST mode**,
   see that playbook), `Connector` (an arrow auto-routed between two *named* `Block`s —

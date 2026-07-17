@@ -31,7 +31,7 @@ HTML-based slides aren't new — reveal.js, Slidev, Spectacle and Marp all exist
 
 - **One slide = one route = one folder.** Slides aren't sections of a single giant document or fenced blocks in one markdown file — each slide is its own SvelteKit route folder (`src/routes/<name>.html/`). So slides diff cleanly one file at a time, each slide can **colocate its own assets** (images, QR codes) right next to it, and every slide is independently URL-addressable and prerendered to its own HTML.
 - **A fixed 1920×1080 canvas with pixel-exact positioning *and* auto-scaling.** You design against one fixed size — `left: 960px` means the same thing on every screen — and the framework scales the whole canvas to fit any window (FITTED) or shows it at an exact zoom you can pan (SCALED), with speaker notes below when zoomed out. Most HTML-slide tools push you toward responsive flow; GeekPresent deliberately gives you a fixed pixel coordinate space and does the scaling math for you.
-- **Slides that are their own documentation.** Drop `ViewSource` on a slide and the top tool bar's ☰ menu gains a **SOURCE** item that pops the slide's *own* source (via Vite's `?raw` import, so it can never drift from the real file) into a Monaco viewer titled with its file path. The deck documents itself with guaranteed-accurate code. (`SourceView` is the same control highlighted by Shiki instead — use it on any slide reached by a *client-side* navigation, i.e. a View-Transition deck or an appendix with `transition`, since Monaco's CDN loader renders blank after a `goto`.)
+- **Slides that are their own documentation — and editable under `pnpm dev`.** Drop `ViewSource` on a slide and the top tool bar's ☰ menu gains **SOURCE** (view the slide's *own* `?raw` source in a Monaco `CodeBox` on the canvas) and **EDIT** (open that file in an *unscaled* popup window at `/_source-edit`, so Monaco's caret is not under the slide's CSS scale). The CodeBox title bar also has **EDIT**. In the popup, **SAVE** writes the full `+page.svelte` through a vite-dev endpoint (same family as ADJUST SAVE; on a static host it answers **NOT ALLOWED**), **REFRESH** reloads from disk (warns if the buffer differs — picks up ADJUST SAVE and IDE edits), and **CLOSE** leaves the window open across slide HMR. (`SourceView` is the same idea with Shiki instead of Monaco for the in-slide panel — use it on any slide reached by a *client-side* navigation, i.e. a View-Transition deck or an appendix with `transition`; its panel also offers **EDIT** into the same popup.)
 - **Appendices — a slide you jump *into* and return *from*.** The deep-dive a talk only sometimes needs: a proof, a full API table, a backup demo. `AppendixLink` jumps in and stamps the calling slide into the URL as the return address, so the same appendix returns to whichever slide asked; `AppendixPage` gives it its way back. It behaves like a real book's appendix — several contiguous slides are one chapter you page through, and walking forward off the end *is* the return. Mark it `hidden` and it leaves the deck's forward march entirely (→/Space step over it, the TOC omits it); leave `hidden` off and it is ordinary back matter you can also page into.
 - **Two artifact types from one component set.** The same `$lib` components compile into either a click-through **presentation** or a long-form, scrollable **Text** — give the talk, then publish the reader-friendly version with no rewrite. A mode flag (`setMode`) lets shared components adapt (e.g. the nav bar collapses to a single TOP button).
 - **Multiple independent presentations in one project.** Navigation and the Table of Contents are scoped *per presentation* via Svelte context (`setPages` / `getPages`), not a single global config. Sibling route folders (`slides/`, `portrait/`, `geeklight/`) each carry their own slide list, theme, fonts, background, and favicon, and coexist without interfering.
@@ -310,9 +310,9 @@ Read-only code viewers built on the Monaco editor:
 
 > Monaco is loaded from a CDN, so the code components need an internet connection.
 
-### View source
+### View source (and edit in dev)
 
-Mount `ViewSource` on a slide to offer that page's *own* source in a `CodeBox`, titled with its file path. On a presentation the open control is the top tool bar's **☰ → SOURCE** menu row (next to OVERVIEW / CAPTURE / PRINT) — the component registers the source with the deck and renders the panel. On a Text (no tool bar) it still shows the classic corner **`</> Source`** button. Because the deck is its own documentation, a viewer can read exactly the text that produced the slide they're on.
+Mount `ViewSource` on a slide to offer that page's *own* source. The component registers with the deck and supplies the bytes; the open controls live in chrome.
 
 ```svelte
 <script>
@@ -325,10 +325,13 @@ Mount `ViewSource` on a slide to offer that page's *own* source in a `CodeBox`, 
 <ViewSource {source} path="src/routes/slides/title.html/+page.svelte" />
 ```
 
-- The source comes from Vite's `?raw` import, so what's shown can never drift from the real file.
+- **☰ → SOURCE** opens an in-slide read-only Monaco `CodeBox` titled with the file path. On a Text (no tool bar) the classic corner **`</> Source`** button still opens that panel.
+- **☰ → EDIT**, or **EDIT** on the CodeBox title bar, opens a separate browser window at `/_source-edit`. Editing lives there on purpose: the slide canvas is CSS-scaled, and Monaco's caret metrics do not follow that scale (typing in the panel drifts the cursor). The popup is 1:1.
+- In the edit window: **SAVE** writes the full `+page.svelte` via a vite-dev endpoint (same refusal language as ADJUST SAVE — **NOT ALLOWED** on a static host, never pre-disabled); **REFRESH** reloads from disk and warns if the buffer differs (use it after ADJUST SAVE or an IDE edit); **CLOSE** leaves the window (SAVE does not close it — the slide may HMR-reload).
+- The source comes from Vite's `?raw` import, so what's shown can never drift from the real file until you change the file.
 - The path can't be auto-derived inside the component, so each page passes its own `source` (the `?raw` import) and `path` string — one import plus one line per slide.
 - Props: `source` (required), `path`, `language` (defaults to `html` — Monaco has no native `svelte` mode, so a `.svelte` file reads best as HTML; the text itself is exact), `text` / `chrome` (label and look of the Text-mode corner button only; defaults `</> Source` and muted chrome).
-- On a presentation, open it from the top bar hamburger; the corner button appears only in Text mode.
+- Worked demo in the stock deck: `slides/viewsource-edit.html`.
 
 ### Animation controls
 

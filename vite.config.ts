@@ -18,7 +18,7 @@ const SITE_URL = (rawSiteUrl === undefined ? DEFAULT_SITE_URL : rawSiteUrl)
 export default defineConfig({
 	plugins: [
 		sveltekit(),
-		// Dev-only: lets ADJUST mode's "Save" write moved Blocks back to source.
+		// Dev-only: ADJUST SAVE (Block patches) and ViewSource SAVE (full +page.svelte).
 		adjustSavePlugin()
 	],
 	// Inject the base URL as a string literal into BOTH the SSR/prerender output and
