@@ -243,13 +243,13 @@ than misleading the next agent.
   `keys="global"` lets Space run it one command at a time and then page the deck. Don't put an
   `<AnimationBar />` on a Terminal slide — both would drive the same clock; pass
   `controls={false}` if you want the bar to own it),
-  `ViewSource` (registers a page's own `?raw` source for the top tool bar's ☰ → **SOURCE**
-  and **EDIT** menu items: SOURCE opens a read-only in-slide `CodeBox`; EDIT — also on the
-  CodeBox title bar — opens an unscaled popup at `/_source-edit` for typing, because Monaco's
-  caret drifts under the canvas CSS scale. The popup has **SAVE** / **REFRESH** / **CLOSE**:
-  SAVE writes the full `+page.svelte` via the vite-dev endpoint family (NOT ALLOWED on a static
-  host); REFRESH reloads from disk and warns if the buffer differs; SAVE does not close the
-  window. On a Text, which has no tool bar, it keeps the classic corner `</> Source` button)
+  `ViewSource` (optional per-slide `?raw` registration for ☰ → **SOURCE** / **EDIT**. In
+  **`pnpm dev`**, SOURCE and EDIT are **deck-wide** even without ViewSource: the shell loads
+  `+page.svelte` via `/__geekpresent/source-load` and hosts a canvas-space CodeBox or the
+  unscaled `/_source-edit` popup. A mounted ViewSource still supplies `?raw` bytes and works on
+  a static host. EDIT opens `/_source-edit` for typing (Monaco's caret drifts under the canvas
+  CSS scale); **SAVE** / **REFRESH** / **CLOSE** as before — SAVE is NOT ALLOWED on a static
+  host. On a Text (no tool bar) ViewSource keeps the classic corner `</> Source` button)
   and `SourceView` (the same control, Shiki instead of Monaco for the in-slide panel — use it
   on any slide reached by a CLIENT-SIDE navigation, i.e. a View-Transition deck or an appendix
   with `transition`, because Monaco's CDN loader renders blank after a `goto`; EDIT still opens
@@ -282,11 +282,11 @@ than misleading the next agent.
   plus framework-internal `Copyright`, `CtrlBtn`,
   `NavigationBar`, `TableOfContent`,
   `OverviewPage` (the all-slides grid — press **O**, click a slide to jump, Escape closes. `SlideDeck`
-  mounts it; no slide places it and no prop offers it. Its tiles are the *real* slides — each is the
-  prerendered page in an `<iframe>` at `?clean`, at native size and CSS-scaled to fit — not
-  screenshots, so nothing goes stale and nothing is generated. Tiles mount lazily as they scroll
-  into view and stay mounted; `hidden` appendices are omitted, as in the ToC. Logic lives in the
-  pure `utils/overviewPageCore.ts`),
+  mounts it; no slide places it. Tiles are live `?clean` iframes, lazy-mounted; `hidden` appendices
+  are omitted. In **`pnpm dev`**, **EDIT** (or **E**) arms deck-structure editing: **ADD**, between-page
+  **+**, and **×** unlist (writes route folder + `pages.ts` via `/__geekpresent/page-add` /
+  `page-remove`; production answers NOT ALLOWED). Spec: `specs/DECK-EDIT-1.md`. Core:
+  `utils/overviewPageCore.ts` + `deckEdit/pageEditCore.ts`),
   `SizeMode`, `Seo` (renders SEO/social metadata
   into `<svelte:head>` — see the SEO note under *Gotchas*).
 - Package manager is **pnpm**, but **only inside the booth** — always
@@ -708,6 +708,16 @@ stay out of the audience's way. A speaker who is actively using one often wants 
 - **Default is auto-hide.** Offered is not active: a first visit still tucks. Click the pin to
   seat the bar fully open (`class="pinned"` forces `translateY(0)`); click again to return to
   auto-hide. The choice survives a slide change and a reload.
+- **Opt-out of a whole bar.** `<SlideDeck toolBar={false}>` / `controlBar={false}` (default
+  **on**) drop the top authoring cluster or the bottom TOC/pager for a bare canvas. Independent
+  of PIN. Hidden either way under `?clean` / `?present`.
+- **Alt+. (⌥. on macOS) raises both bars for keyboard.** Temporary arm (~5s, amber halo) — not
+  a pin. While armed: **a** ANNOTATE, **j** ADJUST, **z** zoom/display, **p** PRESENT, **m** ☰,
+  **t** TOC. Labels show the key at the end (`PRESENT (P)`, `FITTED (Z)`, `☰ (M)`, …). Esc
+  disarms and closes ☰. Letter mnemonics do not fire while typing in a field. Pure core:
+  `chrome/chromeArmCore.ts`.
+- **☰ menu groups.** Navigate (OVERVIEW **O**) · export (CAPTURE, PRINT with nested flyout
+  **cCwWtT**) · source (SOURCE, EDIT). PRINT opens on hover to the left of the row.
 - **Not the same as `fadeChrome`.** `fadeChrome` ghosts `.gp-chrome` opacity until pointed at;
   PIN is the tuck/untuck of the two window-edge bars. They compose: a pinned bar is fully seated
   even when fade would otherwise dim other chrome.
@@ -718,13 +728,13 @@ stay out of the audience's way. A speaker who is actively using one often wants 
 ### "Save this slide as an image (CAPTURE)"
 
 One prop, and a **CAPTURE** entry appears in the top-centre tool bar's **hamburger (☰) menu** —
-hover the ☰ at the bar's right end and OVERVIEW / CAPTURE / PRINT drop down. It downloads the
-current slide as a PNG. (The bar itself is `📌 │ PRESENT │ ANNOTATE │ ADJUST SAVE │ ☰`: the pin
-and PRESENT / ANNOTATE / ADJUST sit in the open, while OVERVIEW / CAPTURE / PRINT — the *navigation
-and output* tools — live behind the hamburger.) **PRINT** opens a small submenu — This slide / This
-slide + notes (print in place; the notes toggle is a local override, no navigation), and Whole
-deck / + notes (a full nav to `/_handout/<deck>.html`). CAPTURE only appears when the deck offers it
-(`capture`), and the whole bar is hidden under `?clean` / `?present`.
+hover the ☰ at the bar's right end for OVERVIEW / CAPTURE / PRINT / SOURCE / EDIT (grouped with
+separators). It downloads the current slide as a PNG. (The bar itself is
+`📌 │ PRESENT (P) │ ANNOTATE (A) │ ADJUST (J) │ FITTED (Z) │ ☰ (M)`: pin and mode toggles sit in
+the open; navigation/output/source tools live behind the hamburger.) **PRINT** opens a nested
+flyout on hover — Current slide / + notes, Whole deck / + notes, Thumbnail grid / Notes grid
+(mnemonics **cCwWtT**). CAPTURE only appears when the deck offers it (`capture`); the whole bar is
+hidden under `?clean` / `?present`.
 
 ```svelte
 <SlideDeck {pages} capture captureScale={2} />

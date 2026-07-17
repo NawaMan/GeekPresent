@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount } from 'svelte';
 
     export let text       = 'Btn';
     export let hoverText  = '';
@@ -10,12 +10,26 @@
 	   frame. In-page buttons leave it false and get the prominent, eye-catching
 	   look by default — so a slide author doesn't have to opt in. */
 	export let chrome     = false;
+	/** Optional letter to underline in `text` / `hoverText` (chrome keyboard mnemonics). */
+	export let mnemonic   = '';
 
 	onMount(() => {
 		if (!hoverText) {
 			hoverText = text;
 		}
 	});
+
+	/** Split label around the first case-insensitive match of `mnemonic`. */
+	function mnParts(label: string, letter: string): { before: string; hit: string; after: string } | null {
+		const L = String(letter ?? '').slice(0, 1);
+		if (!L || !label) return null;
+		const i = label.toLowerCase().indexOf(L.toLowerCase());
+		if (i < 0) return null;
+		return { before: label.slice(0, i), hit: label.slice(i, i + 1), after: label.slice(i + 1) };
+	}
+
+	$: textMn = mnParts(text, mnemonic);
+	$: hoverMn = mnParts(hoverText || text, mnemonic);
 </script>
 
 <style>
@@ -98,6 +112,12 @@
 	button.hidden {
 		display: none;
 	}
+	/* Mnemonic underline — shared look with the ☰ menu's `.tool-mn`. */
+	:global(.chrome-mn) {
+		text-decoration: underline;
+		text-underline-offset: 0.18em;
+		text-decoration-thickness: 1px;
+	}
 </style>
 
 <button
@@ -106,6 +126,18 @@
 	class:selected={isSelected}
 	class:hidden={!isVisible}
 	on:click>
-	<span class="text"      >{text}</span>
-	<span class="hover-text">{hoverText}</span>
+	<span class="text">
+		{#if textMn}
+			{textMn.before}<span class="chrome-mn">{textMn.hit}</span>{textMn.after}
+		{:else}
+			{text}
+		{/if}
+	</span>
+	<span class="hover-text">
+		{#if hoverMn}
+			{hoverMn.before}<span class="chrome-mn">{hoverMn.hit}</span>{hoverMn.after}
+		{:else}
+			{hoverText}
+		{/if}
+	</span>
 </button>

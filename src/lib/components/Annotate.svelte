@@ -461,7 +461,9 @@
 		position: absolute;
 		left: 50%;
 		bottom: 28px;
-		transform: translateX(-50%);
+		/* 75% of prior size — the pen palette was reading large next to the window-edge chrome. */
+		transform: translateX(-50%) scale(0.75);
+		transform-origin: center bottom;
 		z-index: 41;
 		display: flex;
 		align-items: center;

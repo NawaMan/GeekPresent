@@ -41,7 +41,39 @@
 	import { applyPageRule } from '$lib/handout/pageRuleDom';
 	import { printNotes } from '$lib/stores/printNotes';
 	import { overviewOpen } from '$lib/stores/overviewOpen';
-	import { pageSourceAvailable, openPageSource, openPageSourceEdit } from '$lib/stores/pageSource';
+	import {
+		pageSourceCanView,
+		pageSourceCanEdit,
+		pageSourceHasOwner,
+		deckSourceFallback,
+		openPageSource,
+		openPageSourceEdit,
+		closePageSource
+	} from '$lib/stores/pageSource';
+	import {
+		chromeArmed,
+		armChrome,
+		disarmChrome,
+		keepChromeArmed,
+		requestTocOpen,
+		holdMoreMenuClosed
+	} from '$lib/stores/chromeArm';
+	import { chromeKeyIntent } from '$lib/chrome/chromeArmCore';
+	import CodeBox from '$lib/components/CodeBox.svelte';
+
+	// Deck-level SOURCE CodeBox (slides without ViewSource). Opened by openPageSource
+	// when it fills deckSourceFallback; closing the box clears the fallback.
+	// Track "just appeared" so we open without fighting the user's CLOSE click
+	// (a bare `$: if (fallback) expanded = true` would re-open every tick).
+	let deckSourceExpanded = false;
+	let deckSourceHadFallback = false;
+	$: {
+		const has = !!$deckSourceFallback;
+		if (has && !deckSourceHadFallback) deckSourceExpanded = true;
+		if (!has) deckSourceExpanded = false;
+		if (has && deckSourceHadFallback && !deckSourceExpanded) closePageSource();
+		deckSourceHadFallback = has;
+	}
 
 	import { browser }    from '$app/environment';
 	import { page }       from '$app/stores';
@@ -52,7 +84,12 @@
 	import { adjustMode, canAdjust, canSave, setAdjustOffered, applyAdjustParam } from '$lib/stores/adjustMode';
 	import Annotate from '$lib/components/Annotate.svelte';
 	import {
-		setAnnotateOffered, applyAnnotateParam, setInkPath, inkStaleAfterMs
+		annotationMode,
+		canAnnotate,
+		setAnnotateOffered,
+		applyAnnotateParam,
+		setInkPath,
+		inkStaleAfterMs
 	} from '$lib/stores/annotation';
 	import { captureSlide, downloadBlob } from '$lib/capture/captureSlide';
 	import { captureFileName, readCaptureParam, refusalText, resolveCanCapture, readSticky } from '$lib/capture/captureCore';
@@ -142,6 +179,22 @@
 	   already using. Touch devices have no hover to reveal with, so the fade is
 	   disabled there outright. */
 	export let fadeChrome = false;
+
+	/* Bottom ControlBar (TOC + FIRST/PREV/NEXT/LAST + hosted AnimationBar). On by
+	   default — opt OUT with `controlBar={false}` for a bare canvas (e.g. a kiosk
+	   deck, or one that brings its own pager). Keyboard paging still works if a
+	   NavigationBar is mounted elsewhere; this only removes the window-edge bar.
+	   Independent of `toolBar`. Hidden either way under `?clean` / `?present`. */
+	export let controlBar = true;
+
+	/* Top tool bar (PRESENT / ANNOTATE / ADJUST / DISPLAY / ☰ OVERVIEW·CAPTURE·
+	   PRINT·SOURCE·EDIT). On by default — opt OUT with `toolBar={false}` when the
+	   deck is audience-facing and the authoring cluster would only distract. Many
+	   of those rows are *more* useful in vite dev (SOURCE/EDIT write-back, ADJUST
+	   SAVE, CAPTURE experiments); a published talk can drop the whole bar and
+	   keep `controlBar` for navigation. Independent of `controlBar`. Hidden either
+	   way under `?clean` / `?present`. */
+	export let toolBar = true;
 
 	/* Offer the ADJUST authoring control on EVERY slide of this deck, even in a build.
 	   Almost no deck wants this — ADJUST is off in production by default, and the usual
@@ -358,16 +411,15 @@
 		}
 	}
 
-	// PRINT — the flyout's left tool. It opens a little menu rather than printing straight away,
-	// because there are four honest destinations (this slide / the whole deck, each with or
-	// without notes) and the browser's own dialog cannot ask which. Each choice then does the one
-	// thing only a browser can: open the print dialog. The deck's `@media print` block does the
-	// rest — paper the shape of the canvas, chrome stripped, notes honoured.
+	// PRINT — nested flyout off the ☰ → PRINT row (hover or click). Six destinations:
+	// current / whole / grid, each plain or +notes. Mnemonics cCwWtT (lower = no notes,
+	// upper = with notes). Nested beside the row so it no longer floats as a second
+	// centred popover over the hamburger (which looked like two menus fighting).
 	let printMenuOpen = false;
 
-	// Print THIS slide, optionally with its <Note>. The notes toggle is a local override rather
-	// than a navigation, so it must be applied to the DOM/CSS BEFORE the (blocking) print opens —
-	// hence the `await tick()`. It is cleared when the dialog closes (onMount, below).
+	// Print the CURRENT slide, optionally with its <Note>. The notes toggle is a local
+	// override rather than a navigation, so it must be applied to the DOM/CSS BEFORE the
+	// (blocking) print opens — hence the `await tick()`. Cleared when the dialog closes.
 	async function printThisSlide(withNotes: boolean) {
 		printMenuOpen = false;
 		printNotesOverride = withNotes;
@@ -376,8 +428,8 @@
 	}
 
 	// The current deck's name, from the URL: `/slides/title.html` -> `slides`. The handout for it
-	// lives OUTSIDE the deck at `/_handout/<deck>.html`, so these two options navigate there rather
-	// than printing in place — the handout is a different document (every slide at once).
+	// lives OUTSIDE the deck at `/_handout/<deck>.html`, so whole-deck / grid options navigate
+	// there rather than printing in place — the handout is a different document.
 	$: deckName = ($page.url.pathname.replace(base, '').split('/').filter(Boolean)[0]) || '';
 	function openHandout(query: string) {
 		printMenuOpen = false;
@@ -388,6 +440,90 @@
 		// `query` selects the layout: '' pages, '?notes' pages+notes, '?grid' the thumbnail grid,
 		// '?grid&notes' the notes grid.
 		if (browser) window.location.assign(`${base}/_handout/${deckName}.html${query}`);
+	}
+
+	/** Keyboard while the PRINT flyout is open: cCwWtT (case-sensitive). */
+	function onPrintMenuKey(e: KeyboardEvent) {
+		if (!printMenuOpen) return;
+		if (e.ctrlKey || e.metaKey || e.altKey) return;
+		if (e.key === 'Escape') {
+			e.preventDefault();
+			printMenuOpen = false;
+			return;
+		}
+		// Case-sensitive: lower = without notes, upper = with notes.
+		const map: Record<string, () => void> = {
+			c: () => printThisSlide(false),
+			C: () => printThisSlide(true),
+			w: () => openHandout(''),
+			W: () => openHandout('?notes'),
+			t: () => openHandout('?grid'),
+			T: () => openHandout('?grid&notes')
+		};
+		const act = map[e.key];
+		if (!act) return;
+		e.preventDefault();
+		act();
+	}
+
+	/**
+	 * Alt+. raises both window-edge bars; while armed, a/j/d/p/m/t pick a control.
+	 * Esc disarms chrome and closes the ☰ drop (blur). Print-menu keys win when open.
+	 */
+	function onChromeKeys(e: KeyboardEvent) {
+		// PRINT submenu owns its alphabet while open (including Esc).
+		if (printMenuOpen) {
+			onPrintMenuKey(e);
+			return;
+		}
+
+		const intent = chromeKeyIntent(e, $chromeArmed);
+		if (intent === 'ignore') return;
+		e.preventDefault();
+
+		switch (intent) {
+			case 'arm':
+				armChrome();
+				return;
+			case 'disarm':
+				// Shut ☰ even if still hovered (CSS hold), drop focus, then un-arm bars.
+				holdMoreMenuClosed();
+				if (browser && document.activeElement instanceof HTMLElement) {
+					const el = document.activeElement;
+					if (el.closest?.('.annot-menu') || el.classList?.contains('annot-hamburger')) {
+						el.blur();
+					}
+				}
+				disarmChrome();
+				return;
+			case 'annotate':
+				if ($canAnnotate) annotationMode.update((v) => !v);
+				keepChromeArmed();
+				return;
+			case 'adjust':
+				if ($canAdjust) adjustMode.update((v) => !v);
+				keepChromeArmed();
+				return;
+			case 'display':
+				// Toggle FITTED ↔ SCALED @ 100% — the two modes the DISPLAY control offers first.
+				displayMode.update((m) => (m === 'FITTED' ? 'SCALED' : 'FITTED'));
+				keepChromeArmed();
+				return;
+			case 'present':
+				openPresenter();
+				keepChromeArmed();
+				return;
+			case 'more': {
+				// Focus the hamburger so :focus-within opens the ☰ drop.
+				const btn = document.querySelector<HTMLElement>('.annot-hamburger');
+				btn?.focus();
+				keepChromeArmed();
+				return;
+			}
+			case 'toc':
+				requestTocOpen();
+				return;
+		}
 	}
 
 	// "Save" writes the slide's moved Blocks back to source. It only reaches a source
@@ -685,9 +821,8 @@
 	{/if}
 </svelte:head>
 
-<!-- Escape closes the PRINT menu (and only when it is open, so it does not swallow the key the
-     TOC and the pen also listen for). -->
-<svelte:window on:keydown={(e) => { if (printMenuOpen && e.key === 'Escape') printMenuOpen = false; }} />
+<!-- Chrome arm (Alt+.) + mnemonics; PRINT flyout keys when that menu is open. -->
+<svelte:window on:keydown={onChromeKeys} />
 
 <!-- .viewport is the screen-fixed pan area. It centres the frame when it fits and
      scrolls (top-left reachable, via `safe center`) when SCALED overflows it. -->
@@ -724,7 +859,30 @@
 			     listener, and there are a dozen tiles alive at once. Not rendering it is
 			     also what stops a tile from growing a grid of its own, recursively. -->
 			{#if !clean && !present}
-				<OverviewPage {pages} {width} {height} currentPath={currentSlide ?? ''} />
+				<OverviewPage
+					{pages}
+					{width}
+					{height}
+					currentPath={currentSlide ?? ''}
+					deck={deckName}
+				/>
+			{/if}
+			<!-- Deck-level SOURCE panel for slides without ViewSource. MUST live in
+			     canvas space (this .content layer), not the window overlay: <Box>
+			     is position:absolute at 50%/50% of its containing block — the same
+			     placement ViewSource uses. In the overlay it anchored to the window
+			     and the 9999px dimming shadow painted half the screen wrong. -->
+			{#if browser && $deckSourceFallback && !$pageSourceHasOwner}
+				<CodeBox
+					code={$deckSourceFallback.code}
+					language="html"
+					title={$deckSourceFallback.path}
+					bind:expanded={deckSourceExpanded}
+					readOnly
+					edit
+					on:edit={() => openPageSourceEdit()}
+					class="gp-chrome no-print"
+				/>
 			{/if}
 			<Copyright />
 			{/if}
@@ -734,12 +892,14 @@
 
 <!-- Viewport-fixed chrome that sticks to the WINDOW regardless of pan/zoom. <SlideToolbar> is
      the top-centre PRESENT | ANNOTATE | ADJUST | DISPLAY | ☰ bar (it holds the DISPLAY zoom
-     control that used to pin to the top-right corner); the minimap rides alongside. Both are
-     lifted OUT of the scaled slide so they stay put and constant-size. The overlay is z-index
-     50 — above the ink surface (40) — so an armed pen can never bury the ANNOTATE toggle.
-     Hidden by ?clean and in the presenter console (which has its own chrome). -->
-{#if initialized && !clean && !present}
+     control that used to pin to the top-right corner); the ControlBar is the bottom nav
+     mirror. Both are lifted OUT of the scaled slide so they stay put and constant-size. The
+     overlay is z-index 50 — above the ink surface (40) — so an armed pen can never bury the
+     ANNOTATE toggle. Hidden by ?clean and in the presenter console (which has its own chrome).
+     Each bar is also opt-out via `toolBar` / `controlBar` props (default on). -->
+{#if initialized && !clean && !present && (toolBar || controlBar)}
 <div class="overlay" class:fade-chrome={fadeChrome} style="--base-font:{baseFontSize};">
+	{#if toolBar}
 	<SlideToolbar {width} {height}>
 
 		<!-- PRESENT — the anchor. Ensures the presenter console is running (opens it, or
@@ -747,7 +907,12 @@
 		     Hidden with the whole overlay inside the console itself (the overlay is gated
 		     `!present`). -->
 		{#snippet presentBtn()}
-			<button type="button" class="annot-anchor" on:click={openPresenter}>PRESENT</button>
+			<button
+				type="button"
+				class="annot-anchor"
+				title="PRESENT — open speaker console"
+				on:click={openPresenter}
+			>PRESENT (P)</button>
 		{/snippet}
 
 		<!-- ADJUST — the old ADJUST toggle, moved into the menu and renamed. A sub-toggle
@@ -768,7 +933,7 @@
 						? 'ADJUST — placing blocks by hand (click to stop)'
 						: 'ADJUST — drag and resize blocks at exact pixels'}
 					on:click={() => adjustMode.update((v) => !v)}
-				>ADJUST</button>
+				>ADJUST (J)</button>
 				<!-- Save writes moved Blocks back to source via the vite-dev endpoint. Shown
 				     whenever ADJUST is on, and it fires in BOTH worlds — it isn't greyed out
 				     where it can't write. It answers on click instead: the verdict flashes as a
@@ -804,24 +969,94 @@
 			{/if}
 		{/snippet}
 
-		<!-- PRINT/CAPTURE/OVERVIEW — the flat action rows. PLAIN buttons wearing `annot-tool`,
-		     not CtrlBtns, so Annotate can dress them in the menu's own amber livery. -->
+		<!-- ☰ menu rows — plain `.annot-tool` buttons (SlideToolbar dresses them).
+		     Group order: navigate → export → source. Each row is icon + mnemonic label
+		     (+ shortcut / external cue); separators live in SlideToolbar between groups. -->
 		{#snippet printBtn()}
-			<button
-				type="button"
-				class="annot-tool"
-				aria-haspopup="menu"
-				aria-expanded={printMenuOpen}
-				on:click={() => (printMenuOpen = !printMenuOpen)}
-			>PRINT</button>
+			<!-- Nested flyout: hover (or click) opens a submenu to the LEFT of PRINT,
+			     so it stays attached to the ☰ panel instead of a second floating menu. -->
+			<div
+				class="print-flyout"
+				class:open={printMenuOpen}
+				role="presentation"
+				on:mouseenter={() => (printMenuOpen = true)}
+				on:mouseleave={() => (printMenuOpen = false)}
+			>
+				<button
+					type="button"
+					class="annot-tool"
+					aria-haspopup="menu"
+					aria-expanded={printMenuOpen}
+					title="Print current slide or whole deck (hover for options)"
+					on:click|stopPropagation={() => (printMenuOpen = !printMenuOpen)}
+				>
+					<span class="tool-ico" aria-hidden="true">
+						<svg viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.4">
+							<path d="M4 6V2h8v4" />
+							<path d="M4 11H2.5A1.5 1.5 0 0 1 1 9.5v-2A1.5 1.5 0 0 1 2.5 6h11A1.5 1.5 0 0 1 15 7.5v2A1.5 1.5 0 0 1 13.5 11H12" />
+							<rect x="4" y="11" width="8" height="4" rx="0.5" />
+						</svg>
+					</span>
+					<span class="tool-label">P<span class="tool-mn">R</span>INT</span>
+					<span class="tool-trail" aria-hidden="true">▸</span>
+				</button>
+				{#if printMenuOpen}
+					<div class="print-sub" role="menu" aria-label="Print options">
+						<button type="button" role="menuitem" on:click={() => printThisSlide(false)}>
+							<span class="print-sub-label">Current slide</span>
+							<kbd class="print-sub-kbd">c</kbd>
+						</button>
+						<button type="button" role="menuitem" on:click={() => printThisSlide(true)}>
+							<span class="print-sub-label">Current + notes</span>
+							<kbd class="print-sub-kbd">C</kbd>
+						</button>
+						<div class="print-menu-sep" role="separator"></div>
+						<button type="button" role="menuitem" on:click={() => openHandout('')}>
+							<span class="print-sub-label">Whole deck</span>
+							<kbd class="print-sub-kbd">w</kbd>
+						</button>
+						<button type="button" role="menuitem" on:click={() => openHandout('?notes')}>
+							<span class="print-sub-label">Whole + notes</span>
+							<kbd class="print-sub-kbd">W</kbd>
+						</button>
+						<div class="print-menu-sep" role="separator"></div>
+						<button type="button" role="menuitem" on:click={() => openHandout('?grid')}>
+							<span class="print-sub-label">Thumbnail grid</span>
+							<kbd class="print-sub-kbd">t</kbd>
+						</button>
+						<button type="button" role="menuitem" on:click={() => openHandout('?grid&notes')}>
+							<span class="print-sub-label">Notes grid</span>
+							<kbd class="print-sub-kbd">T</kbd>
+						</button>
+					</div>
+				{/if}
+			</div>
 		{/snippet}
-		<!-- CAPTURE — the `canCapture` gate lives inside, so the snippet renders an empty
-		     (zero-size) flank on a deck that does not offer it. -->
+		<!-- CAPTURE — empty when the deck does not offer it (zero footprint). -->
 		{#snippet captureItem()}
 			<span class="capture-btn" class:refused={!!captureTip}>
 				{#if canCapture}
-					<button type="button" class="annot-tool" disabled={capturing} on:click={onCapture}>
-						{captureLabel}
+					<button
+						type="button"
+						class="annot-tool"
+						disabled={capturing}
+						title="Download this slide as a PNG at canvas resolution"
+						on:click={onCapture}
+					>
+						<span class="tool-ico" aria-hidden="true">
+							<!-- camera -->
+							<svg viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.4">
+								<path d="M2.5 5.5h2l1-1.5h5l1 1.5H13.5A1.5 1.5 0 0 1 15 7v5.5A1.5 1.5 0 0 1 13.5 14h-11A1.5 1.5 0 0 1 1 12.5V7A1.5 1.5 0 0 1 2.5 5.5z" />
+								<circle cx="8" cy="9.5" r="2.2" />
+							</svg>
+						</span>
+						<span class="tool-label">
+							{#if captureLabel === 'CAPTURE'}
+								<span class="tool-mn">C</span>APTURE
+							{:else}
+								{captureLabel}
+							{/if}
+						</span>
 					</button>
 					{#if captureTip}
 						<span class="capture-tip" role="status">{captureTip}</span>
@@ -829,37 +1064,90 @@
 				{/if}
 			</span>
 		{/snippet}
-		<!-- OVERVIEW opens the all-slides grid — the same grid the `o` key opens, through the
-		     shared `overviewOpen` store. It is per-slide navigation, a speaker's tool, so it
-		     joins the menu rather than returning to a corner button of its own. -->
+		<!-- OVERVIEW — same grid as the O key. -->
 		{#snippet overviewBtn()}
-			<button type="button" class="annot-tool" on:click={() => overviewOpen.set(true)}>OVERVIEW</button>
+			<button
+				type="button"
+				class="annot-tool"
+				title="All slides as a grid (O)"
+				aria-keyshortcuts="o"
+				on:click={() => {
+					overviewOpen.set(true);
+					// Drop focus so the ☰ :focus-within drop does not stick open over the grid.
+					if (browser && document.activeElement instanceof HTMLElement) {
+						document.activeElement.blur();
+					}
+				}}
+			>
+				<span class="tool-ico" aria-hidden="true">
+					<!-- 2×2 grid -->
+					<svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor">
+						<rect x="1.5" y="1.5" width="5.5" height="5.5" rx="0.8" />
+						<rect x="9" y="1.5" width="5.5" height="5.5" rx="0.8" />
+						<rect x="1.5" y="9" width="5.5" height="5.5" rx="0.8" />
+						<rect x="9" y="9" width="5.5" height="5.5" rx="0.8" />
+					</svg>
+				</span>
+				<span class="tool-label"><span class="tool-mn">O</span>VERVIEW</span>
+				<kbd class="tool-kbd">O</kbd>
+			</button>
 		{/snippet}
-		<!-- SOURCE — opens the page's own `?raw` source via the mounted ViewSource/SourceView
-		     in-slide panel. EDIT — opens the unscaled `/_source-edit` popup for typing (Monaco
-		     under the canvas scale drifts the caret). Hidden when the slide offers none. -->
+		<!-- SOURCE / EDIT — deck chrome in dev; ViewSource also offers them in builds. -->
 		{#snippet sourceItem()}
-			{#if $pageSourceAvailable}
+			{#if $pageSourceCanView}
 				<button
 					type="button"
 					class="annot-tool"
+					title="View this slide's +page.svelte source"
 					on:click={() => openPageSource()}
-				>SOURCE</button>
+				>
+					<span class="tool-ico" aria-hidden="true">
+						<!-- code brackets -->
+						<svg viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+							<path d="M5.5 3.5 2 8l3.5 4.5" />
+							<path d="M10.5 3.5 14 8l-3.5 4.5" />
+						</svg>
+					</span>
+					<span class="tool-label"><span class="tool-mn">S</span>OURCE</span>
+				</button>
+			{/if}
+			{#if $pageSourceCanEdit}
 				<button
 					type="button"
 					class="annot-tool"
+					title="Edit source in a separate window (unscaled)"
 					on:click={() => openPageSourceEdit()}
-				>EDIT</button>
+				>
+					<span class="tool-ico" aria-hidden="true">
+						<!-- pencil -->
+						<svg viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+							<path d="M11.5 2.5 13.5 4.5 5.5 12.5H3.5v-2z" />
+							<path d="M10 4l2 2" />
+						</svg>
+					</span>
+					<span class="tool-label"><span class="tool-mn">E</span>DIT</span>
+					<span class="tool-trail tool-ext" aria-hidden="true" title="Opens in a new window">
+						<!-- external-link -->
+						<svg viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+							<path d="M6.5 3.5H3.5v9h9v-3" />
+							<path d="M9.5 3.5h3v3" />
+							<path d="M12.5 3.5 7 9" />
+						</svg>
+					</span>
+				</button>
 			{/if}
 		{/snippet}
 	</SlideToolbar>
+	{/if}
 
 	<!-- ControlBar — the bottom-centre mirror of the tool bar, holding the navigation controls
 	     lifted out of the scaled slide: the Table of Contents (its flyout opening upward), the
 	     deck's ONE FIRST/PREV/CONTINUE/NEXT/LAST pager (fed the current slide's neighbours), and
 	     — portaled in from the live slide's plain (deck-level) AnimationBar — the central ANIMATE
 	     scrubber. The ControlBar publishes its own portal target (stores/localChrome.animBarSlot),
-	     so nothing needs wiring here; a scoped/driven bar stays in the slide. -->
+	     so nothing needs wiring here; a scoped/driven bar stays in the slide. Opt-out via
+	     `controlBar={false}` on <SlideDeck>. -->
+	{#if controlBar}
 	<ControlBar>
 		{#snippet tocItem()}
 			<TableOfContent bar {pages} deck={deckName} {article} {articleText} {articleHref} />
@@ -874,23 +1162,8 @@
 			/>
 		{/snippet}
 	</ControlBar>
-
-	<!-- The PRINT menu. It is NOT inside the flyout (which collapses the moment the pointer
-	     leaves it) — it is a canvas-space popover of its own, so it survives the click that
-	     opened it. z above the ink surface, and `no-print` so it never prints itself. -->
-	{#if printMenuOpen}
-		<div class="print-scrim no-print" role="presentation" on:click={() => (printMenuOpen = false)}></div>
-		<div class="print-menu no-print" role="menu" aria-label="Print">
-			<button type="button" role="menuitem" on:click={() => printThisSlide(false)}>This slide</button>
-			<button type="button" role="menuitem" on:click={() => printThisSlide(true)}>This slide + notes</button>
-			<div class="print-menu-sep" role="separator"></div>
-			<button type="button" role="menuitem" on:click={() => openHandout('')}>Whole deck</button>
-			<button type="button" role="menuitem" on:click={() => openHandout('?notes')}>Whole deck + notes</button>
-			<div class="print-menu-sep" role="separator"></div>
-			<button type="button" role="menuitem" on:click={() => openHandout('?grid')}>Thumbnail grid</button>
-			<button type="button" role="menuitem" on:click={() => openHandout('?grid&notes')}>Notes grid</button>
-		</div>
 	{/if}
+
 	{#if mapVisible}
 	<SlideMap {width} {height} rect={mapRect} />
 	{/if}
@@ -1133,54 +1406,10 @@
 		border: 1px solid var(--ctrl-forbidden-fg, #E5484D);
 	}
 
-	/* ── The PRINT menu ─────────────────────────────────────────────────────────────
-	   A viewport-fixed popover under the toolbar (the toolbar and this menu both live in the
-	   window-fixed overlay now, not on the scaled slide). The scrim is the click-outside: it
-	   covers the whole window beneath the menu, so a click anywhere else dismisses. Both wear
-	   `no-print`. z-index is within the overlay's stacking context (the overlay itself is 50). */
-	.print-scrim {
-		position: fixed;
-		inset: 0;
-		z-index: 58;
-	}
-	/* Centred under the toolbar, just below the window's top edge. `top: 2.6em` clears the bar
-	   when it has dropped into view (a click on PRINT holds it down via :focus-within). */
-	.print-menu {
-		position: fixed;
-		top: 2.6em;
-		left: 50%;
-		transform: translateX(-50%);
-		z-index: 60;
-		display: flex;
-		flex-direction: column;
-		min-width: 12em;
-		padding: 0.35em;
-		border: 1px solid var(--annot-bar-edge, rgba(255, 255, 255, 0.16));
-		border-radius: 10px;
-		background: var(--annot-toggle-bg, rgba(20, 22, 26, 0.96));
-		box-shadow: 0 8px 26px rgba(0, 0, 0, 0.5);
-		font-size: calc(var(--base-font, 16px) * 0.6);
-	}
-	.print-menu button {
-		text-align: left;
-		cursor: pointer;
-		padding: 0.4em 0.7em;
-		border: 0;
-		border-radius: 6px;
-		background: transparent;
-		color: var(--annot-toggle-fg, #F0A33E);
-		font: inherit;
-		font-weight: bold;
-		white-space: nowrap;
-	}
-	.print-menu button:hover {
-		background: var(--annot-bar-hover, rgba(255, 255, 255, 0.1));
-	}
-	.print-menu-sep {
-		height: 1px;
-		margin: 0.3em 0.2em;
-		background: var(--annot-bar-edge, rgba(255, 255, 255, 0.16));
-	}
+	/* ── PRINT nested flyout (inside the ☰ dropdown) ───────────────────────────────
+	   Sits to the LEFT of the PRINT row so it is a true submenu, not a second floating
+	   panel stacked over the hamburger. Hover (or click) on the row keeps it open via
+	   mouseenter/leave on `.print-flyout`. */
 
 	.content.fill {
 		/* Exact-fit: the box IS the full canvas (padding folded in via border-box),
