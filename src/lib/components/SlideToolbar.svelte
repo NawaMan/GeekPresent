@@ -142,7 +142,7 @@
 				class="annot-hamburger"
 				aria-haspopup="menu"
 				aria-label="More tools"
-				title="More — Overview, Capture, Print, Source"
+				title="More — Overview, Capture, Print, Source, Edit"
 			>☰</button>
 			<div class="annot-drop" role="menu" aria-label="More tools">
 				{@render overviewBtn?.()}

@@ -1,8 +1,12 @@
 <script>
-	// Generic read-only code viewer built on the Monaco editor (loaded from a
-	// CDN). Distilled from JavaCode.svelte, but language is a parameter and it
-	// relies on Monaco's built-in, language-aware folding rather than a custom
+	// Generic code viewer/editor built on the Monaco editor (loaded from a CDN).
+	// Distilled from JavaCode.svelte, but language is a parameter and it relies
+	// on Monaco's built-in, language-aware folding rather than a custom
 	// Java/brace-specific provider.
+	//
+	// Default is READ-ONLY (every deck Code/CodeBox usage). ViewSource flips
+	// `readOnly={false}` under vite dev so the buffer can be typed into and
+	// SAVEd back to disk.
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 
@@ -12,6 +16,8 @@
 	export let height         = '600px';
 	export let fontSize       = 20;   // Monaco's font (fixed px); overridable per usage.
 	export let foldAllAtStart = false;
+	/** When true (default), the buffer cannot be typed into. */
+	export let readOnly       = true;
 
 	// @ts-ignore
 	export let revealLines = [];
@@ -32,10 +38,55 @@
 	let editor;
 	// @ts-ignore
 	let editorElement;
+	// Local edits while the parent still holds the prop from the last `?raw` import.
+	// HMR updates `code`; we only re-sync the model when the buffer is clean.
+	let dirty = false;
+
+	/** Current buffer — Monaco when live, else the prop (jsdom / before mount). */
+	export function getValue() {
+		// @ts-ignore
+		if (editor) return editor.getValue();
+		return code;
+	}
+
+	/** True after the user has typed something that differs from `code`. */
+	export function isDirty() {
+		return dirty;
+	}
+
+	/** Clear the dirty flag (e.g. after a successful SAVE, before HMR lands). */
+	export function markClean() {
+		dirty = false;
+	}
+
+	/** Force the buffer to `next` and clear dirty (REFRESH from disk). */
+	export function setValue(next) {
+		// @ts-ignore
+		if (editor) editor.setValue(next);
+		dirty = false;
+	}
 
 	$: {
 		// @ts-ignore
 		revealTheLines(revealLines);
+	}
+
+	// Keep the model in step with the prop when the user has not typed, and keep
+	// Monaco's readOnly option in step with the prop (dev vs build).
+	$: syncFromProps(code, readOnly);
+
+	// @ts-ignore
+	function syncFromProps(nextCode, nextReadOnly) {
+		// @ts-ignore
+		if (!editor) return;
+		// @ts-ignore
+		editor.updateOptions({ readOnly: nextReadOnly });
+		if (dirty) return;
+		// @ts-ignore
+		if (editor.getValue() !== nextCode) {
+			// @ts-ignore
+			editor.setValue(nextCode);
+		}
 	}
 
 	// @ts-ignore
@@ -130,14 +181,24 @@
 					value: code,
 					// Monaco sizes its own font in fixed px, so it ignores the canvas
 					// font-size lever — it comes from the `fontSize` prop instead.
+					// Pin the family to the deck's monospace so glyph metrics match
+					// the rendered text (a mismatch is another way carets drift).
 					fontSize,
+					fontFamily: "Fira Code, Menlo, Monaco, 'Courier New', monospace",
+					fontLigatures: true,
 					language: language,
 					minimap: { enabled: true },
 					folding: true,
 					automaticLayout: true,
-					readOnly: true,
+					readOnly,
 					theme: 'vs-dark',
 					foldingImportsByDefault: true
+				});
+
+				// @ts-ignore
+				editor.onDidChangeModelContent(() => {
+					// @ts-ignore
+					dirty = editor.getValue() !== code;
 				});
 
 				revealTheLines();

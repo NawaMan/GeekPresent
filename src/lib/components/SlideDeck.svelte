@@ -41,7 +41,7 @@
 	import { applyPageRule } from '$lib/handout/pageRuleDom';
 	import { printNotes } from '$lib/stores/printNotes';
 	import { overviewOpen } from '$lib/stores/overviewOpen';
-	import { pageSourceAvailable, openPageSource } from '$lib/stores/pageSource';
+	import { pageSourceAvailable, openPageSource, openPageSourceEdit } from '$lib/stores/pageSource';
 
 	import { browser }    from '$app/environment';
 	import { page }       from '$app/stores';
@@ -835,9 +835,9 @@
 		{#snippet overviewBtn()}
 			<button type="button" class="annot-tool" on:click={() => overviewOpen.set(true)}>OVERVIEW</button>
 		{/snippet}
-		<!-- SOURCE — opens the page's own `?raw` source via the mounted ViewSource/SourceView.
-		     The slide still mounts that component (to supply the bytes and the panel); only the
-		     trigger moved here from the bottom-right corner. Hidden when the slide offers none. -->
+		<!-- SOURCE — opens the page's own `?raw` source via the mounted ViewSource/SourceView
+		     in-slide panel. EDIT — opens the unscaled `/_source-edit` popup for typing (Monaco
+		     under the canvas scale drifts the caret). Hidden when the slide offers none. -->
 		{#snippet sourceItem()}
 			{#if $pageSourceAvailable}
 				<button
@@ -845,6 +845,11 @@
 					class="annot-tool"
 					on:click={() => openPageSource()}
 				>SOURCE</button>
+				<button
+					type="button"
+					class="annot-tool"
+					on:click={() => openPageSourceEdit()}
+				>EDIT</button>
 			{/if}
 		{/snippet}
 	</SlideToolbar>

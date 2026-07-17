@@ -88,6 +88,9 @@ export const pages = [
     { path: "code-component.html",    title: "Code" },
     { path: "javacode-component.html", title: "JavaCode" },
     { path: "codebox-component.html", title: "CodeBox" },
+    // ViewSource (Monaco) on a slide — view via ☰ → SOURCE; under vite dev the buffer is
+    // editable and SAVE writes the full +page.svelte (same refusal language as ADJUST SAVE).
+    { path: "viewsource-edit.html",   title: "ViewSource — Edit in Dev" },
     { path: "codediff-component.html", title: "CodeDiff", adjust: true },
     { path: "terminal-component.html", title: "Terminal" },
     { path: "speaker-notes.html",     title: "Speaker Notes" },
