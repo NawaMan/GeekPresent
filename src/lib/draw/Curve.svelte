@@ -61,6 +61,7 @@
 		type PathLabelProps,
 		type PathShape,
 		type Point,
+		type SegmentShape,
 		type ShapeEditor,
 		type ShapeStyleProps
 	} from './types';
@@ -176,14 +177,14 @@
 		drawSecs && drawDelayVal && Number.isFinite(drawDelayVal) && drawDelayVal > 0 ? drawDelayVal : 0
 	);
 
-	const base = $derived<PathShape>(
+	const base = $derived<SegmentShape>(
 		C2 ? { kind: 'cubic', from: F, to: T, c1: C1, c2: C2 } : { kind: 'quadratic', from: F, to: T, c1: C1 }
 	);
 
 	// Resolve a stop into a full PathShape (each missing point → base value),
 	// keeping cubic/quadratic identity from the BASE so every frame's `d` has
 	// the same command structure.
-	function stopShape(s: CurveStop): PathShape {
+	function stopShape(s: CurveStop): SegmentShape {
 		const f = s.from ?? F;
 		const t = s.to ?? T;
 		const a = s.c1 ?? C1;
@@ -207,7 +208,7 @@
 
 	// Shaft, trimmed behind each head so the stroke never pokes past a tip.
 	const shaft = $derived.by(() => {
-		let s: PathShape = base;
+		let s: SegmentShape = base;
 		if (atEnd) s = shortenShape(s, size);
 		if (atStart) s = reverseShape(shortenShape(reverseShape(s), size));
 		return s;
@@ -241,7 +242,7 @@
 	const animName = `draw-move-${uid}`;
 	const deg = (rad: number) => round((rad * 180) / Math.PI);
 
-	function shaftDOf(shape: PathShape): string {
+	function shaftDOf(shape: SegmentShape): string {
 		let s = shape;
 		if (atEnd) s = shortenShape(s, size);
 		if (atStart) s = reverseShape(shortenShape(reverseShape(s), size));

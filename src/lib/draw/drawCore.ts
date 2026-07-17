@@ -8,7 +8,7 @@
 // into the SVG (the same discipline as KeyframeStudio's r()). All numbers
 // pass through finite()/round() before reaching an attribute string.
 
-import type { PathSegment, PathShape, Point } from './types';
+import type { PathSegment, PathShape, Point, SegmentShape } from './types';
 
 /** Coerce a possibly non-finite number to a safe finite one. */
 export function finite(value: number, fallback = 0): number {
@@ -128,7 +128,7 @@ export function polylinePath(points: Point[], close = false): string {
  *  loop is smooth through the first/last point too. Returned as PathShapes
  *  so pointAt/angleAt work per segment (segment i runs points[i] →
  *  points[i+1]). */
-export function smoothSegments(points: Point[], close = false): PathShape[] {
+export function smoothSegments(points: Point[], close = false): SegmentShape[] {
 	const pts = points.map(finitePoint);
 	const n = pts.length;
 	if (n < 2) return [];
@@ -136,7 +136,7 @@ export function smoothSegments(points: Point[], close = false): PathShape[] {
 	const count = close ? n : n - 1;
 	const at = (i: number): Point =>
 		close ? pts[((i % n) + n) % n] : pts[Math.max(0, Math.min(n - 1, i))];
-	const segments: PathShape[] = [];
+	const segments: SegmentShape[] = [];
 	for (let i = 0; i < count; i++) {
 		const p0 = at(i - 1);
 		const p1 = at(i);
@@ -149,6 +149,28 @@ export function smoothSegments(points: Point[], close = false): PathShape[] {
 			c2: [round(p2[0] - (p3[0] - p1[0]) / 6), round(p2[1] - (p3[1] - p1[1]) / 6)],
 			to: p2
 		});
+	}
+	return segments;
+}
+
+/** A polyline shape expanded to its segment chain — straight lines through
+ *  the points, or the Catmull-Rom cubics when `smooth` (`close` appends the
+ *  seam segment either way). This is how the evaluators see a polyline:
+ *  pointAt/angleAt delegate to the chain via the multi-segment locators, so
+ *  arc-length distribution and NaN-safety are inherited. Never recursive —
+ *  the chain is only ever lines and cubics. Fewer than 2 points → []. */
+export function polylineSegments(shape: {
+	points: Point[];
+	close?: boolean;
+	smooth?: boolean;
+}): SegmentShape[] {
+	const pts = (Array.isArray(shape.points) ? shape.points : []).map(finitePoint);
+	if (pts.length < 2) return [];
+	if (shape.smooth) return smoothSegments(pts, shape.close);
+	const count = shape.close ? pts.length : pts.length - 1;
+	const segments: SegmentShape[] = [];
+	for (let i = 0; i < count; i++) {
+		segments.push({ kind: 'line', from: pts[i], to: pts[(i + 1) % pts.length] });
 	}
 	return segments;
 }
@@ -343,6 +365,9 @@ function arcGeometry(
 /** The point at parameter t ∈ [0, 1] along a shape. */
 export function pointAt(shape: PathShape, t: number): Point {
 	const u = clamp01(t);
+	// A polyline has waypoints, not from/to: delegate to its segment chain
+	// (arc-length-distributed t, so travel speed is uniform across segments).
+	if (shape.kind === 'polyline') return pointAtMulti(polylineSegments(shape), u);
 	const from = finitePoint(shape.from);
 	const to = finitePoint(shape.to);
 	switch (shape.kind) {
@@ -381,6 +406,8 @@ export function pointAt(shape: PathShape, t: number): Point {
 
 /** The raw (unrounded) tangent vector at t, before degeneracy fallbacks. */
 function tangentAt(shape: PathShape, u: number): [number, number] {
+	// Handled directly in angleAt (delegated to the segment chain), like arc.
+	if (shape.kind === 'polyline') return [0, 0];
 	const from = finitePoint(shape.from);
 	const to = finitePoint(shape.to);
 	switch (shape.kind) {
@@ -414,6 +441,10 @@ function tangentAt(shape: PathShape, u: number): [number, number] {
  *  — never NaN. */
 export function angleAt(shape: PathShape, t: number): number {
 	const u = clamp01(t);
+	// Delegate to the segment chain: within a segment the tangent is exact; AT
+	// a straight corner it snaps to the next segment's heading (no continuous
+	// tangent exists there — `smooth` is the fix, not fancier sampling).
+	if (shape.kind === 'polyline') return angleAtMulti(polylineSegments(shape), u);
 	if (shape.kind === 'arc') {
 		const g = arcGeometry(shape.from, shape.to, shape.bend);
 		if (g) {
@@ -435,7 +466,10 @@ export function angleAt(shape: PathShape, t: number): number {
 }
 
 /** The same shape traversed the other way (from ↔ to). Used to shorten a
- *  shape at its START: reverse, shorten the tail, reverse back. */
+ *  shape at its START: reverse, shorten the tail, reverse back. Kind-
+ *  preserving, so a SegmentShape in is a SegmentShape out (the overload). */
+export function reverseShape(shape: SegmentShape): SegmentShape;
+export function reverseShape(shape: PathShape): PathShape;
 export function reverseShape(shape: PathShape): PathShape {
 	switch (shape.kind) {
 		case 'line':
@@ -448,6 +482,10 @@ export function reverseShape(shape: PathShape): PathShape {
 			// Same physical arc, opposite travel direction: the bulge sits on the
 			// other side RELATIVE to the new direction, so the sign flips.
 			return { kind: 'arc', from: shape.to, to: shape.from, bend: -shape.bend };
+		case 'polyline':
+			// Same waypoints walked backwards; smooth/close are direction-blind
+			// (Catmull-Rom through reversed points mirrors the original curve).
+			return { ...shape, points: [...shape.points].reverse() };
 	}
 }
 
@@ -456,7 +494,10 @@ export function reverseShape(shape: PathShape): PathShape {
  *  curves, exact angular trim for arcs; the px→parameter conversion uses the
  *  end-tangent speed, a first-order approximation that is plenty for
  *  arrowhead-sized trims). `by` ≤ 0 returns the shape unchanged; `by` beyond
- *  the whole shape collapses it to its start. */
+ *  the whole shape collapses it to its start. Kind-preserving, so a
+ *  SegmentShape in is a SegmentShape out (the overload). */
+export function shortenShape(shape: SegmentShape, by: number): SegmentShape;
+export function shortenShape(shape: PathShape, by: number): PathShape;
 export function shortenShape(shape: PathShape, by: number): PathShape {
 	const amount = finite(by);
 	if (amount <= 0) return shape;
@@ -503,6 +544,27 @@ export function shortenShape(shape: PathShape, by: number): PathShape {
 			const bend = chord === 0 ? 0 : clampBend(Math.sign(shape.bend) * (sagitta / chord));
 			return { kind: 'arc', from: shape.from, to: pointAt(shape, t), bend };
 		}
+		case 'polyline': {
+			// Walk back from the tail, dropping whole segments the trim swallows,
+			// then pull the last point along its segment. Chord lengths, so a
+			// `smooth` trim is first-order like trimParameter — plenty for
+			// arrowhead-sized trims. A closed loop has no tail: unchanged.
+			if (shape.close) return shape;
+			const pts = shape.points.map(finitePoint);
+			let remaining = amount;
+			while (pts.length >= 2) {
+				const a = pts[pts.length - 2];
+				const b = pts[pts.length - 1];
+				const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+				if (remaining < len) {
+					pts[pts.length - 1] = shorten(a, b, remaining);
+					break;
+				}
+				remaining -= len;
+				pts.pop();
+			}
+			return { ...shape, points: pts };
+		}
 	}
 }
 
@@ -511,8 +573,9 @@ function roundPoint(p: Point): Point {
 }
 
 /** The parameter that sits ~`by` px back from the end of a curve, using the
- *  end-tangent speed as the local px-per-parameter rate. */
-function trimParameter(shape: PathShape, by: number): number {
+ *  end-tangent speed as the local px-per-parameter rate. (SegmentShape: a
+ *  polyline trims point-wise in shortenShape, never through a parameter.) */
+function trimParameter(shape: SegmentShape, by: number): number {
 	const [dx, dy] = tangentAt(shape, 1);
 	let speed = Math.hypot(dx, dy);
 	if (speed < 1e-9) {
@@ -544,9 +607,9 @@ function safePoint(p: Point | undefined): Point {
  *  control data present: `bend` → arc, else `c1` → curve (cubic when `c2` is
  *  set, else quadratic), else line. A malformed segment (no `to`) is dropped
  *  rather than throwing, so a mid-edit typo can't blow up the stroke. */
-export function pathShapes(start: Point, segments: PathSegment[]): PathShape[] {
+export function pathShapes(start: Point, segments: PathSegment[]): SegmentShape[] {
 	if (!Array.isArray(segments)) return [];
-	const shapes: PathShape[] = [];
+	const shapes: SegmentShape[] = [];
 	let cursor = safePoint(start);
 	for (const seg of segments) {
 		if (!seg || !Array.isArray(seg.to)) continue;
@@ -577,6 +640,10 @@ function shapePath(shape: PathShape): string {
 			return curvePath(shape.from, shape.to, shape.c1, shape.c2);
 		case 'arc':
 			return arcPath(shape.from, shape.to, shape.bend);
+		case 'polyline':
+			return shape.smooth
+				? smoothPath(shape.points, shape.close)
+				: polylinePath(shape.points, shape.close);
 	}
 }
 
@@ -589,7 +656,11 @@ export function multiPath(shapes: PathShape[]): string {
 	if (!Array.isArray(shapes) || shapes.length === 0) return '';
 	let d = '';
 	let prevTo: Point | null = null;
-	for (const s of shapes) {
+	// A polyline in the chain contributes its whole segment chain (never
+	// recursive — the chain is only lines and cubics), so the join logic below
+	// sees uniform from/to segments.
+	const flat = shapes.flatMap((s) => (s.kind === 'polyline' ? polylineSegments(s) : [s]));
+	for (const s of flat) {
 		const from = finitePoint(s.from);
 		const full = shapePath(s);
 		if (prevTo && from[0] === prevTo[0] && from[1] === prevTo[1]) {

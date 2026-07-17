@@ -66,6 +66,7 @@
 		type PathLabelProps,
 		type PathShape,
 		type Point,
+		type SegmentShape,
 		type ShapeEditor,
 		type ShapeStyleProps
 	} from './types';
@@ -172,10 +173,10 @@
 		drawSecs && drawDelayVal && Number.isFinite(drawDelayVal) && drawDelayVal > 0 ? drawDelayVal : 0
 	);
 
-	const base = $derived<PathShape>({ kind: 'arc', from: F, to: T, bend: B });
+	const base = $derived<SegmentShape>({ kind: 'arc', from: F, to: T, bend: B });
 
 	// A stop resolved to a full arc PathShape (missing fields → base values).
-	function stopShape(s: ArcStop): PathShape {
+	function stopShape(s: ArcStop): SegmentShape {
 		return { kind: 'arc', from: s.from ?? F, to: s.to ?? T, bend: s.bend ?? B };
 	}
 	const geomStops = $derived.by(() => {
@@ -195,7 +196,7 @@
 
 	// Shaft, trimmed behind each head so the stroke never pokes past a tip.
 	const shaft = $derived.by(() => {
-		let s: PathShape = base;
+		let s: SegmentShape = base;
 		if (atEnd) s = shortenShape(s, size);
 		if (atStart) s = reverseShape(shortenShape(reverseShape(s), size));
 		return s;
@@ -225,7 +226,7 @@
 	const animName = `draw-move-${uid}`;
 	const deg = (rad: number) => round((rad * 180) / Math.PI);
 
-	function shaftShapeOf(shape: PathShape): PathShape {
+	function shaftShapeOf(shape: SegmentShape): SegmentShape {
 		let s = shape;
 		if (atEnd) s = shortenShape(s, size);
 		if (atStart) s = reverseShape(shortenShape(reverseShape(s), size));

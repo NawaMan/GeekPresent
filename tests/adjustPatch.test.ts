@@ -136,6 +136,39 @@ describe('patchSlideSource', () => {
 		expect(source).toContain('<Line name="x" from={[1, 2]} to={[3, 4]} />');
 	});
 
+	it('applies a literal old→new tag swap for a Polyline (points rewritten in place)', () => {
+		// Polyline saves through the same literal-swap path as Line/Curve/Arc:
+		// the tag carries no box geometry, so its whole canonical opening tag is
+		// the match key. The author's other props (color/thickness/dash) ride
+		// along untouched because they're part of the identical old→new tag.
+		const src = `\t<Polyline name="route" points={[[100, 900], [500, 500], [900, 900]]} smooth color="#7f8c8d" thickness={3} dash />\n`;
+		const oldTag = `<Polyline name="route" points={[[100, 900], [500, 500], [900, 900]]} smooth color="#7f8c8d" thickness={3} dash />`;
+		const newTag = `<Polyline name="route" points={[[100, 900], [550, 450], [900, 900]]} smooth color="#7f8c8d" thickness={3} dash />`;
+		const { source, patched, unmatched } = patchSlideSource(src, [
+			{ kind: 'Polyline', name: 'route', oldTag, newTag }
+		]);
+		expect(unmatched).toHaveLength(0);
+		expect(patched).toHaveLength(1);
+		expect(source).toContain('[550, 450]');
+		expect(source).toContain('color="#7f8c8d" thickness={3} dash'); // decoration survives
+	});
+
+	it("a Polyline tag whose attributes are in a NON-canonical order is 'not-found'", () => {
+		// The exact trap: the shape serializes `smooth color thickness dash`, but
+		// the author wrote `smooth dash thickness color`. Literal swap is byte-for-
+		// byte, so the canonical old tag isn't in the file — SAVE must refuse and
+		// say so (Copy/paste by hand), never silently miss.
+		const src = `<Polyline name="route" points={[[100, 900], [500, 500]]} smooth dash thickness={3} color="#7f8c8d" />`;
+		const oldTag = `<Polyline name="route" points={[[100, 900], [500, 500]]} smooth color="#7f8c8d" thickness={3} dash />`;
+		const newTag = `<Polyline name="route" points={[[100, 900], [550, 450]]} smooth color="#7f8c8d" thickness={3} dash />`;
+		const { patched, unmatched } = patchSlideSource(src, [
+			{ kind: 'Polyline', name: 'route', oldTag, newTag }
+		]);
+		expect(patched).toHaveLength(0);
+		expect(unmatched).toHaveLength(1);
+		expect(unmatched[0].reason).toBe('not-found');
+	});
+
 	it('reports a literal change whose old tag is not in source', () => {
 		const src = `<Curve name="hop" from={[1, 1]} to={[2, 2]} c1={[3, 3]} />`;
 		const { patched, unmatched } = patchSlideSource(src, [

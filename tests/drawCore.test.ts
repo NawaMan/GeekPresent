@@ -21,6 +21,7 @@ import {
 	unwrapAngles,
 	polygonPoints,
 	polylinePath,
+	polylineSegments,
 	smoothPath,
 	smoothSegments,
 	reverseShape,
@@ -433,6 +434,114 @@ describe('smoothSegments / smoothPath', () => {
 		expect(smoothPath([])).toBe('');
 		expect(smoothPath([[5, 5]])).toBe('');
 		expect(smoothPath([[NaN, 0], [1, 2], [Infinity, 4]])).not.toContain('NaN');
+	});
+});
+
+describe('polyline PathShape (waypoints as a shape)', () => {
+	// An L of two equal 100px legs: right, then down.
+	const L: PathShape = { kind: 'polyline', points: [[0, 0], [100, 0], [100, 100]] };
+
+	it('polylineSegments expands to straight lines (and the close seam)', () => {
+		expect(polylineSegments({ points: [[0, 0], [100, 0], [100, 100]] })).toEqual([
+			{ kind: 'line', from: [0, 0], to: [100, 0] },
+			{ kind: 'line', from: [100, 0], to: [100, 100] }
+		]);
+		const closed = polylineSegments({ points: [[0, 0], [100, 0], [100, 100]], close: true });
+		expect(closed).toHaveLength(3);
+		expect(closed[2]).toEqual({ kind: 'line', from: [100, 100], to: [0, 0] });
+	});
+
+	it('polylineSegments smooth delegates to the Catmull-Rom cubics', () => {
+		const pts: Point[] = [[0, 0], [100, 0], [100, 100]];
+		expect(polylineSegments({ points: pts, smooth: true })).toEqual(smoothSegments(pts));
+	});
+
+	it('polylineSegments is total: fewer than 2 points → no segments', () => {
+		expect(polylineSegments({ points: [] })).toEqual([]);
+		expect(polylineSegments({ points: [[5, 5]] })).toEqual([]);
+	});
+
+	it('pointAt distributes t by arc length across the legs', () => {
+		expect(pointAt(L, 0)).toEqual([0, 0]);
+		expect(pointAt(L, 0.25)).toEqual([50, 0]);
+		expect(pointAt(L, 0.5)).toEqual([100, 0]); // equal legs → the corner
+		expect(pointAt(L, 0.75)).toEqual([100, 50]);
+		expect(pointAt(L, 1)).toEqual([100, 100]);
+	});
+
+	it('pointAt on a closed polyline returns to the start at t=1', () => {
+		const sq: PathShape = {
+			kind: 'polyline',
+			points: [[0, 0], [100, 0], [100, 100], [0, 100]],
+			close: true
+		};
+		expect(pointAt(sq, 0)).toEqual([0, 0]);
+		expect(pointAt(sq, 0.5)).toEqual([100, 100]); // halfway round the square
+		expect(pointAt(sq, 1)).toEqual([0, 0]);
+	});
+
+	it('angleAt is the leg heading — it SNAPS at the corner, never blends', () => {
+		expectAngle(angleAt(L, 0.25), 0); // heading right
+		expectAngle(angleAt(L, 0.75), Math.PI / 2); // heading down (+y)
+	});
+
+	it('a smooth polyline still passes exactly THROUGH every waypoint', () => {
+		const S: PathShape = { kind: 'polyline', points: [[0, 0], [100, 0], [100, 100]], smooth: true };
+		expect(pointAt(S, 0)).toEqual([0, 0]);
+		expect(pointAt(S, 1)).toEqual([100, 100]);
+		// The middle waypoint is ON the curve: some sampled t passes through it.
+		const min = Math.min(
+			...Array.from({ length: 101 }, (_, i) => dist(pointAt(S, i / 100), [100, 0]))
+		);
+		expect(min).toBeLessThan(3);
+	});
+
+	it('reverseShape walks the same waypoints backwards', () => {
+		expect(reverseShape(L)).toEqual({
+			kind: 'polyline',
+			points: [
+				[100, 100],
+				[100, 0],
+				[0, 0]
+			]
+		});
+	});
+
+	it('shortenShape trims the tail leg point-wise', () => {
+		expect(shortenShape(L, 40)).toEqual({
+			kind: 'polyline',
+			points: [
+				[0, 0],
+				[100, 0],
+				[100, 60]
+			]
+		});
+	});
+
+	it('shortenShape drops whole legs the trim swallows', () => {
+		// 130px eats the whole down leg, then 30px more off the first.
+		expect(shortenShape(L, 130)).toEqual({
+			kind: 'polyline',
+			points: [
+				[0, 0],
+				[70, 0]
+			]
+		});
+	});
+
+	it('shortenShape leaves a closed loop untouched (no tail to trim)', () => {
+		const sq: PathShape = { kind: 'polyline', points: [[0, 0], [100, 0], [100, 100]], close: true };
+		expect(shortenShape(sq, 40)).toEqual(sq);
+	});
+
+	it('multiPath flattens a polyline into the chained d', () => {
+		expect(multiPath([L])).toBe('M 0 0 L 100 0 L 100 100');
+	});
+
+	it('is total on junk: empty points evaluate safely', () => {
+		const empty: PathShape = { kind: 'polyline', points: [] };
+		expect(pointAt(empty, 0.5)).toEqual([0, 0]);
+		expect(angleAt(empty, 0.5)).toBe(0);
 	});
 });
 

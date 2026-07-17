@@ -408,7 +408,10 @@ are load-bearing when you touch anything nearby:
    `:5173`; the host URL is the `"--publish", "HOST:5173"` mapping in `.booth/config.toml` (stock
    `http://localhost:31173/…`). Tell the user the full URL. Tests and static builds also go
    **only** through the booth (`./booth exec --run -- pnpm test`, `./booth exec --run -- pnpm build`
-   / `./build-static.sh …`) — not host `pnpm`.
+   / `./build-static.sh …`) — not host `pnpm`. **Worktree caveat:** a booth started from a git
+   *worktree* fails with `fatal: not a git repository`, because the worktree's `.git` points into
+   the main repo's `.git`, which the container does not mount — run the booth from a normal clone,
+   or stop and tell the user rather than reaching for a host toolchain.
 7. **Verify before declaring done.** Cover the change with a test (`tests/*.test.ts`, or
    `tests/*.ssr.test.ts` for prerender behavior) and/or have the user check the slide in dev. The
    build is static, so also sanity-check it isn't relying on any server feature.

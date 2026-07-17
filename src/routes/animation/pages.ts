@@ -14,6 +14,7 @@ export const pages = [
     { path: "draw-progress.html",     title: "Draw — Keyframed Progress" },
     { path: "draw-sprite.html",       title: "Draw — Flying Sprite" },
     { path: "sprite-curve.html",      title: "Sprite — Following a Curve" },
+    { path: "sprite-polyline.html",   title: "Sprite — Riding a Polyline" },
     { path: "sprite-delay.html",      title: "Sprite — Staggered Timing" },
     { path: "sprite-multi.html",      title: "Draw — Sprites × Many" },
     { path: "draw-keyframe.html",     title: "Draw × Sprite" },
