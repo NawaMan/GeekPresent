@@ -15,41 +15,68 @@ wastes a whole session.
 
 ### CodingBooth — how to run things
 
-This repo ships a **CodingBooth** wrapper (`./booth` + `.booth/`). Prefer it whenever `./booth`
-exists: install, test, and build run *inside* the container so host Node/pnpm drift does not
-matter. Details also live in `dev-run.sh` and `.booth/config.toml` — this section is the agent
-summary.
+This repo ships a **CodingBooth** wrapper (`./booth` + `.booth/`). **Agents run everything
+through the booth** — install, test, build, and the **dev server**. Many hosts have no Node or
+pnpm; the booth image does. Never assume host `pnpm` / `node` / bare `vite` exist. Details also
+live in `dev-run.sh` and `.booth/config.toml` — this section is the agent summary.
 
 | Goal | Command |
 | --- | --- |
-| Dev server (user owns this — see Rule 6) | `./booth exec --run -- ./dev-run.sh` |
-| Dev on a non-default host port | `GEEKPRESENT_PORT=32000 ./booth exec --run -- ./dev-run.sh` |
+| Dev server (**booth only** — see Rule 6) | `./booth exec --run -- ./dev-run.sh` |
 | One-shot in the booth (tests, scripts, …) | `./booth exec --run -- <command>` |
 | Run the test suite | `./booth exec --run -- pnpm test` |
 | Static build (into `docs/` via vite, or a folder) | `./booth exec --run -- pnpm build` or `./booth exec --run -- ./build-static.sh ./dist` |
-| Host-only fallback (no booth / no Docker) | `pnpm install` then `pnpm test` / `pnpm build` — prefix with `npm_config_verify_deps_before_run=false` if pnpm nags about deps |
 
-**Ports (easy to get wrong):**
+**No host pnpm / Node fallback for agents.** Do not run `pnpm …`, `npm …`, or `vite …` on the host
+for this project — not for dev, not for tests, not for builds, not “just this once”. If Docker or
+booth is broken, stop and tell the user; do not invent a host toolchain path.
 
-- Inside the booth, Vite listens on **container** port **5173**.
-- On the **host**, that is published as **`${GEEKPRESENT_PORT:-31173}`** (see `.booth/config.toml`).
-- Open slides at `http://localhost:<host-port>/slides/<name>.html` (e.g. default
-  `http://localhost:31173/slides/title.html`, or `:32000` if the user set `GEEKPRESENT_PORT=32000`).
-- `GEEKPRESENT_PORT` is applied when the booth container is **created**. It cannot re-bind `-p` on a
-  live container — if the user already has a booth running on a port, use *that* URL; do not start a
-  second dev server to "fix" the port.
-- **Booth name = folder name.** CodingBooth names the container after the project directory
-  (e.g. worktree `…/worktree/sticky-bars` → booth name around `sticky-bars`). If you need to
-  *create* a booth and the default host port is **already occupied** (another booth, another
-  process, or `bind: address already in use` on publish), pick a free `GEEKPRESENT_PORT` (e.g.
-  `32000`, `32001`, …) and start with that:
-  `GEEKPRESENT_PORT=<free> ./booth exec --run -- ./dev-run.sh`.
-  **Tell the user the port you chose** (and the full URL) so they open the right host — do not
-  silently leave them on `:31173`. Still do **not** kill someone else's booth or the user's
-  running dev to free a port (Rule 6).
+**Two different ports (easy to mix up):**
 
-**If `./booth` is missing**, fall back to host `pnpm` and treat the default dev URL as whatever the
-user said (often `http://localhost:5173` for bare `pnpm dev`).
+| Port | What it is | How to set it |
+| --- | --- | --- |
+| **Booth control** | Host → container **10000** (CodingBooth's own port; shown in `./booth list`) | `.booth/config.toml` → **`port = "NEXT"`** (recommended). CodingBooth picks a free host port when the booth is **created**. |
+| **Vite / slides** | Host → container **5173** (the slide site) | `run-args` in `.booth/config.toml`: `"--publish", "<host>:5173"` (stock default is **31173:5173**) |
+
+**Control port = `NEXT`.** That is enough for concurrent booths — no `CB_PORT`, no CLI `--port` in the
+usual recipe. A hard-coded `port = "31000"` collides when another booth already holds it; prefer
+`NEXT`. (CodingBooth still accepts CLI / env pin if someone needs a fixed number; agents should
+not.) There is **no** `GEEKPRESENT_PORT`; that name is obsolete. `exec` does **not** take `--port`.
+
+```bash
+# usual: config has port = "NEXT" → free control port; Vite host from run-args publish
+./booth exec --run -- ./dev-run.sh
+```
+
+**Avoid port conflicts before creating a booth (local config only):**
+
+1. Check what is already running: `./booth list` (and note main GeekPresent stock **31000** /
+   Vite **31173** if present).
+2. Edit **this checkout’s** `.booth/config.toml` only:
+   - set `port = "NEXT"` (free control port on create — not a fixed `31000`);
+   - set `"--publish", "<free-host>:5173"` in `run-args` so Vite is not still `31173:5173`
+     (e.g. `32000:5173` for a worktree beside the main booth).
+3. **Do not `git add`, stage, or commit that `config.toml` change.** It is machine/worktree-local
+   until CodingBooth can reassign Vite expose properly. Leave it dirty in the working tree.
+4. Then create/start: `./booth exec --run -- ./dev-run.sh`.
+
+Ports are fixed at container **create** time; they cannot re-bind on a live container. If this
+project’s booth is already up, use *that* URL from `./booth list` — do not start a second one to
+"fix" the port (Rule 6).
+
+Open slides at `http://localhost:<vite-host-port>/slides/<name>.html` (e.g. stock
+`http://localhost:31173/slides/title.html`, or the publish host you set above). After create, read
+the control port from the booth banner / `./booth list` and the Vite URL from config’s publish
+mapping; **tell the user** both when they are not the stock defaults.
+
+**Booth name = folder name.** CodingBooth names the container after the project directory (e.g.
+worktree `…/worktree/view-source` → booth `view-source`). Check with `./booth list`. Still do
+**not** kill someone else's booth or the user's running dev to free a port (Rule 6).
+
+> **Known gap (CodingBooth):** reassigning the Vite expose per concurrent booth without editing
+> `config.toml` is not clean yet. Relative `+OFFSET:5173` publish forms and/or config-driven expose
+> are the proper fix on the CodingBooth side — until then, agents edit local publish as above and
+> **never commit** those port picks.
 
 ### Session = linked worktree + branch (GitKraken-visible)
 
@@ -257,9 +284,8 @@ than misleading the next agent.
   pure `utils/overviewPageCore.ts`),
   `SizeMode`, `Seo` (renders SEO/social metadata
   into `<svelte:head>` — see the SEO note under *Gotchas*).
-- Package manager is **pnpm**. Prefer **`./booth exec --run -- …`** when CodingBooth is present
-  (see *Quick start for agents*). The **user** runs the dev server — default host URL
-  `http://localhost:31173` — not you (Rule 6).
+- Package manager is **pnpm**, but **only inside the booth** — always
+  **`./booth exec --run -- …`** (see *Quick start for agents*). The host may not have pnpm at all.
 
 ## Two kinds of artifact: presentations and texts
 
@@ -369,17 +395,15 @@ are load-bearing when you touch anything nearby:
    respect any base path — hardcoded `/foo.png` breaks under a subpath deploy.
 5. **The presentation folder(s) under `src/routes/` are the source of truth** (`slides/` is the
    default one). There is no `example/` folder anymore; don't recreate one.
-6. **The user runs the dev server — you don't.** They typically keep
-   `./booth exec --run -- ./dev-run.sh` (or bare `pnpm dev`) running themselves. **Never** start,
-   restart, or kill the dev server, `dev-run.sh`, or the booth container that hosts it. Default
-   host URL is `http://localhost:${GEEKPRESENT_PORT:-31173}/…` (container Vite is always `:5173` —
-   see *Quick start for agents*). To see how a change looks, *ask the user* to load the page (e.g.
-   `http://localhost:31173/slides/<name>.html`, or whatever host port they told you) and tell you
-   what they see. What you *can* do unprompted: tests and a static build **in the booth** when
-   present (`./booth exec --run -- pnpm test`, `./booth exec --run -- pnpm build` /
-   `./build-static.sh …`); host fallbacks are fine if booth is unavailable
-   (`npm_config_verify_deps_before_run=false pnpm test` / `pnpm exec vite build`). Those do not
-   touch the dev server.
+6. **Dev server runs only via booth — never host pnpm/Node.** When a live dev server is needed
+   (user asks you to run it, or you must verify in the browser yourself), start it with
+   **`./booth exec --run -- ./dev-run.sh`** (see *Quick start for agents*). Check `./booth list`
+   first: if this project's booth already has Vite up, use that URL — do not start a second one,
+   and **never** kill someone else's booth or their running dev. Vite is always container
+   `:5173`; the host URL is the `"--publish", "HOST:5173"` mapping in `.booth/config.toml` (stock
+   `http://localhost:31173/…`). Tell the user the full URL. Tests and static builds also go
+   **only** through the booth (`./booth exec --run -- pnpm test`, `./booth exec --run -- pnpm build`
+   / `./build-static.sh …`) — not host `pnpm`.
 7. **Verify before declaring done.** Cover the change with a test (`tests/*.test.ts`, or
    `tests/*.ssr.test.ts` for prerender behavior) and/or have the user check the slide in dev. The
    build is static, so also sanity-check it isn't relying on any server feature.
