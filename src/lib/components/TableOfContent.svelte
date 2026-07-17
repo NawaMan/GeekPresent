@@ -206,7 +206,12 @@
 
 	/* Hosted in the bottom ControlBar: the trigger sits inline in the bar's flex row and
 	   the flyout opens UPWARD out of it. Bounded to the viewport — the slide's --canvas-h
-	   is undefined in the window-fixed overlay, so it would fall back to the wrong 1080. */
+	   is undefined in the window-fixed overlay, so it would fall back to the wrong 1080.
+
+	   Height: ~half a viewport at most (min of 42vh and a roomy viewport remainder), so a
+	   long deck scrolls inside the panel instead of covering the whole slide — especially
+	   noticeable when the bars are PIN-locked open and the flyout has the full window to
+	   grow into. The 10em remainder leaves room for both chrome bars + a bit of margin. */
 	.toc.bar {
 		position: relative;
 		top: auto;
@@ -219,7 +224,7 @@
 		left: 0;
 		margin-left: 0;
 		margin-bottom: 4px;
-		max-height: calc(100vh - 4em);
+		max-height: min(42vh, calc(100vh - 10em));
 	}
 
 	.toc .content {
