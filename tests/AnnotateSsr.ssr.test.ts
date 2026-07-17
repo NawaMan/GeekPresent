@@ -80,6 +80,20 @@ describe('Annotate (SSR)', () => {
 		expect(body).not.toContain('annot-bar'); // the pen is not armed; nothing to put down
 	});
 
+	it('draws a Shift-snapped pen stroke as a STRAIGHT ruler, not a bowed curve', () => {
+		// A snapped stroke commits as two points (snapAxis), exactly like a levelled highlighter.
+		// The mirror window prerenders it through strokeD, which must give a straight M…L for two
+		// points — not smoothPath's cubic — or the audience would see a bowed "straight" edge.
+		inkPath.set(SLIDE);
+		inkBook.set({
+			[SLIDE]: { strokes: [{ id: 'r', tool: 'pen', points: [[100, 200], [500, 200]] }], ts: 1 }
+		});
+		const { body } = render(Annotate, { props: {} });
+
+		expect(body).toContain('M 100 200 L 500 200');
+		expect(body).not.toContain('C '); // dead straight, no Bézier bow
+	});
+
 	it('never emits NaN geometry from a junk stroke', () => {
 		inkPath.set(SLIDE);
 		inkBook.set({

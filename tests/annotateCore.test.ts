@@ -14,6 +14,7 @@ import {
 	sanitizeInkBook,
 	sanitizeStrokes,
 	simplifyPoints,
+	snapAxis,
 	strokeD,
 	strokeWidth,
 	toCanvasPoint
@@ -134,6 +135,54 @@ describe('levelPoints — a highlighter is not a pen', () => {
 		expect(levelPoints([])).toEqual([]);
 		expect(levelPoints(null as unknown as Point[])).toEqual([]);
 		expect(levelPoints([[NaN, 0], [100, Infinity]] as Point[]).flat().every(Number.isFinite)).toBe(true);
+	});
+});
+
+describe('snapAxis — the pen borrows a straight edge from Shift', () => {
+	it('snaps a mostly-horizontal drag to a dead-level underline at the press Y', () => {
+		// The intent is "underline this line of code": travel is far in X, a wobble in Y, so the
+		// line lays flat at the height the pen went down (200), and grows sideways to the far X.
+		const underline: Point[] = [[100, 200], [200, 208], [300, 194], [500, 205]];
+		expect(snapAxis(underline)).toEqual([[100, 200], [500, 200]]);
+	});
+
+	it('snaps a mostly-vertical drag to a dead-plumb line at the press X', () => {
+		// Dropping a plumb line down a column: travel is far in Y, so the line stands vertical at
+		// the X the pen went down (100), reaching the far Y.
+		const plumb: Point[] = [[100, 100], [106, 220], [94, 340], [103, 500]];
+		expect(snapAxis(plumb)).toEqual([[100, 100], [100, 500]]);
+	});
+
+	it('anchors at the PRESS point and reaches the CURRENT one — a ruler, not a bounding box', () => {
+		// The far end is where the pen is now (the last sample), not the extreme of the wander —
+		// so a stroke that overshoots and comes back ends where the pen actually is.
+		const overshoot: Point[] = [[0, 0], [600, 5], [400, 5]];
+		expect(snapAxis(overshoot)).toEqual([[0, 0], [400, 0]]); // ends at 400, not the 600 peak
+	});
+
+	it('resolves a dead-diagonal drag to horizontal — ties go to the underline', () => {
+		// |dx| === |dy|: one axis has to win rather than jitter, and an underline is the commoner
+		// intent than a plumb line.
+		expect(snapAxis([[0, 0], [300, 300]])).toEqual([[0, 0], [300, 0]]);
+	});
+
+	it('reduces to two points, so smoothPath cannot bow the ruler', () => {
+		const d = strokeD(snapAxis([[10, 50], [100, 60], [200, 45], [300, 50]]));
+		expect(d).toBe('M 10 50 L 300 50');
+		expect(d).not.toContain('C '); // a straight segment, not a cubic
+	});
+
+	it('leaves a gesture with no travel ALONE — a tap is a dot, not a zero-length line', () => {
+		// No dominant axis to snap to; collapsing it would make the dot vanish. Mirrors
+		// levelPoints leaving an extent-less swipe be.
+		expect(snapAxis([[100, 100], [100, 100]])).toEqual([[100, 100], [100, 100]]);
+		expect(snapAxis([[5, 5]])).toEqual([[5, 5]]);
+	});
+
+	it('is total for junk — never a NaN ruler', () => {
+		expect(snapAxis([])).toEqual([]);
+		expect(snapAxis(null as unknown as Point[])).toEqual([]);
+		expect(snapAxis([[NaN, 0], [100, Infinity]] as Point[]).flat().every(Number.isFinite)).toBe(true);
 	});
 });
 

@@ -46,6 +46,16 @@ function stroke(svg: Element, points: [number, number][]): void {
 	at('pointerup', points[points.length - 1]);
 }
 
+/** The same gesture with Shift held — the pen's straight-edge modifier (snapAxis). */
+function shiftStroke(svg: Element, points: [number, number][]): void {
+	const at = (type: string, [clientX, clientY]: [number, number]) =>
+		fireEvent(svg, new MouseEvent(type, { clientX, clientY, bubbles: true, button: 0, shiftKey: true }));
+
+	at('pointerdown', points[0]);
+	for (const p of points.slice(1)) at('pointermove', p);
+	at('pointerup', points[points.length - 1]);
+}
+
 beforeEach(() => {
 	localStorage.clear();
 	resetAllInk();
@@ -133,6 +143,43 @@ describe('Annotate — armed', () => {
 		render(AnnotateHost);
 		annotateTool.set('pen');
 		stroke(surfaceAt(), [[10, 50], [100, 60], [200, 45], [300, 50]]);
+
+		const pts = get(strokes)[0].points;
+		expect(pts.length).toBeGreaterThan(2);
+		expect(document.querySelector('.annot-stroke')?.getAttribute('d')).toContain('C ');
+	});
+
+	it('snaps a Shift-held pen stroke to a dead-level underline', () => {
+		// Shift is the pen's straight-edge: a wobbly, mostly-horizontal drag commits as a ruler.
+		// Client y wobbles 50→60→45→50; canvas is double, and horizontal travel wins.
+		render(AnnotateHost);
+		annotateTool.set('pen');
+		shiftStroke(surfaceAt(), [[10, 50], [100, 60], [200, 45], [300, 50]]);
+
+		const pts = get(strokes)[0].points;
+		expect(pts).toHaveLength(2); // reduced to a ruler…
+		expect(pts[0][1]).toBe(pts[1][1]); // …dead level, at the height the pen went down
+		expect(document.querySelector('.annot-stroke')?.getAttribute('d')).not.toContain('C ');
+	});
+
+	it('snaps a Shift-held vertical drag to a dead-plumb line', () => {
+		// The other axis: travel is far in Y, so the ruler stands vertical at the press X.
+		render(AnnotateHost);
+		annotateTool.set('pen');
+		shiftStroke(surfaceAt(), [[50, 10], [56, 100], [45, 200], [52, 300]]);
+
+		const pts = get(strokes)[0].points;
+		expect(pts).toHaveLength(2);
+		expect(pts[0][0]).toBe(pts[1][0]); // dead vertical, at the X the pen went down (canvas 100)
+		expect(pts[0][0]).toBe(100);
+	});
+
+	it('leaves the pen freehand when snapPen is off, Shift or no Shift', () => {
+		// The opt-out: a deck that wants a purely freehand pen sets snapPen={false}, and Shift
+		// becomes inert rather than straightening the mark.
+		render(AnnotateHost, { props: { snapPen: false } });
+		annotateTool.set('pen');
+		shiftStroke(surfaceAt(), [[10, 50], [100, 60], [200, 45], [300, 50]]);
 
 		const pts = get(strokes)[0].points;
 		expect(pts.length).toBeGreaterThan(2);

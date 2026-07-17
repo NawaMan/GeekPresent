@@ -1110,17 +1110,33 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
   - Open questions: the trigger — a fixed zoom-out threshold, "hide whenever a `?present` window is
     open", or a deck prop — and whether the below-page Note stays as a no-console fallback.
 
-- [ ] **ANNOTATE pen — Shift snaps a stroke to the X/Y axis** — hold Shift and the pen lays a dead-
+- [x] **ANNOTATE pen — Shift snaps a stroke to the X/Y axis** — hold Shift and the pen lays a dead-
   horizontal or dead-vertical line, whichever the gesture favours, instead of following the wrist's
   wobble.
-  - Why: underlining a line of code or dropping a plumb line down a column is the common ANNOTATE
-    move, and freehand can't hold a straight edge on stage — the same reason `levelPoints` already
-    pins a *highlighter* swipe to one y. The pen has no such discipline yet.
-  - Approach: extend `annotateCore` — while Shift is down, reduce the live stroke to two points
-    (press point → current point projected onto whichever axis the delta favours), recomputed every
-    `pointermove` exactly as `levelHighlight` runs, so releasing Shift returns to freehand and a test
-    can pin it against gesture prefixes. Pure and SSR-inert; no new store or token.
-  - Open questions: 45° diagonals too (snap to the nearest of 4/8 headings), or axis-only to start.
+  - Done: `snapAxis()` in `src/lib/annotate/annotateCore.ts` — the pen's twin of `levelPoints`,
+    pure/total/NaN-safe in the same tradition. It reduces the stroke to two points: the press point,
+    and the CURRENT point projected onto whichever axis the gesture has travelled furthest along
+    (anchored at the press, like the level band — the ruler grows out from where the pen went down
+    and never shifts under it). `src/lib/components/Annotate.svelte` wires it into the existing
+    `shapeOf` alongside the highlighter's levelling, tracking Shift as a **live modifier** from both
+    the pointer events AND Shift's own keydown/keyup — so pressing or releasing Shift MID-stroke
+    straightens or un-straightens the line at once, without lifting the pen. Applied to the LIVE
+    stroke as well as the committed one, so what you watch is what you get; committed strokes store
+    the already-snapped two points, so re-render never re-snaps.
+  - **Axis-only, and horizontal wins ties** — settling the open question. A dead-diagonal drag
+    resolves to an underline rather than jittering between two axes or growing an 8-heading table;
+    45° diagonals were left out deliberately (axis-only is the move a speaker actually reaches for —
+    underline a line of code, plumb a column). A gesture with no travel (a tap) has no dominant axis
+    and is left ALONE, so Shift never swallows a point-mark into a zero-length line.
+  - **Opt-out mirrors `levelHighlight`**: a new `snapPen` prop (default `true`) makes Shift inert for
+    a deck that wants a purely freehand pen. No new store or token.
+  - Tests: `snapAxis` unit-tested directly in `tests/annotateCore.test.ts` (underline/plumb, the
+    ruler ends at the current point not the wander's peak, tie→horizontal, tap left alone, junk→no
+    NaN); DOM coverage in `tests/Annotate.test.ts` (Shift-held horizontal + vertical snap, and
+    `snapPen={false}` keeping it freehand); SSR in `tests/AnnotateSsr.ssr.test.ts` proving a snapped
+    two-point stroke prerenders as a straight `M…L`, not a bowed cubic, on the mirror path. Demo:
+    `src/routes/slides/annotate-snap.html/` — the pen's own straight-edge slide, second in the
+    four-slide annotate story (draw → straighten → it stays → turn it on).
 
 - [ ] **`Toast` — a transient on-slide message, optionally spotlighting what it names** — a short
   banner the speaker (or a build) raises over the live slide that fades itself out, and can dim the

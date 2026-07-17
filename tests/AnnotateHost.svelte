@@ -9,6 +9,7 @@
 	export let canvasWidth = 1920;
 	export let canvasHeight = 1080;
 	export let inkColors: (string | null)[] = [null, '#E5484D', '#3FA9F5'];
+	export let snapPen = true;
 </script>
 
-<Annotate {canvasWidth} {canvasHeight} {inkColors} />
+<Annotate {canvasWidth} {canvasHeight} {inkColors} {snapPen} />

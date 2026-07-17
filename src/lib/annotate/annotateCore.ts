@@ -167,6 +167,43 @@ export function levelPoints(points: Point[]): Point[] {
 	];
 }
 
+/** Snap a PEN stroke to a dead-straight X- or Y-axis line — the pen's answer to Shift.
+
+    Underlining a line of code, or dropping a plumb line down a column, is the common
+    ANNOTATE move, and a freehand hand cannot hold a straight edge on stage — the very
+    reason `levelPoints` pins a HIGHLIGHTER swipe to one row. The pen has no such discipline
+    of its own; this is the one it borrows while Shift is held. The stroke is reduced to the
+    two points a ruler would draw: the press point, and the current point PROJECTED onto
+    whichever axis the gesture has travelled furthest along.
+
+    ANCHORED AT THE PRESS POINT, exactly as the level band is — the line grows out from where
+    the pen went down and never shifts under it. It is recomputed every `pointermove` (Shift
+    is a live modifier, not a commit-time flag), so the axis is free to FLIP mid-gesture as
+    the dominant direction changes, and releasing Shift hands the raw freehand samples back
+    untouched.
+
+    A gesture with no travel — a tap, or a press that has not moved yet — is left ALONE
+    rather than collapsed to a zero-length line: there is no dominant axis to choose, and a
+    dot is a real mark (`strokeD` paints a lone point as one). This mirrors `levelPoints`
+    leaving an extent-less swipe be.
+
+    Horizontal wins a tie: an underline is the more common intent than a plumb line, and a
+    dead-diagonal drag has to resolve to one axis rather than jitter between the two. */
+export function snapAxis(points: Point[]): Point[] {
+	if (!Array.isArray(points) || points.length < 2) return Array.isArray(points) ? points.map(finitePoint) : [];
+	const pts = points.map(finitePoint);
+
+	const start = pts[0];
+	const end = pts[pts.length - 1]; // where the pen is NOW — the far end of the ruler
+	const dx = end[0] - start[0];
+	const dy = end[1] - start[1];
+	if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return pts; // no travel yet — a tap; leave it be
+
+	return Math.abs(dx) >= Math.abs(dy)
+		? [[round(start[0]), round(start[1])], [round(end[0]), round(start[1])]] // dead HORIZONTAL, at the press Y
+		: [[round(start[0]), round(start[1])], [round(start[0]), round(end[1])]]; // dead VERTICAL, at the press X
+}
+
 /** Keep the pen's bar inside the canvas.
 
     A bar dragged off the edge is a bar the speaker cannot get back — and since the position

@@ -49,6 +49,7 @@
 		inkAgeText,
 		levelPoints,
 		simplifyPoints,
+		snapAxis,
 		strokeD,
 		strokeWidth,
 		toCanvasPoint,
@@ -73,6 +74,10 @@
 		/** Keep a highlighter swipe LEVEL — the band sits on the row you swiped, rather than
 		 *  sloping along with the hand that drew it. Set false for a freehand highlighter. */
 		levelHighlight?: boolean;
+		/** Let Shift snap a PEN stroke to a dead-straight X/Y axis line — an underline or a
+		 *  plumb line the wrist can't hold freehand (the pen's twin of levelHighlight). Set
+		 *  false to make Shift inert and keep the pen fully freehand. */
+		snapPen?: boolean;
 	}
 
 	let {
@@ -81,7 +86,8 @@
 		penWidth = 6,
 		highlighterWidth = 34,
 		inkColors = [null, '#E5484D', '#3FA9F5', '#4BD07A', '#FFFFFF'],
-		levelHighlight = true
+		levelHighlight = true,
+		snapPen = true
 	}: Props = $props();
 
 
@@ -100,20 +106,29 @@
 	let live: Point[] = $state([]);
 	let seq = 0;
 
+	// Is Shift down right now? A live modifier, so it is tracked from every pointer event AND
+	// from Shift's own keydown/keyup — pressing or releasing Shift WITHOUT moving must reshape
+	// the stroke under the pen immediately, not wait for the next sample.
+	let snapping = $state(false);
+
 	/** `null` colour → no inline style → the role token paints it. */
 	function paint(c: string | null | undefined): string {
 		return c ? `stroke:${c};` : '';
 	}
 
 	/** The shape a gesture actually takes. A highlighter is LEVELLED — the band sits on the
-	    row you swiped instead of sloping with your hand (see levelPoints). Applied to the LIVE
-	    stroke as well as the committed one, so what you watch yourself draw is what you get;
-	    levelling only at commit would make the band jump straight the instant the pen lifted.
+	    row you swiped instead of sloping with your hand (see levelPoints). A PEN is SNAPPED to
+	    a straight X/Y axis while Shift is held (see snapAxis) — an underline or a plumb line.
+	    Both are applied to the LIVE stroke as well as the committed one, so what you watch
+	    yourself draw is what you get; shaping only at commit would make the mark jump straight
+	    the instant the pen lifted.
 
-	    Committed strokes are stored already-levelled, so re-rendering never re-levels: a stroke
-	    drawn with `levelHighlight={false}` keeps its curve for good. */
+	    Committed strokes are stored already-shaped, so re-rendering never re-shapes: a stroke
+	    drawn freehand (Shift up, or `snapPen={false}`) keeps its curve for good. */
 	function shapeOf(points: Point[], tool: AnnotateTool): Point[] {
-		return tool === 'highlighter' && levelHighlight ? levelPoints(points) : points;
+		if (tool === 'highlighter' && levelHighlight) return levelPoints(points);
+		if (tool === 'pen' && snapPen && snapping) return snapAxis(points);
+		return points;
 	}
 
 	function pointFrom(ev: PointerEvent): Point {
@@ -145,12 +160,14 @@
 	function onPointerDown(ev: PointerEvent): void {
 		if (!armed || ev.button !== 0) return;
 		ev.preventDefault();
+		snapping = ev.shiftKey; // Shift may already be held as the pen goes down
 		capture(ev.pointerId, true);
 		live = [pointFrom(ev)];
 	}
 
 	function onPointerMove(ev: PointerEvent): void {
 		if (!armed || live.length === 0) return;
+		snapping = ev.shiftKey; // the authoritative read each sample — Shift can be let go mid-stroke
 		const p = pointFrom(ev);
 		// A 2px gate while drawing keeps the live array (and the path we re-render on every
 		// move) from filling with near-duplicates at the pointer's sample rate; simplifyPoints
@@ -162,11 +179,12 @@
 
 	function onPointerUp(ev: PointerEvent): void {
 		if (live.length === 0) return;
+		snapping = ev.shiftKey; // whether the mark COMMITS straight is decided at the lift
 		capture(ev.pointerId, false);
 
-		// Decimate first, THEN level: levelling reduces a swipe to two points, so simplifying
-		// afterwards would have nothing left to do — and the mean-y that levelling takes should
-		// be the mean of the samples the hand actually produced, not of a thinned subset.
+		// Decimate first, THEN shape: levelling/snapping reduces a stroke to two points, so
+		// simplifying afterwards would have nothing left to do — and the extent a shape reads
+		// should come from the samples the hand actually produced, not from a thinned subset.
 		const points = shapeOf(simplifyPoints(live, 4), $annotateTool);
 		live = [];
 		if (points.length === 0) return;
@@ -245,6 +263,11 @@
 	    persists, paging away no longer destroys it; it is still there when you come back. */
 	function onKeydown(ev: KeyboardEvent): void {
 		if (!armed) return;
+		// Shift is a straight-edge modifier for the pen (snapAxis). Tracked from the key itself,
+		// not just from pointer events, so pressing it MID-stroke straightens the live line at
+		// once — the speaker does not have to twitch the pen to see the ruler engage. It never
+		// preventDefaults or returns early: Shift is also a chord prefix elsewhere.
+		if (ev.key === 'Shift') snapping = true;
 		if (ev.key === 'Escape') {
 			ev.preventDefault();
 			annotationMode.set(false);
@@ -253,9 +276,15 @@
 			undoStroke();
 		}
 	}
+
+	function onKeyup(ev: KeyboardEvent): void {
+		// Releasing Shift returns the pen to freehand — the live stroke bows back to the samples
+		// the moment the key comes up, even if the pointer is holding still.
+		if (ev.key === 'Shift') snapping = false;
+	}
 </script>
 
-<svelte:window on:keydown={onKeydown} />
+<svelte:window on:keydown={onKeydown} on:keyup={onKeyup} />
 
 {#if showSurface}
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -461,8 +490,9 @@
 		position: absolute;
 		left: 50%;
 		bottom: 28px;
-		/* 75% of prior size — the pen palette was reading large next to the window-edge chrome. */
-		transform: translateX(-50%) scale(0.75);
+		/* 75% of prior size, then another 70% on top — the pen palette was reading large
+		   next to the window-edge chrome. Net 0.75 * 0.7 = 0.525 of the original size. */
+		transform: translateX(-50%) scale(0.525);
 		transform-origin: center bottom;
 		z-index: 41;
 		display: flex;
