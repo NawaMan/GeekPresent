@@ -334,6 +334,11 @@
 	const ctx = getContext<DrawContext | undefined>(DRAW_CONTEXT_KEY);
 	const editing = $derived(ctx?.editing ?? false);
 
+	// Publish the live geometry under our name so a <Sprite path="<name>"> can
+	// ride this curve. Init-time (not an effect) so it exists during prerender;
+	// the getter reads the live points, so dragging a handle re-routes the rider.
+	if (name && ctx) onDestroy(ctx.registerPathSource(name, () => base));
+
 	const stopsAttrFor = (list: CurveStop[] | undefined) =>
 		list && list.length
 			? ` stops={[${list

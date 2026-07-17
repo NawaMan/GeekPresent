@@ -71,6 +71,7 @@ describe('patchSlideSource', () => {
 		const { source, patched, unmatched } = patchSlideSource(src, [change({ name: 'pinned' })]);
 		expect(patched).toHaveLength(0);
 		expect(unmatched).toHaveLength(1);
+		expect(unmatched[0].reason).toBe('ambiguous'); // a twin TIE, and the tooltip says so
 		expect(source).toBe(src); // nothing written — and above all, the SAMPLE is untouched
 	});
 
@@ -93,6 +94,7 @@ describe('patchSlideSource', () => {
 		const { unmatched, patched } = patchSlideSource(src, [change({ name: 'ghost' })]);
 		expect(patched).toHaveLength(0);
 		expect(unmatched).toHaveLength(1);
+		expect(unmatched[0].reason).toBe('not-found'); // absent ≠ ambiguous — different fix for the author
 	});
 
 	it('does not confuse ImageBlock with Block', () => {
@@ -141,6 +143,26 @@ describe('patchSlideSource', () => {
 		]);
 		expect(patched).toHaveLength(0);
 		expect(unmatched).toHaveLength(1);
+		expect(unmatched[0].reason).toBe('not-found');
+	});
+
+	it("a Draw tag written with EXPRESSION geometry is 'not-found', never 'ambiguous'", () => {
+		// The sprite-curve slide's shape: the real <Curve> points at a shared
+		// const (`from={curve.from}`), so the canonical literal tag the shape
+		// serializes does not exist in the file. The old blanket message blamed a
+		// code-sample twin for this; the reason must say the tag was NOT FOUND.
+		const src = `<Curve name="road" from={curve.from} c1={curve.c1} c2={curve.c2} to={curve.to} />`;
+		const { patched, unmatched } = patchSlideSource(src, [
+			{
+				kind: 'Curve',
+				name: 'road',
+				oldTag: `<Curve name="road" from={[170, 1010]} c1={[560, 770]} c2={[1330, 1100]} to={[1750, 830]} />`,
+				newTag: `<Curve name="road" from={[170, 1010]} c1={[560, 770]} c2={[1330, 1100]} to={[1750, 700]} />`
+			}
+		]);
+		expect(patched).toHaveLength(0);
+		expect(unmatched).toHaveLength(1);
+		expect(unmatched[0].reason).toBe('not-found');
 	});
 
 	it('mixes a geometry Block change and a literal shape change', () => {

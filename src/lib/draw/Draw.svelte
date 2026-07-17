@@ -38,11 +38,13 @@
 	} from '$lib/stores/adjustChanges';
 	import { canAdjust, adjustMode } from '$lib/stores/adjustMode';
 	import { trackPointer } from '$lib/utils/drag';
+	import { SvelteMap } from 'svelte/reactivity';
 	import {
 		DRAW_CONTEXT_KEY,
 		SPRITE_ISOLATION_KEY,
 		type BlockShapeRegistration,
 		type DrawContext,
+		type PathShape,
 		type ShapeEditor,
 		type SpriteIsolation
 	} from './types';
@@ -125,6 +127,12 @@
 	// registration as an HTML sibling of the svg (HTML can't live inside it).
 	let blocks = $state<BlockShapeRegistration[]>([]);
 
+	// Named path sources: Line/Curve/Arc publish their live geometry by name so
+	// a <Sprite path="name"> can ride them. A SvelteMap so a late-registering
+	// shape still reaches a sprite that already looked its name up; each getter
+	// reads the shape's reactive points, so a handle drag re-samples the flight.
+	const pathSources = new SvelteMap<string, () => PathShape>();
+
 	setContext<DrawContext>(DRAW_CONTEXT_KEY, {
 		get width() {
 			return width;
@@ -172,6 +180,17 @@
 			return () => {
 				blocks = blocks.filter((b) => b.id !== shape.id);
 			};
+		},
+		registerPathSource(name, get) {
+			pathSources.set(name, get);
+			return () => {
+				// Only clear our own registration — a same-named late arrival
+				// (HMR re-mount) must not be wiped by the old instance's teardown.
+				if (pathSources.get(name) === get) pathSources.delete(name);
+			};
+		},
+		pathSource(name) {
+			return pathSources.get(name)?.() ?? null;
 		}
 	});
 
@@ -584,6 +603,13 @@
 	   Blocks/ghosts beneath. */
 	.draw.raised {
 		z-index: 60;
+		/* While EDITING, let the surface paint beyond the canvas edge: points
+		   may legitimately live off-stage (a control point pulled below the
+		   slide, a flight that enters from outside), and their handles must be
+		   visible and grabbable to edit. Published/presenting keeps the svg
+		   default (hidden), so an off-stage sprite stays hidden until its path
+		   crosses the edge — the whole point of a fly-in. */
+		overflow: visible;
 	}
 
 	/* Floating Copy toolbar (ADJUST mode, selected shape only) — the

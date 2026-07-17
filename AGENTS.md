@@ -352,6 +352,28 @@ build steps, emphasis):
 - CSS `@keyframes` / `transition:` in a slide's `<style>` work too.
 - The `Box` component is already a worked example of CSS-transition choreography.
 
+For **scrubbed, timeline animation** — shapes drawing themselves in, elements flying —
+use the Draw family (`$lib/draw`) with one `<AnimationBar />`: every shape's animation
+is pure generated CSS, so it prerenders and the bar scrubs them together. A `<Sprite>`
+is the flying HTML element. It takes either discrete keyframe `stops`, or — for a
+smooth curve — a **`path`**: a literal shape (`path={{ kind: "cubic", from: […],
+c1: […], c2: […], to: […] }}`) or **the name of a `Line`/`Curve`/`Arc` in the same
+`<Draw>`** (`path="road"`), which it rides with LIVE shared geometry — author the
+curve once, drag its handles in ADJUST and the flight re-routes with it. Extras:
+`size` (the box riding centred on the path), `orient` (bank to the tangent; default),
+`rotate` (glyph offset, e.g. 🚀 ≈ −45), `samples`, `delay` (hold the start pose N
+seconds before flying — the sprite counterpart of a shape's `drawDelay`, for
+staggering objects on one timeline), `ease` (whole-flight timing function,
+default ease-in-out; `"linear"` makes position proportional to time, so staggered
+objects hold formation while their windows overlap), and `lock` (hide a sprite
+from ADJUST entirely — for generated stops). Flight samples are spaced by arc length
+(constant speed), so a sprite riding a shape that also has `draw={same seconds}`
+stays glued to the drawing stroke's pen tip. Worked timing example:
+`sprite-delay.html` in the `animation/` deck (start late / finish early / both). Off-stage geometry is fine: points may lie
+outside the canvas (ADJUST shows them; presentation clips at the slide edge, which is
+what makes fly-ins work). See the `animation/` deck — `sprite-curve.html` is the
+worked example.
+
 **Worth telling the user:** slide-to-slide navigation is a **full page load**
 (`NavigationBar` sets `window.location.href`), not client-side routing. Animations live *within* a
 slide — and *cross-slide* transitions (animating one slide into the next) **do** work, via the
@@ -407,12 +429,20 @@ with a tooltip naming what didn't land. This matters more than it sounds: a part
 write that *claimed* `SAVED` would quietly lose the author's drag on the next reload,
 with the only evidence in a `console.warn` nobody had reason to open.
 
-The usual cause is a tag with a **twin**. A slide that documents a component often
-shows the tag in a `<QuickCode>` sample living in the *same file*, and the patcher
-scans raw source — so a sample that spells out both `name` and `x/y/width/height` is
-indistinguishable from the real tag, and neither can be placed. **Elide the geometry in
-code samples** (`<Block name="api" …>`), the way every sample in this deck already
-does, and the ambiguity never arises.
+There are two distinct causes, and the tooltip tells the one that actually happened
+(each unmatched tag carries a `reason` from the patcher):
+
+- **`not-found` — the tag isn't in the source in its literal form.** Draw shapes save
+  by a literal old→new tag swap, so a tag whose geometry is *expressions*
+  (`from={curve.from}` pointing at a shared const), or one reformatted across lines,
+  has no bytes for the patcher to find. Nothing to rewrite — Copy it and paste by
+  hand; one paste makes the tag canonical, after which SAVE lands.
+- **`ambiguous` — a tag with a twin.** A slide that documents a component often
+  shows the tag in a `<QuickCode>` sample living in the *same file*, and the patcher
+  scans raw source — so a sample that spells out both `name` and `x/y/width/height` is
+  indistinguishable from the real tag, and neither can be placed. **Elide the geometry
+  in code samples** (`<Block name="api" …>`), the way every sample in this deck already
+  does, and the ambiguity never arises.
 
 1. In the slide's `+page.svelte`, wrap the element:
    ```svelte

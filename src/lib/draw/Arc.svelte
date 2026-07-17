@@ -313,6 +313,10 @@
 	const ctx = getContext<DrawContext | undefined>(DRAW_CONTEXT_KEY);
 	const editing = $derived(ctx?.editing ?? false);
 
+	// Publish the live geometry under our name so a <Sprite path="<name>"> can
+	// ride this arc (see Curve.svelte — same contract).
+	if (name && ctx) onDestroy(ctx.registerPathSource(name, () => ({ kind: 'arc', from: F, to: T, bend: B })));
+
 	const apex = $derived(pointAt(base, 0.5));
 
 	// bend keeps 3 decimals (the handle produces fractions); never NaN/-0.

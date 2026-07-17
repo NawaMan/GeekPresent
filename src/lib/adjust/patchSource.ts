@@ -59,13 +59,23 @@ export interface LayoutChange {
 	newTag?: string;
 }
 
+/** WHY a change couldn't be placed — so the UI can tell the author the true
+    story instead of one blanket explanation:
+    - 'not-found':  no tag in the source matches at all. For a literal (Draw
+      shape) change that means the canonical serialized tag isn't in the file —
+      geometry written as EXPRESSIONS (`from={curve.from}`), a reformatted /
+      multi-line tag, or a tag living in another file.
+    - 'ambiguous':  several tags tie for the match (a code sample of the tag in
+      the same file, say) and it is never guessed at. */
+export type UnmatchReason = 'not-found' | 'ambiguous';
+
 export interface PatchResult {
 	/** The rewritten source (unchanged if nothing matched). */
 	source: string;
 	/** Changes that were located and applied. */
 	patched: LayoutChange[];
-	/** Changes no tag could be confidently matched to. */
-	unmatched: LayoutChange[];
+	/** Changes no tag could be confidently matched to, each carrying WHY. */
+	unmatched: Array<LayoutChange & { reason: UnmatchReason }>;
 }
 
 const GEOM_ATTRS = ['x', 'y', 'width', 'height'] as const;
@@ -148,8 +158,8 @@ function geomMatches(tagText: string, g: Geometry | undefined): boolean {
 	return GEOM_ATTRS.every((a) => readGeomAttr(tagText, a) === Math.round(g[a]));
 }
 
-/** Pick the tag this change targets, or null if none is a confident match. */
-function chooseTarget(spans: TagSpan[], change: LayoutChange): TagSpan | null {
+/** Pick the tag this change targets, or the reason none is a confident match. */
+function chooseTarget(spans: TagSpan[], change: LayoutChange): TagSpan | UnmatchReason {
 	let pool = spans;
 	if (change.name) {
 		const named = pool.filter((s) => hasName(s.text, change.name!));
@@ -159,11 +169,13 @@ function chooseTarget(spans: TagSpan[], change: LayoutChange): TagSpan | null {
 		// risk patching an unrelated tag that merely shares the geometry. With
 		// several, narrow by geometry to disambiguate.
 		if (named.length === 1) return named[0];
-		if (named.length === 0) return null;
+		if (named.length === 0) return 'not-found';
 		pool = named;
 	}
 	const byGeom = pool.filter((s) => geomMatches(s.text, change.before));
-	return byGeom.length === 1 ? byGeom[0] : null;
+	if (byGeom.length === 1) return byGeom[0];
+	// Zero candidates → the tag just isn't here; several → a genuine twin tie.
+	return byGeom.length === 0 ? 'not-found' : 'ambiguous';
 }
 
 /** Rewrite the four geometry attributes in a single opening tag's text, plus the
@@ -206,7 +218,7 @@ function applyGeometry(tagText: string, after: Geometry): string {
 export function patchSlideSource(source: string, changes: LayoutChange[]): PatchResult {
 	let current = source;
 	const patched: LayoutChange[] = [];
-	const unmatched: LayoutChange[] = [];
+	const unmatched: PatchResult['unmatched'] = [];
 
 	for (const change of changes) {
 		// Literal whole-tag replacement (Draw shapes): find the exact old tag and
@@ -219,7 +231,9 @@ export function patchSlideSource(source: string, changes: LayoutChange[]): Patch
 			}
 			const at = current.indexOf(change.oldTag);
 			if (at === -1) {
-				unmatched.push(change);
+				// The canonical tag isn't in the file — geometry via expressions, a
+				// reformatted tag, or a tag in another file. Nothing to rewrite.
+				unmatched.push({ ...change, reason: 'not-found' });
 				continue;
 			}
 			current = current.slice(0, at) + change.newTag + current.slice(at + change.oldTag.length);
@@ -229,13 +243,13 @@ export function patchSlideSource(source: string, changes: LayoutChange[]): Patch
 
 		// Geometry attribute patch (Blocks).
 		if (!change.after) {
-			unmatched.push(change);
+			unmatched.push({ ...change, reason: 'not-found' });
 			continue;
 		}
 		const spans = findOpeningTags(current, change.kind);
 		const target = chooseTarget(spans, change);
-		if (!target) {
-			unmatched.push(change);
+		if (typeof target === 'string') {
+			unmatched.push({ ...change, reason: target });
 			continue;
 		}
 		const newText = applyGeometry(target.text, change.after);

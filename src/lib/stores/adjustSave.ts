@@ -10,12 +10,20 @@ import { adjustChanges, shapeChanges } from './adjustChanges';
 
 const ENDPOINT = '/__geekpresent/adjust-save';
 
+/** A tag the server couldn't place, and WHY (see patchSource.UnmatchReason):
+    'not-found' — the tag isn't in the source in its literal/canonical form;
+    'ambiguous' — several tags tie for the match and it is never guessed at. */
+export interface UnmatchedTag {
+	label: string;
+	reason: 'not-found' | 'ambiguous';
+}
+
 export interface SaveResult {
 	ok: boolean;
 	/** How many tags were written. */
 	patched: number;
-	/** Labels of tags the server couldn't place (paste those by hand). */
-	unmatched: string[];
+	/** Tags the server couldn't place (paste those by hand), with the cause. */
+	unmatched: UnmatchedTag[];
 	error?: string;
 }
 
@@ -42,7 +50,12 @@ export async function saveAdjust(): Promise<SaveResult> {
 		if (!res.ok) {
 			return { ok: false, patched: 0, unmatched: [], error: data.error || `HTTP ${res.status}` };
 		}
-		return { ok: true, patched: data.patched ?? 0, unmatched: data.unmatched ?? [] };
+		// Tolerate the pre-reason payload shape (plain label strings) from a stale
+		// dev server, defaulting to the commoner cause.
+		const unmatched: UnmatchedTag[] = (data.unmatched ?? []).map((u: unknown) =>
+			typeof u === 'string' ? { label: u, reason: 'not-found' as const } : (u as UnmatchedTag)
+		);
+		return { ok: true, patched: data.patched ?? 0, unmatched };
 	} catch (err) {
 		return { ok: false, patched: 0, unmatched: [], error: err instanceof Error ? err.message : String(err) };
 	}

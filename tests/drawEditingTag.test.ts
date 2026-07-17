@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boxTag, sharedAttrs } from '$lib/draw/editing';
+import { boxTag, playheadPercent, sharedAttrs } from '$lib/draw/editing';
 
 // The opening tag ADJUST emits — what COPY puts on your clipboard, and what you paste
 // over the tag in your source.
@@ -43,5 +43,53 @@ describe('sharedAttrs — the author’s props survive the round-trip', () => {
 			'<Rect name="api" color="red" thickness={4} id="api-box" class="hot"' +
 				' x={100} y={100} width={200} height={80} />'
 		);
+	});
+});
+
+// The live playhead percent behind "+ keyframe" / preview: read the CSS
+// animation's currentTime off the element and map it onto the keyframe pct
+// scale. currentTime spans delay + duration, the pct scale only the duration —
+// so a delayed sprite's playhead must subtract the hold, clamping at 0 while
+// the animation is still waiting (fill:both parks it at the start pose).
+describe('playheadPercent', () => {
+	/** An element whose getAnimations() reports the given CSS animations. */
+	const el = (...anims: Array<{ name: string; currentTime: number | null }>) =>
+		({
+			getAnimations: () =>
+				anims.map((a) => ({ animationName: a.name, currentTime: a.currentTime }))
+		}) as unknown as Element;
+
+	it('maps currentTime onto the duration: halfway is 50', () => {
+		expect(playheadPercent(el({ name: 'fly', currentTime: 1500 }), 'fly', 3)).toBe(50);
+	});
+
+	it('subtracts the delay — the pct scale starts AFTER the hold', () => {
+		const held = el({ name: 'fly', currentTime: 1500 });
+		// 1.5s into a 1.5s delay: the flight has not begun. Without the delay
+		// argument this used to read 50%.
+		expect(playheadPercent(held, 'fly', 3, 1.5)).toBe(0);
+		expect(playheadPercent(el({ name: 'fly', currentTime: 3000 }), 'fly', 3, 1.5)).toBe(50);
+		expect(playheadPercent(el({ name: 'fly', currentTime: 4500 }), 'fly', 3, 1.5)).toBe(100);
+	});
+
+	it('clamps to 0..100 beyond either end', () => {
+		expect(playheadPercent(el({ name: 'fly', currentTime: 9999 }), 'fly', 3)).toBe(100);
+		expect(playheadPercent(el({ name: 'fly', currentTime: -50 }), 'fly', 3)).toBe(0);
+	});
+
+	it('picks the animation by NAME among several, falling back to the first', () => {
+		const both = el({ name: 'other', currentTime: 0 }, { name: 'fly', currentTime: 1500 });
+		expect(playheadPercent(both, 'fly', 3)).toBe(50);
+		// Unknown name: the first animation stands in rather than reading nothing.
+		expect(playheadPercent(both, 'missing', 3)).toBe(0);
+	});
+
+	it('returns null when there is nothing to read', () => {
+		expect(playheadPercent(undefined, 'fly', 3)).toBeNull();
+		expect(playheadPercent(el({ name: 'fly', currentTime: 1500 }), 'fly', null)).toBeNull();
+		// currentTime not a number (idle/unresolved animation).
+		expect(playheadPercent(el({ name: 'fly', currentTime: null }), 'fly', 3)).toBeNull();
+		// No getAnimations at all (bare jsdom element).
+		expect(playheadPercent(document.createElement('div'), 'fly', 3)).toBeNull();
 	});
 });

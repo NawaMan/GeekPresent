@@ -413,14 +413,30 @@
 	    not a partial save. Drives the tooltip's wording; `saveRefused` drives the
 	    look, since both outcomes are "read this before you carry on". */
 	let savePartial = 0;
+	/** The distinct causes among the unplaced tags, so the tooltip tells the TRUE
+	    story: 'not-found' (the tag isn't in the source in literal form — geometry
+	    via expressions, or reformatted) reads very differently from 'ambiguous'
+	    (a twin such as a code sample ties the match). One blanket message here
+	    used to blame a twin for every failure, sending authors hunting for a
+	    code sample that didn't exist. */
+	let saveReasons: Array<'not-found' | 'ambiguous'> = [];
 	let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
-	// The two refusals share one tooltip. A partial write names its count, because
-	// "some tags didn't save" sends an author hunting through a file to find which.
+	// Each unmatched cause gets its own honest sentence; a mixed batch gets both.
+	const UNMATCH_STORY = {
+		'not-found':
+			"The tag isn't in the source in its literal form (geometry written as " +
+			'expressions, or a reformatted tag), so there is nothing to rewrite — ' +
+			'Copy it and paste by hand.',
+		ambiguous:
+			'A tag whose name AND geometry match another (a code sample of itself, ' +
+			'say) is ambiguous, so it is never guessed at — Copy that one by hand.'
+	} as const;
 	$: saveTip = savePartial
 		? `${savePartial === 1 ? '1 tag' : `${savePartial} tags`} not written — see the console. ` +
-			'A tag whose name AND geometry match another (a code sample of itself, say) is ' +
-			'ambiguous, so it is never guessed at — Copy that one by hand.'
+			(saveReasons.length ? saveReasons : (['not-found'] as const))
+				.map((r) => UNMATCH_STORY[r])
+				.join(' ')
 		: 'Save not allowed in this setup.';
 
 	function flashSave(label: string, ms: number) {
@@ -430,6 +446,7 @@
 			saveLabel = 'SAVE';
 			saveRefused = false;
 			savePartial = 0;
+			saveReasons = [];
 		}, ms);
 	}
 
@@ -456,6 +473,7 @@
 			// count, so "1 of 2" is legible without opening devtools.
 			saveRefused = true;
 			savePartial = r.unmatched.length;
+			saveReasons = [...new Set(r.unmatched.map((u) => u.reason))];
 			flashSave(`${r.patched} OF ${r.patched + r.unmatched.length}`, 2600);
 			console.warn('[adjust save] not written — Copy these by hand:', r.unmatched);
 		} else {

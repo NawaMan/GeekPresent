@@ -338,6 +338,17 @@ export interface DrawContext {
 	/** Rect/Ellipse register their Block-shaped box; Draw renders the editing
 	 *  Block. Returns the unregister function. */
 	registerBlock(shape: BlockShapeRegistration): () => void;
+	/** A named path shape (Line/Curve/Arc) publishes its LIVE geometry here so
+	 *  a `<Sprite path="name">` can ride it — one curve authored once, flight
+	 *  and stroke always in step, in ADJUST and in source. Registration happens
+	 *  at component INIT (not an effect) so it exists during prerender, which
+	 *  gives it Connector's document-order rule: the sprite must come AFTER the
+	 *  shape it references. Returns the unregister. */
+	registerPathSource(name: string, get: () => PathShape): () => void;
+	/** The named shape's current geometry, or null when nothing (yet) publishes
+	 *  under that name — the sprite then renders nothing, like a Connector with
+	 *  an unknown endpoint (never a broken flight). */
+	pathSource(name: string): PathShape | null;
 }
 
 /** setContext/getContext key used by <Draw> and its children. */

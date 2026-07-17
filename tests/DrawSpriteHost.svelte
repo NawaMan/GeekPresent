@@ -17,4 +17,16 @@
 			{ pct: 100, x: 1500, y: 430, w: 228, h: 219, rot: -45, ease: 'ease-out' }
 		]}
 	>ROCKET</Sprite>
+
+	<!-- A LOCKED sprite (e.g. calculated stops): flies like any other, but must
+	     grow zero ADJUST chrome and never register for selection/Copy. -->
+	<Sprite
+		name="locked"
+		lock
+		animate={2}
+		stops={[
+			{ pct: 0, x: 0, y: 0, w: 50, h: 50 },
+			{ pct: 100, x: 500, y: 500, w: 50, h: 50 }
+		]}
+	>LOCKED</Sprite>
 </Draw>

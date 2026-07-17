@@ -64,7 +64,15 @@ the button has a fourth outcome beside `SAVED` / `NONE` / `NOT ALLOWED` — the 
 what didn't land. A partial write that claimed `SAVED` would quietly lose the author's drag on the next
 reload.
 
-> **The usual cause is a tag with a twin.** A slide documenting a component often shows the tag in a
+**There are two distinct causes, and the tooltip names the one that actually happened** (each unmatched
+tag carries a `reason` from the patcher — `'not-found'` vs `'ambiguous'`):
+
+> **`not-found` — the tag isn't in the source in its literal form.** Draw shapes save by a literal
+> old→new tag swap, so a tag whose geometry is EXPRESSIONS (`from={curve.from}` pointing at a shared
+> const), or one reformatted/multi-line, has no bytes for the patcher to find. Nothing to rewrite —
+> Copy it and paste by hand (one paste makes the tag canonical, after which SAVE lands).
+
+> **`ambiguous` — a tag with a twin.** A slide documenting a component often shows the tag in a
 > `<QuickCode>` sample *in the same file*, and the patcher scans raw source — so a sample spelling out both
 > `name` and `x/y/width/height` is indistinguishable from the real tag, and **neither** can be placed.
 > **Elide the geometry in code samples** (`<Block name="api" …>`), as every sample in this deck does.

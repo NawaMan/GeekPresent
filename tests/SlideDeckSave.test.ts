@@ -145,8 +145,11 @@ describe('SAVE that only half-lands', () => {
 		await tick();
 	};
 
-	/** The dev endpoint's verdict, whatever the real one would have said. */
-	const serverSays = (patched: number, unmatched: string[]) => {
+	/** The dev endpoint's verdict, whatever the real one would have said. The live
+	    payload is `{label, reason}` objects (see devSavePlugin); bare strings stand
+	    in for a STALE dev server from before reasons existed — the client shims them. */
+	type Unmatched = { label: string; reason: 'not-found' | 'ambiguous' } | string;
+	const serverSays = (patched: number, unmatched: Unmatched[]) => {
 		globalThis.fetch = (() =>
 			Promise.resolve(
 				new Response(JSON.stringify({ patched, unmatched }), {
@@ -177,7 +180,7 @@ describe('SAVE that only half-lands', () => {
 	});
 
 	it('counts what landed instead of claiming SAVED', async () => {
-		serverSays(1, ['<Block name="pinned" x={460} y={838} width={300} height={150}>']);
+		serverSays(1, [{ label: 'pinned', reason: 'ambiguous' }]);
 		const container = await mount(teaches);
 		await fireEvent.click(saveIcon(container)!);
 		await settle();
@@ -187,7 +190,7 @@ describe('SAVE that only half-lands', () => {
 	});
 
 	it('wears the refusal styling and says what did not land, out loud', async () => {
-		serverSays(1, ['<Block name="pinned" x={460} y={838} width={300} height={150}>']);
+		serverSays(1, [{ label: 'pinned', reason: 'ambiguous' }]);
 		const container = await mount(teaches);
 		await fireEvent.click(saveIcon(container)!);
 		await settle();
@@ -200,13 +203,68 @@ describe('SAVE that only half-lands', () => {
 	});
 
 	it('pluralises the count, because "1 tags not written" reads as a bug', async () => {
-		serverSays(1, ['<Block name="a" …>', '<Block name="b" …>']);
+		serverSays(1, [
+			{ label: 'a', reason: 'not-found' },
+			{ label: 'b', reason: 'not-found' }
+		]);
 		const container = await mount(teaches);
 		await fireEvent.click(saveIcon(container)!);
 		await settle();
 
 		expect(flash(container)).toBe('1 OF 3');
 		expect(container.querySelector('.save-tip')?.textContent).toContain('2 tags not written');
+	});
+
+	// The tooltip must tell the TRUE story per cause — one blanket message used to
+	// blame a code-sample twin for every failure, sending authors hunting for a
+	// twin that didn't exist (lived too: a <Curve> whose geometry was expressions
+	// on a shared const can never match literally — no twin anywhere in sight).
+	it("names the TRUE cause: a tag absent in literal form gets the expressions story", async () => {
+		serverSays(0, [{ label: 'road', reason: 'not-found' }]);
+		const container = await mount(teaches);
+		await fireEvent.click(saveIcon(container)!);
+		await settle();
+
+		const tip = container.querySelector('.save-tip')?.textContent ?? '';
+		expect(tip).toContain("isn't in the source in its literal form");
+		expect(tip).not.toContain('name AND geometry match another');
+	});
+
+	it('names the TRUE cause: a twin tie gets the ambiguity story', async () => {
+		serverSays(0, [{ label: 'pinned', reason: 'ambiguous' }]);
+		const container = await mount(teaches);
+		await fireEvent.click(saveIcon(container)!);
+		await settle();
+
+		const tip = container.querySelector('.save-tip')?.textContent ?? '';
+		expect(tip).toContain('name AND geometry match another');
+		expect(tip).not.toContain('literal form');
+	});
+
+	it('a mixed batch tells both stories', async () => {
+		serverSays(0, [
+			{ label: 'road', reason: 'not-found' },
+			{ label: 'pinned', reason: 'ambiguous' }
+		]);
+		const container = await mount(teaches);
+		await fireEvent.click(saveIcon(container)!);
+		await settle();
+
+		const tip = container.querySelector('.save-tip')?.textContent ?? '';
+		expect(tip).toContain('2 tags not written');
+		expect(tip).toContain("isn't in the source in its literal form");
+		expect(tip).toContain('name AND geometry match another');
+	});
+
+	it('tolerates the legacy string payload from a stale dev server', async () => {
+		serverSays(0, ['<Block name="pinned" x={460} y={838} width={300} height={150}>']);
+		const container = await mount(teaches);
+		await fireEvent.click(saveIcon(container)!);
+		await settle();
+
+		// Shimmed to the commoner cause rather than crashing or claiming SAVED.
+		expect(flash(container)).toBe('0 OF 1');
+		expect(container.querySelector('.save-tip')?.textContent).toContain('1 tag not written');
 	});
 
 	it('still says SAVED — plainly — when every tag landed', async () => {

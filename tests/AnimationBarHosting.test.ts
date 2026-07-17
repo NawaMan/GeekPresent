@@ -99,4 +99,31 @@ describe('AnimationBar hosting', () => {
 
 		slot.remove();
 	});
+
+	it('a destroyed hosted bar leaves NO node behind in the slot — a successor hosts alone', async () => {
+		// The SAVE → HMR duplicate: the portaled .anim-bar lives OUTSIDE its
+		// component's subtree, where anchor-range teardown can miss it. The portal
+		// action must evict its node on destroy, or every save strands one more
+		// ANIMATE button in the ControlBar.
+		const slot = document.createElement('div');
+		document.body.appendChild(slot);
+		animBarSlot.set(slot);
+
+		const first = render(AnimationBar);
+		await tick();
+		await tick();
+		expect(slot.querySelectorAll('.anim-bar')).toHaveLength(1);
+
+		first.unmount();
+		await tick();
+		expect(slot.querySelectorAll('.anim-bar')).toHaveLength(0);
+
+		// The remount (what HMR does after a SAVE) hosts exactly one bar.
+		render(AnimationBar);
+		await tick();
+		await tick();
+		expect(slot.querySelectorAll('.anim-bar')).toHaveLength(1);
+
+		slot.remove();
+	});
 });

@@ -80,7 +80,7 @@ describe('Sprite editing (ADJUST mode)', () => {
 	it('renders one ghost box per stop; selecting reveals move/resize/rotate handles', async () => {
 		const { container } = render(DrawSpriteHost);
 		const hits = container.querySelectorAll('.sprite-hit');
-		expect(hits).toHaveLength(3); // one per stop
+		expect(hits).toHaveLength(3); // one per (unlocked) stop — the locked sprite adds none
 		// No handles until selected.
 		expect(container.querySelector('.draw-handle')).toBeNull();
 		await grab(hits[0]);
@@ -121,6 +121,17 @@ describe('Sprite editing (ADJUST mode)', () => {
 		redo();
 		await tick();
 		expect(spriteEl(container).style.left).toBe('400px');
+	});
+
+	it('a locked sprite still flies but grows zero ADJUST chrome', () => {
+		const { container } = render(DrawSpriteHost);
+		// Both sprites render and animate…
+		const els = container.querySelectorAll('.sprite-el');
+		expect(els).toHaveLength(2);
+		expect((els[1] as HTMLElement).style.animation).toContain('draw-sprite-');
+		// …but only the unlocked one has ghost boxes: 3 stops, not 3 + 2.
+		expect(container.querySelectorAll('.sprite-hit')).toHaveLength(3);
+		expect(container.querySelectorAll('.sprite-box')).toHaveLength(3);
 	});
 
 	it('"+ keyframe" adds an interpolated stop; remove floors at 2; % retimes', async () => {
