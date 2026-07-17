@@ -63,3 +63,7 @@ narration/**/voice_clips/
 
 # Local slide captures (`utils/capture-slides.sh` with no --og).
 /captures/
+
+# Linked agent worktrees (`git worktree add worktree/<name> -b <name>`). Nested under the
+# main checkout so they must be ignored; see AGENTS.md "Session = linked worktree + branch".
+/worktree/

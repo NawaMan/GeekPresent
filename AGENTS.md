@@ -39,10 +39,10 @@ summary.
   live container — if the user already has a booth running on a port, use *that* URL; do not start a
   second dev server to "fix" the port.
 - **Booth name = folder name.** CodingBooth names the container after the project directory
-  (e.g. worktree `…/sticky-bars` → booth name around `sticky-bars`). If you need to *create* a
-  booth and the default host port is **already occupied** (another booth, another process, or
-  `bind: address already in use` on publish), pick a free `GEEKPRESENT_PORT` (e.g. `32000`,
-  `32001`, …) and start with that:
+  (e.g. worktree `…/worktree/sticky-bars` → booth name around `sticky-bars`). If you need to
+  *create* a booth and the default host port is **already occupied** (another booth, another
+  process, or `bind: address already in use` on publish), pick a free `GEEKPRESENT_PORT` (e.g.
+  `32000`, `32001`, …) and start with that:
   `GEEKPRESENT_PORT=<free> ./booth exec --run -- ./dev-run.sh`.
   **Tell the user the port you chose** (and the full URL) so they open the right host — do not
   silently leave them on `:31173`. Still do **not** kill someone else's booth or the user's
@@ -51,33 +51,82 @@ summary.
 **If `./booth` is missing**, fall back to host `pnpm` and treat the default dev URL as whatever the
 user said (often `http://localhost:5173` for bare `pnpm dev`).
 
-### Worktree / feature checkout → create a branch for the PR
+### Session = linked worktree + branch (GitKraken-visible)
 
-If this checkout is an **isolated line of work** (not the user's long-lived main clone), create a
-**feature branch early** so they can push and open a PR without fighting `main`.
+**This is the only setup for isolated agent sessions on this project.** One session folder, one
+branch, registered with the main clone so GitKraken lists it.
 
-How to tell (any one is enough):
+```bash
+# from the main clone root, e.g. ~/dev/git/GeekPresent
+mkdir -p worktree
+git worktree add worktree/<name> -b <name>    # branch + linked checkout in one step
+cd worktree/<name>
+grok                                          # start the session HERE — do NOT use grok -w / --worktree
+```
 
-- Linked git worktree: `git rev-parse --git-dir` and `git rev-parse --git-common-dir` resolve to
-  different paths.
-- Path looks like a worktree session: `…/worktrees/<name>/…` (e.g. Grok/agent worktrees).
-- The user said they are in a worktree, or the session/workspace is named for a feature.
+| Piece | Value | Notes |
+| --- | --- | --- |
+| Working tree | `<repo>/worktree/<name>/` | Open this in the editor / Grok / GitKraken |
+| Branch | `<name>` (same as the folder) | Created by `-b <name>`; already checked out |
+| Git bookkeeping | `<repo>/.git/worktrees/<name>/` | Auto; **never** open or check out files here |
+| Gitignore | `/worktree/` in `.gitignore` | Nested under main → must be ignored (already present) |
 
-Then, **before the first substantive edit** (or as soon as you notice you are still on `main` /
-`master` with work pending):
+Check that GitKraken will see it (open the **main** repo, not only the worktree path):
 
-1. Name the branch after the worktree folder or the task (e.g. path `…/worktrees/sticky-bars` →
-   branch `sticky-bars`, or `feat/chrome-pin` if the user named the task). Prefer an existing
-   local branch of that name over inventing a second one.
-2. `git checkout -b <branch>` if it does not exist yet; if it already exists, check it out.
-3. Tell the user the branch name so they can push / open the PR when ready.
+```bash
+git worktree list
+# …/GeekPresent                      […] [main]
+# …/GeekPresent/worktree/<name>      […] [<name>]
+```
+
+A healthy linked worktree has a **file** `.git` pointing at the main repo (not a `.git/` directory):
+
+```text
+gitdir: /…/GeekPresent/.git/worktrees/<name>
+```
+
+**Do not** use `grok --worktree=…` / `grok -w` / Ctrl+W to create the isolation for this project.
+Those often produce a **standalone clone** under `~/.grok/worktrees/…` (full `.git/` directory).
+Standalone clones are **invisible** to GitKraken’s worktree list for the main repo. If one already
+exists and the user wants GitKraken: move work aside, `git worktree add worktree/<name> <branch>`
+from main, re-apply any uncommitted edits, delete the standalone.
+
+Optional: Grok’s home-dir bucket can still be redirected so accidental Grok paths resolve under
+the repo (does **not** make a standalone into a linked worktree):
+
+```bash
+# from main clone — only if you want the path alias
+ln -sfn "$(pwd)/worktree" ~/.grok/worktrees/git-geekpresent
+```
+
+When the user asks for “a session”, “a worktree”, or a feature checkout: run the recipe above
+(or confirm `worktree/<name>` already exists and is linked), then work **inside** that folder.
+Keep `/worktree/` in `.gitignore`.
+
+### Already in a worktree → stay on the feature branch
+
+If this checkout is an **isolated line of work** (not the long-lived main clone), the branch
+should already match the folder (`git worktree add … -b <name>`). If you are still on `main` /
+`master` inside `worktree/<name>/`, fix that **before the first substantive edit**:
+
+How to tell you are in a worktree (any one is enough):
+
+- Path is `…/worktree/<name>/…`, or `.git` is a file with `gitdir: …/.git/worktrees/…`
+- `git rev-parse --git-dir` and `--git-common-dir` resolve to different paths
+- The user said this is a worktree / feature session
+
+Then:
+
+1. Prefer branch name = folder name (`…/worktree/view-source` → `view-source`). Reuse that
+   branch if it exists; otherwise `git checkout -b <name>`.
+2. Tell the user the branch name so they can push / open the PR when ready.
 
 Still **do not** `git commit`, `git push`, or open the PR unless the user asks (Rule 8). Creating
-the branch is the exception — it only sets up the line of work; it does not publish anything.
+or switching the branch is the exception.
 
-If you are on a normal day-to-day clone of `main` (no worktree path, no feature session), do
-**not** invent a branch unless the user asks or the change is clearly a long-lived feature they
-want isolated.
+If you are on a normal day-to-day clone of `main` (no `worktree/<name>` path, no feature
+session), do **not** invent a branch unless the user asks or the change is clearly a long-lived
+feature they want isolated.
 
 ## Skills — the executable half of this file
 
@@ -338,7 +387,7 @@ are load-bearing when you touch anything nearby:
    tree. Don't `git add`, `git commit`, or `git push` on your own initiative — "the change is done"
    is not permission to commit it. When the user asks for a commit message, use `/commit-msg`.
    **Exception — worktrees:** if this checkout is a git worktree, **do** create/switch to a
-   feature branch early (see *Git worktree → create a branch for the PR* above) so the user can
+   feature branch early (see *Session = linked worktree + branch* above) so the user can
    push and open a PR; still do not commit or push that branch unless asked.
 
 ---
