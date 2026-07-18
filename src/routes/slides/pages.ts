@@ -50,6 +50,10 @@ export const pages = [
     { path: "draw-sequence.html",     title: "Draw — Building a Diagram", adjust: true },
     { path: "connector-component.html", title: "Connector — Arrows by Name", adjust: true },
     { path: "note-highlight-component.html", title: "Note-driven Highlight", adjust: true },
+    // Beside the Spotlight it is built from: Toast reuses the same blockAnchors punch-out
+    // to dim around a named Block, then adds the banner + auto-dismiss the highlight lacks.
+    // `adjust: true` so the "drag the box, the spotlight follows" line is live for the room.
+    { path: "toast-component.html", title: "Toast — Transient Message + Spotlight", adjust: true },
     // The pen sits next to the Spotlight it complements: the highlight rings what the
     // AUTHOR named, ANNOTATE draws on what the SPEAKER decides to point at. No `annotate`
     // flag here — that one is deck-wide (see +layout.svelte), because a speaker tool takes

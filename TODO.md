@@ -1153,20 +1153,42 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     `src/routes/slides/annotate-snap.html/` — the pen's own straight-edge slide, second in the
     four-slide annotate story (draw → straighten → it stays → turn it on).
 
-- [ ] **`Toast` — a transient on-slide message, optionally spotlighting what it names** — a short
+- [x] **`Toast` — a transient on-slide message, optionally spotlighting what it names** — a short
   banner the speaker (or a build) raises over the live slide that fades itself out, and can dim the
   slide around a named target at the same moment.
-  - Why: "look here" is two actions today — say it and point at it — and no primitive does both in
-    one gesture. A toast that carries a `highlight` turns "Deployed!" plus a spotlight on the
-    `deploy` box into one call, on one timeline.
-  - Approach: reuse what already points at components — `highlight="deploy"` resolves through
-    `stores/blockAnchors.ts` exactly as `Connector`/`Spotlight` do, and the dimming is
-    `spotlightCore`'s existing geometry, so the toast adds only the message chrome and the auto-
-    dismiss. Colours/timing as `--toast-*` role tokens in `roles.css`; the reveal opt-in and
-    SSR-inert. Done = `Toast.svelte` + a `toastCore.ts` for the timing + a demo slide + DOM and SSR
-    tests.
-  - Open questions: author-placed (a `<Toast>` firing on a build step) or speaker-raised from the
-    console mid-talk — or both; and whether two firing at once stack.
+  - Done: `src/lib/components/Toast.svelte`, the `Spotlight` it is built from plus a banner and an
+    auto-dismiss. It reuses EXACTLY what points at components: `highlight="deploy"` resolves through
+    `stores/blockAnchors.ts` the same way `Connector`/`Spotlight` do, and the dim is
+    `draw/spotlightCore.ts`'s `spotlightRect` punch-out — so the scrim's hole follows the box even
+    as it is dragged in ADJUST mode, with no coordinate authored. The only new machinery is the
+    message chrome and the timing, the latter a pure/total `src/lib/utils/toastCore.ts`
+    (`drawCore`/`spotlightCore` discipline: junk duration falls back to the default dwell rather
+    than a `setTimeout(NaN)` that flashes the toast away on frame 0; an unknown `placement` resolves
+    to `bottom`, never a class the stylesheet can't match; `dim` clamps to 0–1).
+  - **Settles the open design question: author-placed, and it does NOT stack.** A `<Toast>` sits in
+    the slide markup and is driven by an `open` prop — flip it from a `Steps` build, a button, or
+    (via a shared store) the console — rather than being a console-only speaker gadget; that keeps
+    it on the same one-build-per-slide timeline the rest of the deck already speaks. `duration`
+    auto-dismisses it (`0`/negative → sticky), and an `onclose` fires so the trigger can reset and
+    re-fire. Two toasts are two independent components, each its own banner — no z-stacking manager,
+    because the honest use is one "look here" at a time; a slide that truly wants two just places two
+    (the demo does, at different `placement`s).
+  - **REVEAL-style, SSR-inert** like `Spotlight`: it renders NOTHING until it is both client-mounted
+    and `open`, so a prerendered slide carrying an open `<Toast>` still ships no banner and no scrim
+    (`ToastSsr.ssr.test.ts` proves the always-inert contract on `svelte/server`). The fade in/out is
+    a pure CSS `@keyframes` (like the Spotlight pulse), honouring `prefers-reduced-motion` and never
+    touching `element.animate` — which is also why the DOM test runs at all in jsdom. Colours as new
+    `--toast-*` role tokens in `themes/roles.css` (dark-default fallbacks, beside `--spotlight-*`):
+    the banner carries its own dark plate like the annotate bar, and the faint ring reads in the same
+    warm "look here" accent as the Spotlight ring.
+  - Tests: `toastCore` unit-tested directly in `tests/toastCore.test.ts` (dwell/sticky/junk timing,
+    placement fallback, dim clamp — no NaN); DOM coverage in `tests/Toast.test.ts` (inert while
+    closed, banner on open, the `spotlightRect` punch-out grown by pad, the dim tracking an
+    ADJUST-mode drag, a plain banner for an unresolved highlight, placement fallback, auto-dismiss
+    firing `onclose`, sticky staying up); SSR in `tests/ToastSsr.ssr.test.ts`. Demo:
+    `src/routes/slides/toast-component.html/` (a Deploy button fires a highlighting toast over a
+    named `deploy` Block, a Save button a plain top banner), registered in `pages.ts` beside
+    Note-driven Highlight with `adjust: true` so "drag the box, the spotlight follows" is live.
 
 - [x] **`Terminal`** — fake console: typed command + output, riding the `AnimationBar` keyframe clock.
   - Done: `src/lib/components/Terminal.svelte`, with the schedule in

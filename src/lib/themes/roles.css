@@ -117,6 +117,20 @@
 	--spotlight-glow:  var(--ACCENT-WARM, #F0A33E);
 	--spotlight-scrim: var(--BACKDROP, #000000);
 
+	/* Toast — a transient banner the speaker (or a build) raises over the live slide,
+	   optionally dimming the slide around a named Block (Spotlight's punch-out geometry).
+	   The banner carries its own dark plate — it floats OVER the slide the audience is
+	   reading, so it can't inherit a surface colour it doesn't know, exactly like the
+	   annotate bar. The scrim is plain black (softened by the component's own opacity)
+	   and the faint ring reads in the warm "look here" accent the Spotlight ring uses,
+	   since it is the same act: pointing at something. Fallbacks are the dark default. */
+	--toast-bg:     rgba(20, 22, 26, 0.94);
+	--toast-fg:     var(--INK, #D7DDE5);
+	--toast-edge:   rgba(255, 255, 255, 0.16);
+	--toast-shadow: rgba(0, 0, 0, 0.45);
+	--toast-scrim:  var(--BACKDROP, #000000);
+	--toast-ring:   var(--ACCENT-WARM, #F0A33E);
+
 	/* Annotation — the speaker's ink (see components/Annotate.svelte). The pen reads in
 	   the same warm "look here" accent the Spotlight ring uses, since it is the same act:
 	   pointing at something. Its glow is a dark halo, not a coloured one — ink lands on
