@@ -257,35 +257,31 @@
 		border: 1px solid color-mix(in srgb, var(--hint-border, #C0F1FF) 28%, transparent);
 	}
 
-	/* The (X): a corner badge, ABSOLUTELY positioned so it never widens the pill —
-	   the pill's size (and thus the contrast measured on it) is untouched. It sits
-	   just off the top-right, overlapping the rounded corner's empty space. It
-	   rides the group's rest-opacity like the text, so it's a quiet affordance
-	   until you point at the hint, then it's fully there to click.
-
-	   Shaped to match the annotate tool bar's own close (.annot-close): a clean round
-	   button with a transparent rest border that fills on hover, and the glyph nudged
-	   up for optical centring — so the two dismiss buttons read as the same control.
-	   It keeps a translucent backdrop of its own (the annotate bar sits on an opaque
-	   pill; this one floats over arbitrary slide pixels and would vanish without it). */
+	/* The (×): now sits INLINE at the end of the row, exactly where the annotate tool
+	   bar's own close (.annot-close) sits in its bar — trailing the last button, not a
+	   corner badge floating off the pill. Same size, same round shape, same rest/hover
+	   treatment (transparent at rest, filling in on hover, glyph nudged up for optical
+	   centring) — the two dismiss buttons are now the same control, not just similarly
+	   shaped ones. No backdrop of its own: it used to need one (a corner badge floats
+	   over arbitrary slide pixels), but inline it sits on the pill's own background —
+	   the same reason .annot-close needs none, sitting on the bar's. `vertical-align:
+	   middle` keeps its circle centred against the label's text baseline — `.text` is
+	   plain inline flow, not a flex row, so nothing else aligns it. */
 	.close {
-		position: absolute;
-		top: -0.55em;
-		right: -0.5em;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
+		vertical-align: middle;
 		width: 1.7em;
 		height: 1.7em;
+		margin-left: 0.4em;
 		padding: 0;
 		font-size: 0.85em;
 		line-height: 1;
 		border-radius: 50%;
 		cursor: pointer;
 		color: var(--hint-fg, #C0F1FF);
-		/* Denser than the pill so the badge reads as its own thing on any backdrop,
-		   mixed toward --BACKDROP like the pill so it needn't know the surface. */
-		background: color-mix(in srgb, var(--hint-bg, #000000) 85%, transparent);
+		background: transparent;
 		border: 1px solid transparent;
 	}
 	.close:hover,
