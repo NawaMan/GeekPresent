@@ -15,7 +15,11 @@
   should recede while you read the slide and sharpen the moment you look at it —
   and it carries an (X) so a viewer can dismiss it once they've read it. A drag
   grip (like the annotate tool bar's) lets a viewer park it off whatever it lands
-  on; the move lasts the life of the slide and a reload returns it home.
+  on, and — like the pen's bar — it REMEMBERS that across a page turn, as long as
+  the viewer never dismisses it: dismissing (× or double-clicking the grip home)
+  resets it, so the next Hint (this slide reloaded, or a later slide's) starts
+  fresh rather than inheriting a spot chosen for a cue that's gone. See
+  stores/hintPos.ts.
 
   Props:
     text        — the cue.
@@ -40,6 +44,7 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
 	import { trackPointer } from '$lib/utils/drag';
+	import { hintOffset } from '$lib/stores/hintPos';
 
 	export let text = '-hint-';
 	export let isVisible = true;
@@ -83,6 +88,8 @@
 
 	function close() {
 		open = false;
+		// Dismissal resets the shared position for the NEXT Hint too (see stores/hintPos.ts).
+		hintOffset.set(null);
 		dispatch('close');
 	}
 
@@ -95,11 +102,13 @@
 	// The move is a TRANSLATE from the resting spot, not an absolute canvas coordinate: the
 	// cue is absolutely positioned inside SlideDeck's transform-scaled `.content`, so a
 	// translate in canvas px rides that same scale for free — no need to know the canvas
-	// origin or unpick `.content`'s padding. Unlike the annotate bar this is NOT persisted:
-	// the cue is already ephemeral (dismissal lasts only the life of the slide), so a reload
-	// returns it home, same as everything else about it.
+	// origin or unpick `.content`'s padding.
 	let root: HTMLDivElement;
-	let offset = { x: 0, y: 0 }; // canvas-px shift from the resting position
+	// canvas-px shift from the resting position — reads through the SHARED hintOffset store
+	// (stores/hintPos.ts), so it survives a page turn as long as the viewer never dismisses.
+	// Only when `movable`, though: a movable={false} Hint stays pinned at its resting spot
+	// regardless of whatever an earlier (different) Hint's drag left behind.
+	$: offset = movable ? ($hintOffset ?? { x: 0, y: 0 }) : { x: 0, y: 0 };
 	$: moved = offset.x !== 0 || offset.y !== 0;
 
 	function onGripDown(ev: PointerEvent) {
@@ -118,23 +127,27 @@
 		const roomU = frame ? (rootRect.top - frame.top) / scale : Infinity;
 		const roomD = frame ? (frame.bottom - rootRect.bottom) / scale : Infinity;
 		const start = offset;
+		// The exact stored value (may be `null`) — so an Esc-cancel restores precisely what
+		// was there, rather than turning an un-dragged `null` into an explicit `{x:0,y:0}`.
+		const startStored = $hintOffset;
 
 		trackPointer(ev, {
 			scaleFrom: root,
 			onMove: (dx, dy) => {
-				offset = {
+				hintOffset.set({
 					x: start.x + Math.max(-roomL, Math.min(roomR, dx)),
 					y: start.y + Math.max(-roomU, Math.min(roomD, dy))
-				};
+				});
 			},
 			// Esc mid-drag puts it back where it was, like every other gesture in the deck.
-			onCancel: () => (offset = start)
+			onCancel: () => hintOffset.set(startStored)
 		});
 	}
 
-	/** Double-click the grip to send the cue back to its resting spot. */
+	/** Double-click the grip to send the cue back to its resting spot — and clear the
+	    shared memory, same as a dismiss, so the next Hint doesn't inherit it either. */
 	function homeHint() {
-		offset = { x: 0, y: 0 };
+		hintOffset.set(null);
 	}
 </script>
 

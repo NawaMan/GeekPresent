@@ -121,10 +121,30 @@ export const annotateColor = writable<Record<AnnotateTool, string | null>>({
     Persisted, because a bar you have to re-park on every slide is worse than one that never
     moved. `sync: false`: this is one speaker's idea of where the tools should sit, not a
     property of the deck — the audience window has no bar to move, and the presenter's choice
-    should not shove anything on theirs. */
+    should not shove anything on theirs.
+
+    It survives paging ONLY while the pen stays armed — see the reset just below. Close the
+    pen and it forgets: the next time it opens, here or on another slide, it starts fresh at
+    its resting spot, rather than a position chosen for a slide the speaker has left behind. */
 export const barPos = persisted<BarPos>('annotationBarPos', null, {
 	codec: barPosCodec(),
 	sync: false
+});
+
+/** Closing the pen resets where its bar was parked. A bar dragged out of the way stays put
+    for as long as the speaker keeps paging with the pen ARMED — `annotationMode` is itself
+    persisted, so that survives the full-page reload a slide change usually is — but the
+    moment it goes false, the position goes with it.
+
+    Only a LIVE transition counts. `wasArmed` starts `false` on every fresh page load, so the
+    very first callback below — which may well report `true`, read back from a PRIOR session
+    that left the pen armed — can never look like "just closed": there is nothing to compare
+    it against yet. Only an actual true→false seen WITHIN this page's lifetime (the speaker
+    clicking ANNOTATE off, or `?annotate=off`) resets the bar. */
+let wasArmed = false;
+annotationMode.subscribe((armed) => {
+	if (wasArmed && !armed) barPos.set(null);
+	wasArmed = armed;
 });
 
 /** Has the speaker dismissed the stale-ink prompt for THIS visit? Not persisted, and

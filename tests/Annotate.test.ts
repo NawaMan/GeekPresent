@@ -622,6 +622,42 @@ describe('Annotate — armed', () => {
 		expect(get(barPos)).toBe(null);
 	});
 
+	it('resets the bar position when the pen is closed, so the next arm starts fresh', async () => {
+		render(AnnotateHost);
+		surfaceAt();
+
+		const bar = document.querySelector('.annot-bar') as HTMLElement;
+		bar.getBoundingClientRect = () =>
+			({ left: 100, top: 400, width: 200, height: 30, right: 300, bottom: 430, x: 100, y: 400 }) as DOMRect;
+
+		const grip = document.querySelector('.annot-grip') as HTMLElement;
+		await fireEvent(grip, new MouseEvent('pointerdown', { clientX: 0, clientY: 0, bubbles: true, button: 0 }));
+		await fireEvent(window, new MouseEvent('pointermove', { clientX: 50, clientY: 25, bubbles: true }));
+		await fireEvent(window, new MouseEvent('pointerup', { bubbles: true }));
+		expect(get(barPos)).toEqual({ x: 300, y: 850 });
+
+		// Closing the pen — annotationMode going true → false — is the new "reset" trigger,
+		// the twin of the double-click Home the test above already covers.
+		annotationMode.set(false);
+		expect(get(barPos)).toBe(null);
+
+		// Re-arming — right back here, or (in the real app) after a full-page slide change,
+		// since annotationMode is itself persisted — starts at the default spot either way.
+		annotationMode.set(true);
+		expect(get(barPos)).toBe(null);
+	});
+
+	it('leaves the bar position alone on a live re-arm that never actually closed', () => {
+		render(AnnotateHost);
+		barPos.set({ x: 111, y: 222 });
+
+		// Re-asserting the SAME (already armed) value is not a close — a writable store
+		// notifies on every set() regardless of value, so this is what proves the reset
+		// is keyed on an actual true→false transition, not "annotationMode changed".
+		annotationMode.set(true);
+		expect(get(barPos)).toEqual({ x: 111, y: 222 });
+	});
+
 	it('does not draw a stroke while the grip is being dragged', async () => {
 		// The grip sits ON the bar, which sits over the ink surface. Without stopPropagation the
 		// same gesture that moves the bar would also scribble a line underneath it.

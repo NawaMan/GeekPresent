@@ -75,6 +75,15 @@ function press(target: EventTarget, key: string) {
 	return ev;
 }
 
+/** Wait for the next animation frame — flushes OverviewPage's rAF-throttled scroll
+    handler (onGridScroll) so a stubbed scroll's effect on `currentDirection` is settled
+    before assertions run. */
+function flushRaf(): Promise<void> {
+	const { promise, resolve } = Promise.withResolvers<void>();
+	requestAnimationFrame(() => resolve());
+	return promise;
+}
+
 describe('OverviewPage — closed by default', () => {
 	it('shows NOTHING: no button, no grid, and not one document booted', () => {
 		stubObserver();
@@ -521,5 +530,75 @@ describe('OverviewPage — keyboard browsing (roving focus)', () => {
 		} finally {
 			window.removeEventListener('keydown', paged);
 		}
+	});
+});
+
+describe('OverviewPage — the CURRENT control', () => {
+	it('shows CURRENT, with no arrow, once a current slide is tracked', async () => {
+		stubObserver();
+		render(OverviewPageHost, { props: { currentPath: 'intro.html' } });
+		await openGrid();
+
+		const btn = document.querySelector('.current-btn');
+		expect(btn).not.toBeNull();
+		expect(btn!.textContent?.trim()).toBe('CURRENT');
+		expect(btn!.classList.contains('pending')).toBe(false);
+	});
+
+	it('is absent when nothing on the deck matches the current path', async () => {
+		stubObserver();
+		render(OverviewPageHost, { props: { currentPath: 'nowhere.html' } });
+		await openGrid();
+
+		expect(document.querySelector('.current-btn')).toBeNull();
+	});
+
+	it('shows a ▼ once the current tile scrolls below the visible area, and clicking scrolls it back', async () => {
+		stubObserver();
+		render(OverviewPageHost, { props: { currentPath: 'outro.html' } });
+		await openGrid();
+
+		const grid = document.querySelector('.grid') as HTMLElement;
+		const current = screen.getByRole('button', { name: /Outro/ }) as HTMLElement;
+		// The grid's visible area ends at 500; the current tile sits entirely below it —
+		// currentTileDirection (overviewPageCore) reads this as 'below'.
+		grid.getBoundingClientRect = () =>
+			({ top: 0, bottom: 500, left: 0, right: 0, width: 0, height: 500, x: 0, y: 0 }) as DOMRect;
+		current.getBoundingClientRect = () =>
+			({ top: 600, bottom: 650, left: 0, right: 0, width: 0, height: 50, x: 0, y: 0 }) as DOMRect;
+
+		await fireEvent.scroll(grid);
+		await flushRaf(); // onGridScroll is rAF-throttled
+		await tick();
+
+		const btn = document.querySelector('.current-btn') as HTMLElement;
+		expect(btn.classList.contains('pending')).toBe(true);
+		expect(btn.querySelector('.current-arrow')?.textContent).toBe('▼');
+
+		const scrolled = vi.fn();
+		current.scrollIntoView = scrolled;
+		await fireEvent.click(btn);
+		expect(scrolled).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' });
+	});
+
+	it('shows a ▲ once the current tile scrolls above the visible area', async () => {
+		stubObserver();
+		render(OverviewPageHost, { props: { currentPath: 'title.html' } });
+		await openGrid();
+
+		const grid = document.querySelector('.grid') as HTMLElement;
+		const current = screen.getByRole('button', { name: /Title/ }) as HTMLElement;
+		grid.getBoundingClientRect = () =>
+			({ top: 200, bottom: 700, left: 0, right: 0, width: 0, height: 500, x: 0, y: 0 }) as DOMRect;
+		current.getBoundingClientRect = () =>
+			({ top: -100, bottom: -50, left: 0, right: 0, width: 0, height: 50, x: 0, y: 0 }) as DOMRect;
+
+		await fireEvent.scroll(grid);
+		await flushRaf();
+		await tick();
+
+		const btn = document.querySelector('.current-btn') as HTMLElement;
+		expect(btn.classList.contains('pending')).toBe(true);
+		expect(btn.querySelector('.current-arrow')?.textContent).toBe('▲');
 	});
 });

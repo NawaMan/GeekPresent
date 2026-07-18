@@ -690,7 +690,10 @@ Nothing to place: `SlideDeck` mounts `<Annotate>` once, like `Spotlight`. One pr
 > Other props: `inkColors` (the swatches; `null` is the theme's own colour, so un-picked ink
 > follows a re-theme instead of freezing a hex), `penWidth` / `highlighterWidth`. Colours and
 > the bar's resting opacity are `--annot-*` role tokens. The bar drags by its `⠿` grip and
-> remembers where it was put; double-click the grip to send it home.
+> remembers where it was put for as long as the pen stays armed — paging with ANNOTATE on
+> keeps it there, since `annotationMode` is itself persisted — but closing the pen (or
+> double-clicking the grip) resets it, so the next time it opens, here or on another slide,
+> it starts back at its default spot rather than wherever a past session left it.
 >
 > Demo: `annotate-component.html` → `annotate-persistence.html` → `annotate-setup.html`.
 

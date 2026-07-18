@@ -869,8 +869,16 @@
 		/* 75% of prior size, then another 70% on top — the pen palette was reading large
 		   next to the window-edge chrome. Net 0.75 * 0.7 = 0.525 of the original size.
 		   Keep this literal in sync with BAR_SCALE above — the dragged (inline) transform
-		   reuses that constant so a drag never loses the shrink. */
-		transform: translateX(-50%) scale(0.525);
+		   reuses that constant so a drag never loses the shrink.
+
+		   translateY(-100%) is listed AFTER scale on purpose: percentages in `translate()`
+		   resolve against the element's own (unscaled) box, but composed in THIS order the
+		   shift gets scaled down right along with everything else — so it moves the bar up
+		   by exactly its own RENDERED height (0.525 × unscaled), clearing the 28px gap it
+		   sits in rather than overshooting by the unscaled height. Listed before translateX
+		   so translateX's own -50% (centering) still resolves against the unscaled width,
+		   unaffected — matches how it already behaved. */
+		transform: translateX(-50%) scale(0.525) translateY(-100%);
 		transform-origin: center bottom;
 		z-index: 41;
 		display: flex;
