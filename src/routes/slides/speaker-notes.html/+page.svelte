@@ -24,6 +24,14 @@
 		key is the underlined letter in its button, so there is no legend to memorise.
 	</p>
 	<p>
+		The console <b>pages the deck</b> too, so your hands never leave it:
+		<Kbd keys="→" /> / <Kbd keys="←" /> move a slide, and the audience window follows.
+		<Kbd keys="Space" /> <b>advances a build</b> (it relays the same pulse as
+		<b>CONTINUE</b>, stepping a <code>Steps</code>/<code>Video</code> slide) — so it never
+		pages past an unfinished build the console can't see. <Kbd keys="Shift" />+<Kbd keys="Space" />
+		walks back.
+	</p>
+	<p>
 		While the console is open it becomes the <b>single</b> notes surface: this
 		below-the-slide copy disappears — redundant, and it was only eating height under an
 		already-shrunken slide. Close the console and it returns as the no-console fallback.

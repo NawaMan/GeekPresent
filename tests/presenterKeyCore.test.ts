@@ -44,6 +44,46 @@ describe('presenterKeyIntent — the three console mnemonics', () => {
 	});
 });
 
+describe('presenterKeyIntent — paging keys', () => {
+	it('arrows page the deck (→ next, ← prev), never step', () => {
+		expect(presenterKeyIntent(key({ key: 'ArrowRight' }))).toBe('next');
+		expect(presenterKeyIntent(key({ key: 'ArrowLeft' }))).toBe('prev');
+	});
+
+	it('Shift does not change what an arrow does — it still pages', () => {
+		expect(presenterKeyIntent(key({ key: 'ArrowRight', shiftKey: true }))).toBe('next');
+		expect(presenterKeyIntent(key({ key: 'ArrowLeft', shiftKey: true }))).toBe('prev');
+	});
+
+	it('Space advances the build (relays CONTINUE, never pages)', () => {
+		// however the browser reports the space bar
+		expect(presenterKeyIntent(key({ key: ' ' }))).toBe('continue');
+		expect(presenterKeyIntent(key({ key: 'Spacebar', code: 'Space' }))).toBe('continue');
+	});
+
+	it('Shift+Space walks the deck back', () => {
+		expect(presenterKeyIntent(key({ key: ' ', shiftKey: true }))).toBe('prev');
+		expect(presenterKeyIntent(key({ key: 'Spacebar', code: 'Space', shiftKey: true }))).toBe('prev');
+	});
+
+	it('never pages while the caret is in a field (the timer input)', () => {
+		const inField = { target: { tagName: 'INPUT' } as EventTarget };
+		expect(presenterKeyIntent(key({ key: 'ArrowRight', ...inField }))).toBe('ignore');
+		expect(presenterKeyIntent(key({ key: ' ', ...inField }))).toBe('ignore');
+	});
+
+	it('leaves modified paging chords to the browser (Alt+←, Cmd+→…)', () => {
+		expect(presenterKeyIntent(key({ key: 'ArrowLeft', altKey: true }))).toBe('ignore');
+		expect(presenterKeyIntent(key({ key: 'ArrowRight', metaKey: true }))).toBe('ignore');
+		expect(presenterKeyIntent(key({ key: ' ', ctrlKey: true }))).toBe('ignore');
+	});
+
+	it('respects an already-consumed paging event', () => {
+		expect(presenterKeyIntent(key({ key: 'ArrowRight', defaultPrevented: true }))).toBe('ignore');
+		expect(presenterKeyIntent(key({ key: ' ', defaultPrevented: true }))).toBe('ignore');
+	});
+});
+
 describe('presenterKeyIntent — Escape closes menus', () => {
 	it('a plain Escape means close', () => {
 		expect(presenterKeyIntent(key({ key: 'Escape' }))).toBe('close');

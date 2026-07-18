@@ -14,11 +14,33 @@
 // soft confirm the RESET menus already lean on, so no key destroys with one press.
 // Esc closes whatever is open — even from the timer field, so it always has an out.
 //
+// The console also PAGES: →/← walk the deck, Space advances. But the console window
+// is blind to the audience slide's build state (`activeSteps` lives in the window
+// that mounts the slide, not here), so the split mirrors NavigationBar's rule that
+// arrows always page and never step:
+//
+//   →      page next            ←      page prev
+//   Space  advance the build    Shift+Space  page prev (walk back)
+//
+// Space returns 'continue' — the view relays the same CONTINUE pulse the button
+// fires, which steps an armed <Steps>/Video build in the audience window and pages
+// NOTHING. So a blind Space can never skip past an unfinished build (the "no skip-
+// past" the arrows deliberately don't promise): it defers to the build every time.
+//
 // Total: garbage input → 'ignore', never throws.
 
 import { isChromeTypingTarget } from './chromeArmCore';
+import { isSpaceKey } from '$lib/utils/stepKeys';
 
-export type PresenterKeyIntent = 'toc' | 'checks' | 'ink' | 'close' | 'ignore';
+export type PresenterKeyIntent =
+	| 'toc'
+	| 'checks'
+	| 'ink'
+	| 'close'
+	| 'next'
+	| 'prev'
+	| 'continue'
+	| 'ignore';
 
 /**
  * What a key means in the presenter console window.
@@ -41,8 +63,15 @@ export function presenterKeyIntent(
 	if (isChromeTypingTarget(e?.target)) return 'ignore';
 
 	// A modifier means a browser/OS chord (Ctrl+A, Cmd+T…) — leave those alone.
+	// (Shift is NOT a chord here — Shift+Space is a real console gesture.)
 	if (e.ctrlKey || e.metaKey || e.altKey) return 'ignore';
 	if (e.defaultPrevented) return 'ignore';
+
+	// Paging. Space defers to the build via a CONTINUE relay ('continue'); Shift+Space
+	// walks the deck back; the arrows page outright, never stepping (stepKeys' rule).
+	if (isSpaceKey(e)) return e.shiftKey ? 'prev' : 'continue';
+	if (k === 'arrowright') return 'next';
+	if (k === 'arrowleft') return 'prev';
 
 	switch (k) {
 		case 't':

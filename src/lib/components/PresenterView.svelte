@@ -11,10 +11,13 @@
       control that drives the audience window's animation, a clock and an
       elapsed-since-open timer.
 
-  Arrow-key paging is owned by the slide's (hidden) NavigationBar, so there is a
-  single owner for the deck's motion. This component's own keydown is scoped to the
-  console's controls: T / C / A toggle the TOC / reset-checks / reset-ink menus and
-  Esc closes them (see presenterKeyCore) — the mnemonics underlined in each button.
+  The audience window pages from its own NavigationBar; the console has no such bar
+  (SlideDeck gates it under `!present`), so this component's keydown drives BOTH the
+  console's menus and its paging (see presenterKeyCore): T / C / A toggle the TOC /
+  reset-checks / reset-ink menus, Esc closes them, →/← page the deck, Space relays a
+  CONTINUE pulse (advances a build, never pages), and Shift+Space walks back. Paging
+  reuses the bottom bar's go()/doContinue(), so the audience follows exactly as a
+  button click would — over the same localStorage nav / gp:continue channels.
 -->
 <script lang="ts">
 	import CtrlBtn from './CtrlBtn.svelte';
@@ -166,6 +169,22 @@
 				inkOpen = open;
 				break;
 			}
+			// Paging from the console — the same go()/doContinue() the bottom-bar
+			// buttons call, so the audience follows over the localStorage channel
+			// exactly as a click would. →/← page; Space relays a CONTINUE pulse that
+			// steps an armed build without paging; Shift+Space walks back.
+			case 'next':
+				e.preventDefault();
+				go(nav.next, 'forward');
+				break;
+			case 'prev':
+				e.preventDefault();
+				go(nav.prev, 'back');
+				break;
+			case 'continue':
+				e.preventDefault();
+				doContinue();
+				break;
 		}
 	}
 

@@ -1099,18 +1099,33 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     pure core, the `isAdjustSaveChord` precedent. Demo: the presenter-console shortcut line added to
     `src/routes/slides/speaker-notes.html/+page.svelte`, which shows the T/C/A/Esc keys with `<Kbd>`.
 
-- [ ] **Arrow keys and Space page the deck from the presenter console** — the console window should
+- [x] **Arrow keys and Space page the deck from the presenter console** — the console window should
   advance/retreat on →/← and Space like the audience deck does.
   - Why: the console is where the speaker's eyes and hands are, but the paging keys live on the
-    audience deck's `NavigationBar`, which the console window doesn't host — so today advancing means
-    clicking, or focusing the other window. `?present` already mirrors navigation across windows via
-    `localStorage`, so the console needs to *drive* that channel, not grow a second deck.
-  - Approach: the same window `keydown` as the mnemonics above, text-field-guarded, writing the
-    shared navigation store / firing the `gp:continue`-style pulse the CONTINUE button already uses —
-    so Space still obeys the one-build-per-slide `spaceIntent` handoff a `Steps`/`Video` build relies
-    on rather than blindly paging past an unfinished build.
-  - Open questions: Shift+Space to walk back (as Video's chapters do), and whether Space should defer
-    to an armed build the console can't see.
+    audience deck's `NavigationBar`, which the console window doesn't host (SlideDeck gates the whole
+    overlay under `!present`) — so today advancing meant clicking, or focusing the other window.
+    `?present` already mirrors navigation across windows via `localStorage`, so the console needed to
+    *drive* that channel, not grow a second deck.
+  - Done: `presenterKeyIntent` in `src/lib/chrome/presenterKeyCore.ts` — the console's existing
+    keyboard decider (T/C/A/Esc) — now also answers `'next' | 'prev' | 'continue'`, reusing
+    `stepKeys.isSpaceKey` so "the space bar, however the browser reports it" has one definition. It
+    keeps the same guards as the mnemonics (typing-target, Ctrl/Cmd/Alt chord, `defaultPrevented`),
+    and `PresenterView.svelte`'s `onKeydown` dispatches the three new intents onto the SAME
+    `go(nav.next/prev)` / `doContinue()` the bottom-bar buttons call — so the audience follows over
+    the localStorage nav channel (and `gp:continue`) exactly as a click would, no new relay.
+  - **Settling the open questions.** Shift+Space walks the deck back (`'prev'`), matching the item.
+    And Space **defers to an armed build the console can't see** rather than paging: it returns
+    `'continue'`, which relays the CONTINUE pulse that steps a `<Steps>`/`Video` build in the audience
+    window (via that slide's `gp:continue` listener) and pages NOTHING — so a blind Space can never
+    skip past an unfinished build. The arrows keep `NavigationBar`/`stepKeys`' rule that →/← always
+    page and never step. Paging keys stay text-field-guarded (the timer input) and inert under a
+    browser chord (Alt+←, Cmd+→).
+  - Tests: the new intents unit-tested directly in `tests/presenterKeyCore.test.ts` (→/← page, Shift
+    leaves an arrow paging, Space→continue by key AND code, Shift+Space→prev, all four bail in a
+    field / under a modifier / when already consumed). No PresenterView DOM/SSR test — the console
+    mounts only in a `?present` window and a deck boot renders blank in jsdom, so coverage lives in
+    the pure core (the `presenterKeyIntent` precedent). Demo: the paging-keys paragraph added to
+    `src/routes/slides/speaker-notes.html/+page.svelte`, beside the T/C/A/Esc line.
 
 - [x] **Drop the below-the-slide speaker Note once the PRESENT console carries it** — the Note
   printed under the canvas is redundant while the console shows notes in their own pane, so an
