@@ -1070,19 +1070,34 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
   - Open questions: partial budgets (most decks will annotate a few key slides, not all 65) — treat
     an unbudgeted slide as zero, or spread the remaining time evenly across them?
 
-- [ ] **Keyboard mnemonics in the presenter console — TOC, reset checks, reset annotation** — the
+- [x] **Keyboard mnemonics in the presenter console — TOC, reset checks, reset annotation** — the
   console's buttons are pointer-only; give the three navigational/destructive ones a key each.
-  - Why: on stage the speaker drives from the keyboard, and reaching for the mouse to open the TOC or
-    clear last run's ink and check-offs is exactly the fumble the console exists to spare. All three
-    already sit on `PresenterView.svelte` — the TOC, the note-tick reset, and the ink RESET /
-    RESET ALL beside it (line ~523).
-  - Approach: a window `keydown` on the console window only (it already owns `?present`), guarded so
-    it never fires while a text field has focus; act on the SAME shared stores the buttons do — the
-    `inkBook` reset, the `presenter` check-off store, `TableOfContent`'s open state — so audience and
-    console stay in step for free. Underline the mnemonic letter in each button label rather than
-    inventing a legend.
-  - Open questions: which letters, and whether a destructive key (reset ink/checks) wants a confirm
-    or leans on the "re-arms next visit" softness the RESET menu already has.
+  - Done: a pure `presenterKeyIntent(e, inkOffered)` in `src/lib/chrome/presenterKeyCore.ts` — the
+    console's twin of `chromeArmCore`'s mnemonics, and it reuses that file's `isChromeTypingTarget`
+    so the two share one definition of "the caret is in a field". It answers one total, NaN-free
+    question — `'toc' | 'checks' | 'ink' | 'close' | 'ignore'` — and `PresenterView.svelte`'s
+    existing `onKeydown` (which only closed menus on Esc before) now dispatches on it, acting on the
+    SAME `tocOpen` / `checksOpen` / `inkOpen` state the buttons toggle, so audience and console stay
+    in step for free (the ink/check stores are already the shared, persisted channel).
+  - **The letters are T / C / A** (settling the open question): **T** table of contents, **C** reset
+    check-offs, **A** reset annotations — each the underlined letter in its button (`CtrlBtn`'s
+    `mnemonic` prop, the same underline the deck chrome uses), so there is no separate legend. The
+    three buttons read `TOC` / `☑ Checks` / `✎ Annotate` with the C and A underlined in the words;
+    `text` and `hoverText` are kept identical so a button never jumps width under the pointer, and
+    each wrapper's `title` names the key too.
+  - **A key only OPENS its menu — it never resets** (settling the destructive-key half): opening the
+    reset menu is the soft confirm the RESET menus already lean on, so the actual clear stays a
+    deliberate second click and no keypress destroys ink or check-offs on its own. The keys toggle
+    (press again to close) and open one menu at a time; **Esc** closes whatever is open — and it is
+    checked BEFORE the typing guard, so it still dismisses the timer popover from inside its input.
+    A also stays inert unless the pen is offered (`$canAnnotate`), matching the button that only
+    shows there. Letters bail on a typing target and on any Ctrl/Cmd/Alt chord (browser wins).
+  - Tests: `presenterKeyIntent` unit-tested directly in `tests/presenterKeyCore.test.ts` (T/C claimed,
+    A gated on `inkOffered`, case-insensitive, every other letter and every modifier chord ignored,
+    Esc closes even from a field, junk → no throw). No PresenterView DOM/SSR test — the console mounts
+    only in a `?present` window and a deck boot renders blank in jsdom, so the coverage lives in the
+    pure core, the `isAdjustSaveChord` precedent. Demo: the presenter-console shortcut line added to
+    `src/routes/slides/speaker-notes.html/+page.svelte`, which shows the T/C/A/Esc keys with `<Kbd>`.
 
 - [ ] **Arrow keys and Space page the deck from the presenter console** — the console window should
   advance/retreat on →/← and Space like the audience deck does.

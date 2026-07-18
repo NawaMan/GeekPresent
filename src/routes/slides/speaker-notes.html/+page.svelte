@@ -6,6 +6,7 @@
 	import ContentPage from '$lib/templates/ContentPage.svelte';
 	import Note from '$lib/components/Note.svelte';
 	import QuickCode from '$lib/components/QuickCode.svelte';
+	import Kbd from '$lib/components/Kbd.svelte';
 </script>
 
 <ContentPage title="Speaker Notes" subtitle="Notes visible below the slide in SCALED mode">
@@ -15,6 +16,13 @@
   <p>Mention Y as a follow-up.</p>
 </Note>`} />
 	<p>Notes are hidden in <b>FITTED</b> mode and when printing.</p>
+	<p>
+		Open the <b>presenter console</b> (the <b>PRESENT</b> chrome button) for your notes in
+		their own pane, with the next slide previewed. There the keyboard drives the console:
+		<Kbd keys="T" /> opens the table of contents, <Kbd keys="C" /> the reset-checks menu, and
+		<Kbd keys="A" /> the reset-annotations menu — <Kbd keys="Esc" /> closes any of them. Each
+		key is the underlined letter in its button, so there is no legend to memorise.
+	</p>
 </ContentPage>
 
 <Note>

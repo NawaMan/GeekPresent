@@ -12,7 +12,9 @@
       elapsed-since-open timer.
 
   Arrow-key paging is owned by the slide's (hidden) NavigationBar, so there is a
-  single keydown owner; this component adds the visible controls + previews only.
+  single owner for the deck's motion. This component's own keydown is scoped to the
+  console's controls: T / C / A toggle the TOC / reset-checks / reset-ink menus and
+  Esc closes them (see presenterKeyCore) — the mnemonics underlined in each button.
 -->
 <script lang="ts">
 	import CtrlBtn from './CtrlBtn.svelte';
@@ -29,6 +31,7 @@
 		loadPresenterSplit, savePresenterSplit, clearSlideChecks, clearDeckChecks
 	} from '$lib/stores/presenter';
 	import { canAnnotate, strokes, resetSlideInk, resetAllInk } from '$lib/stores/annotation';
+	import { presenterKeyIntent } from '$lib/chrome/presenterKeyCore';
 	import type { Page } from '$lib/utils/navigate';
 	import type { AnimState } from '$lib/utils/slideAnim';
 
@@ -127,8 +130,43 @@
 		if (inkRef && !inkRef.contains(e.target as Node)) inkOpen = false;
 		if (timerRef && !timerRef.contains(e.target as Node)) timerMenuOpen = false;
 	}
+	// Console keyboard mnemonics: T / C / A toggle the TOC / reset-checks / reset-ink
+	// menus a speaker would otherwise have to reach for the mouse to open, and Esc
+	// closes whatever is open. The letters act on the SAME state the buttons do, and
+	// only ever OPEN a menu — the destructive reset stays a deliberate second click.
+	function closeMenus() {
+		tocOpen = false;
+		checksOpen = false;
+		inkOpen = false;
+		timerMenuOpen = false;
+	}
 	function onKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') { tocOpen = false; checksOpen = false; timerMenuOpen = false; }
+		switch (presenterKeyIntent(e, $canAnnotate)) {
+			case 'close':
+				closeMenus();
+				break;
+			case 'toc': {
+				e.preventDefault();
+				const open = !tocOpen; // toggle: the same key closes it again
+				closeMenus();
+				tocOpen = open;
+				break;
+			}
+			case 'checks': {
+				e.preventDefault();
+				const open = !checksOpen;
+				closeMenus();
+				checksOpen = open;
+				break;
+			}
+			case 'ink': {
+				e.preventDefault();
+				const open = !inkOpen;
+				closeMenus();
+				inkOpen = open;
+				break;
+			}
+		}
 	}
 
 	// Clock + elapsed timer (client-only; this component mounts only in browser).
@@ -330,8 +368,8 @@
 <!-- Bottom bar: nav + TOC + ANIMATE on the left, meters on the right. -->
 <div class="bar no-print">
 	<div class="controls">
-		<div class="toc" class:open={tocOpen} bind:this={tocRef}>
-			<CtrlBtn text={tocOpen ? 'TOC ▾' : 'TOC ▴'} isSelected={tocOpen} on:click={() => (tocOpen = !tocOpen)} />
+		<div class="toc" class:open={tocOpen} bind:this={tocRef} title="Table of contents (T)">
+			<CtrlBtn text={tocOpen ? 'TOC ▾' : 'TOC ▴'} mnemonic="T" isSelected={tocOpen} on:click={() => (tocOpen = !tocOpen)} />
 			{#if tocOpen}
 			<div class="toc-menu">
 				<ol>
@@ -347,14 +385,14 @@
 			{/if}
 		</div>
 		&nbsp;
-		<div class="toc checks" class:open={checksOpen} bind:this={checksRef} title="Reset checks">
-			<!-- hoverText is the ICON, not a label — see the ✎ button below. CtrlBtn SWAPS the two
-			     on hover, so a wordy hoverText makes the button jump wider under the pointer, and
-			     this bar is a fixed row a speaker aims at without looking. The wrapper's `title`
-			     says what it does; the menu names both actions in full. -->
+		<div class="toc checks" class:open={checksOpen} bind:this={checksRef} title="Reset checks (C)">
+			<!-- hoverText mirrors text exactly so the label never changes width under the pointer
+			     (CtrlBtn SWAPS the two on hover): this bar is a fixed row a speaker aims at without
+			     looking. The C in "Checks" is the underlined mnemonic; the menu names both actions. -->
 			<CtrlBtn
-				text={checksOpen ? '☑ ▾' : '☑ ▴'}
-				hoverText={checksOpen ? '☑ ▾' : '☑ ▴'}
+				text={checksOpen ? '☑ Checks ▾' : '☑ Checks ▴'}
+				hoverText={checksOpen ? '☑ Checks ▾' : '☑ Checks ▴'}
+				mnemonic="C"
 				isSelected={checksOpen}
 				on:click={() => (checksOpen = !checksOpen)}
 			/>
@@ -369,15 +407,14 @@
 		<!-- Reset the speaker's ink. Shown only where the pen is offered, and it reports how
 		     much ink is on the current slide so "reset" is never a shot in the dark. -->
 		{#if $canAnnotate}
-		<div class="toc checks" class:open={inkOpen} bind:this={inkRef} title="Reset annotations">
-			<!-- hoverText is the ICON again, not a label: CtrlBtn SWAPS the two on hover, so a
-			     wordy hoverText makes the button jump wider under the pointer. The console's bar is
-			     a fixed row of controls a speaker aims at without looking, and one of them growing
-			     mid-reach is worse than it being unlabelled. The wrapper's `title` still says what
-			     it does, and the menu it opens names both actions in full. -->
+		<div class="toc checks" class:open={inkOpen} bind:this={inkRef} title="Reset annotations (A)">
+			<!-- hoverText mirrors text exactly so the label never changes width under the pointer
+			     (CtrlBtn SWAPS the two on hover), keeping this fixed control row steady. The A in
+			     "Annotate" is the underlined mnemonic; the menu it opens names both actions in full. -->
 			<CtrlBtn
-				text={inkOpen ? '✎ ▾' : '✎ ▴'}
-				hoverText={inkOpen ? '✎ ▾' : '✎ ▴'}
+				text={inkOpen ? '✎ Annotate ▾' : '✎ Annotate ▴'}
+				hoverText={inkOpen ? '✎ Annotate ▾' : '✎ Annotate ▴'}
+				mnemonic="A"
 				isSelected={inkOpen}
 				on:click={() => (inkOpen = !inkOpen)}
 			/>
@@ -575,6 +612,11 @@
 		align-items: center;
 		gap: 18px;
 		flex-wrap: wrap;
+		/* Take the leftover width and wrap the buttons INTERNALLY when the bar is
+		   narrow, rather than squeezing the meters column (which then breaks the clock
+		   onto two lines). min-width:0 lets it actually shrink below content width. */
+		flex: 1 1 auto;
+		min-width: 0;
 	}
 	.nav {
 		display: flex;
@@ -661,6 +703,8 @@
 		flex-direction: column;
 		align-items: flex-end;
 		gap: 8px;
+		/* Hold the meters' natural width — never shrink so the clock keeps one line. */
+		flex: none;
 	}
 	.pos {
 		font-size: 1.1rem;
@@ -682,10 +726,15 @@
 		align-items: center;
 		gap: 16px;
 		font-variant-numeric: tabular-nums;
+		/* Keep the wall clock and the timer on one row — never wrap the pair. */
+		flex-wrap: nowrap;
+		white-space: nowrap;
 	}
 	.clock {
 		font-size: 1.5rem;
 		color: #eaf2f9;
+		/* Keep the whole "🕑 10:30:45 AM" together — no break before the AM/PM. */
+		white-space: nowrap;
 	}
 	.timer {
 		position: relative;
@@ -718,6 +767,7 @@
 		border: 1.5px solid #2b333d;
 		border-radius: 6px;
 		padding: 2px 12px;
+		white-space: nowrap; /* keep "⏱ 00:00" on one line */
 	}
 	.elapsed:hover,
 	.timer.open .elapsed {
