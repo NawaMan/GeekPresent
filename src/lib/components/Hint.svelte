@@ -177,6 +177,9 @@
 	{/if}
 	<span class="label">{text}</span>
 	{#if dismissible}
+		<!-- Matches the annotate bar's own `.annot-sep` before its close — a divider that
+		     separates "the cue" from "dismiss it", not just visual filler. -->
+		<span class="sep" aria-hidden="true"></span>
 		<button class="close" type="button" aria-label="Dismiss hint" on:click={close}>
 			<span aria-hidden="true">×</span>
 		</button>
@@ -274,7 +277,6 @@
 		vertical-align: middle;
 		width: 1.7em;
 		height: 1.7em;
-		margin-left: 0.4em;
 		padding: 0;
 		font-size: 0.85em;
 		line-height: 1;
@@ -293,6 +295,24 @@
 	.close span {
 		display: block;
 		transform: translateY(-0.06em);
+	}
+
+	/* Divider between the cue and its dismiss — the same idea as the annotate bar's own
+	   `.annot-sep`, sized for an INLINE row rather than a flex one: there is no `align-
+	   self: stretch` to lean on here, so it takes a fixed height instead. Rounded caps
+	   (top and bottom) rather than annot-sep's sharp rectangle — a hairline reads fine
+	   stretched flex-tall across a whole bar, but a short inline one looks better
+	   softened at both ends, like a tiny capsule rather than a cut line. Margin on both
+	   sides is the ONLY spacing before the close button now (.close carries none of its
+	   own), so the gap either side of the divider stays even. */
+	.sep {
+		display: inline-block;
+		vertical-align: middle;
+		width: 2px;
+		height: 1.1em;
+		margin: 0 0.5em;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--hint-border, #C0F1FF) 28%, transparent);
 	}
 
 	/* The drag grip — the dotted handle the cue is moved by, styled like the annotate tool
