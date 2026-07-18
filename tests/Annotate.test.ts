@@ -56,13 +56,25 @@ function shiftStroke(svg: Element, points: [number, number][]): void {
 	at('pointerup', points[points.length - 1]);
 }
 
+/** Move the pointer over the surface without a button down — drives the eraser's hover
+    highlight (what a delete right here WOULD take). */
+function hover(svg: Element, [clientX, clientY]: [number, number]): void {
+	fireEvent(svg, new MouseEvent('pointermove', { clientX, clientY, bubbles: true }));
+}
+
+/** A single eraser tap at a point: press and release, no drag. */
+function eraseAt(svg: Element, [clientX, clientY]: [number, number]): void {
+	fireEvent(svg, new MouseEvent('pointerdown', { clientX, clientY, bubbles: true, button: 0 }));
+	fireEvent(svg, new MouseEvent('pointerup', { clientX, clientY, bubbles: true, button: 0 }));
+}
+
 beforeEach(() => {
 	localStorage.clear();
 	resetAllInk();
 	canAnnotate.set(true);
 	annotationMode.set(false);
 	annotateTool.set('pen');
-	annotateColor.set({ pen: null, highlighter: null });
+	annotateColor.set({ pen: null, line: null, arrow: null, rectangle: null, highlighter: null, text: null });
 	inkStaleAfterMs.set(INK_STALE_AFTER_MS);
 	barPos.set(null);
 	inkPath.set('');
@@ -186,6 +198,305 @@ describe('Annotate — armed', () => {
 		expect(document.querySelector('.annot-stroke')?.getAttribute('d')).toContain('C ');
 	});
 
+	it('draws a LINE as a dead-straight two-point segment, no head, whatever the hand did', () => {
+		// A line is an arrow without the chevron: however the drag wandered, it commits as a
+		// straight tail→head segment, and strokeD paints exactly one `M … L …` (no curve, no
+		// second sub-path for a head).
+		render(AnnotateHost);
+		annotateTool.set('line');
+		stroke(surfaceAt(), [[10, 10], [150, 40], [300, 200]]);
+
+		const list = get(strokes);
+		expect(list).toHaveLength(1);
+		expect(list[0].tool).toBe('line');
+		expect(list[0].points).toHaveLength(2); // tail and head only — the wander is dropped
+
+		const d = document.querySelector('.annot-stroke')?.getAttribute('d') ?? '';
+		expect(d).toBe('M 20 20 L 600 400'); // one straight segment, in canvas px (double)
+		expect(d).not.toContain('C '); // not smoothed
+		expect(d.split('M ')).toHaveLength(2); // one sub-path — no arrowhead
+		expect(document.querySelector('.annot-stroke')?.classList.contains('highlighter')).toBe(false);
+	});
+
+	it('snaps a Shift-held line to a dead-straight axis, like the pen and the arrow', () => {
+		render(AnnotateHost);
+		annotateTool.set('line');
+		shiftStroke(surfaceAt(), [[10, 50], [100, 60], [300, 45]]);
+
+		const pts = get(strokes)[0].points;
+		expect(pts).toHaveLength(2);
+		expect(pts[0][1]).toBe(pts[1][1]); // dead level — tail and head share a Y
+	});
+
+	it('draws an ARROW as a straight shaft with a chevron head, whatever the hand did', () => {
+		// The arrow is not freehand: however the drag wandered, it commits as a straight
+		// tail→head line, and renders a shaft plus a two-line head (a second M sub-path).
+		render(AnnotateHost);
+		annotateTool.set('arrow');
+		stroke(surfaceAt(), [[10, 10], [150, 40], [300, 200]]);
+
+		const list = get(strokes);
+		expect(list).toHaveLength(1);
+		expect(list[0].tool).toBe('arrow');
+		expect(list[0].points).toHaveLength(2); // tail and head only — the wander is dropped
+
+		const d = document.querySelector('.annot-stroke')?.getAttribute('d') ?? '';
+		expect(d.startsWith('M 20 20 L 600 400')).toBe(true); // shaft, in canvas px (double)
+		expect(d.split('M ')).toHaveLength(3); // a shaft sub-path AND a head sub-path
+		expect(d).toContain('L 600 400 L'); // the two barbs meet at the head
+		expect(Number(document.querySelector('.annot-stroke')?.getAttribute('stroke-width'))).toBe(6);
+	});
+
+	it('is NOT a highlighter — an arrow paints opaque, like the pen', () => {
+		render(AnnotateHost);
+		annotateTool.set('arrow');
+		stroke(surfaceAt(), [[10, 10], [200, 10]]);
+		expect(document.querySelector('.annot-stroke')?.classList.contains('highlighter')).toBe(false);
+	});
+
+	it('snaps a Shift-held arrow to a dead-straight axis, like the pen', () => {
+		// The arrow borrows the pen's straight-edge: a mostly-horizontal Shift-drag lies flat
+		// at the press Y, so the arrow points dead sideways.
+		render(AnnotateHost);
+		annotateTool.set('arrow');
+		shiftStroke(surfaceAt(), [[10, 50], [100, 60], [300, 45]]);
+
+		const pts = get(strokes)[0].points;
+		expect(pts).toHaveLength(2);
+		expect(pts[0][1]).toBe(pts[1][1]); // dead level — tail and head share a Y
+	});
+
+	it('lights the stroke under the eraser, and clears the light when the pointer moves off', () => {
+		// The hover preview: the mark a delete right here WOULD take gets the `erasing` class,
+		// so the speaker deletes exactly the one they meant. Pen mark runs along canvas y=200.
+		render(AnnotateHost);
+		stroke(surfaceAt(), [[100, 100], [140, 100]]);
+		expect(get(strokes)).toHaveLength(1);
+
+		annotateTool.set('eraser');
+		hover(surfaceAt(), [120, 100]); // client 120,100 → canvas 240,200 — on the mark
+		expect(document.querySelector('.annot-stroke')?.classList.contains('erasing')).toBe(true);
+
+		hover(surfaceAt(), [400, 400]); // far off it
+		expect(document.querySelector('.annot-stroke')?.classList.contains('erasing')).toBe(false);
+	});
+
+	it('erases the whole stroke under an eraser tap', () => {
+		render(AnnotateHost);
+		stroke(surfaceAt(), [[100, 100], [140, 100]]);
+		expect(get(strokes)).toHaveLength(1);
+
+		annotateTool.set('eraser');
+		eraseAt(surfaceAt(), [120, 100]);
+		expect(get(strokes)).toHaveLength(0);
+		expect(document.querySelectorAll('.annot-stroke')).toHaveLength(0);
+	});
+
+	it('wipes every stroke the eraser is dragged across', () => {
+		render(AnnotateHost);
+		const svg = surfaceAt();
+		stroke(svg, [[100, 100], [140, 100]]); // canvas y=200
+		stroke(svg, [[100, 140], [140, 140]]); // canvas y=280
+		expect(get(strokes)).toHaveLength(2);
+
+		annotateTool.set('eraser');
+		const e = surfaceAt();
+		// Press on the first mark, then drag down onto the second before releasing.
+		fireEvent(e, new MouseEvent('pointerdown', { clientX: 120, clientY: 100, bubbles: true, button: 0 }));
+		fireEvent(e, new MouseEvent('pointermove', { clientX: 120, clientY: 140, bubbles: true, button: 0 }));
+		fireEvent(e, new MouseEvent('pointerup', { clientX: 120, clientY: 140, bubbles: true, button: 0 }));
+		expect(get(strokes)).toHaveLength(0);
+	});
+
+	it('lights only the TOP-MOST stroke, not the whole stack under the pointer', () => {
+		// Two marks stacked on the same spot: the preview lights just the one painted last (on
+		// top), because that is the only one a click will take.
+		render(AnnotateHost);
+		const svg = surfaceAt();
+		stroke(svg, [[100, 100], [140, 100]]);
+		stroke(svg, [[100, 100], [140, 100]]);
+
+		annotateTool.set('eraser');
+		hover(surfaceAt(), [120, 100]);
+		expect(document.querySelectorAll('.annot-stroke')).toHaveLength(2);
+		expect(document.querySelectorAll('.annot-stroke.erasing')).toHaveLength(1); // just the top one
+	});
+
+	it('deletes only the TOP-MOST stroke under a click, leaving the ones beneath', () => {
+		// A click takes the mark painted last (on top) and leaves the earlier one, rather than
+		// clearing the whole stack in one tap.
+		render(AnnotateHost);
+		const svg = surfaceAt();
+		stroke(svg, [[100, 100], [140, 100]]); // A, drawn first → underneath
+		stroke(svg, [[100, 100], [140, 100]]); // B, drawn second → on top
+		const [aId, bId] = get(strokes).map((s) => s.id);
+		expect(aId).not.toBe(bId);
+
+		annotateTool.set('eraser');
+		eraseAt(surfaceAt(), [120, 100]);
+
+		const remaining = get(strokes);
+		expect(remaining).toHaveLength(1);
+		expect(remaining[0].id).toBe(aId); // B (the top-most) went; A survives
+	});
+
+	it('does NOT draw — an eraser gesture over empty canvas leaves the ink untouched', () => {
+		// The eraser removes; it never adds. A press-and-release on nothing must not commit a
+		// dot the way the pen would.
+		render(AnnotateHost);
+		stroke(surfaceAt(), [[100, 100], [140, 100]]);
+		expect(get(strokes)).toHaveLength(1);
+
+		annotateTool.set('eraser');
+		eraseAt(surfaceAt(), [400, 400]); // misses the mark entirely
+		expect(get(strokes)).toHaveLength(1); // nothing deleted — and nothing added
+	});
+
+	it('steps the colour swatches aside while the eraser is armed', async () => {
+		render(AnnotateHost, { props: { inkColors: [null, '#E5484D'] } });
+		expect(screen.queryByLabelText('Theme colour')).not.toBeNull();
+
+		await fireEvent.click(screen.getByLabelText('Erase'));
+		expect(get(annotateTool)).toBe('eraser');
+		expect(screen.getByLabelText('Erase').getAttribute('aria-pressed')).toBe('true');
+		expect(screen.queryByLabelText('Theme colour')).toBeNull(); // no colour to pick when deleting
+	});
+
+	it('draws a RECTANGLE as a closed box between two corners', () => {
+		render(AnnotateHost);
+		annotateTool.set('rectangle');
+		stroke(surfaceAt(), [[50, 50], [100, 80], [150, 120]]); // drag corner to corner
+
+		const list = get(strokes);
+		expect(list).toHaveLength(1);
+		expect(list[0].tool).toBe('rectangle');
+		expect(list[0].points).toHaveLength(2); // two corners only
+
+		const d = document.querySelector('.annot-stroke')?.getAttribute('d') ?? '';
+		expect(d.startsWith('M 100 100')).toBe(true); // top-left corner, canvas px (client 50,50 → 100,100)
+		expect(d.endsWith('Z')).toBe(true); // a closed box
+		expect(d).not.toContain('C '); // not smoothed
+	});
+
+	it('offers the tools as icon buttons with accessible names, and picks on click', async () => {
+		render(AnnotateHost);
+		for (const label of ['Pen', 'Line', 'Arrow', 'Rectangle', 'Highlight', 'Text', 'Erase']) {
+			expect(screen.getByLabelText(label)).not.toBeNull();
+		}
+		await fireEvent.click(screen.getByLabelText('Rectangle'));
+		expect(get(annotateTool)).toBe('rectangle');
+	});
+
+	it('places a TEXT label: click, type, Enter commits it as an SVG <text>', async () => {
+		render(AnnotateHost);
+		annotateTool.set('text');
+		await fireEvent(
+			surfaceAt(),
+			new MouseEvent('pointerdown', { clientX: 100, clientY: 100, bubbles: true, button: 0 })
+		);
+
+		const input = document.querySelector('.annot-text-input') as HTMLInputElement;
+		expect(input).not.toBeNull();
+		await fireEvent.input(input, { target: { value: 'Hello' } });
+		await fireEvent.keyDown(input, { key: 'Enter' });
+
+		const list = get(strokes);
+		expect(list).toHaveLength(1);
+		expect(list[0].tool).toBe('text');
+		expect(list[0].text).toBe('Hello');
+		expect(list[0].points[0]).toEqual([200, 200]); // client 100,100 → canvas 200,200
+		expect(document.querySelector('.annot-text')?.textContent).toBe('Hello');
+	});
+
+	it('cancels a half-typed label on Escape, committing nothing', async () => {
+		render(AnnotateHost);
+		annotateTool.set('text');
+		await fireEvent(
+			surfaceAt(),
+			new MouseEvent('pointerdown', { clientX: 100, clientY: 100, bubbles: true, button: 0 })
+		);
+		const input = document.querySelector('.annot-text-input') as HTMLInputElement;
+		await fireEvent.input(input, { target: { value: 'oops' } });
+		await fireEvent.keyDown(input, { key: 'Escape' });
+
+		expect(get(strokes)).toHaveLength(0); // nothing committed
+		expect(document.querySelector('.annot-text-input')).toBeNull(); // editor shut
+		expect(get(annotationMode)).toBe(true); // …and Escape did NOT also disarm the pen
+	});
+
+	it('re-opens an existing label on a tap and re-commits the edit to the same mark', async () => {
+		render(AnnotateHost);
+		annotateTool.set('text');
+		await fireEvent(
+			surfaceAt(),
+			new MouseEvent('pointerdown', { clientX: 100, clientY: 100, bubbles: true, button: 0 })
+		);
+		let input = document.querySelector('.annot-text-input') as HTMLInputElement;
+		await fireEvent.input(input, { target: { value: 'first' } });
+		await fireEvent.keyDown(input, { key: 'Enter' });
+		const id = get(strokes)[0].id;
+
+		// Tap the label again (down + up, no travel) → the editor re-opens holding its text.
+		await fireEvent(
+			surfaceAt(),
+			new MouseEvent('pointerdown', { clientX: 100, clientY: 100, bubbles: true, button: 0 })
+		);
+		await fireEvent(window, new MouseEvent('pointerup', { clientX: 100, clientY: 100, bubbles: true }));
+		input = document.querySelector('.annot-text-input') as HTMLInputElement;
+		expect(input).not.toBeNull();
+		expect(input.value).toBe('first');
+
+		await fireEvent.input(input, { target: { value: 'second' } });
+		await fireEvent.keyDown(input, { key: 'Enter' });
+		expect(get(strokes)).toHaveLength(1);
+		expect(get(strokes)[0].id).toBe(id); // the same mark, patched — not a new one
+		expect(get(strokes)[0].text).toBe('second');
+	});
+
+	it('drags a label to a new anchor without re-opening the editor', async () => {
+		render(AnnotateHost);
+		annotateTool.set('text');
+		await fireEvent(
+			surfaceAt(),
+			new MouseEvent('pointerdown', { clientX: 100, clientY: 100, bubbles: true, button: 0 })
+		);
+		const input = document.querySelector('.annot-text-input') as HTMLInputElement;
+		await fireEvent.input(input, { target: { value: 'move me' } });
+		await fireEvent.keyDown(input, { key: 'Enter' });
+		const id = get(strokes)[0].id;
+		expect(get(strokes)[0].points[0]).toEqual([200, 200]);
+
+		// Grab the label and drag it: down on it, move well past the threshold, up.
+		await fireEvent(
+			surfaceAt(),
+			new MouseEvent('pointerdown', { clientX: 100, clientY: 100, bubbles: true, button: 0 })
+		);
+		await fireEvent(window, new MouseEvent('pointermove', { clientX: 150, clientY: 130, bubbles: true }));
+		await fireEvent(window, new MouseEvent('pointerup', { clientX: 150, clientY: 130, bubbles: true }));
+
+		// 50/30 screen px at half scale = 100/60 canvas px, from [200,200] → [300,260].
+		expect(get(strokes)[0].id).toBe(id);
+		expect(get(strokes)[0].points[0]).toEqual([300, 260]);
+		expect(document.querySelector('.annot-text-input')).toBeNull(); // a drag does not open the editor
+	});
+
+	it('erases a TEXT label like any other mark', async () => {
+		render(AnnotateHost);
+		annotateTool.set('text');
+		await fireEvent(
+			surfaceAt(),
+			new MouseEvent('pointerdown', { clientX: 100, clientY: 100, bubbles: true, button: 0 })
+		);
+		const input = document.querySelector('.annot-text-input') as HTMLInputElement;
+		await fireEvent.input(input, { target: { value: 'gone soon' } });
+		await fireEvent.keyDown(input, { key: 'Enter' });
+		expect(get(strokes)).toHaveLength(1);
+
+		annotateTool.set('eraser');
+		eraseAt(surfaceAt(), [100, 100]); // on the label's anchor
+		expect(get(strokes)).toHaveLength(0);
+	});
+
 	it('renders a lone tap as a dot rather than nothing', () => {
 		render(AnnotateHost);
 		const svg = surfaceAt();
@@ -251,10 +562,10 @@ describe('Annotate — armed', () => {
 		expect(get(annotateColor).highlighter).toBe(null);
 	});
 
-	it('puts the pen down on DONE and on Escape', async () => {
+	it('puts the pen down on the close (×) and on Escape', async () => {
 		render(AnnotateHost);
 
-		await fireEvent.click(screen.getByText('DONE'));
+		await fireEvent.click(screen.getByLabelText('Close annotation tools'));
 		expect(get(annotationMode)).toBe(false);
 
 		annotationMode.set(true);
@@ -388,7 +699,7 @@ describe('Annotate — disarmed', () => {
 		render(AnnotateHost);
 
 		expect(document.querySelector('.annot-surface')).toBeNull();
-		expect(screen.queryByText('PEN')).toBeNull();
+		expect(screen.queryByLabelText('Pen')).toBeNull();
 		// The ANNOTATE toggle (which arms the pen in the first place) now lives in
 		// <SlideToolbar>; its presence/absence is asserted there, not on this fixture.
 	});
@@ -401,7 +712,7 @@ describe('Annotate — disarmed', () => {
 
 		expect(document.querySelectorAll('.annot-stroke')).toHaveLength(1);
 		expect((document.querySelector('.annot-surface') as SVGElement).style.pointerEvents).toBe('none');
-		expect(screen.queryByText('PEN')).toBeNull(); // no palette in the audience's window
+		expect(screen.queryByLabelText('Pen')).toBeNull(); // no palette in the audience's window
 	});
 
 	// (The "no chrome under ?clean / ?present" case moved to SlideToolbar.test.ts, which now

@@ -31,6 +31,7 @@
 -->
 <script lang="ts">
 	import { browser } from '$app/environment';
+	import { tick } from 'svelte';
 	import {
 		annotationMode,
 		canAnnotate,
@@ -40,19 +41,29 @@
 		staleInk,
 		addStroke,
 		undoStroke,
+		eraseStrokes,
+		updateStroke,
 		resetSlideInk,
 		resetAllInk,
 		dismissStale
 	} from '$lib/stores/annotation';
 	import {
+		arrowD,
 		clampBarPos,
+		hitStroke,
+		hitText,
 		inkAgeText,
 		levelPoints,
+		rectD,
+		sanitizeText,
 		simplifyPoints,
 		snapAxis,
+		straightLine,
 		strokeD,
 		strokeWidth,
 		toCanvasPoint,
+		TEXT_MAX_LEN,
+		type AnnotateMode,
 		type AnnotateTool,
 		type Stroke
 	} from '$lib/annotate/annotateCore';
@@ -67,6 +78,15 @@
 		 *  is to swipe OVER the words, so it must cover a line of text. */
 		penWidth?: number;
 		highlighterWidth?: number;
+		/** Arrowhead length in canvas px — the chevron on an ARROW mark. Clamped to the
+		 *  shaft, so a short arrow keeps a head no longer than itself (see arrowD). */
+		arrowHead?: number;
+		/** The eraser's reach in canvas px, ON TOP of each stroke's own half-width — how close
+		 *  the pointer must come to a mark to catch it. Bigger = a more forgiving rubber. */
+		eraserRadius?: number;
+		/** Font size of a TEXT mark, in canvas px — stored on the mark when placed, so a label
+		 *  keeps its size across reloads and windows even if this default later changes. */
+		textSize?: number;
 		/** The swatches offered in the bar. The FIRST is always the theme's own colour
 		 *  (`null` → painted by the --annot-* role token), so the default follows a re-theme
 		 *  instead of freezing today's hex into every mark. */
@@ -74,9 +94,10 @@
 		/** Keep a highlighter swipe LEVEL — the band sits on the row you swiped, rather than
 		 *  sloping along with the hand that drew it. Set false for a freehand highlighter. */
 		levelHighlight?: boolean;
-		/** Let Shift snap a PEN stroke to a dead-straight X/Y axis line — an underline or a
-		 *  plumb line the wrist can't hold freehand (the pen's twin of levelHighlight). Set
-		 *  false to make Shift inert and keep the pen fully freehand. */
+		/** Let Shift snap a PEN stroke — or an ARROW — to a dead-straight X/Y axis line, an
+		 *  underline or a plumb line the wrist can't hold freehand (the pen's twin of
+		 *  levelHighlight). Set false to make Shift inert; the pen stays fully freehand and the
+		 *  arrow stays free-angle (still a straight tail→head line, just not axis-locked). */
 		snapPen?: boolean;
 	}
 
@@ -85,6 +106,9 @@
 		canvasHeight = 1080,
 		penWidth = 6,
 		highlighterWidth = 34,
+		arrowHead = 36,
+		eraserRadius = 14,
+		textSize = 44,
 		inkColors = [null, '#E5484D', '#3FA9F5', '#4BD07A', '#FFFFFF'],
 		levelHighlight = true,
 		snapPen = true
@@ -100,11 +124,157 @@
 	// "has ink" alone would give the speaker nothing to draw on.
 	const showSurface = $derived(armed || $strokes.length > 0);
 
-	const color = $derived($annotateColor[$annotateTool]);
+	// The tool actually drawn with as a stroke. The eraser and text tools do not lay down a
+	// live path — eraser removes, text types — so while either is selected we stand in the pen
+	// (the draw path never runs: `live` stays empty). This keeps every draw-side call
+	// (shapeOf/dFor/strokeWidth) type-safe without an `as` in sight.
+	const drawTool = $derived<AnnotateTool>(
+		$annotateTool === 'eraser' || $annotateTool === 'text' ? 'pen' : $annotateTool
+	);
+	// The colour the next mark uses — the selected tool's own, or null for the eraser (which
+	// paints nothing). Text is colourable, so it keeps its swatch.
+	const color = $derived($annotateTool === 'eraser' ? null : $annotateColor[$annotateTool]);
 
 	let surface: SVGSVGElement | undefined = $state();
 	let live: Point[] = $state([]);
 	let seq = 0;
+
+	// ── The eraser ────────────────────────────────────────────────────────────────────────
+	// Whole-stroke rubber: hover a mark and it lights up in the erase colour to say "this is
+	// what goes"; press (or drag across) and it is removed. There is no partial erase — a
+	// stroke is stored as points, and rubbing out a *piece* would mean splitting the polyline;
+	// the unit you drew is the unit you take back, same as UNDO.
+	let hoverPoint: Point | null = $state(null); // where the pointer is, in canvas px (null = off-surface)
+	let erasing = $state(false); // is a delete-drag in progress (button held)?
+
+	/** The one stroke an erase right here would take — the TOP-MOST under the pointer, or null.
+	    Reactive on the pointer position AND the stroke list, so the highlight clears the instant
+	    that stroke is removed under the cursor. Null unless the eraser is armed. */
+	const eraseHoverId = $derived.by<string | null>(() => {
+		if (!armed || $annotateTool !== 'eraser' || !hoverPoint) return null;
+		return topStrokeUnder(hoverPoint);
+	});
+
+	/** The top-most mark the pointer is on, or null. Marks paint in array order, so a later one
+	    sits OVER an earlier one; scanning from the end returns the one you actually see under the
+	    cursor. A TEXT label is caught by its box (hitText); a stroke by its ink, within the
+	    eraser's reach plus the stroke's own half-width — so a fat highlighter catches as easily
+	    as it looks and a hair-thin pen needs a near-direct hit. */
+	function topStrokeUnder(p: Point): string | null {
+		for (let i = $strokes.length - 1; i >= 0; i--) {
+			const s = $strokes[i];
+			if (s.tool === 'text') {
+				if (hitText(p, s.points[0] ?? [0, 0], s.text ?? '', s.size ?? textSize, eraserRadius)) return s.id;
+			} else {
+				const halfWidth = strokeWidth(s.tool, penWidth, highlighterWidth) / 2;
+				if (hitStroke(p, s.points, eraserRadius + halfWidth)) return s.id;
+			}
+		}
+		return null;
+	}
+
+	// ── Text: place, re-edit, drag ─────────────────────────────────────────────────────────
+	// A typed label, not a stroke. Clicking empty canvas opens an editor at that point; clicking
+	// an existing label re-opens it; dragging one moves it. The editor is a real <input> laid
+	// over the surface in canvas px, so it scales with the slide and the caret behaves.
+	const TEXT_GRAB_SLOP = 8; // canvas px of forgiveness when grabbing a label to move/edit
+	const TEXT_DRAG_THRESHOLD = 4; // canvas px of travel before a press counts as a move, not a tap
+
+	/** The label being edited: its id (null = a NEW label), anchor and size. Null = editor shut. */
+	let editing: { id: string | null; x: number; y: number; size: number } | null = $state(null);
+	let editText = $state('');
+	let textInput: HTMLInputElement | undefined = $state();
+
+	/** The top-most TEXT label under a point (for the text tool to grab/edit), or null. */
+	function topTextUnder(p: Point): string | null {
+		for (let i = $strokes.length - 1; i >= 0; i--) {
+			const s = $strokes[i];
+			if (s.tool !== 'text') continue;
+			if (hitText(p, s.points[0] ?? [0, 0], s.text ?? '', s.size ?? textSize, TEXT_GRAB_SLOP)) return s.id;
+		}
+		return null;
+	}
+
+	/** Open the editor — for an existing label (id set → load its text/size) or a new one at p. */
+	function openEditor(id: string | null, at: Point, size = textSize): void {
+		const mark = id ? $strokes.find((s) => s.id === id) : undefined;
+		editing = { id, x: at[0], y: at[1], size: mark?.size ?? size };
+		editText = mark?.text ?? '';
+		tick().then(() => {
+			textInput?.focus();
+			textInput?.select();
+		});
+	}
+
+	/** Confirm the editor: commit the text as a new mark, patch the one being edited, or (an
+	    emptied existing label) delete it. Idempotent — a second call with the editor already
+	    shut does nothing, so blur-then-click can both fire safely. */
+	function commitText(): void {
+		if (!editing) return;
+		const text = sanitizeText(editText);
+		const { id, x, y, size } = editing;
+		editing = null;
+		editText = '';
+		if (id) {
+			if (text) updateStroke(id, { text });
+			else eraseStrokes([id]); // emptied → the label is gone, like erasing it
+		} else if (text) {
+			const stroke: Stroke = { id: `ink-${Date.now()}-${++seq}`, tool: 'text', points: [[x, y]], text, size };
+			if (color) stroke.color = color;
+			addStroke(stroke);
+		}
+	}
+
+	/** Abandon the editor without committing — Escape. A half-typed new label vanishes; an
+	    existing one keeps whatever it already held. */
+	function cancelEditor(): void {
+		editing = null;
+		editText = '';
+	}
+
+	function onEditorKeydown(ev: KeyboardEvent): void {
+		// Keep the editor's keys to itself: Enter commits, Escape cancels, and NEITHER may reach
+		// the window handler that would otherwise disarm the pen or undo a stroke mid-word.
+		ev.stopPropagation();
+		if (ev.key === 'Enter') {
+			ev.preventDefault();
+			commitText();
+		} else if (ev.key === 'Escape') {
+			ev.preventDefault();
+			cancelEditor();
+		}
+	}
+
+	/** A text-tool press: commit any open editor, then grab the label under the pointer (tap →
+	    re-edit, drag → move) or open a fresh editor on empty canvas. */
+	function onTextPointerDown(ev: PointerEvent): void {
+		const p = pointFrom(ev);
+		if (editing) commitText(); // clicking away confirms the current label first
+
+		const id = topTextUnder(p);
+		if (!id) {
+			openEditor(null, p);
+			return;
+		}
+
+		// An existing label: decide tap-vs-drag from how far the pointer travels before it lifts.
+		const mark = $strokes.find((s) => s.id === id);
+		const anchor: Point = mark?.points[0] ?? [p[0], p[1]];
+		let moved = false;
+		trackPointer(ev, {
+			scaleFrom: liveScale,
+			onMove: (dx, dy) => {
+				if (Math.hypot(dx, dy) > TEXT_DRAG_THRESHOLD) moved = true;
+				if (moved) updateStroke(id, { points: [[anchor[0] + dx, anchor[1] + dy]] });
+			},
+			onEnd: () => {
+				if (!moved) openEditor(id, anchor); // a tap re-opens it for editing
+			},
+			onCancel: () => {
+				if (moved) updateStroke(id, { points: [anchor] }); // Esc mid-drag puts it back
+			}
+		});
+	}
 
 	// Is Shift down right now? A live modifier, so it is tracked from every pointer event AND
 	// from Shift's own keydown/keyup — pressing or releasing Shift WITHOUT moving must reshape
@@ -119,16 +289,30 @@
 	/** The shape a gesture actually takes. A highlighter is LEVELLED — the band sits on the
 	    row you swiped instead of sloping with your hand (see levelPoints). A PEN is SNAPPED to
 	    a straight X/Y axis while Shift is held (see snapAxis) — an underline or a plumb line.
-	    Both are applied to the LIVE stroke as well as the committed one, so what you watch
-	    yourself draw is what you get; shaping only at commit would make the mark jump straight
-	    the instant the pen lifted.
+	    A LINE or an ARROW is always the straight tail→head segment (straightLine), and takes
+	    the SAME Shift axis-lock the pen does, so a Shift-held one lies dead horizontal or
+	    vertical. All are applied to the LIVE stroke as well as the committed one, so what you
+	    watch yourself draw is what you get; shaping only at commit would make the mark jump
+	    straight the instant the pen lifted.
 
 	    Committed strokes are stored already-shaped, so re-rendering never re-shapes: a stroke
 	    drawn freehand (Shift up, or `snapPen={false}`) keeps its curve for good. */
 	function shapeOf(points: Point[], tool: AnnotateTool): Point[] {
 		if (tool === 'highlighter' && levelHighlight) return levelPoints(points);
 		if (tool === 'pen' && snapPen && snapping) return snapAxis(points);
+		if (tool === 'line' || tool === 'arrow') return snapPen && snapping ? snapAxis(points) : straightLine(points);
+		if (tool === 'rectangle') return straightLine(points); // two opposite corners; rectD normalises them
 		return points;
+	}
+
+	/** The `d` for a mark. An ARROW gets a shaft-plus-chevron path (arrowD), a RECTANGLE a
+	    closed box (rectD), every other stroke the smoothed ink line (strokeD). The points are
+	    already shaped by shapeOf, so this only chooses how they become a path — the geometry is
+	    the core's. (TEXT is never a path; it renders as an SVG <text>, not through here.) */
+	function dFor(points: Point[], tool: AnnotateTool): string {
+		if (tool === 'arrow') return arrowD(points, arrowHead);
+		if (tool === 'rectangle') return rectD(points);
+		return strokeD(points);
 	}
 
 	function pointFrom(ev: PointerEvent): Point {
@@ -157,16 +341,53 @@
 		}
 	}
 
+	/** Delete the top-most stroke under a point — one erase step. Called on press and on each
+	    move of a delete-drag, so scrubbing the eraser takes the marks one at a time as it passes
+	    over them. `eraseHoverId` re-derives from the shortened list, so the highlight drops the
+	    stroke the same frame it goes. */
+	function eraseUnder(p: Point): void {
+		const id = topStrokeUnder(p);
+		if (id) eraseStrokes([id]);
+	}
+
 	function onPointerDown(ev: PointerEvent): void {
 		if (!armed || ev.button !== 0) return;
 		ev.preventDefault();
+
+		if ($annotateTool === 'eraser') {
+			capture(ev.pointerId, true);
+			erasing = true;
+			hoverPoint = pointFrom(ev);
+			eraseUnder(hoverPoint); // a click erases; a drag keeps erasing (onPointerMove)
+			return;
+		}
+
+		if ($annotateTool === 'text') {
+			onTextPointerDown(ev); // place / re-edit / drag a label — its own gesture, no `live`
+			return;
+		}
+
 		snapping = ev.shiftKey; // Shift may already be held as the pen goes down
 		capture(ev.pointerId, true);
 		live = [pointFrom(ev)];
 	}
 
 	function onPointerMove(ev: PointerEvent): void {
-		if (!armed || live.length === 0) return;
+		if (!armed) return;
+
+		if ($annotateTool === 'eraser') {
+			// Track the pointer whether or not a button is down: with no button it drives the
+			// hover highlight (what WOULD go); with the button held it also erases as it goes.
+			hoverPoint = pointFrom(ev);
+			if (erasing) eraseUnder(hoverPoint);
+			return;
+		}
+
+		// Text places, re-edits or drags on pointerDOWN (the drag runs on its own trackPointer
+		// listeners), so the surface's own move does nothing for it.
+		if ($annotateTool === 'text') return;
+
+		if (live.length === 0) return;
 		snapping = ev.shiftKey; // the authoritative read each sample — Shift can be let go mid-stroke
 		const p = pointFrom(ev);
 		// A 2px gate while drawing keeps the live array (and the path we re-render on every
@@ -178,6 +399,15 @@
 	}
 
 	function onPointerUp(ev: PointerEvent): void {
+		if ($annotateTool === 'eraser') {
+			if (!erasing) return;
+			erasing = false;
+			capture(ev.pointerId, false);
+			return;
+		}
+
+		if ($annotateTool === 'text') return; // the text gesture ends on its own trackPointer up
+
 		if (live.length === 0) return;
 		snapping = ev.shiftKey; // whether the mark COMMITS straight is decided at the lift
 		capture(ev.pointerId, false);
@@ -185,14 +415,27 @@
 		// Decimate first, THEN shape: levelling/snapping reduces a stroke to two points, so
 		// simplifying afterwards would have nothing left to do — and the extent a shape reads
 		// should come from the samples the hand actually produced, not from a thinned subset.
-		const points = shapeOf(simplifyPoints(live, 4), $annotateTool);
+		const points = shapeOf(simplifyPoints(live, 4), drawTool);
 		live = [];
 		if (points.length === 0) return;
 
-		const stroke: Stroke = { id: `ink-${Date.now()}-${++seq}`, tool: $annotateTool, points };
+		const stroke: Stroke = { id: `ink-${Date.now()}-${++seq}`, tool: drawTool, points };
 		if (color) stroke.color = color;
 		addStroke(stroke);
 	}
+
+	/** The pointer left the surface: forget where it was, so no stroke stays lit as "about to
+	    be erased" while the cursor is elsewhere. A delete-drag already in progress is left to
+	    end on its own pointerup (pointer capture still delivers it). */
+	function onPointerLeave(): void {
+		hoverPoint = null;
+	}
+
+	// Single source of truth for the palette's shrink — read by both the default (CSS)
+	// transform and the dragged (inline) one below, so a drag can never lose it (see
+	// barStyle: `transform:none` used to wipe the scale outright once the bar had ever
+	// been moved, so anyone who'd dragged it even once got the full-size bar back forever).
+	const BAR_SCALE = 0.525;
 
 	// ── Dragging the bar ────────────────────────────────────────────────────────────────
 	// The bar is wide and it sits over the slide, so wherever it defaults to it is in someone's
@@ -241,19 +484,36 @@
 		barPos.set(null);
 	}
 
-	// `null` → let the CSS place it (bottom-centre). Dragged → explicit canvas coords, and the
-	// centring transform has to go with them or the bar would sit half a bar-width to the left.
+	// `null` → let the CSS place it (bottom-centre, scaled around its own centre-bottom).
+	// Dragged → explicit canvas coords, scaled around its own top-left so the box still
+	// renders exactly at the point the drag measured and clamped.
 	const barStyle = $derived(
-		$barPos ? `left:${$barPos.x}px; top:${$barPos.y}px; bottom:auto; transform:none;` : ''
+		$barPos
+			? `left:${$barPos.x}px; top:${$barPos.y}px; bottom:auto; transform:scale(${BAR_SCALE}); transform-origin:top left;`
+			: ''
 	);
 
-	function pick(tool: AnnotateTool): void {
+	function pick(tool: AnnotateMode): void {
 		annotateTool.set(tool);
 	}
 
 	function setColor(c: string | null): void {
+		if ($annotateTool === 'eraser') return; // the eraser has no colour to set
 		annotateColor.update((m) => ({ ...m, [$annotateTool]: c }));
 	}
+
+	// The bar's mode buttons, as icons. Each carries its word as the aria-label AND the tooltip,
+	// so nothing is lost by dropping the text — a screen reader and a hover both still say "Pen".
+	// The `d` is a 24×24 line glyph, stroked in currentColor (see .annot-btn.icon svg).
+	const TOOLS: { tool: AnnotateMode; label: string; d: string }[] = [
+		{ tool: 'pen', label: 'Pen', d: 'M4 20l1-4L15 5l4 4L9 19l-4 1z M14 6l4 4' },
+		{ tool: 'line', label: 'Line', d: 'M5 19L19 5' },
+		{ tool: 'arrow', label: 'Arrow', d: 'M5 19L19 5M11 5h8v8' },
+		{ tool: 'rectangle', label: 'Rectangle', d: 'M5 6h14v12H5z' },
+		{ tool: 'highlighter', label: 'Highlight', d: 'M4 20h5M6 18L15 9l3 3-9 9H6zM14 8l3 3' },
+		{ tool: 'text', label: 'Text', d: 'M6 6h12M12 6v13M9 19h6' },
+		{ tool: 'eraser', label: 'Erase', d: 'M4 20h9M6 18l7-7 6 6-4 4H10z' }
+	];
 
 	/** Escape puts the pen down; Ctrl/Cmd+Z takes back a stroke.
 
@@ -292,6 +552,8 @@
 		bind:this={surface}
 		class="annot-surface"
 		class:armed
+		class:erasing={armed && $annotateTool === 'eraser'}
+		class:texting={armed && $annotateTool === 'text'}
 		viewBox="0 0 {canvasWidth} {canvasHeight}"
 		style="width:{canvasWidth}px; height:{canvasHeight}px; pointer-events:{armed ? 'auto' : 'none'};"
 		aria-hidden="true"
@@ -299,29 +561,64 @@
 		onpointermove={onPointerMove}
 		onpointerup={onPointerUp}
 		onpointercancel={onPointerUp}
+		onpointerleave={onPointerLeave}
 	>
 		{#each $strokes as stroke (stroke.id)}
-			<path
-				class="annot-stroke"
-				class:highlighter={stroke.tool === 'highlighter'}
-				d={strokeD(stroke.points)}
-				stroke-width={strokeWidth(stroke.tool, penWidth, highlighterWidth)}
-				style={paint(stroke.color)}
-			/>
+			{#if stroke.tool === 'text'}
+				<!-- The label being edited is hidden here — its <input> stands in its place, so the
+				     text does not double up while you type. -->
+				{#if !(editing && editing.id === stroke.id)}
+					<text
+						class="annot-text"
+						class:erasing={eraseHoverId === stroke.id}
+						x={stroke.points[0]?.[0] ?? 0}
+						y={stroke.points[0]?.[1] ?? 0}
+						font-size={stroke.size ?? textSize}
+						dominant-baseline="hanging"
+						style={stroke.color ? `fill:${stroke.color};` : ''}>{stroke.text}</text
+					>
+				{/if}
+			{:else}
+				<path
+					class="annot-stroke"
+					class:highlighter={stroke.tool === 'highlighter'}
+					class:erasing={eraseHoverId === stroke.id}
+					d={dFor(stroke.points, stroke.tool)}
+					stroke-width={strokeWidth(stroke.tool, penWidth, highlighterWidth)}
+					style={paint(stroke.color)}
+				/>
+			{/if}
 		{/each}
 
 		<!-- The stroke under the pen right now. Same paint as a committed one, so the ink does
-		     not shift the instant the pen lifts. -->
+		     not shift the instant the pen lifts. (Never rendered in eraser or text mode — those
+		     remove/type instead of building a stroke, so `live` stays empty.) -->
 		{#if live.length > 0}
 			<path
 				class="annot-stroke"
-				class:highlighter={$annotateTool === 'highlighter'}
-				d={strokeD(shapeOf(live, $annotateTool))}
-				stroke-width={strokeWidth($annotateTool, penWidth, highlighterWidth)}
+				class:highlighter={drawTool === 'highlighter'}
+				d={dFor(shapeOf(live, drawTool), drawTool)}
+				stroke-width={strokeWidth(drawTool, penWidth, highlighterWidth)}
 				style={paint(color)}
 			/>
 		{/if}
 	</svg>
+
+	<!-- The text editor: a real <input> laid over the surface at the label's canvas anchor, so
+	     it scales with the slide and the caret behaves. Blur or Enter commits, Escape cancels
+	     (see commitText / onEditorKeydown). Only ever shown while a label is being written. -->
+	{#if armed && editing}
+		<input
+			class="annot-text-input no-print"
+			bind:this={textInput}
+			bind:value={editText}
+			maxlength={TEXT_MAX_LEN}
+			style="left:{editing.x}px; top:{editing.y}px; font-size:{editing.size}px; {color ? `color:${color};` : ''}"
+			aria-label="Annotation text"
+			onkeydown={onEditorKeydown}
+			onblur={commitText}
+		/>
+	{/if}
 {/if}
 
 <!-- The top-centre PRESENT | ANNOTATE | ADJUST | DISPLAY | ☰ cluster used to live HERE, but it
@@ -364,45 +661,53 @@
 			onpointerdown={onGripDown}
 			ondblclick={homeBar}
 		>⠿</span>
-		<button
-			type="button"
-			class="annot-btn"
-			class:on={$annotateTool === 'pen'}
-			aria-pressed={$annotateTool === 'pen'}
-			onclick={() => pick('pen')}>PEN</button
-		>
-		<button
-			type="button"
-			class="annot-btn"
-			class:on={$annotateTool === 'highlighter'}
-			aria-pressed={$annotateTool === 'highlighter'}
-			onclick={() => pick('highlighter')}>HIGHLIGHT</button
-		>
-		<span class="annot-sep" aria-hidden="true"></span>
-
-		<!-- Swatches for speed (you are on stage), plus a picker for anything else. The first
-		     swatch is the THEME's colour, and picking it stores `null` rather than a hex. -->
-		{#each inkColors as c, i (i)}
+		<!-- The mode buttons, as icons — PEN LINE ARROW RECTANGLE HIGHLIGHT TEXT ERASE. The word
+		     lives on as the aria-label and the tooltip, so nothing is lost by dropping the text.
+		     ERASE is a MODE, not a colour of ink (it removes marks); it wears the erase tint when
+		     armed, the same token a mark about to be deleted lights up in. -->
+		{#each TOOLS as t (t.tool)}
 			<button
 				type="button"
-				class="annot-swatch"
-				class:on={color === c}
-				class:theme={c === null}
-				class:hl={$annotateTool === 'highlighter'}
-				style={c ? `--swatch:${c};` : ''}
-				aria-label={c === null ? 'Theme colour' : `Colour ${c}`}
-				aria-pressed={color === c}
-				onclick={() => setColor(c)}
-			></button>
+				class="annot-btn icon"
+				class:on={$annotateTool === t.tool}
+				class:erase={t.tool === 'eraser'}
+				aria-label={t.label}
+				aria-pressed={$annotateTool === t.tool}
+				title={t.label}
+				onclick={() => pick(t.tool)}
+			>
+				<svg viewBox="0 0 24 24" aria-hidden="true"><path d={t.d} /></svg>
+			</button>
 		{/each}
-		<label class="annot-custom" title="Custom colour">
-			<input
-				type="color"
-				aria-label="Custom ink colour"
-				value={color ?? '#F0A33E'}
-				oninput={(e) => setColor((e.currentTarget as HTMLInputElement).value)}
-			/>
-		</label>
+
+		<!-- Colour is meaningless while erasing, so the swatches step aside for the eraser. -->
+		{#if $annotateTool !== 'eraser'}
+			<span class="annot-sep" aria-hidden="true"></span>
+
+			<!-- Swatches for speed (you are on stage), plus a picker for anything else. The first
+			     swatch is the THEME's colour, and picking it stores `null` rather than a hex. -->
+			{#each inkColors as c, i (i)}
+				<button
+					type="button"
+					class="annot-swatch"
+					class:on={color === c}
+					class:theme={c === null}
+					class:hl={$annotateTool === 'highlighter'}
+					style={c ? `--swatch:${c};` : ''}
+					aria-label={c === null ? 'Theme colour' : `Colour ${c}`}
+					aria-pressed={color === c}
+					onclick={() => setColor(c)}
+				></button>
+			{/each}
+			<label class="annot-custom" title="Custom colour">
+				<input
+					type="color"
+					aria-label="Custom ink colour"
+					value={color ?? '#F0A33E'}
+					oninput={(e) => setColor((e.currentTarget as HTMLInputElement).value)}
+				/>
+			</label>
+		{/if}
 
 		<span class="annot-sep" aria-hidden="true"></span>
 		<button type="button" class="annot-btn" disabled={$strokes.length === 0} onclick={undoStroke}
@@ -413,7 +718,17 @@
 		>
 		<button type="button" class="annot-btn" onclick={resetAllInk}>RESET ALL</button>
 		<span class="annot-sep" aria-hidden="true"></span>
-		<button type="button" class="annot-btn done" onclick={() => annotationMode.set(false)}>DONE</button>
+		<!-- Put the pen down. An (×) like the one on <Hint>, rather than a DONE word — it reads
+		     as "close this" and costs the bar less width. -->
+		<button
+			type="button"
+			class="annot-close"
+			aria-label="Close annotation tools"
+			title="Close (Esc)"
+			onclick={() => annotationMode.set(false)}
+		>
+			<span aria-hidden="true">×</span>
+		</button>
 	</div>
 {/if}
 
@@ -434,6 +749,15 @@
 		cursor: crosshair;
 		touch-action: none;
 		user-select: none;
+	}
+	/* Erasing is a different job from drawing, so a different pointer — the stroke that lights
+	   up says WHAT goes, the cursor says the mode is delete, not draw. */
+	.annot-surface.armed.erasing {
+		cursor: cell;
+	}
+	/* Text places a caret, so the I-beam — the same cue any text field gives. */
+	.annot-surface.armed.texting {
+		cursor: text;
 	}
 
 	.annot-stroke {
@@ -461,6 +785,58 @@
 		opacity: var(--annot-highlighter-alpha, 0.45);
 		mix-blend-mode: var(--annot-highlighter-blend, screen);
 		filter: none;
+	}
+
+	/* A stroke the eraser is about to remove, lit in the erase colour so the speaker deletes
+	   exactly the one they meant. A role token, so it themes; the fallback is a bright red —
+	   the universal "this goes" — chosen light-on-dark for the themeless main deck, the same
+	   rule the other --annot-* fallbacks follow. It must WIN over .highlighter (identical
+	   specificity), so it comes AFTER that rule and restores full opacity, normal blend and
+	   its own glow — otherwise a translucent band would light only faintly. */
+	.annot-stroke.erasing {
+		stroke: var(--annot-erase, #FF5C5C);
+		opacity: 1;
+		mix-blend-mode: normal;
+		filter: drop-shadow(0 0 7px var(--annot-erase-glow, rgba(255, 92, 92, 0.75)));
+	}
+
+	/* A TEXT label — FILLED (not stroked) with its own role token, which defaults to the pen's
+	   colour so untinted text follows the theme with the ink. The same glow the pen carries, so
+	   a label reads over whatever the slide put behind it. */
+	.annot-text {
+		fill: var(--annot-text, var(--annot-pen, #F0A33E));
+		font-family: inherit;
+		font-weight: 600;
+		white-space: pre;
+		filter: drop-shadow(0 0 6px var(--annot-pen-glow, rgba(0, 0, 0, 0.55)));
+	}
+	/* A label the eraser is about to remove, lit in the erase colour like a stroke is. */
+	.annot-text.erasing {
+		fill: var(--annot-erase, #FF5C5C);
+		filter: drop-shadow(0 0 7px var(--annot-erase-glow, rgba(255, 92, 92, 0.75)));
+	}
+
+	/* The text editor: a bare, chromeless <input> sitting exactly where the label will draw, at
+	   canvas px, so what you type is what lands. No border/background of its own — it borrows the
+	   label's colour and the deck's font — with a thin caret-side rule so you can see it is live.
+	   z-index 43 keeps it over the surface (40) so it takes focus and the caret. */
+	.annot-text-input {
+		position: absolute;
+		z-index: 43;
+		margin: 0;
+		padding: 0 0.05em;
+		border: none;
+		border-left: 2px solid currentColor;
+		background: transparent;
+		color: var(--annot-text, var(--annot-pen, #F0A33E));
+		font-family: inherit;
+		font-weight: 600;
+		line-height: 1;
+		outline: none;
+		/* The label draws from its TOP (dominant-baseline: hanging); an input is centred in its
+		   own line box, so pull it up by the lead the label leaves above the glyphs — the two
+		   then sit at the same place and committing does not make the text jump. */
+		transform: translateY(-0.05em);
 	}
 
 	/* ── The stale-ink notice ───────────────────────────────────────────────────────── */
@@ -491,16 +867,21 @@
 		left: 50%;
 		bottom: 28px;
 		/* 75% of prior size, then another 70% on top — the pen palette was reading large
-		   next to the window-edge chrome. Net 0.75 * 0.7 = 0.525 of the original size. */
+		   next to the window-edge chrome. Net 0.75 * 0.7 = 0.525 of the original size.
+		   Keep this literal in sync with BAR_SCALE above — the dragged (inline) transform
+		   reuses that constant so a drag never loses the shrink. */
 		transform: translateX(-50%) scale(0.525);
 		transform-origin: center bottom;
 		z-index: 41;
 		display: flex;
 		align-items: center;
-		gap: 0.4em;
-		padding: 0.45em 0.7em;
+		/* Tighter than before (gap 0.4→0.28, padding 0.45/0.7→0.3/0.5) so the icons can grow
+		   (font-size 0.8→0.92) without the bar getting wider — the buttons carry glyphs now, not
+		   words, so they read better big and packed close. */
+		gap: 0.28em;
+		padding: 0.3em 0.5em;
 		border-radius: 999px;
-		font-size: calc(var(--base-font, 16px) * 0.8);
+		font-size: calc(var(--base-font, 16px) * 0.92);
 		background: var(--annot-bar-bg, rgba(20, 22, 26, 0.92));
 		border: 1px solid var(--annot-bar-edge, rgba(255, 255, 255, 0.16));
 		box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
@@ -528,12 +909,32 @@
 		font: inherit;
 		font-weight: bold;
 		letter-spacing: 0.03em;
-		padding: 0.25em 0.8em;
+		padding: 0.2em 0.55em;
 		border-radius: 999px;
 		border: 1px solid transparent;
 		background: transparent;
 		color: var(--annot-bar-fg, #D7DDE5);
 		white-space: nowrap;
+	}
+	/* A mode button carries a glyph, not a word: a square-ish target with a larger icon inside.
+	   The <svg> strokes in currentColor, so the icon flips to the on-fg colour when the button
+	   is active (.on sets both background and colour). */
+	.annot-btn.icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.22em;
+		border-radius: 8px;
+	}
+	.annot-btn.icon svg {
+		display: block;
+		width: 1.5em;
+		height: 1.5em;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 2;
+		stroke-linecap: round;
+		stroke-linejoin: round;
 	}
 	.annot-btn:hover:not(:disabled) {
 		background: var(--annot-bar-hover, rgba(255, 255, 255, 0.1));
@@ -542,16 +943,47 @@
 		background: var(--annot-pen, #F0A33E);
 		color: var(--annot-bar-on-fg, #1A1206);
 	}
+	/* The eraser armed: tint its button with the erase colour, not the pen's, so the bar
+	   itself says the next gesture DELETES. Same token the about-to-go strokes light up in. */
+	.annot-btn.erase.on {
+		background: var(--annot-erase, #FF5C5C);
+		color: var(--annot-bar-on-fg, #1A1206);
+	}
 	.annot-btn:disabled {
 		opacity: 0.35;
 		cursor: default;
 	}
-	.annot-btn.done {
-		color: var(--annot-bar-done, #7FD1A0);
-	}
 	.annot-btn.keep {
 		color: var(--annot-bar-fg, #D7DDE5);
 		opacity: 0.75;
+	}
+
+	/* Put the pen down — a round (×), the same idea as <Hint>'s dismiss, in place of a DONE
+	   word. Quiet at rest, brightens on hover; the glyph is nudged up for optical centring. */
+	.annot-close {
+		cursor: pointer;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.7em;
+		height: 1.7em;
+		padding: 0;
+		border: 1px solid transparent;
+		border-radius: 50%;
+		background: transparent;
+		color: var(--annot-bar-fg, #D7DDE5);
+		font: inherit;
+		font-size: 1.25em;
+		line-height: 1;
+		opacity: 0.8;
+	}
+	.annot-close:hover {
+		background: var(--annot-bar-hover, rgba(255, 255, 255, 0.1));
+		opacity: 1;
+	}
+	.annot-close span {
+		display: block;
+		transform: translateY(-0.06em);
 	}
 
 	.annot-swatch {

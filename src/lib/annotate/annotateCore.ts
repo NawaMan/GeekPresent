@@ -17,9 +17,18 @@ import type { Point } from '$lib/draw/types';
 import type { Codec } from '$lib/utils/stateCore';
 import { finite, finitePoint, round, smoothPath } from '$lib/draw/drawCore';
 
-/** Pen (opaque, thin) or highlighter (fat, translucent, blended band). The two
-    differ only in how the SAME stroke geometry is painted. */
-export type AnnotateTool = 'pen' | 'highlighter';
+/** The DRAW tools: pen (opaque, thin freehand), line (a straight two-point segment), arrow
+    (a line with a chevron head DERIVED at render time, see arrowD), rectangle (a closed box
+    between two corners, see rectD), highlighter (fat, translucent, blended band), or text (a
+    typed label anchored at a point — the one mark that is NOT a `d`-from-points path). The
+    stroke ones differ only in how the gesture is SHAPED and how the `d` is painted; text
+    carries its own string. */
+export type AnnotateTool = 'pen' | 'line' | 'arrow' | 'rectangle' | 'highlighter' | 'text';
+
+/** What the bar can be set to: any DRAW tool, or the ERASER. The eraser is a MODE, not a
+    tool a stroke can be — it removes whole strokes rather than adding one — so it lives
+    here and never in `Stroke.tool` or the per-tool colour map. */
+export type AnnotateMode = AnnotateTool | 'eraser';
 
 /** One freehand mark. `id` exists so a mirrored list can be keyed without
     re-drawing every stroke on each update.
@@ -34,6 +43,11 @@ export interface Stroke {
 	tool: AnnotateTool;
 	points: Point[];
 	color?: string;
+	/** TEXT marks only: the typed label. `points[0]` is its top-left anchor. */
+	text?: string;
+	/** TEXT marks only: the font size in canvas px, stored so a re-theme or another window
+	    renders the label at the size it was placed rather than the current default. */
+	size?: number;
 }
 
 /** One slide's ink, plus when it was last touched.
@@ -204,6 +218,161 @@ export function snapAxis(points: Point[]): Point[] {
 		: [[round(start[0]), round(start[1])], [round(start[0]), round(end[1])]]; // dead VERTICAL, at the press X
 }
 
+/** Reduce a gesture to the straight segment a LINE or an ARROW draws — tail (press) to
+    head (current/lift).
+
+    Like `snapAxis`, but FREE-ANGLE: the mark points wherever the hand dragged, it is not
+    projected onto an axis. Anchored at the press point, with the head chasing the current
+    sample — so the live mark swings with the pointer and commits pointing where it was let
+    go. A drag that never travelled (a tap) is left as its samples, so it falls through to a
+    dot rather than collapsing to a zero-length segment. Total and NaN-safe. */
+export function straightLine(points: Point[]): Point[] {
+	if (!Array.isArray(points) || points.length < 2) return Array.isArray(points) ? points.map(finitePoint) : [];
+	const pts = points.map(finitePoint);
+	return [pts[0], pts[pts.length - 1]];
+}
+
+/** The SVG `d` for an ARROW — a straight shaft from tail to head, with an OPEN two-line
+    chevron head at the head end.
+
+    Defined by exactly two points, the tail (press) and the head (current/lift): the
+    head is DERIVED here rather than stored, the same "the points are the truth, the `d`
+    is derived" discipline `strokeD` keeps — so a mirrored arrow re-draws identically on
+    the window that only heard it, and the head stays crisp at any canvas scale. The head
+    is two barbs swept `headAngle` back from the reversed shaft direction, drawn as an
+    open chevron rather than a filled triangle so it paints with the SAME round-cap stroke
+    (and the same theme colour and glow) as the rest of the ink — no fill to theme, no
+    <marker> to register.
+
+    `headLen` is clamped to the shaft length, so a short arrow keeps a head no longer than
+    itself instead of a chevron that overshoots the tail. A zero-length arrow (tail == head,
+    a tap that never travelled) falls back to a dot exactly as `strokeD` does — a mark, not
+    nothing. Every input may be junk and the answer is still drawable: nothing here is NaN. */
+export function arrowD(points: Point[], headLen = 36, headAngle = Math.PI / 7): string {
+	if (!Array.isArray(points) || points.length === 0) return '';
+	const pts = points.map(finitePoint);
+	const tail = pts[0];
+	const head = pts[pts.length - 1];
+	const dx = head[0] - tail[0];
+	const dy = head[1] - tail[1];
+	const len = Math.hypot(dx, dy);
+	if (!(len > 0)) {
+		const [x, y] = tail; // a tap, or tail == head — a dot, like strokeD
+		return `M ${round(x)} ${round(y)} L ${round(x)} ${round(y)}`;
+	}
+
+	const ux = dx / len;
+	const uy = dy / len;
+	const h = Math.min(Math.max(0, finite(headLen, 36)), len); // never longer than the shaft
+	const a = Math.max(0, finite(headAngle, Math.PI / 7));
+	const cos = Math.cos(a);
+	const sin = Math.sin(a);
+
+	// The two barbs: the reversed shaft direction (-ux, -uy) rotated by ±a, scaled by h,
+	// hung off the head. Rotation of (vx, vy) by θ is (vx·cos − vy·sin, vx·sin + vy·cos).
+	const b1x = head[0] + h * (-ux * cos + uy * sin);
+	const b1y = head[1] + h * (-uy * cos - ux * sin);
+	const b2x = head[0] + h * (-ux * cos - uy * sin);
+	const b2y = head[1] + h * (-uy * cos + ux * sin);
+
+	return (
+		`M ${round(tail[0])} ${round(tail[1])} L ${round(head[0])} ${round(head[1])}` +
+		` M ${round(b1x)} ${round(b1y)} L ${round(head[0])} ${round(head[1])} L ${round(b2x)} ${round(b2y)}`
+	);
+}
+
+/** The SVG `d` for a RECTANGLE — a closed box between two opposite corners. The corners are
+    NORMALISED (min/max), so dragging up-left draws the same box as down-right, and the outline
+    is drawn stroke-only (the surface fills nothing) so it rings what it is put around. A
+    zero-area drag — a tap, or a dead-horizontal/vertical drag — still yields a drawable path
+    rather than nothing. Total and NaN-safe, like the rest of the family. */
+export function rectD(points: Point[]): string {
+	if (!Array.isArray(points) || points.length === 0) return '';
+	const pts = points.map(finitePoint);
+	const a = pts[0];
+	const b = pts[pts.length - 1];
+	const x1 = round(Math.min(a[0], b[0]));
+	const y1 = round(Math.min(a[1], b[1]));
+	const x2 = round(Math.max(a[0], b[0]));
+	const y2 = round(Math.max(a[1], b[1]));
+	return `M ${x1} ${y1} L ${x2} ${y1} L ${x2} ${y2} L ${x1} ${y2} Z`;
+}
+
+/** Distance in canvas px from a point to a single segment a→b — the classic projection
+    onto the segment, clamped to its ends. A degenerate segment (a == b) collapses to the
+    distance to that point rather than dividing by zero. Total: junk in → a finite answer. */
+function segmentDistance(p: Point, a: Point, b: Point): number {
+	const vx = b[0] - a[0];
+	const vy = b[1] - a[1];
+	const wx = p[0] - a[0];
+	const wy = p[1] - a[1];
+	const len2 = vx * vx + vy * vy;
+	// t = how far along a→b the foot of the perpendicular falls, clamped into [0, 1] so a
+	// point beyond an end measures to the END, not to the infinite line.
+	let t = len2 > 0 ? (wx * vx + wy * vy) / len2 : 0;
+	t = Math.max(0, Math.min(1, t));
+	const cx = a[0] + t * vx;
+	const cy = a[1] + t * vy;
+	return Math.hypot(p[0] - cx, p[1] - cy);
+}
+
+/** The closest a stroke's INK comes to a point, in canvas px — the min over its segments.
+    This is the eraser's whole question: "is the pointer on this mark?" A stroke stored as
+    its sampled points is exactly a polyline, so hit-testing the samples hit-tests the ink.
+
+    An EMPTY stroke is infinitely far (nothing to touch), so it never registers a hit; a
+    single-point stroke (a tap → a dot) measures to that point. Total and NaN-safe, in the
+    drawCore tradition: every coordinate is repaired before it is used. */
+export function distanceToStroke(point: Point, points: Point[]): number {
+	if (!Array.isArray(points) || points.length === 0) return Infinity;
+	const p = finitePoint(point);
+	const pts = points.map(finitePoint);
+	if (pts.length === 1) return Math.hypot(p[0] - pts[0][0], p[1] - pts[0][1]);
+
+	let min = Infinity;
+	for (let i = 1; i < pts.length; i++) {
+		const d = segmentDistance(p, pts[i - 1], pts[i]);
+		if (d < min) min = d;
+	}
+	return min;
+}
+
+/** Does an eraser centred at `point` with reach `tolerance` (canvas px) touch this stroke?
+    `tolerance` is the eraser's own radius plus the stroke's half-width, so a fat highlighter
+    band is as easy to catch as it looks and a hair-thin pen needs a near-direct hit. A
+    non-finite or negative tolerance reads as 0 — a hit only dead on the ink. */
+export function hitStroke(point: Point, points: Point[], tolerance: number): boolean {
+	const tol = Math.max(0, finite(tolerance, 0));
+	return distanceToStroke(point, points) <= tol;
+}
+
+/** Approximate the box a TEXT mark occupies, in canvas px: its anchor is the TOP-LEFT, the
+    width grows with the character count, the height is one line of the font size. Approximate
+    on purpose — it is used to GRAB, RE-EDIT or ERASE a label, where "near enough" beats a
+    glyph-metric measurement the pure layer cannot make (real advances live in the browser).
+    A wider-than-average font just means the grab box runs a little short of the last glyph. */
+export function textBounds(
+	anchor: Point,
+	text: string,
+	size: number
+): { x: number; y: number; w: number; h: number } {
+	const a = finitePoint(anchor);
+	const s = Math.max(1, finite(size, 40));
+	const chars = typeof text === 'string' ? text.length : 0;
+	const w = Math.max(s * 0.6, chars * s * 0.55); // a rough mean glyph advance
+	const h = s * 1.25; // one line, with a little lead
+	return { x: round(a[0]), y: round(a[1]), w: round(w), h: round(h) };
+}
+
+/** Is a point within a TEXT mark's box, padded by `tolerance` (the eraser's reach, or a grab
+    slop)? Uses textBounds, so it is the same box the label is measured to draw inside. */
+export function hitText(point: Point, anchor: Point, text: string, size: number, tolerance = 0): boolean {
+	const p = finitePoint(point);
+	const tol = Math.max(0, finite(tolerance, 0));
+	const b = textBounds(anchor, text, size);
+	return p[0] >= b.x - tol && p[0] <= b.x + b.w + tol && p[1] >= b.y - tol && p[1] <= b.y + b.h + tol;
+}
+
 /** Keep the pen's bar inside the canvas.
 
     A bar dragged off the edge is a bar the speaker cannot get back — and since the position
@@ -307,17 +476,55 @@ export function sanitizeStrokes(raw: unknown): Stroke[] {
 			.map((p) => finitePoint(p as Point));
 		if (points.length === 0) continue;
 
+		const tool: AnnotateTool = KNOWN_TOOLS.includes(s.tool as AnnotateTool)
+			? (s.tool as AnnotateTool)
+			: 'pen';
+
 		const stroke: Stroke = {
 			id: typeof s.id === 'string' && s.id ? s.id : `ink-${out.length}`,
-			tool: s.tool === 'highlighter' ? 'highlighter' : 'pen',
+			tool,
 			points
 		};
 		// An unusable colour drops back to the theme token rather than costing the stroke —
 		// and is never passed through to the DOM, since it lands in an inline `style`.
 		if (isColor(s.color)) stroke.color = s.color as string;
+
+		// A TEXT mark carries a string, and a label with no words is nothing to draw — so a
+		// text mark whose content fails sanitation is DROPPED, not kept blank.
+		if (tool === 'text') {
+			const text = sanitizeText(s.text);
+			if (!text) continue;
+			stroke.text = text;
+			const size = finite(s.size as number, 0);
+			if (size > 0) stroke.size = round(size);
+		}
+
 		out.push(stroke);
 	}
 	return out;
+}
+
+/** The tools a stored mark may legitimately claim. An unknown value falls back to the pen
+    (a tool is just a paint choice — losing the mark over it would be a bad trade); this list
+    is the gate that keeps the eraser MODE, or any junk, from riding in as a stroke. */
+const KNOWN_TOOLS: AnnotateTool[] = ['pen', 'line', 'arrow', 'rectangle', 'highlighter', 'text'];
+
+/** The longest a text label may be — a guard on the one field that carries free user input
+    into storage. Not a UX limit so much as an abuse cap: a runaway string would bloat the
+    localStorage payload the presenter channel pushes on every change. */
+export const TEXT_MAX_LEN = 280;
+
+/** Coerce a text mark's content into something safe to store and draw.
+
+    It reaches the DOM as SVG TEXT content, which Svelte escapes — no markup runs — so the
+    risk is not injection but abuse: the string is capped at TEXT_MAX_LEN, control characters
+    (including the newlines a single-line label never has) are dropped, and an all-whitespace
+    or empty result is `undefined` so the caller drops the mark rather than storing a blank. */
+export function sanitizeText(raw: unknown): string | undefined {
+	if (typeof raw !== 'string') return undefined;
+	// eslint-disable-next-line no-control-regex
+	const cleaned = raw.replace(/[\u0000-\u001F\u007F]/g, '').slice(0, TEXT_MAX_LEN);
+	return cleaned.trim().length > 0 ? cleaned : undefined;
 }
 
 /** Is this a colour we are willing to write into an inline `style`?

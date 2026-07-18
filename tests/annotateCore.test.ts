@@ -4,19 +4,28 @@
 // that the answer is still something drawable.
 import { describe, expect, it } from 'vitest';
 import {
+	arrowD,
 	barPosCodec,
 	clampBarPos,
+	distanceToStroke,
+	hitStroke,
+	hitText,
 	inkAgeText,
 	inkBookCodec,
 	isColor,
 	isStaleInk,
 	levelPoints,
+	rectD,
 	sanitizeInkBook,
 	sanitizeStrokes,
+	sanitizeText,
 	simplifyPoints,
 	snapAxis,
+	straightLine,
 	strokeD,
 	strokeWidth,
+	textBounds,
+	TEXT_MAX_LEN,
 	toCanvasPoint
 } from '../src/lib/annotate/annotateCore';
 import {
@@ -186,6 +195,186 @@ describe('snapAxis — the pen borrows a straight edge from Shift', () => {
 	});
 });
 
+describe('straightLine — an arrow is tail→head, free-angle', () => {
+	it('reduces a wobbly drag to the press point and the lift point', () => {
+		// Unlike snapAxis it does NOT project onto an axis: the arrow points wherever the hand
+		// went. The wander in the middle is dropped; only where it started and ended survive.
+		const drag: Point[] = [[100, 100], [150, 130], [220, 180], [300, 250]];
+		expect(straightLine(drag)).toEqual([[100, 100], [300, 250]]);
+	});
+
+	it('ends where the pen is NOW, not at the extreme of an overshoot', () => {
+		const overshoot: Point[] = [[0, 0], [400, 400], [250, 250]];
+		expect(straightLine(overshoot)).toEqual([[0, 0], [250, 250]]);
+	});
+
+	it('leaves a gesture with no travel as its samples — a tap falls through to a dot', () => {
+		expect(straightLine([[50, 50]])).toEqual([[50, 50]]);
+	});
+
+	it('is total for junk', () => {
+		expect(straightLine([])).toEqual([]);
+		expect(straightLine(null as unknown as Point[])).toEqual([]);
+		expect(straightLine([[NaN, 0], [10, Infinity]] as Point[]).flat().every(Number.isFinite)).toBe(true);
+	});
+});
+
+describe('arrowD — a straight shaft with a chevron head', () => {
+	it('draws the shaft then a two-line chevron meeting at the head', () => {
+		// A horizontal arrow: the shaft runs 0,0 → 100,0, then two barbs sweep BACK to the
+		// head from behind it (x < 100) and splay symmetrically above and below the axis.
+		const d = arrowD([[0, 0], [100, 0]]);
+		expect(d.startsWith('M 0 0 L 100 0')).toBe(true);
+		expect(d).toContain('L 100 0 L'); // the barbs both meet AT the head
+		const nums = d.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+		// Shaft (0,0)(100,0) then barb1 (bx,by) head (100,0) barb2 (bx,-by): symmetric in y.
+		const b1y = nums[5];
+		const b2y = nums[nums.length - 1];
+		expect(b1y).toBe(-b2y); // the two barbs mirror across the shaft
+		expect(nums[4]).toBeLessThan(100); // barbs sit BEHIND the head, not ahead of it
+	});
+
+	it('points the head wherever the arrow points — a downward arrow splays in x', () => {
+		// Shaft straight down (0,0 → 0,100): now the barbs mirror across the vertical axis,
+		// i.e. symmetric in X and both above the head (y < 100).
+		const d = arrowD([[0, 0], [0, 100]]);
+		expect(d.startsWith('M 0 0 L 0 100')).toBe(true);
+		const seg = d.split(' M ')[1].split(' '); // "bx by L 0 100 L bx2 by2"
+		expect(Number(seg[0])).toBe(-Number(seg[6])); // barbs mirror across the shaft in X
+		expect(Number(seg[1])).toBeLessThan(100); // and sit behind the head
+	});
+
+	it('never lets the head outrun the shaft — a short arrow keeps a proportional head', () => {
+		// headLen is clamped to the shaft length, so a stubby arrow does not grow a chevron
+		// longer than the arrow itself. With a 10px shaft and a 36px default head, the barbs
+		// cannot reach further than 10px back from the head.
+		const d = arrowD([[0, 0], [10, 0]]);
+		const nums = d.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+		expect(nums[4]).toBeGreaterThanOrEqual(0); // barb x never runs back past the tail
+	});
+
+	it('renders a zero-length arrow as a dot, like strokeD — a mark, not nothing', () => {
+		// A tap, or a press that never moved: there is no direction for a head, so it degrades
+		// to the same dot strokeD paints for a lone point.
+		expect(arrowD([[40, 60], [40, 60]])).toBe('M 40 60 L 40 60');
+		expect(arrowD([[40, 60]])).toBe('M 40 60 L 40 60');
+	});
+
+	it('is empty only when there is genuinely nothing to draw', () => {
+		expect(arrowD([])).toBe('');
+		expect(arrowD(null as unknown as Point[])).toBe('');
+	});
+
+	it('never emits NaN', () => {
+		expect(arrowD([[NaN, 0], [Infinity, 10]] as Point[])).not.toContain('NaN');
+		expect(arrowD([[0, 0], [100, 0]], NaN)).not.toContain('NaN');
+	});
+});
+
+describe('rectD — a box between two corners', () => {
+	it('draws a closed rectangle, normalising the corners', () => {
+		// Top-left then bottom-right, and the reverse, draw the SAME box — so dragging any
+		// direction rings the same region.
+		expect(rectD([[10, 10], [30, 40]])).toBe('M 10 10 L 30 10 L 30 40 L 10 40 Z');
+		expect(rectD([[30, 40], [10, 10]])).toBe('M 10 10 L 30 10 L 30 40 L 10 40 Z');
+	});
+
+	it('is empty only when there is nothing to draw, and never emits NaN', () => {
+		expect(rectD([])).toBe('');
+		expect(rectD(null as unknown as [number, number][])).toBe('');
+		expect(rectD([[NaN, 0], [10, Infinity]] as [number, number][])).not.toContain('NaN');
+	});
+});
+
+describe('textBounds / hitText — a label is caught by its box', () => {
+	it('anchors the box at the top-left and grows the width with the text', () => {
+		const short = textBounds([100, 100], 'hi', 40);
+		const long = textBounds([100, 100], 'a much longer label', 40);
+		expect(short.x).toBe(100);
+		expect(short.y).toBe(100);
+		expect(long.w).toBeGreaterThan(short.w); // more characters → a wider box
+		expect(short.h).toBeGreaterThan(0);
+	});
+
+	it('hits inside the box and misses outside it, with the tolerance as slop', () => {
+		expect(hitText([110, 110], [100, 100], 'hello', 40)).toBe(true); // inside
+		expect(hitText([500, 500], [100, 100], 'hello', 40)).toBe(false); // far away
+		// Just past the right edge: outside with no slop, inside with a generous one.
+		const b = textBounds([100, 100], 'hello', 40);
+		expect(hitText([b.x + b.w + 5, 110], [100, 100], 'hello', 40, 0)).toBe(false);
+		expect(hitText([b.x + b.w + 5, 110], [100, 100], 'hello', 40, 20)).toBe(true);
+	});
+
+	it('is total for junk anchors and sizes', () => {
+		expect(typeof hitText([NaN, 0], [0, 0], 'x', NaN)).toBe('boolean');
+		expect(textBounds([0, 0], 'x', 0).h).toBeGreaterThan(0); // a zero size floors to a visible box
+	});
+});
+
+describe('sanitizeText — free user input, made safe to store and draw', () => {
+	it('keeps ordinary text and trims-to-undefined the empty', () => {
+		expect(sanitizeText('hello world')).toBe('hello world');
+		expect(sanitizeText('   ')).toBeUndefined(); // all whitespace is nothing to show
+		expect(sanitizeText('')).toBeUndefined();
+		expect(sanitizeText(42)).toBeUndefined(); // not even a string
+		expect(sanitizeText(null)).toBeUndefined();
+	});
+
+	it('strips control characters (including newlines) but keeps ordinary spaces', () => {
+		expect(sanitizeText('a\nb\tc')).toBe('abc'); // newline + tab gone
+		expect(sanitizeText('x\u0000y')).toBe('xy'); // a NUL between the letters, stripped
+		expect(sanitizeText('two words')).toBe('two words'); // ordinary spaces are the speaker's
+	});
+
+	it('caps a runaway string at TEXT_MAX_LEN', () => {
+		const huge = 'z'.repeat(TEXT_MAX_LEN + 500);
+		expect(sanitizeText(huge)?.length).toBe(TEXT_MAX_LEN);
+	});
+});
+
+describe('distanceToStroke / hitStroke — the eraser asks "am I on this mark?"', () => {
+	it('is zero on the polyline and the perpendicular offset beside it', () => {
+		expect(distanceToStroke([50, 0], [[0, 0], [100, 0]])).toBe(0);
+		expect(distanceToStroke([50, 10], [[0, 0], [100, 0]])).toBe(10);
+	});
+
+	it('measures to the END, not the infinite line, past a segment', () => {
+		// A point beyond the tip is as far as the tip, so an eraser off the end of a stroke does
+		// not "hit" the line it would extend to.
+		expect(distanceToStroke([150, 0], [[0, 0], [100, 0]])).toBe(50);
+	});
+
+	it('takes the nearest of several segments', () => {
+		// An L-shaped stroke: the point is closest to the vertical leg, 10 px away.
+		expect(distanceToStroke([110, 50], [[0, 0], [100, 0], [100, 100]])).toBe(10);
+	});
+
+	it('is infinitely far from an empty stroke, and measures to a lone dot', () => {
+		expect(distanceToStroke([0, 0], [])).toBe(Infinity);
+		expect(distanceToStroke([3, 4], [[0, 0]])).toBe(5); // 3-4-5
+	});
+
+	it('is total — junk coordinates are repaired, never propagated', () => {
+		expect(Number.isFinite(distanceToStroke([NaN, 0], [[0, 0], [10, 0]]))).toBe(true);
+		expect(distanceToStroke([0, 0], null as unknown as [number, number][])).toBe(Infinity);
+	});
+
+	it('hits within the tolerance and misses beyond it', () => {
+		expect(hitStroke([50, 10], [[0, 0], [100, 0]], 17)).toBe(true);
+		expect(hitStroke([50, 30], [[0, 0], [100, 0]], 17)).toBe(false);
+	});
+
+	it('reads a negative or NaN tolerance as 0 — a hit only dead on the ink', () => {
+		expect(hitStroke([50, 0], [[0, 0], [100, 0]], -5)).toBe(true); // on the line
+		expect(hitStroke([50, 0.5], [[0, 0], [100, 0]], -5)).toBe(false); // just off it
+		expect(hitStroke([50, 0], [[0, 0], [100, 0]], NaN)).toBe(true);
+	});
+
+	it('never hits an empty stroke, however generous the tolerance', () => {
+		expect(hitStroke([0, 0], [], 1000)).toBe(false);
+	});
+});
+
 describe('clampBarPos / barPosCodec — a bar you can always get back', () => {
 	it('keeps the bar inside the canvas', () => {
 		expect(clampBarPos(-50, -50, 400, 60)).toEqual({ x: 0, y: 0 });
@@ -247,6 +436,12 @@ describe('strokeWidth', () => {
 		expect(strokeWidth('highlighter')).toBeGreaterThan(strokeWidth('pen'));
 	});
 
+	it('draws a line, an arrow and a rectangle at the pen width — a stroke, not a band', () => {
+		expect(strokeWidth('arrow')).toBe(strokeWidth('pen'));
+		expect(strokeWidth('line')).toBe(strokeWidth('pen'));
+		expect(strokeWidth('rectangle')).toBe(strokeWidth('pen'));
+	});
+
 	it('falls back to a visible width rather than a zero/NaN one', () => {
 		expect(strokeWidth('pen', 0)).toBe(1);
 		expect(strokeWidth('pen', NaN)).toBe(6);
@@ -278,6 +473,28 @@ describe('sanitizeStrokes', () => {
 		// A tool is only a paint choice — losing the mark over it would be a bad trade.
 		const out = sanitizeStrokes([{ id: 'x', tool: 'crayon', points: [[0, 0], [1, 1]] }]);
 		expect(out[0].tool).toBe('pen');
+	});
+
+	it('preserves every known tool off the wire, so a mark survives a reload and the mirror', () => {
+		// The trap the pen/highlighter-only coercion had: an arrow (or a line) read back from
+		// localStorage would come back a pen and lose its head. Every known tool must round-trip.
+		const roundTrip = (tool: string) =>
+			sanitizeStrokes([{ id: 't', tool, points: [[0, 0], [1, 1]] }])[0].tool;
+		expect(roundTrip('line')).toBe('line');
+		expect(roundTrip('arrow')).toBe('arrow');
+		expect(roundTrip('rectangle')).toBe('rectangle');
+		expect(roundTrip('highlighter')).toBe('highlighter');
+		expect(roundTrip('pen')).toBe('pen');
+	});
+
+	it('carries a TEXT mark\u2019s words and size, and DROPS a text mark with no words', () => {
+		// A label is nothing without its string, so a text mark whose content fails sanitation is
+		// dropped rather than kept blank; a good one keeps its text and size.
+		const ok = sanitizeStrokes([{ id: 't', tool: 'text', points: [[10, 10]], text: 'hi', size: 40 }]);
+		expect(ok).toHaveLength(1);
+		expect(ok[0]).toMatchObject({ tool: 'text', text: 'hi', size: 40 });
+		expect(sanitizeStrokes([{ id: 'x', tool: 'text', points: [[10, 10]] }])).toHaveLength(0);
+		expect(sanitizeStrokes([{ id: 'x', tool: 'text', points: [[10, 10]], text: '   ' }])).toHaveLength(0);
 	});
 
 	it('repairs NaN coordinates and names an unnamed stroke', () => {

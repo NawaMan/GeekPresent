@@ -137,6 +137,16 @@
 	--annot-highlighter-alpha: 0.45;
 	--annot-highlighter-blend: screen;
 
+	/* The eraser's "this one goes" colour: a stroke under the eraser lights up in it before
+	   you delete, and the ERASE button wears it while armed. Red is the universal delete cue,
+	   and this default reads on the dark main deck; a light theme is free to pick its own. */
+	--annot-erase:             #FF5C5C;
+	--annot-erase-glow:        rgba(255, 92, 92, 0.75);
+
+	/* A TEXT label's fill. Defaults to the pen's colour, so untinted labels follow the ink
+	   through a re-theme; override for a deck that wants typed notes a different colour. */
+	--annot-text:              var(--annot-pen, #F0A33E);
+
 	/* The pen's palette (PEN / HIGHLIGHT / swatches / UNDO / RESET / DONE) and the ANNOTATE
 	   toggle. Both float OVER the slide rather than sitting in the deck frame, so they carry
 	   their own dark plate instead of inheriting a surface colour they cannot predict.

@@ -8,6 +8,7 @@ import {
 	inkBookCodec,
 	isStaleInk,
 	INK_STALE_AFTER_MS,
+	type AnnotateMode,
 	type AnnotateTool,
 	type BarPos,
 	type InkBook,
@@ -96,17 +97,22 @@ export const strokes = derived([inkBook, inkPath], ([$book, $path]) => $book[$pa
 /** The current slide's ink entry, timestamp and all (the stale check reads this). */
 export const slideInk = derived([inkBook, inkPath], ([$book, $path]) => $book[$path]);
 
-/** Which tool the next stroke uses. Not persisted: a pen is the right thing to wake up
-    holding, and a speaker who left the highlighter selected three talks ago would be
-    surprised by a fat yellow band. */
-export const annotateTool = writable<AnnotateTool>('pen');
+/** Which bar mode is selected — a DRAW tool, or the ERASER (which removes strokes rather
+    than adding one). Not persisted: a pen is the right thing to wake up holding, and a
+    speaker who left the highlighter (or, worse, the eraser) selected three talks ago would
+    be surprised by what the next gesture does. */
+export const annotateTool = writable<AnnotateMode>('pen');
 
 /** The colour the next stroke uses, per tool. `null` means "whatever the theme says" —
     the `--annot-*` role token — which is the default, so ink follows a re-theme instead
     of freezing today's hex into every mark. Only an explicit pick overrides it. */
 export const annotateColor = writable<Record<AnnotateTool, string | null>>({
 	pen: null,
-	highlighter: null
+	line: null,
+	arrow: null,
+	rectangle: null,
+	highlighter: null,
+	text: null
 });
 
 /** Where the speaker parked the pen's bar, in canvas px — `null` until they drag it, so an
@@ -171,10 +177,41 @@ export function addStroke(stroke: Stroke): Stroke[] {
 	return writeSlide([...get(strokes), stroke]);
 }
 
+/** Patch one mark in place, by id — how the TEXT tool re-commits an edited label and how a
+    drag drops it at a new anchor, without disturbing the rest of the slide's ink. A no-op
+    (no write, no timestamp bump) if the id is not on this slide, so a stale edit target does
+    not stamp the book. */
+export function updateStroke(id: string, patch: Partial<Stroke>): Stroke[] {
+	const current = get(strokes);
+	let changed = false;
+	const next = current.map((s) => {
+		if (s.id !== id) return s;
+		changed = true;
+		return { ...s, ...patch };
+	});
+	return changed ? writeSlide(next) : current;
+}
+
 /** Take back the most recent stroke. A stroke is the unit the speaker drew, so it is the
     unit they expect back — which is the whole eraser story. */
 export function undoStroke(): Stroke[] {
 	return writeSlide(get(strokes).slice(0, -1));
+}
+
+/** The ERASER's delete: drop whole strokes by id. Ids not on this slide are ignored, and a
+    set that matches nothing is a no-op (no write, no timestamp bump). Erasing every stroke
+    leaves NO entry behind, exactly like RESET — writeSlide deletes an emptied slide.
+
+    There is deliberately no undo-restore: like `undoStroke`, this rewrites the slide's list
+    rather than pushing onto a history, so an erased stroke is gone. A real undo of an erase
+    would need a history stack this overlay does not keep. */
+export function eraseStrokes(ids: Iterable<string>): Stroke[] {
+	const drop = new Set(ids);
+	if (drop.size === 0) return get(strokes);
+	const current = get(strokes);
+	const remaining = current.filter((s) => !drop.has(s.id));
+	if (remaining.length === current.length) return current; // nothing matched — leave it be
+	return writeSlide(remaining);
 }
 
 /** Clear THIS slide's ink. */
