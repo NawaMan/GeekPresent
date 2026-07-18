@@ -115,39 +115,44 @@ describe('SlideDeck — the PRINT menu', () => {
 	});
 	afterEach(() => vi.unstubAllGlobals());
 
+	// Match the tool, not its decorated label: the chrome appends a mnemonic key hint
+	// and a "▸" submenu marker (e.g. "PRINT ▸", "OVERVIEW O"), so find by prefix.
 	const printButton = (root: ParentNode) =>
 		[...root.querySelectorAll('.annot-tool')].find(
-			(b) => b.textContent?.trim() === 'PRINT'
+			(b) => b.textContent?.trim().startsWith('PRINT')
 		) as HTMLElement;
 
-	it('PRINT opens a menu of the honest destinations', async () => {
+	it('PRINT opens a flyout of the honest destinations', async () => {
 		// The button no longer prints on click — the browser's own dialog cannot ask "this slide
-		// or the whole deck? one per page, a grid, with notes or without?", so the menu does.
+		// or the whole deck? one per page, a grid, with notes or without?", so the flyout does.
 		const root = await mount({ annotate: true });
-		expect(root.querySelector('.print-menu')).toBeNull();
+		expect(root.querySelector('.print-sub')).toBeNull();
 
 		await fireEvent.click(printButton(root));
-		const items = [...root.querySelectorAll('.print-menu button')].map((b) => b.textContent?.trim());
+		const items = [...root.querySelectorAll('.print-sub .print-sub-label')].map((b) =>
+			b.textContent?.trim()
+		);
 		expect(items).toEqual([
-			'This slide',
-			'This slide + notes',
+			'Current slide',
+			'Current + notes',
 			'Whole deck',
-			'Whole deck + notes',
+			'Whole + notes',
 			'Thumbnail grid',
 			'Notes grid'
 		]);
 	});
 
-	it('"This slide + notes" grows the paper and prints — WITHOUT navigating', async () => {
+	it('"Current + notes" grows the paper and prints — WITHOUT navigating', async () => {
 		// The notes toggle for a single slide is a local override, not a trip to `?notes`, so it
 		// has to reach the DOM before the (blocking) print fires. Here: the frame is marked and the
 		// paper has grown its band by the time print is called.
 		const root = await mount({ annotate: true });
 		await fireEvent.click(printButton(root));
-		const notes = [...root.querySelectorAll('.print-menu button')].find((b) =>
-			b.textContent?.includes('This slide + notes')
+		const notes = [...root.querySelectorAll('.print-sub button')].find((b) =>
+			b.textContent?.includes('Current + notes')
 		) as HTMLElement;
 		await fireEvent.click(notes);
+		await tick();
 		await tick();
 
 		expect((root.querySelector('.container') as HTMLElement).classList.contains('print-notes')).toBe(true);
@@ -155,17 +160,19 @@ describe('SlideDeck — the PRINT menu', () => {
 		expect(window.print).toHaveBeenCalled();
 	});
 
-	it('closes on Escape, and on a click outside (the scrim)', async () => {
+	it('closes on Escape, and on mouseleave off the flyout', async () => {
 		const root = await mount({ annotate: true });
 
 		await fireEvent.click(printButton(root));
-		expect(root.querySelector('.print-menu')).not.toBeNull();
+		expect(root.querySelector('.print-sub')).not.toBeNull();
 		await fireEvent.keyDown(window, { key: 'Escape' });
-		expect(root.querySelector('.print-menu')).toBeNull();
+		expect(root.querySelector('.print-sub')).toBeNull();
 
+		// The flyout is a nested hover menu now — no scrim; leaving it dismisses it.
 		await fireEvent.click(printButton(root));
-		await fireEvent.click(root.querySelector('.print-scrim') as HTMLElement);
-		expect(root.querySelector('.print-menu')).toBeNull();
+		expect(root.querySelector('.print-sub')).not.toBeNull();
+		await fireEvent.mouseLeave(root.querySelector('.print-flyout') as HTMLElement);
+		expect(root.querySelector('.print-sub')).toBeNull();
 	});
 
 	it('the OVERVIEW tool opens the all-slides grid, through the shared store', async () => {
@@ -174,7 +181,7 @@ describe('SlideDeck — the PRINT menu', () => {
 		overviewOpen.set(false);
 		const root = await mount({ annotate: true });
 		const overview = [...root.querySelectorAll('.annot-tool')].find(
-			(b) => b.textContent?.trim() === 'OVERVIEW'
+			(b) => b.textContent?.trim().startsWith('OVERVIEW')
 		) as HTMLElement;
 		expect(overview).toBeTruthy();
 		expect(get(overviewOpen)).toBe(false);
