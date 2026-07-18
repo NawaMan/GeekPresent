@@ -315,7 +315,7 @@
 		vertical-align: middle;
 		width: 2px;
 		height: 1.1em;
-		margin: 0 0.5em;
+		margin: 0 0em;
 		border-radius: 999px;
 		background: color-mix(in srgb, var(--hint-border, #C0F1FF) 28%, transparent);
 	}
