@@ -645,9 +645,9 @@
 {#if armed}
 	<!-- The pen's own palette. It has to live ABOVE the ink surface: while the mode is on the
 	     surface takes every pointer on the canvas, so anything still clickable must out-rank
-	     it. Ghosted until pointed at (the fadeChrome trick), because it hangs over the slide
-	     the audience is reading — but it keeps its full hit area, so it is exactly where the
-	     speaker last left it. -->
+	     it. Fully visible at rest, so the tools stay legible; the bar is draggable, so the
+	     speaker parks it clear of the slide the audience is reading rather than relying on it
+	     to fade. -->
 	<div class="annot-bar no-print" role="toolbar" aria-label="Annotation tools" bind:this={bar} style={barStyle}>
 		<!-- Drag by the GRIP, not by the bar's face — a bar you drag by its body is a bar whose
 		     buttons you can no longer press. Double-click sends it home. -->
@@ -886,22 +886,11 @@
 		border: 1px solid var(--annot-bar-edge, rgba(255, 255, 255, 0.16));
 		box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
 
-		/* Ghosted until pointed at — the same opacity trick (never visibility/display) that
-		   fadeChrome uses on the deck's own controls, and for the same reason: a ghosted bar
-		   keeps its FULL hit area, so the pointer finds it exactly where it always was. */
-		opacity: var(--annot-bar-idle, 0.28);
-		transition: opacity 0.18s ease-in-out;
-	}
-	.annot-bar:hover,
-	.annot-bar:focus-within {
+		/* Fully visible at rest. The bar used to ghost until pointed at (the fadeChrome trick),
+		   because it hung over the slide at a FIXED spot the speaker couldn't move. Now that the
+		   bar is draggable — park it off the content and double-click to send it home — there is
+		   nothing to fade for: the speaker chooses where it sits, so it can simply stay legible. */
 		opacity: 1;
-	}
-	/* A touch reader has no hover to summon it with, so a ghosted bar there is just a lost
-	   bar — exactly the carve-out fadeChrome makes. */
-	@media (hover: none) {
-		.annot-bar {
-			opacity: 1;
-		}
 	}
 
 	.annot-btn {
