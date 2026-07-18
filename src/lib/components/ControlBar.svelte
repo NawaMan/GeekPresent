@@ -122,7 +122,7 @@
 		/* Auto-hide, like the tool bar's upward tuck: at rest the bar tucks DOWN so a peek strip
 		   shows at the window's bottom edge, and hover / focus seats it flush on that edge. Tucked
 		   a touch LESS than the tool bar's -72% so a bit more of it shows at rest (~40% peek). */
-		transform: translateX(-50%) translateY(60%);
+		transform: translateX(-50%) translateY(85%);
 		transition: transform 160ms ease;
 		display: flex;
 		align-items: center;

@@ -56,6 +56,19 @@ describe('Hint (SSR)', () => {
 		expect(body).toContain('cue'); // the cue itself survives
 	});
 
+	it('ships the drag grip by default, with an accessible label', () => {
+		const { body } = render(Hint, { props: { text: 'cue' } });
+		expect(body).toContain('class="grip'); // prefix — Svelte appends a scoped hash
+		expect(body).toContain('aria-label="Move the hint"');
+	});
+
+	it('movable={false} drops the grip', () => {
+		const { body } = render(Hint, { props: { text: 'cue', movable: false } });
+		expect(body).not.toContain('aria-label="Move the hint"');
+		expect(body).not.toContain('class="grip');
+		expect(body).toContain('cue'); // the cue itself survives
+	});
+
 	// `dim` rides an inline custom property, which IS in the server markup (unlike
 	// the scoped stylesheet) — so the resting-opacity plumbing is assertable here.
 	it('dim sets the resting-opacity custom property, clamped', () => {

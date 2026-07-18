@@ -47,6 +47,9 @@
 		text-justify: center;
 		text-align: center;
 		font-weight: bold;
+		/* Keep the label on ONE line — a chrome button squeezed narrow (the tool bar's
+		   "FITTED (Z)", a pager's "PREV") must never wrap its key hint under the word. */
+		white-space: nowrap;
 
 		/* Default (in-page) look: prominent / eye-catching — a filled accent-blue
 		   button with white text, so it reads clearly as a clickable affordance

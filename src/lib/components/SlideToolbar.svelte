@@ -188,7 +188,7 @@
 		/* Auto-hide: tucked up so only a peek strip shows at the top edge. A hover on that strip
 		   — or keyboard focus reaching a button inside — slides the whole bar down. -72% leaves
 		   ~28% peeking; nudge toward -85% to hide more, -60% to show more. */
-		transform: translateX(-50%) translateY(-72%);
+		transform: translateX(-50%) translateY(-80%);
 		transition: transform 160ms ease;
 		z-index: 1;
 		display: flex;
@@ -256,6 +256,9 @@
 		border: 0;
 		background: transparent;
 		color: var(--annot-toggle-fg, #F0A33E);
+		/* A word button, like .annot-tab: its label ("PRESENT (P)") must stay on one line —
+		   a bar squeezed narrow would otherwise wrap "(P)" under the word. */
+		white-space: nowrap;
 	}
 	.annot-tools :global(.annot-anchor:hover),
 	.annot-tools :global(.annot-anchor:focus-visible) {
