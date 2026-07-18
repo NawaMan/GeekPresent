@@ -142,3 +142,149 @@ export function mountedTiles(seen: ReadonlySet<number>, currentNumber: number): 
 	if (Number.isFinite(currentNumber) && currentNumber > 0) next.add(currentNumber);
 	return next;
 }
+
+/** A `getBoundingClientRect()`-shaped rect, narrowed to the two edges this
+    module actually compares — easy to build in a test without a DOM. */
+export interface VerticalRect {
+	top: number;
+	bottom: number;
+}
+
+export type CurrentTileDirection = 'above' | 'below' | 'visible' | 'unknown';
+
+/**
+ * Where does the CURRENT tile sit relative to the grid's visible (scrolled)
+ * viewport — so the CURRENT control can show a speaker which way to look, not
+ * just that they should look.
+ *
+ * Compares EDGES, not a point: a tile that only partly overlaps the viewport
+ * (its top above the fold, its bottom still showing) reads as 'visible' — it is
+ * already on screen, nothing to scroll for. Only a tile that has fully scrolled
+ * past one edge (its far edge crossed the near edge of the viewport) counts as
+ * 'above' or 'below'.
+ *
+ * `tileRect` is `null` when there is no current slide yet (a fresh deck context,
+ * or a `currentPath` that matches nothing) or the tile hasn't mounted its node —
+ * 'unknown' either way, so the caller can hide the arrow rather than guess.
+ */
+export function currentTileDirection(
+	gridRect: VerticalRect,
+	tileRect: VerticalRect | null
+): CurrentTileDirection {
+	if (!tileRect) return 'unknown';
+	if (tileRect.bottom < gridRect.top) return 'above';
+	if (tileRect.top > gridRect.bottom) return 'below';
+	return 'visible';
+}
+
+/**
+ * Column count of a responsive grid (`repeat(auto-fill, minmax(...))`), read
+ * back from actual tile positions rather than assumed — the column count isn't
+ * a fixed constant, it depends on the window width. Counts how many LEADING
+ * tiles (in render order, which is row-major) share the first tile's top edge.
+ *
+ * `epsilon` tolerates the sub-pixel jitter two same-row boxes can differ by.
+ */
+export function gridColumnCount(tileTops: number[], epsilon = 1): number {
+	if (tileTops.length === 0) return 1;
+	const first = tileTops[0];
+	let n = 0;
+	for (const top of tileTops) {
+		if (Math.abs(top - first) > epsilon) break;
+		n++;
+	}
+	return Math.max(1, n);
+}
+
+/** How many full rows fit in the grid's visible (scrolled) height — what
+    PageUp/PageDown step by, one column-count's worth of tiles per row. A
+    non-finite or non-positive `rowHeight` (one row total, nothing measured
+    yet) falls back to a single row rather than dividing by zero. */
+export function gridRowsPerPage(gridHeight: number, rowHeight: number): number {
+	if (!Number.isFinite(gridHeight) || !Number.isFinite(rowHeight) || rowHeight <= 0) return 1;
+	return Math.max(1, Math.floor(gridHeight / rowHeight));
+}
+
+export type GridNavIntent = 'left' | 'right' | 'up' | 'down' | 'first' | 'last' | 'pageUp' | 'pageDown';
+
+/**
+ * The new focused tile NUMBER (1-based) for a roving-focus move. Every
+ * direction clamps into `[1, total]` rather than wrapping — Home/End already
+ * cover "jump to an end", so a clamped Right at the last tile staying put reads
+ * as "you're at the end", not a silent wrap back to tile 1.
+ *
+ * Total-safe: an empty deck (`total <= 0`) returns 0 — the caller's cue that
+ * there is nothing to focus.
+ */
+export function moveFocus(
+	current: number,
+	total: number,
+	columns: number,
+	rowsPerPage: number,
+	intent: GridNavIntent
+): number {
+	if (total <= 0) return 0;
+	const cols = Math.max(1, columns);
+	const rows = Math.max(1, rowsPerPage);
+	switch (intent) {
+		case 'left':
+			return Math.min(total, Math.max(1, current - 1));
+		case 'right':
+			return Math.min(total, Math.max(1, current + 1));
+		case 'up':
+			return Math.min(total, Math.max(1, current - cols));
+		case 'down':
+			return Math.min(total, Math.max(1, current + cols));
+		case 'pageUp':
+			return Math.min(total, Math.max(1, current - cols * rows));
+		case 'pageDown':
+			return Math.min(total, Math.max(1, current + cols * rows));
+		case 'first':
+			return 1;
+		case 'last':
+			return total;
+	}
+}
+
+export type OverviewGridKeyIntent = GridNavIntent | 'commit' | 'toCurrent' | 'ignore';
+
+/**
+ * What a key means to the grid's roving keyboard focus — the browsing half.
+ * Deliberately keyboard-ONLY here (no mouse, no navigation side effects): every
+ * intent but 'commit' just moves which tile is focused, so the audience/main
+ * window never sees anything until the speaker actually presses Enter. See
+ * OverviewPage's `jump()` for the one place 'commit' actually navigates.
+ *
+ * A modifier (Ctrl/Cmd/Alt) is left alone — a browser or OS chord, not ours —
+ * and a typing target (the EDIT-deck add form) is left alone too, though in
+ * practice that form lives outside the grid's DOM and never reaches this.
+ */
+export function overviewGridKeyIntent(e: KeyboardEvent): OverviewGridKeyIntent {
+	if (e.ctrlKey || e.metaKey || e.altKey) return 'ignore';
+	if (isTypingTarget(e.target)) return 'ignore';
+	switch (e.key) {
+		case 'ArrowLeft':
+			return 'left';
+		case 'ArrowRight':
+			return 'right';
+		case 'ArrowUp':
+			return 'up';
+		case 'ArrowDown':
+			return 'down';
+		case 'Home':
+			return 'first';
+		case 'End':
+			return 'last';
+		case 'PageUp':
+			return 'pageUp';
+		case 'PageDown':
+			return 'pageDown';
+		case 'Enter':
+			return 'commit';
+		case ' ':
+		case 'Spacebar':
+			return 'toCurrent';
+		default:
+			return 'ignore';
+	}
+}

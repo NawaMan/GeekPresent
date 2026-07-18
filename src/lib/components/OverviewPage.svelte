@@ -1,6 +1,15 @@
 <!--
   OverviewPage — the all-slides grid. The "press O" move: see the whole deck at once,
-  click a slide to jump there.
+  click a slide to jump there — or drive it purely from the keyboard: ←/→/↑/↓ move a
+  roving focus between tiles, Home/End jump to the first/last, PageUp/PageDown move a
+  screenful at a time, Space jumps focus to the CURRENT slide, and Enter is the only
+  key that actually navigates. Every other key just moves which tile is FOCUSED — a
+  local, this-window-only change (same guarantee the presenter console's grid already
+  gives the mouse: browsing is invisible, a commit is not). The arrows are claimed at
+  the grid itself (`on:keydown` + `stopPropagation`, in the bubble phase, from whichever
+  tile is focused) — the same trick Tabs' roving strip uses to take them back from
+  NavigationBar's `window`-level pager before it ever sees them, so a speaker can
+  browse the WHOLE deck with the keyboard alone without paging the live slide away.
 
   Phase 1 also offers EDIT DECK (dev only): add a slide (scaffold + pages.ts) or
   unlist one. Static hosts show the control and refuse with NOT ALLOWED — same
@@ -29,8 +38,7 @@
 <script lang="ts">
 
 	import { browser }   from '$app/environment';
-	import { onMount }   from 'svelte';
-	import { onDestroy } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 
 	import { navigate } from '$lib/utils/deckNav';
 	import { overviewOpen } from '$lib/stores/overviewOpen';
@@ -46,7 +54,18 @@
 		type PageTemplate
 	} from '$lib/deckEdit/pageEditCore';
 	import { getViewTransitions } from '$lib/presentation';
-	import { overviewPageTiles, tileScale, overviewPageKeyIntent, mountedTiles } from '$lib/utils/overviewPageCore';
+	import {
+		overviewPageTiles,
+		tileScale,
+		overviewPageKeyIntent,
+		mountedTiles,
+		currentTileDirection,
+		type CurrentTileDirection,
+		gridColumnCount,
+		gridRowsPerPage,
+		moveFocus,
+		overviewGridKeyIntent
+	} from '$lib/utils/overviewPageCore';
 	import type { Page } from '$lib/utils/navigate';
 
 	export let pages: Array<Page> = [];
@@ -58,11 +77,18 @@
 	export let currentPath = '';
 	/** Deck folder name under src/routes (e.g. "slides") — required for EDIT writes. */
 	export let deck = '';
+	/** True when mounted in the presenter console (?present). Only changes what a
+	    tile CLICK does: `jump()` keeps `?present` on the navigation target so the
+	    pick lands back in the console, the same way PresenterView's own go()/jump()
+	    do — everything else (opening the grid, browsing, closing it) behaves
+	    identically to the audience window and never touches it. */
+	export let present = false;
 
 	const viewTransitions = getViewTransitions();
 
-	// Open state lives in a shared store so the OVERVIEW item in the tool flyout can drive it
-	// too, not just the `o` key. See stores/overviewOpen.
+	// Open state lives in a shared store so other buttons can drive it too, not just
+	// the `o` key: the OVERVIEW item in the audience tool flyout, and the OVERVIEW
+	// button in the presenter console's bar (PresenterView). See stores/overviewOpen.
 
 
 	$: tiles = overviewPageTiles(pages, currentPath);
@@ -95,6 +121,89 @@
 	// exists (a child's action fires before the parent's bind:this is assigned), so
 	// the node list is the source of truth and the observer picks it up when it starts.
 	const tileNodes = new Map<number, HTMLElement>();
+
+	// Where the CURRENT tile sits relative to the grid's visible (scrolled) area —
+	// drives the CURRENT control's arrow. See currentTileDirection (overviewPageCore)
+	// for the comparison; this just supplies the two rects from the live DOM.
+	let currentDirection: CurrentTileDirection = 'unknown';
+	function updateCurrentDirection() {
+		if (!browser || !gridRef) {
+			currentDirection = 'unknown';
+			return;
+		}
+		const node = tileNodes.get(currentNumber);
+		currentDirection = currentTileDirection(gridRef.getBoundingClientRect(), node ? node.getBoundingClientRect() : null);
+	}
+	// Recomputed on scroll (rAF-throttled — a scroll event fires far more often
+	// than the answer can change) and on resize (the viewport, and so the
+	// definition of "visible", moved). Both are cheap: two getBoundingClientRect
+	// calls, no layout thrash.
+	let scrollRaf: number | undefined;
+	function onGridScroll() {
+		if (scrollRaf != null) return;
+		scrollRaf = requestAnimationFrame(() => {
+			scrollRaf = undefined;
+			updateCurrentDirection();
+		});
+	}
+	/** CURRENT: center the tile you're standing on, wherever it has scrolled to. */
+	function scrollToCurrent() {
+		tileNodes.get(currentNumber)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+	}
+
+	// ── Keyboard browsing (roving focus) ────────────────────────────────────────
+	// Arrow keys move which tile is FOCUSED; only Enter actually navigates (jump()
+	// below). Moving focus, scrolling, Home/End, PageUp/PageDown, Space-to-current —
+	// none of it touches anywhere but this window, the same way hovering a tile
+	// with the mouse never did: browsing stays invisible, a commit is not.
+	let focusedNumber = 0;
+
+	function focusTile(n: number) {
+		tileNodes.get(n)?.focus();
+	}
+
+	/** The grid's live column count — a responsive `auto-fill` layout, not a fixed
+	    number, so ↑/↓ and PageUp/PageDown read it back from actual tile positions
+	    rather than assuming one. See gridColumnCount (overviewPageCore). */
+	function liveColumns(): number {
+		return gridColumnCount(tiles.map((t) => tileNodes.get(t.number)?.getBoundingClientRect().top ?? 0));
+	}
+
+	/** How many rows currently fit the grid's visible height — PageUp/PageDown's
+	    step size. Measures row height from tile 1 vs. the first tile of row 2. */
+	function liveRowsPerPage(columns: number): number {
+		if (!gridRef) return 1;
+		const rowOneTop = tileNodes.get(1)?.getBoundingClientRect().top;
+		const rowTwoTop = tileNodes.get(columns + 1)?.getBoundingClientRect().top;
+		const rowHeight = rowOneTop != null && rowTwoTop != null ? rowTwoTop - rowOneTop : 0;
+		return gridRowsPerPage(gridRef.getBoundingClientRect().height, rowHeight);
+	}
+
+	function onGridKeydown(e: KeyboardEvent) {
+		const intent = overviewGridKeyIntent(e);
+		if (intent === 'ignore' || tiles.length === 0) return;
+		// Claimed HERE, in the bubble phase, at the focused tile — the same trick
+		// Tabs' roving strip uses (see its keydown handler) to take the arrows back
+		// from NavigationBar's window-level pager before the event ever reaches it,
+		// order-independent of which listener happened to mount first.
+		e.preventDefault();
+		e.stopPropagation();
+		if (intent === 'commit') {
+			const tile = tiles[focusedNumber - 1];
+			if (tile) jump(tile.path, tile.number);
+			return;
+		}
+		if (intent === 'toCurrent') {
+			if (currentNumber > 0) {
+				focusedNumber = currentNumber;
+				focusTile(focusedNumber);
+			}
+			return;
+		}
+		const columns = liveColumns();
+		focusedNumber = moveFocus(focusedNumber || 1, tiles.length, columns, liveRowsPerPage(columns), intent);
+		focusTile(focusedNumber);
+	}
 
 	// ── EDIT DECK state ──────────────────────────────────────────────────────────
 	let showAddForm = false;
@@ -308,7 +417,12 @@
 		overviewEditMode.set(false);
 		showAddForm = false;
 		const direction = currentNumber > 0 && number < currentNumber ? 'back' : 'forward';
-		navigate(`./${path}`, { viewTransitions, kind: 'slide', direction });
+		// In the presenter console, keep `?present` so the pick lands back in the
+		// console. The AUDIENCE window is never touched by opening/browsing this grid
+		// (this store lives only in this window) — it follows only now, once this
+		// navigation actually happens, over the same localStorage relay PREV/NEXT/TOC
+		// already use (SlideDeck's publishCurrentSlide / subscribeCurrentSlide).
+		navigate(`./${path}${present ? '?present' : ''}`, { viewTransitions, kind: 'slide', direction });
 	}
 
 	// `o` opens the grid, Escape closes it (or steps out of form → edit → grid).
@@ -362,19 +476,27 @@
 	onMount(() => {
 		if (!browser) return;
 		window.addEventListener('keydown', handleGlobalKeydown);
+		window.addEventListener('resize', updateCurrentDirection);
 		if (typeof IntersectionObserver === 'undefined') eagerAll = true;
 	});
 	onDestroy(() => {
-		if (browser) window.removeEventListener('keydown', handleGlobalKeydown);
+		if (browser) {
+			window.removeEventListener('keydown', handleGlobalKeydown);
+			window.removeEventListener('resize', updateCurrentDirection);
+			if (scrollRaf != null) cancelAnimationFrame(scrollRaf);
+		}
 		observer?.disconnect();
 		observer = undefined;
 		if (editFlashTimer) clearTimeout(editFlashTimer);
 	});
 
-	// Closing the grid always drops EDIT so the next open is browse mode.
+	// Closing the grid always drops EDIT so the next open is browse mode, and
+	// clears the roving focus so the next open re-initializes it fresh (onto
+	// the then-current slide, not wherever browsing last left off).
 	$: if (browser && !$overviewOpen) {
 		overviewEditMode.set(false);
 		showAddForm = false;
+		focusedNumber = 0;
 	}
 
 	// The observer can only exist once the grid is in the DOM; tear it down on close
@@ -386,18 +508,43 @@
 			observer = undefined;
 		}
 	}
+
+	// Where the current tile sits: on open (after the grid's tiles are actually in
+	// the DOM — `tick()` waits for that), and again whenever `currentNumber` moves
+	// (deck navigation while the grid happens to stay mounted, e.g. an EDIT-mode add).
+	// The same tick also seeds (or re-validates) the keyboard focus and plants it on
+	// a real tile, so the very first arrow key press is already scoped inside the
+	// grid — see onGridKeydown's stopPropagation for why that scoping matters.
+	$: if (browser && $overviewOpen && gridRef) {
+		currentNumber;
+		tick().then(() => {
+			updateCurrentDirection();
+			if (!focusedNumber || !tiles.some((t) => t.number === focusedNumber)) {
+				focusedNumber = currentNumber > 0 ? currentNumber : (tiles[0]?.number ?? 0);
+			}
+			if (focusedNumber) focusTile(focusedNumber);
+		});
+	}
 </script>
 
-<!-- OverviewPage has no button of its OWN — no third thing sitting in the corner competing with
-     the ToC for the eye. It opens with `O` (the shortcut a speaker who wants slide 40 already
-     reaches for) and, for the mouse, from the OVERVIEW item in ANNOTATE's tool flyout, which
-     drives the same `overviewOpen` store. Esc (or a click outside) closes it. -->
+<!-- OverviewPage has no button of its OWN in the audience window — no third thing sitting in
+     the corner competing with the ToC for the eye. It opens with `O` (the shortcut a speaker
+     who wants slide 40 already reaches for) and, for the mouse, from the OVERVIEW item in
+     ANNOTATE's tool flyout (audience) or the OVERVIEW button in the bottom bar (presenter
+     console) — both drive the same `overviewOpen` store. Esc (or a click outside) closes it.
+
+     In the PRESENTER CONSOLE, this component is mounted as a plain sibling of PresenterView
+     (see SlideDeck), not nested in the hidden slide canvas — so `present` only needs to swap
+     `position: absolute` (canvas-space) for `position: fixed` (covers the real window) and
+     raise the z-index above the console's own bar/splitter/previews (70/65/60), putting the
+     grid on top of the whole console UI when open. -->
 {#if $overviewOpen}
-	<!-- The scrim covers the whole canvas. Clicking it (but not the grid) closes,
-	     the same "click outside dismisses" the ToC has. -->
+	<!-- The scrim covers the whole canvas (or, in the console, the whole window).
+	     Clicking it (but not the grid) closes, the same "click outside dismisses" the ToC has. -->
 	<div
 		class="scrim no-print"
 		class:editing={$overviewEditMode}
+		class:present={present}
 		role="presentation"
 		on:click|self={close}
 		style="--canvas-w:{width}px; --canvas-h:{height}px;"
@@ -418,6 +565,22 @@
 				</span>
 			{/if}
 			<span class="head-actions">
+				{#if currentNumber > 0}
+					<!-- CURRENT: jump the scroll position to the tile you're standing on. The
+					     arrow only appears once that tile has scrolled fully off one edge (see
+					     currentTileDirection) — it names the direction, the click does the rest. -->
+					<button
+						type="button"
+						class="current-btn"
+						class:pending={currentDirection === 'above' || currentDirection === 'below'}
+						on:click|stopPropagation={scrollToCurrent}
+						title="Scroll to the slide you're on"
+					>
+						{#if currentDirection === 'above'}<span class="current-arrow" aria-hidden="true">▲</span
+							>{:else if currentDirection === 'below'}<span class="current-arrow" aria-hidden="true">▼</span
+							>{/if}CURRENT
+					</button>
+				{/if}
 				{#if $overviewEditMode}
 					<button
 						type="button"
@@ -448,7 +611,7 @@
 					{#if $overviewEditMode}
 						ADD · + between · × unlist · <kbd>E</kbd> done · <kbd>Esc</kbd>
 					{:else}
-						click a slide · <kbd>E</kbd> edit · <kbd>Esc</kbd> close
+						arrows move · <kbd>↵</kbd> select · <kbd>Space</kbd> current · <kbd>E</kbd> edit · <kbd>Esc</kbd> close
 					{/if}
 				</span>
 			</span>
@@ -516,7 +679,10 @@
 			</div>
 		{/if}
 
-		<div class="grid" class:editing={$overviewEditMode} bind:this={gridRef}>
+		<!-- svelte-ignore a11y_no_static_element_interactions — the keydown listener
+		     coordinates roving focus among the real interactive elements (the tile
+		     <button>s); it never turns the div itself into a control. -->
+		<div class="grid" class:editing={$overviewEditMode} bind:this={gridRef} on:scroll={onGridScroll} on:keydown={onGridKeydown}>
 			{#each tiles as tile (tile.path)}
 				<div class="tile-wrap">
 					<button
@@ -607,6 +773,17 @@
 		padding: 2em 2.2em;
 		gap: 1.2em;
 	}
+	/* Presenter console: this component is mounted as a plain sibling of
+	   PresenterView (see SlideDeck), not nested inside the hidden slide canvas, so
+	   there is no `visibility: hidden` ancestor to escape — just `position: fixed`
+	   so `inset: 0` sizes off the real window instead of the canvas-space box, and
+	   a z-index above the console's own bar/splitter/previews (70/65/60), so the
+	   grid is the topmost thing when open, covering the whole console window. */
+	.scrim.present {
+		position: fixed;
+		z-index: 100;
+	}
+
 
 	.head {
 		/* functional */
@@ -716,6 +893,50 @@
 		border-color: #c0392b;
 		color: #fff;
 	}
+	/* CURRENT — same chrome-button look as EDIT, so the two read as one family of
+	   head controls. `.pending` (the current tile has scrolled off an edge) borrows
+	   the same accent as a tile's own `.current` ring, so the cue reads consistently
+	   whether you're looking at the button or the thing it points at. */
+	.current-btn {
+		/* functional */
+		cursor: pointer;
+		/* cosmetic */
+		font: inherit;
+		font-size: 0.75em;
+		font-weight: bold;
+		letter-spacing: 0.06em;
+		color: var(--overview-page-head-fg, #E6EDF3);
+		background: transparent;
+		border: 1.5px solid var(--overview-page-tile-border, #2B3440);
+		border-radius: 4px;
+		padding: 0.25em 0.7em;
+	}
+	.current-btn:hover,
+	.current-btn:focus-visible {
+		border-color: var(--overview-page-tile-hover-border, #2980B9);
+	}
+	.current-btn.pending {
+		border-color: var(--overview-page-current-border, #00B356);
+		color: var(--overview-page-current-border, #00B356);
+	}
+	.current-arrow {
+		/* functional */
+		display: inline-block;
+		margin-right: 0.3em;
+		/* cosmetic — a small bounce toward the edge it's pointing at, so it reads as
+		   a nudge rather than a static glyph. Respects reduced motion below. */
+		animation: current-arrow-bounce 1s ease-in-out infinite;
+	}
+	@keyframes current-arrow-bounce {
+		0%, 100% { transform: translateY(0); }
+		50%      { transform: translateY(-2px); }
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.current-arrow {
+			animation: none;
+		}
+	}
+
 	kbd {
 		/* cosmetic */
 		border: 1px solid var(--overview-page-tile-border, #2B3440);

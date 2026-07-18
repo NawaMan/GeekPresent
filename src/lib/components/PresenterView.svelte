@@ -7,7 +7,8 @@
     - a right column with scaled <iframe> previews of the CURRENT and NEXT slides
       (via ?clean, the chrome-hidden capture mode) — always accurate, since every
       slide is a real prerendered document,
-    - a bottom bar: PREV/NEXT (+ FIRST/LAST) nav, a TOC jump menu, an ANIMATE
+    - a bottom bar: PREV/NEXT (+ FIRST/LAST) nav, an OVERVIEW button (the all-slides
+      grid, same component the audience deck offers), a TOC jump menu, an ANIMATE
       control that drives the audience window's animation, a clock and an
       elapsed-since-open timer.
 
@@ -18,6 +19,13 @@
   CONTINUE pulse (advances a build, never pages), and Shift+Space walks back. Paging
   reuses the bottom bar's go()/doContinue(), so the audience follows exactly as a
   button click would — over the same localStorage nav / gp:continue channels.
+
+  OVERVIEW is deliberately NOT one of those keydown-driven paging actions: it opens
+  <OverviewPage> (mounted alongside this component by SlideDeck once `present` is
+  also allowed through its gate), whose own `o` / Escape handling and `overviewOpen`
+  store are local to THIS window — so browsing the grid never reaches the audience.
+  Only picking a tile does, by navigating this window (keeping `?present`, see
+  OverviewPage's `jump()`), which the audience follows the same way PREV/NEXT/TOC do.
 -->
 <script lang="ts">
 	import CtrlBtn from './CtrlBtn.svelte';
@@ -35,6 +43,7 @@
 	} from '$lib/stores/presenter';
 	import { canAnnotate, strokes, resetSlideInk, resetAllInk } from '$lib/stores/annotation';
 	import { presenterKeyIntent } from '$lib/chrome/presenterKeyCore';
+	import { overviewOpen } from '$lib/stores/overviewOpen';
 	import type { Page } from '$lib/utils/navigate';
 	import type { AnimState } from '$lib/utils/slideAnim';
 
@@ -142,6 +151,14 @@
 		checksOpen = false;
 		inkOpen = false;
 		timerMenuOpen = false;
+	}
+	// OVERVIEW opens the all-slides grid (<OverviewPage>, mounted alongside this
+	// component once SlideDeck's gate lets it through for `present`). Closing the
+	// console's own popovers first is cosmetic only — the grid's z-index already
+	// sits above them — but it keeps state tidy for when the grid closes again.
+	function openOverview() {
+		closeMenus();
+		overviewOpen.set(true);
 	}
 	function onKeydown(e: KeyboardEvent) {
 		switch (presenterKeyIntent(e, $canAnnotate)) {
@@ -384,11 +401,15 @@
 	on:pointerup={onSplitUp}
 ></div>
 
-<!-- Bottom bar: nav + TOC + ANIMATE on the left, meters on the right. -->
+<!-- Bottom bar: nav + OVERVIEW + ToC + ANIMATE on the left, meters on the right. -->
 <div class="bar no-print">
 	<div class="controls">
+		<div class="tools">
+		<span class="ov-btn" title="All slides — pick one without the audience seeing you browse (O)">
+			<CtrlBtn text="OVERVIEW" mnemonic="O" isSelected={$overviewOpen} on:click={openOverview} />
+		</span>
 		<div class="toc" class:open={tocOpen} bind:this={tocRef} title="Table of contents (T)">
-			<CtrlBtn text={tocOpen ? 'TOC ▾' : 'TOC ▴'} mnemonic="T" isSelected={tocOpen} on:click={() => (tocOpen = !tocOpen)} />
+			<CtrlBtn text={tocOpen ? 'ToC ▾' : 'ToC ▴'} mnemonic="T" isSelected={tocOpen} on:click={() => (tocOpen = !tocOpen)} />
 			{#if tocOpen}
 			<div class="toc-menu">
 				<ol>
@@ -403,7 +424,7 @@
 			</div>
 			{/if}
 		</div>
-		&nbsp;
+
 		<div class="toc checks" class:open={checksOpen} bind:this={checksRef} title="Reset checks (C)">
 			<!-- hoverText mirrors text exactly so the label never changes width under the pointer
 			     (CtrlBtn SWAPS the two on hover): this bar is a fixed row a speaker aims at without
@@ -422,7 +443,7 @@
 			</div>
 			{/if}
 		</div>
-		&nbsp;
+
 		<!-- Reset the speaker's ink. Shown only where the pen is offered, and it reports how
 		     much ink is on the current slide so "reset" is never a shot in the dark. -->
 		{#if $canAnnotate}
@@ -446,8 +467,8 @@
 			</div>
 			{/if}
 		</div>
-		&nbsp;
 		{/if}
+		</div>
 		<div class="nav">
 			<CtrlBtn text="FIRST" on:click={() => go(nav.first, 'back')} isDisabled={!nav.first} />
 			<CtrlBtn text="◀ PREV" on:click={() => go(nav.prev, 'back')} isDisabled={!nav.prev} />
@@ -642,6 +663,18 @@
 		align-items: center;
 		gap: 6px;
 		font-size: 1.5rem; /* CtrlBtn is em-based; set the lever here */
+	}
+	/* OVERVIEW / ToC / Checks / Annotate — same gap as .nav, so the two button rows
+	   read as one consistent bar instead of the top row looking looser. */
+	.tools {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	/* OVERVIEW — same sizing lever as .toc/.nav so the CtrlBtn matches theirs. */
+	.ov-btn {
+		font-size: 1.5rem;
 	}
 
 	/* TOC jump menu — button in the bar, list opens UPWARD. */

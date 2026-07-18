@@ -893,7 +893,13 @@
 			     Gated in MARKUP rather than hidden in CSS (which is how ?clean retires the
 			     other chrome): a tile must not build a slide list or arm a global `o`
 			     listener, and there are a dozen tiles alive at once. Not rendering it is
-			     also what stops a tile from growing a grid of its own, recursively. -->
+			     also what stops a tile from growing a grid of its own, recursively.
+
+			     AUDIENCE window only (`!present`) — the presenter console gets its OWN
+			     mount, outside `.viewport`, alongside <PresenterView> below. It cannot
+			     live here for the console: `.viewport` is `position:fixed`, which always
+			     opens a stacking context, so no z-index in here could ever outrank
+			     PresenterView's bar (a later sibling of `.viewport`, not a descendant). -->
 			{#if !clean && !present}
 				<OverviewPage
 					{pages}
@@ -1210,6 +1216,28 @@
      canvas; the current slide's own <Note> supplies the notes panel. -->
 {#if initialized && present}
 <PresenterView {pages} {width} {height} />
+<!-- The all-slides grid, mounted for the CONSOLE specifically. A sibling of
+     PresenterView (not the audience mount above, inside `.viewport`) is required:
+     `.viewport` is `position:fixed`, which unconditionally opens its own stacking
+     context, so no z-index inside it can ever outrank a LATER root-level sibling
+     like PresenterView's bar — the grid rendered invisibly BEHIND the console's
+     own chrome the one time this was tried nested in `.content`. Being a plain
+     later sibling here, it also needs no `.container.present { visibility: hidden
+     }` escape trick: it was never inside that hidden subtree.
+
+     Opening/browsing it never reaches the audience — `overviewOpen` is a fresh
+     module instance in THIS window, no cross-window relay exists for it. Only a
+     tile CLICK does anything cross-window, by navigating this window (keeping
+     `?present`, see OverviewPage's `jump()`), which the audience follows the same
+     way PREV/NEXT/TOC already do (SlideDeck's publishCurrentSlide relay). -->
+<OverviewPage
+	{pages}
+	{width}
+	{height}
+	currentPath={currentSlide ?? ''}
+	deck={deckName}
+	{present}
+/>
 {/if}
 
 <style>

@@ -66,6 +66,15 @@ const cards = () => [...document.querySelectorAll('.tile .card')].map((c) => c.t
 const scrim = () => document.querySelector('.scrim');
 const openGrid = () => fireEvent.keyDown(window, { key: 'o' });
 
+/** Dispatch a real, bubbling KeyboardEvent AT `target` — unlike `fireEvent.keyDown(window,
+    …)`, this is what actually happens when a FOCUSED tile receives a key: the grid's local
+    `.grid` listener sees it in the bubble phase before it ever reaches `window`. */
+function press(target: EventTarget, key: string) {
+	const ev = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+	target.dispatchEvent(ev);
+	return ev;
+}
+
 describe('OverviewPage — closed by default', () => {
 	it('shows NOTHING: no button, no grid, and not one document booted', () => {
 		stubObserver();
@@ -378,5 +387,139 @@ describe('OverviewPage — keys it must not steal', () => {
 		// Not ours to consume — the deck's other Escape listeners (ToC, SizeMode,
 		// Annotate) must still see it unprevented.
 		expect(escape.defaultPrevented).toBe(false);
+	});
+});
+
+describe('OverviewPage — keyboard browsing (roving focus)', () => {
+	// The core promise: arrow keys, Home/End, PageUp/PageDown and Space only ever
+	// move which tile is FOCUSED, in this window, and never navigate. Enter is the
+	// one key that commits — and even then, only from a real user gesture inside
+	// the grid, never from the mere act of moving around.
+
+	it('focuses the CURRENT tile automatically when the grid opens', async () => {
+		stubObserver();
+		render(OverviewPageHost, { props: { currentPath: 'intro.html' } });
+		await openGrid();
+
+		expect(document.activeElement).toBe(screen.getByRole('button', { name: /Intro/ }));
+	});
+
+	it('→ moves focus to the next tile — nothing navigates', async () => {
+		stubObserver();
+		render(OverviewPageHost, { props: { currentPath: 'title.html' } });
+		await openGrid();
+		const title = screen.getByRole('button', { name: /Title/ });
+		expect(document.activeElement).toBe(title);
+
+		press(title, 'ArrowRight');
+		await tick();
+
+		expect(document.activeElement).toBe(screen.getByRole('button', { name: /Intro/ }));
+		// Browsing, not committing: the grid is still open.
+		expect(scrim()).not.toBeNull();
+	});
+
+	it('← moves focus to the previous tile, clamped at the first (no wraparound)', async () => {
+		stubObserver();
+		render(OverviewPageHost, { props: { currentPath: 'title.html' } });
+		await openGrid();
+		const title = screen.getByRole('button', { name: /Title/ });
+
+		press(title, 'ArrowLeft'); // already first — stays put
+		await tick();
+		expect(document.activeElement).toBe(title);
+		expect(scrim()).not.toBeNull();
+	});
+
+	it('Home/End jump focus straight to the first/last tile', async () => {
+		stubObserver();
+		render(OverviewPageHost, { props: { currentPath: 'intro.html' } });
+		await openGrid();
+		const intro = screen.getByRole('button', { name: /Intro/ });
+
+		press(intro, 'End');
+		await tick();
+		expect(document.activeElement).toBe(screen.getByRole('button', { name: /Outro/ }));
+
+		press(screen.getByRole('button', { name: /Outro/ }), 'Home');
+		await tick();
+		expect(document.activeElement).toBe(screen.getByRole('button', { name: /Title/ }));
+		expect(scrim()).not.toBeNull();
+	});
+
+	it('PageDown/PageUp move without erroring or navigating, clamped in range', async () => {
+		stubObserver();
+		render(OverviewPageHost, { props: { currentPath: 'title.html' } });
+		await openGrid();
+		const title = screen.getByRole('button', { name: /Title/ });
+
+		press(title, 'PageDown');
+		await tick();
+		expect(document.activeElement).not.toBeNull();
+		expect(scrim()).not.toBeNull();
+	});
+
+	it('Space moves focus back to the CURRENT tile, wherever browsing left off', async () => {
+		stubObserver();
+		render(OverviewPageHost, { props: { currentPath: 'title.html' } });
+		await openGrid();
+		const title = screen.getByRole('button', { name: /Title/ });
+
+		press(title, 'ArrowRight'); // wander off to Intro
+		await tick();
+		expect(document.activeElement).toBe(screen.getByRole('button', { name: /Intro/ }));
+
+		press(document.activeElement!, ' ');
+		await tick();
+		// Back on the current slide (Title) — and still just browsing.
+		expect(document.activeElement).toBe(title);
+		expect(scrim()).not.toBeNull();
+	});
+
+	it('Enter commits the FOCUSED tile — closes the grid, exactly like a click', async () => {
+		stubObserver();
+		render(OverviewPageHost, { props: { currentPath: 'title.html' } });
+		await openGrid();
+		const title = screen.getByRole('button', { name: /Title/ });
+
+		press(title, 'ArrowRight'); // focus a DIFFERENT tile than the current one
+		await tick();
+		expect(scrim()).not.toBeNull(); // moving focus alone never commits
+
+		press(document.activeElement!, 'Enter');
+		await tick();
+		expect(scrim()).toBeNull(); // Enter does
+	});
+
+	it('claims arrow keys ONLY from a focused tile — the deck pager is untouched otherwise', async () => {
+		stubObserver();
+		render(OverviewPageHost, { props: { currentPath: 'title.html' } });
+		await openGrid();
+		const title = screen.getByRole('button', { name: /Title/ });
+
+		// A window listener stands in for NavigationBar's real page-level arrow-key pager.
+		const paged = vi.fn();
+		window.addEventListener('keydown', paged);
+		try {
+			// From the focused tile, the grid claims the key: prevented + stopped, so
+			// it never reaches window — the deck must not page out from under browsing.
+			const owned = press(title, 'ArrowRight');
+			await tick();
+			expect(owned.defaultPrevented).toBe(true);
+			expect(paged).not.toHaveBeenCalled();
+
+			// A key the grid does not recognise passes straight through.
+			paged.mockClear();
+			const other = press(document.activeElement!, 'x');
+			expect(other.defaultPrevented).toBe(false);
+			expect(paged).toHaveBeenCalledTimes(1);
+
+			// A key from OUTSIDE the grid entirely (the deck body) is never touched.
+			paged.mockClear();
+			press(document.body, 'ArrowRight');
+			expect(paged).toHaveBeenCalledTimes(1);
+		} finally {
+			window.removeEventListener('keydown', paged);
+		}
 	});
 });

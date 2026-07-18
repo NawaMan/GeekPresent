@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+	currentTileDirection,
+	gridColumnCount,
+	gridRowsPerPage,
 	isTypingTarget,
 	mountedTiles,
+	moveFocus,
+	overviewGridKeyIntent,
 	overviewPageKeyIntent,
 	overviewPageTiles,
 	tileScale
@@ -197,5 +202,150 @@ describe('mountedTiles — which tiles hold a live document', () => {
 	it('is total — no current slide (0) and junk numbers add nothing', () => {
 		expect([...mountedTiles(new Set([1]), 0)]).toEqual([1]);
 		expect([...mountedTiles(new Set([NaN]), NaN)]).toEqual([]);
+	});
+});
+
+describe('currentTileDirection — which way to scroll for the current slide', () => {
+	const grid = { top: 100, bottom: 500 };
+
+	it('is "unknown" when there is no current tile (no match, or not yet mounted)', () => {
+		expect(currentTileDirection(grid, null)).toBe('unknown');
+	});
+
+	it('is "visible" when the tile is fully inside the viewport', () => {
+		expect(currentTileDirection(grid, { top: 150, bottom: 250 })).toBe('visible');
+	});
+
+	it('is "visible" when the tile only PARTLY overlaps — nothing to scroll for', () => {
+		expect(currentTileDirection(grid, { top: 450, bottom: 550 })).toBe('visible'); // spills below
+		expect(currentTileDirection(grid, { top: 50, bottom: 150 })).toBe('visible'); // spills above
+	});
+
+	it('is "above" once the tile has fully scrolled past the top edge', () => {
+		expect(currentTileDirection(grid, { top: -200, bottom: 50 })).toBe('above');
+	});
+
+	it('is "below" once the tile has fully scrolled past the bottom edge', () => {
+		expect(currentTileDirection(grid, { top: 550, bottom: 700 })).toBe('below');
+	});
+
+	it('treats a tile exactly flush with an edge as still visible (boundary, not past it)', () => {
+		expect(currentTileDirection(grid, { top: 500, bottom: 600 })).toBe('visible');
+		expect(currentTileDirection(grid, { top: 0, bottom: 100 })).toBe('visible');
+	});
+});
+
+describe('gridColumnCount — how many tiles share the first row', () => {
+	it('counts the leading tiles that share the first top edge', () => {
+		expect(gridColumnCount([10, 10, 10, 10, 400, 400, 400, 400])).toBe(4);
+	});
+
+	it('tolerates a few px of sub-pixel jitter between same-row tiles', () => {
+		expect(gridColumnCount([10, 10.4, 9.6, 400])).toBe(3);
+	});
+
+	it('is 1 for a single column (each tile its own row)', () => {
+		expect(gridColumnCount([10, 200, 390])).toBe(1);
+	});
+
+	it('is total-safe: an empty list is still 1, never 0', () => {
+		expect(gridColumnCount([])).toBe(1);
+	});
+});
+
+describe('gridRowsPerPage — PageUp/PageDown step size', () => {
+	it('floors to whole rows that fit the visible height', () => {
+		expect(gridRowsPerPage(1000, 300)).toBe(3);
+	});
+
+	it('is never less than 1, even in a viewport shorter than one row', () => {
+		expect(gridRowsPerPage(100, 300)).toBe(1);
+	});
+
+	it('falls back to 1 rather than dividing by zero or NaN', () => {
+		expect(gridRowsPerPage(1000, 0)).toBe(1);
+		expect(gridRowsPerPage(1000, NaN)).toBe(1);
+		expect(gridRowsPerPage(NaN, 300)).toBe(1);
+	});
+});
+
+describe('moveFocus — roving keyboard focus over the grid', () => {
+	// 12 tiles, 4 columns (3 rows), 2 rows fit the visible viewport per page.
+	const total = 12;
+	const cols = 4;
+	const rowsPerPage = 2;
+
+	it('left/right step by one, clamped at the ends (no wraparound)', () => {
+		expect(moveFocus(5, total, cols, rowsPerPage, 'right')).toBe(6);
+		expect(moveFocus(5, total, cols, rowsPerPage, 'left')).toBe(4);
+		expect(moveFocus(1, total, cols, rowsPerPage, 'left')).toBe(1);
+		expect(moveFocus(total, total, cols, rowsPerPage, 'right')).toBe(total);
+	});
+
+	it('up/down step by a whole row (the column count)', () => {
+		expect(moveFocus(6, total, cols, rowsPerPage, 'down')).toBe(10);
+		expect(moveFocus(6, total, cols, rowsPerPage, 'up')).toBe(2);
+	});
+
+	it('up/down clamp into range rather than landing off-grid', () => {
+		expect(moveFocus(2, total, cols, rowsPerPage, 'up')).toBe(1); // 2-4 = -2 → clamped
+		expect(moveFocus(11, total, cols, rowsPerPage, 'down')).toBe(total); // 11+4=15 → clamped
+	});
+
+	it('pageUp/pageDown step by a whole page (columns * rowsPerPage)', () => {
+		expect(moveFocus(9, total, cols, rowsPerPage, 'pageDown')).toBe(total); // 9+8=17 → clamped
+		expect(moveFocus(9, total, cols, rowsPerPage, 'pageUp')).toBe(1); // 9-8=1
+	});
+
+	it('first/last (Home/End) jump straight to the ends regardless of position', () => {
+		expect(moveFocus(7, total, cols, rowsPerPage, 'first')).toBe(1);
+		expect(moveFocus(7, total, cols, rowsPerPage, 'last')).toBe(total);
+	});
+
+	it('is total-safe: an empty deck yields 0, never a fabricated tile number', () => {
+		expect(moveFocus(1, 0, cols, rowsPerPage, 'right')).toBe(0);
+	});
+});
+
+describe('overviewGridKeyIntent — what a key means to the roving grid', () => {
+	const el = (tagName: string) => ({ tagName, isContentEditable: false }) as unknown as EventTarget;
+	const key = (init: Partial<KeyboardEvent> & { key: string }): KeyboardEvent =>
+		({
+			key: init.key,
+			ctrlKey: init.ctrlKey ?? false,
+			metaKey: init.metaKey ?? false,
+			altKey: init.altKey ?? false,
+			shiftKey: init.shiftKey ?? false,
+			target: init.target ?? null
+		}) as KeyboardEvent;
+
+	it('maps the arrows, Home/End and PageUp/PageDown to movement intents', () => {
+		expect(overviewGridKeyIntent(key({ key: 'ArrowLeft' }))).toBe('left');
+		expect(overviewGridKeyIntent(key({ key: 'ArrowRight' }))).toBe('right');
+		expect(overviewGridKeyIntent(key({ key: 'ArrowUp' }))).toBe('up');
+		expect(overviewGridKeyIntent(key({ key: 'ArrowDown' }))).toBe('down');
+		expect(overviewGridKeyIntent(key({ key: 'Home' }))).toBe('first');
+		expect(overviewGridKeyIntent(key({ key: 'End' }))).toBe('last');
+		expect(overviewGridKeyIntent(key({ key: 'PageUp' }))).toBe('pageUp');
+		expect(overviewGridKeyIntent(key({ key: 'PageDown' }))).toBe('pageDown');
+	});
+
+	it('Enter commits; Space goes to the current slide — neither is movement', () => {
+		expect(overviewGridKeyIntent(key({ key: 'Enter' }))).toBe('commit');
+		expect(overviewGridKeyIntent(key({ key: ' ' }))).toBe('toCurrent');
+	});
+
+	it('ignores an unrelated key', () => {
+		expect(overviewGridKeyIntent(key({ key: 'a' }))).toBe('ignore');
+	});
+
+	it('leaves a modified chord alone — Cmd/Ctrl/Alt belong to the browser or OS', () => {
+		expect(overviewGridKeyIntent(key({ key: 'ArrowLeft', metaKey: true }))).toBe('ignore');
+		expect(overviewGridKeyIntent(key({ key: 'ArrowRight', ctrlKey: true }))).toBe('ignore');
+		expect(overviewGridKeyIntent(key({ key: 'Enter', altKey: true }))).toBe('ignore');
+	});
+
+	it('never fires while the caret is in a text field', () => {
+		expect(overviewGridKeyIntent(key({ key: 'ArrowRight', target: el('INPUT') }))).toBe('ignore');
 	});
 });
