@@ -1220,6 +1220,25 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     named `deploy` Block, a Save button a plain top banner), registered in `pages.ts` beside
     Note-driven Highlight with `adjust: true` so "drag the box, the spotlight follows" is live.
 
+- [ ] **`Cursor` — a fake mouse pointer that demonstrates a UI without a live app** — an author-
+  placed pointer glyph that sits at a point, glides between named targets, and flashes a click
+  ripple, so a slide can *show* a hover → click → drag instead of cutting to a screen recording.
+  - Why: demoing an interaction today means a `Video` (heavy, re-record on every UI change) or hand-
+    waving over a static shot. A scriptable cursor makes the gesture part of the slide's own
+    timeline — it scrubs, holds and replays with everything else, and it re-times for free when the
+    talk does.
+  - Approach: it's a `Sprite` wearing a pointer, not a new engine — reuse the unified Draw + Sprite
+    path (the `polyline` path kind already carries a sprite between points) for the motion, aim the
+    endpoints at boxes by name through `stores/blockAnchors.ts` exactly as `Connector`/`Spotlight`
+    do, and ride the `AnimationBar` keyframe clock (`Canvas`/`Terminal`/`Sprite` discipline) so
+    hold/seek/replay come free. The click ripple is an opt-in, SSR-inert reveal keyed to a path
+    checkpoint; colours/size are `--cursor-*` role tokens in `roles.css`. Done = component + a demo
+    slide that *is* the docs + a DOM test + an SSR test (glyph prerenders, no `NaN` in the path).
+  - Open questions: a standalone `<Cursor>` vs. just a pointer preset/glyph on `Sprite` (if the path
+    engine already does everything, the cursor may be one glyph + a ripple layer, not a component);
+    how a "click" is authored — a keyframe marker on the path, or a `Steps`-style beat; and whether
+    hover/drag want distinct pointer states or just the move + ripple to start.
+
 - [x] **`Terminal`** — fake console: typed command + output, riding the `AnimationBar` keyframe clock.
   - Done: `src/lib/components/Terminal.svelte`, with the schedule in
     `src/lib/utils/terminalCore.ts` (pure, total — `drawCore`/`videoCore` discipline:
