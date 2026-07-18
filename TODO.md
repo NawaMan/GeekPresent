@@ -1932,17 +1932,31 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
 
 ## Authoring / LAYOUT mode
 
-- [ ] **Ctrl+S saves while in ADJUST mode** — trap the browser's Save shortcut and route it to
+- [x] **Ctrl+S saves while in ADJUST mode** — trap the browser's Save shortcut and route it to
   ADJUST's SAVE instead of the "save this webpage" dialog.
-  - Why: SAVE is the whole point of an ADJUST session and it's a mouse trip to the chrome; Ctrl+S is
-    the reflex every author already has, and today it pops the browser's page-save dialog — worse
-    than useless mid-edit.
-  - Approach: a `keydown` that `preventDefault()`s Ctrl/Cmd+S only while `canLayout && layoutMode`
-    are both true (the gate `Block`/`Draw` already read), then calls the exact SAVE path the button
-    does — inheriting SAVE's own NOT-ALLOWED / partial-save handling rather than a second code path.
-    Inert whenever ADJUST isn't active, so it never shadows the browser shortcut on a normal slide.
-  - Open questions: Cmd+S on mac in the same handler (yes), and whether to flash SAVE's existing
-    confirmation so the keypress isn't silent.
+  - Done: a pure `isAdjustSaveChord(e, adjustActive)` in `src/lib/chrome/chromeArmCore.ts` — the
+    keyboard core that already owns the chrome mnemonics and `isChromeTypingTarget`. It answers one
+    total, NaN-free question: is this a plain Ctrl/Cmd+S *and* is ADJUST active? `SlideDeck.svelte`'s
+    existing `onChromeKeys` window handler consults it FIRST, passing `$canAdjust && $adjustMode`
+    (offered AND on); on a match it `preventDefault()`s and calls the SAME `onSave()` the SAVE button
+    fires — so NOT-ALLOWED, ERROR, NONE and the `1 OF 2` partial-save flashes are all inherited, not
+    re-implemented. Off a normal slide the chord is inert and the browser keeps its shortcut.
+  - **Cmd+S on mac is the same handler** (settling the open question — yes): the chord matches on
+    `ctrlKey || metaKey`, so Windows/Linux Ctrl+S and mac Cmd+S both land, while `Shift`/`Alt` are
+    left to the browser's own Save-As-family chords. `e.code === 'KeyS'` is a fallback so a non-Latin
+    layout still saves. **The keypress is not silent** — `onSave()` flips the SAVE label to
+    SAVED / NONE / `1 OF 2` / NOT ALLOWED exactly as a click does, so the chord's outcome shows in
+    the chrome with no extra machinery.
+  - **Deliberately NOT guarded on a typing target**, unlike the letter mnemonics. Ctrl+S means "save
+    my work" everywhere; suppressing it because the caret sits in an editable Block would pop the very
+    browser dialog we're removing. A modifier chord doesn't collide with typing the way a bare letter
+    does, so the guard would only create a dead spot.
+  - Tests: `isAdjustSaveChord` unit-tested directly in `tests/chromeArmCore.test.ts` (Ctrl+S / Cmd+S /
+    capital-S / non-Latin-via-`code` claimed; inert when ADJUST off; bare-S, Shift, Alt and other
+    letters left alone; fires with the caret in a field). Demo: the ADJUST shortcut line in
+    `src/routes/slides/adjust-mode.html/+page.svelte` now names **Ctrl+S to SAVE** alongside Esc /
+    Ctrl+Z, so the slide that teaches ADJUST documents the reflex. (No SlideDeck DOM/SSR test: a deck
+    boot renders blank in jsdom, so the coverage lives in the pure core — the `snapAxis` precedent.)
 
 - [x] **LAYOUT visible in production (demo mode)** — let a deployed deck *show* LAYOUT so a
       talk can demonstrate the authoring workflow live, with SAVE reading **NOT ALLOWED**.

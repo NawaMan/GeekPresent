@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { chromeKeyIntent, isChromeTypingTarget } from '../src/lib/chrome/chromeArmCore';
+import {
+	chromeKeyIntent,
+	isAdjustSaveChord,
+	isChromeTypingTarget
+} from '../src/lib/chrome/chromeArmCore';
 
 function key(
 	partial: Partial<KeyboardEvent> & { key: string; code?: string }
@@ -10,6 +14,7 @@ function key(
 		altKey: !!partial.altKey,
 		ctrlKey: !!partial.ctrlKey,
 		metaKey: !!partial.metaKey,
+		shiftKey: !!partial.shiftKey,
 		defaultPrevented: !!partial.defaultPrevented,
 		target: partial.target ?? null
 	} as KeyboardEvent;
@@ -63,5 +68,34 @@ describe('chromeKeyIntent', () => {
 	it('ignores mnemonics while typing even when armed', () => {
 		const input = { tagName: 'INPUT' } as unknown as EventTarget;
 		expect(chromeKeyIntent(key({ key: 'a', target: input }), true)).toBe('ignore');
+	});
+});
+
+describe('isAdjustSaveChord', () => {
+	it('claims Ctrl+S and Cmd+S while ADJUST is active', () => {
+		expect(isAdjustSaveChord(key({ key: 's', ctrlKey: true }), true)).toBe(true);
+		expect(isAdjustSaveChord(key({ key: 's', metaKey: true }), true)).toBe(true);
+		// Capital S (Shift-lock, not Shift held) and non-Latin layouts via e.code.
+		expect(isAdjustSaveChord(key({ key: 'S', ctrlKey: true }), true)).toBe(true);
+		expect(isAdjustSaveChord(key({ key: 'ы', code: 'KeyS', ctrlKey: true }), true)).toBe(true);
+	});
+
+	it('stays inert when ADJUST is not active — the browser keeps Ctrl+S', () => {
+		expect(isAdjustSaveChord(key({ key: 's', ctrlKey: true }), false)).toBe(false);
+		expect(isAdjustSaveChord(key({ key: 's', metaKey: true }), false)).toBe(false);
+	});
+
+	it('leaves other chords to the browser', () => {
+		// Bare S types a letter; Shift/Alt carry Save As and friends.
+		expect(isAdjustSaveChord(key({ key: 's' }), true)).toBe(false);
+		expect(isAdjustSaveChord(key({ key: 's', ctrlKey: true, shiftKey: true }), true)).toBe(false);
+		expect(isAdjustSaveChord(key({ key: 's', ctrlKey: true, altKey: true }), true)).toBe(false);
+		// A different letter under Ctrl is not ours.
+		expect(isAdjustSaveChord(key({ key: 'a', ctrlKey: true }), true)).toBe(false);
+	});
+
+	it('fires even with the caret in a field — Ctrl+S means save, not the dialog', () => {
+		const input = { tagName: 'INPUT' } as unknown as EventTarget;
+		expect(isAdjustSaveChord(key({ key: 's', ctrlKey: true, target: input }), true)).toBe(true);
 	});
 });

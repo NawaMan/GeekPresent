@@ -49,7 +49,7 @@
 </Block>
 
 <!-- The design note that earns this slide: the axis is different from ADJUST's, on purpose. -->
-<Block name="why" x={995} y={370} width={860} height={330}>
+<Block name="why" x={995} y={367} width={860} height={330}>
 	<Callout kind="info" title="Why deck-wide, and not per-slide?">
 		<p>
 			<code>adjust: true</code> is set on the individual slides that <i>teach</i> ADJUST,

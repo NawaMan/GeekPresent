@@ -16,6 +16,28 @@ export function isChromeTypingTarget(t: EventTarget | null): boolean {
 	return /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName ?? '');
 }
 
+/**
+ * Is this the browser Save chord (Ctrl+S / Cmd+S) that ADJUST should claim for its
+ * own SAVE, instead of letting the browser pop its "save this webpage" dialog?
+ *
+ * True ONLY when the chord is pressed AND ADJUST is currently active — so on a
+ * normal slide the answer is false and the browser keeps its shortcut untouched.
+ * `adjustActive` is the caller's `$canAdjust && $adjustMode`: offered AND on.
+ *
+ * Unlike the letter mnemonics, this deliberately does NOT bail while a text field
+ * has focus: Ctrl+S means "save my work" everywhere, and popping the browser dialog
+ * because the caret sits in an editable Block is the exact misfire we're removing.
+ * Plain Ctrl/Cmd+S only — Shift/Alt carry other browser chords (Save As, …) and are
+ * left to the browser. `e.code` is a fallback so a non-Latin layout still saves.
+ * Total: no throw on garbage, and never true off a real Ctrl/Cmd+S.
+ */
+export function isAdjustSaveChord(e: KeyboardEvent, adjustActive: boolean): boolean {
+	if (!adjustActive) return false;
+	if (e.altKey || e.shiftKey) return false;
+	if (!(e.ctrlKey || e.metaKey)) return false;
+	return e.key === 's' || e.key === 'S' || e.code === 'KeyS';
+}
+
 export type ChromeKeyIntent =
 	| 'arm'
 	| 'disarm'

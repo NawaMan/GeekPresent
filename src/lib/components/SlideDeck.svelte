@@ -58,7 +58,7 @@
 		requestTocOpen,
 		holdMoreMenuClosed
 	} from '$lib/stores/chromeArm';
-	import { chromeKeyIntent } from '$lib/chrome/chromeArmCore';
+	import { chromeKeyIntent, isAdjustSaveChord } from '$lib/chrome/chromeArmCore';
 	import CodeBox from '$lib/components/CodeBox.svelte';
 
 	// Deck-level SOURCE CodeBox (slides without ViewSource). Opened by openPageSource
@@ -471,6 +471,17 @@
 	 * Esc disarms chrome and closes the ☰ drop (blur). Print-menu keys win when open.
 	 */
 	function onChromeKeys(e: KeyboardEvent) {
+		// Ctrl/Cmd+S while ADJUST is active (offered AND on) writes the moved Blocks
+		// back to source instead of popping the browser's save-page dialog. It routes
+		// through onSave(), so NOT-ALLOWED / partial-save handling is inherited rather
+		// than duplicated; on a normal slide the chord is inert and the browser keeps
+		// its shortcut.
+		if (isAdjustSaveChord(e, $canAdjust && $adjustMode)) {
+			e.preventDefault();
+			onSave();
+			return;
+		}
+
 		// PRINT submenu owns its alphabet while open (including Esc).
 		if (printMenuOpen) {
 			onPrintMenuKey(e);

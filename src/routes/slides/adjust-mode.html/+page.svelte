@@ -41,7 +41,7 @@
 			<code>vite dev</code> offers ADJUST everywhere regardless, and
 			<code>?adjust</code> on any slide URL opts a built site in by hand (sticky;
 			<code>?adjust=off</code> clears it, and outranks the flag above). Drag, resize,
-			<b>⤒</b>/<b>⤓</b> to restack, <b>Esc</b> to cancel, <b>Ctrl+Z</b> to undo &mdash;
+			<b>⤒</b>/<b>⤓</b> to restack, <b>Esc</b> to cancel, <b>Ctrl+Z</b> to undo, <b>Ctrl+S</b> to SAVE &mdash;
 			all of it works here, and <b>Copy</b> hands back the updated tag.
 		</p>
 	</div>
