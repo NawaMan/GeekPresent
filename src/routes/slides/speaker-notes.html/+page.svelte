@@ -23,6 +23,11 @@
 		<Kbd keys="A" /> the reset-annotations menu — <Kbd keys="Esc" /> closes any of them. Each
 		key is the underlined letter in its button, so there is no legend to memorise.
 	</p>
+	<p>
+		While the console is open it becomes the <b>single</b> notes surface: this
+		below-the-slide copy disappears — redundant, and it was only eating height under an
+		already-shrunken slide. Close the console and it returns as the no-console fallback.
+	</p>
 </ContentPage>
 
 <Note>

@@ -97,8 +97,10 @@
 	import { getViewTransitions } from '$lib/presentation';
 	import {
 		presenterMode, publishCurrentSlide, subscribeCurrentSlide, subscribeAnimCommand,
-		subscribeContinue, subscribeHighlight, deckKeyFromPath, openPresenterWindow
+		subscribeContinue, subscribeHighlight, deckKeyFromPath, openPresenterWindow,
+		consoleLive, publishConsoleAlive, subscribeConsoleAlive, loadConsoleBeat
 	} from '$lib/stores/presenter';
+	import { consoleIsLive, CONSOLE_BEAT_MS, CONSOLE_TTL_MS } from '$lib/utils/consoleLiveCore';
 	import Spotlight from '$lib/components/Spotlight.svelte';
 	import { setHighlight } from '$lib/stores/highlightTarget';
 	import { collectFinite, applyState } from '$lib/utils/slideAnim';
@@ -794,6 +796,28 @@
 			? subscribeHighlight(deckKey, (name) => setHighlight(name))
 			: () => {};
 
+		// Console presence. In the ?present window this is the CONSOLE, so heartbeat —
+		// stamp the shared key now (so an already-open audience flips at once) and keep
+		// re-stamping on an interval while we live. In an audience window (top only — an
+		// iframe preview must not react, like the relays above) TRACK that beat: seed
+		// from the last stored beat, follow new ones, and re-judge staleness on a timer,
+		// because a console that CLOSED sends no farewell — only the clock reveals it
+		// gone. The verdict lands in `consoleLive`, which <Note> reads to drop its now-
+		// redundant below-slide note.
+		let stopConsole = () => {};
+		if (present) {
+			publishConsoleAlive(deckKey);
+			const beat = window.setInterval(() => publishConsoleAlive(deckKey), CONSOLE_BEAT_MS);
+			stopConsole = () => window.clearInterval(beat);
+		} else if (window.self === window.top) {
+			let lastBeat = loadConsoleBeat(deckKey);
+			const refresh = () => consoleLive.set(consoleIsLive(lastBeat, Date.now(), CONSOLE_TTL_MS));
+			refresh();
+			const stopBeat = subscribeConsoleAlive(deckKey, (ts) => { lastBeat = ts; refresh(); });
+			const poll = window.setInterval(refresh, CONSOLE_BEAT_MS);
+			stopConsole = () => { stopBeat(); window.clearInterval(poll); consoleLive.set(false); };
+		}
+
 		// NOTE: no ink subscription here. Ink rides a persisted(sync: true) store, so the
 		// `storage` event mirrors it between the two deck windows with nothing to wire up —
 		// and because it is keyed BY SLIDE, the console's next-slide <iframe> preview shows
@@ -808,6 +832,7 @@
 			stopAnim();
 			stopContinue();
 			stopHighlight();
+			stopConsole(); // stop the heartbeat / presence tracking; clears consoleLive
 			setHighlight(null); // don't leave a stale spotlight across a deck swap
 			// Ink is NOT cleared here — it is meant to survive. That is the whole point.
 			window.removeEventListener('resize', onResize);

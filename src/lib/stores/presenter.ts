@@ -13,6 +13,13 @@ import type { AnimState } from '$lib/utils/slideAnim';
     in SCALED mode) and by NavigationBar (so paging keeps the ?present flag). */
 export const presenterMode = writable<boolean>(false);
 
+/** True in an AUDIENCE window when a ?present console for the same deck is currently
+    live (heartbeating — see publishConsoleAlive / the console channel below). Set by
+    SlideDeck's audience branch; read by <Note> so the redundant below-slide SCALED
+    note yields once the console is carrying the notes. Defaults false, so a deck with
+    no console open (and every prerender) keeps the below-slide note as the fallback. */
+export const consoleLive = writable<boolean>(false);
+
 /** The deck a slide belongs to, as its route prefix — the sync namespace, so two
     decks (/slides/ vs /portrait/) never cross-drive each other. Examples:
     "/slides/intro.html" -> "/slides/", "/slides/intro.html/" -> "/slides/". */
@@ -150,6 +157,59 @@ export function subscribeHighlight(deckKey: string, cb: (name: string | null) =>
 		} catch {
 			// A malformed value clears rather than throws.
 			cb(null);
+		}
+	};
+	window.addEventListener('storage', onStorage);
+	return () => window.removeEventListener('storage', onStorage);
+}
+
+// CONSOLE PRESENCE — a heartbeat, so an audience window can tell whether a ?present
+// console is actually open (and thus already showing the notes) vs one that was
+// closed. Same publish/subscribe + fresh `ts` shape as the relays above, but it is
+// a LIVENESS beat, not a command: the console re-stamps it on an interval while it
+// lives, and the audience judges staleness with consoleLiveCore (a missed beat goes
+// stale rather than lying live forever). There is no farewell write on close — a
+// force-quit would skip it — so absence-of-beats, not an event, is what marks it gone.
+const consoleKeyFor = (deckKey: string) => `geekpresent:console:${deckKey}`;
+
+/** Stamp THIS window's console as alive for `deckKey` (call on an interval while the
+    ?present console is open). Best-effort; a no-op off-browser. */
+export function publishConsoleAlive(deckKey: string): void {
+	if (!browser) return;
+	try {
+		localStorage.setItem(consoleKeyFor(deckKey), JSON.stringify({ ts: Date.now() }));
+	} catch {
+		// best-effort
+	}
+}
+
+/** The last console heartbeat ms for `deckKey`, or 0 if none/garbage. Read once on
+    mount so the audience knows a console is already live before the first `storage`
+    event (which only fires on the NEXT beat). */
+export function loadConsoleBeat(deckKey: string): number {
+	if (!browser) return 0;
+	try {
+		const raw = localStorage.getItem(consoleKeyFor(deckKey));
+		const ts = raw ? (JSON.parse(raw) as { ts?: unknown }).ts : 0;
+		return typeof ts === 'number' && Number.isFinite(ts) && ts > 0 ? ts : 0;
+	} catch {
+		return 0;
+	}
+}
+
+/** Subscribe to console heartbeats for `deckKey`; `cb` gets each beat's ms. `storage`
+    only fires cross-window, so a console never hears its own beat. Returns an
+    unsubscribe; a no-op off-browser. */
+export function subscribeConsoleAlive(deckKey: string, cb: (beatMs: number) => void): () => void {
+	if (!browser) return () => {};
+	const key = consoleKeyFor(deckKey);
+	const onStorage = (e: StorageEvent) => {
+		if (e.key !== key || !e.newValue) return;
+		try {
+			const ts = (JSON.parse(e.newValue) as { ts?: unknown }).ts;
+			if (typeof ts === 'number' && Number.isFinite(ts) && ts > 0) cb(ts);
+		} catch {
+			// ignore malformed payloads
 		}
 	};
 	window.addEventListener('storage', onStorage);

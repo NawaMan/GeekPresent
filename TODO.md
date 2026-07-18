@@ -1112,18 +1112,33 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
   - Open questions: Shift+Space to walk back (as Video's chapters do), and whether Space should defer
     to an armed build the console can't see.
 
-- [ ] **Drop the below-the-slide speaker Note once the PRESENT console carries it** — when the deck
-  is zoomed out far enough, the Note printed under the canvas is redundant: the presenter console now
-  shows notes in their own pane.
-  - Why: the below-page Note was the notes surface *before* the console existed; with `?present`
-    showing them properly it's duplicated text eating vertical space exactly when the slide is
-    already small.
-  - Approach: gate the below-canvas Note on `displayMode` / the fit scale — hide it once the deck is
-    zoomed out past a threshold (or whenever a `?present` console is live), leaving the console as the
-    single notes surface. No new machinery: `displayMode` is already a store and notes already render
-    in the console.
-  - Open questions: the trigger — a fixed zoom-out threshold, "hide whenever a `?present` window is
-    open", or a deck prop — and whether the below-page Note stays as a no-console fallback.
+- [x] **Drop the below-the-slide speaker Note once the PRESENT console carries it** — the Note
+  printed under the canvas is redundant while the console shows notes in their own pane, so an
+  audience window drops it exactly then.
+  - Done: the audience window learns a `?present` console is open via a new HEARTBEAT channel —
+    `publishConsoleAlive` / `subscribeConsoleAlive` / `loadConsoleBeat` in `src/lib/stores/presenter.ts`,
+    the same publish/subscribe + fresh-`ts` shape as the CONTINUE/HIGHLIGHT relays beside it, but a
+    LIVENESS beat rather than a command. The console re-stamps it every `CONSOLE_BEAT_MS` while it
+    lives (`SlideDeck.svelte`'s `present` branch); the audience window (top only — an iframe preview
+    must not react) seeds from the last stored beat, follows new ones, and re-judges staleness on a
+    timer, since a console that CLOSED sends no farewell and only the clock reveals it gone.
+  - **Settling the open question — the trigger is "a live console is carrying the notes", not a zoom
+    threshold or a deck prop, and the below-slide Note stays as the no-console fallback.** The verdict
+    is a pure, total, NaN-safe `consoleIsLive(lastBeat, now, ttl)` in `src/lib/utils/consoleLiveCore.ts`
+    (the `drawCore`/`toastCore` discipline: a missing/garbage/future beat never throws and never lies
+    live; a degenerate ttl falls back to `CONSOLE_TTL_MS` rather than answering everything). Its boolean
+    lands in a new `consoleLive` store; `Note.svelte`'s `visible` now reads
+    `$displayMode === 'SCALED' && !$consoleLive`, so the below-slide copy drops only when a console is
+    live and returns when it closes. `presenterMode` (the console's own pinned panel) and the
+    print/handout homes are untouched — this drops ONLY the audience-window duplicate.
+  - SSR-safe by default: `consoleLive` defaults false and the beat is browser-guarded, so prerender is
+    unchanged (`tests/NoteSsr.ssr.test.ts` still proves the note never leaks into built HTML).
+  - Tests: `consoleIsLive` unit-tested directly in `tests/consoleLiveCore.test.ts` (fresh/edge/stale
+    ttl, no-beat, future-skew, garbage → no NaN, degenerate-ttl fallback, ttl > 2×beat so one dropped
+    beat never flickers); DOM coverage in `tests/NoteVisibility.test.ts` (SCALED shows, SCALED +
+    `consoleLive` drops, closing the console re-shows, FITTED hides regardless, and `presenterMode`
+    still shows the panel). Demo: the behaviour paragraph added to
+    `src/routes/slides/speaker-notes.html/+page.svelte`, the slide that documents the notes surfaces.
 
 - [x] **ANNOTATE pen — Shift snaps a stroke to the X/Y axis** — hold Shift and the pen lays a dead-
   horizontal or dead-vertical line, whichever the gesture favours, instead of following the wrist's

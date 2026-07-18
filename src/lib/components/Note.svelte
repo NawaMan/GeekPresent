@@ -5,6 +5,9 @@
     coordinate space (so it scales with the slide), shown only in SCALED display
     mode — there the slide is at an exact factor and the note sits below it,
     reachable by scrolling. In FITTED mode the slide fills the window, so it hides.
+    It ALSO hides once a live ?present console for this deck is carrying the notes
+    (consoleLive) — the console's own panel is then the single notes surface and the
+    below-slide copy is redundant. With no console open it stays as the fallback.
 
   - In a presenter window (loaded with ?present, see stores/presenter), the same
     note renders as the console's notes panel: pinned to the viewport, always
@@ -21,7 +24,7 @@
 	import { page } from '$app/stores';
 	import { displayMode } from '$lib/stores/displayMode';
 	import {
-		presenterMode, deckKeyFromPath, loadChecks, saveChecks, publishHighlight
+		presenterMode, consoleLive, deckKeyFromPath, loadChecks, saveChecks, publishHighlight
 	} from '$lib/stores/presenter';
 	import { setHighlight } from '$lib/stores/highlightTarget';
 	import { printNotes } from '$lib/stores/printNotes';
@@ -46,9 +49,16 @@
 	// …and `?notes` on a single slide is the same request, made of the deck instead of the
 	// handout: print THIS slide with its note under it. It ADDS to the screen rules rather than
 	// replacing them, because it is a print instruction and the deck is still a deck.
+	// The below-slide SCALED note yields once a live ?present console is carrying the
+	// notes ($consoleLive — set by SlideDeck's audience branch from the console's
+	// heartbeat). It is redundant then: the console shows the note in its own pinned
+	// panel, and duplicating it under an already-shrunken slide only eats height. With
+	// no console open $consoleLive is false and the below-slide note stays as the
+	// fallback. The presenter panel ($presenterMode) and print/handout are untouched —
+	// this drops ONLY the audience-window duplicate.
 	$: visible = handout
 		? handout.notes
-		: $printNotes || $displayMode === 'SCALED' || $presenterMode;
+		: $printNotes || ($displayMode === 'SCALED' && !$consoleLive) || $presenterMode;
 
 	// The deck + slide this note belongs to — the key its check states persist under.
 	$: slidePath = $page.url.pathname.replace(/\/+$/, '').split('/').pop() || '';
