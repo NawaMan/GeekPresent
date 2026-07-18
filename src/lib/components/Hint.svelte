@@ -253,7 +253,12 @@
 	   it is. */
 	.text.boxed {
 		bottom: 1em;
-		padding: 0.15em 0.7em;
+		/* Right side is tighter than left: the close button now sits inline (see .close),
+		   and Annotate's own bar leaves only ~6.5px after its × — 0.7em read as roughly
+		   double that gap here, since Hint isn't itself scaled down the way the bar's
+		   `scale(0.525)` shrinks its padding along with everything else. 0.35em is the
+		   value that lands the same on-screen gap; left is untouched (the grip side). */
+		padding: 0.15em 0.35em 0.15em 0.7em;
 		border-radius: 999px;
 		color: var(--hint-fg, #C0F1FF);
 		background: color-mix(in srgb, var(--hint-bg, #000000) 62%, transparent);
