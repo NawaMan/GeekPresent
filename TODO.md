@@ -10,6 +10,28 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
 
 ## Tier 1 — closes clear gaps
 
+- [ ] **Two ordinary tabs of one deck lock-step each other (multi-tab sync bug)** — open the same
+  deck in two browser tabs and paging in one pages the other; they should be independent, only the
+  presenter console ↔ audience pair should move together.
+  - Why: it's a real surprise in normal use — a speaker (or a reader) with the deck open twice finds
+    one tab yanked to whatever slide the other is on. The cross-window relay was built for the
+    console↔audience lock-step, but it drives ANY two windows of the same deck, not just that pair.
+  - Root cause: `subscribeCurrentSlide` in `SlideDeck.svelte:762` is gated only on being the top
+    window (`window.self === window.top`), NOT on presenter role, and every window also
+    `publishCurrentSlide`s. So two plain audience tabs both announce and both follow through the one
+    shared `geekpresent:current:${deckKey}` key + `storage` events (`stores/presenter.ts`), and
+    lock-step. The `deckKey` namespace already keeps *different* decks apart — the missing axis is
+    WHO may drive whom within one deck.
+  - Approach: scope the follow to the presenter relationship rather than to "any other window". The
+    repo already knows a console is live — `publishConsoleAlive` / `consoleLive` (`SlideDeck.svelte`
+    ~799) — so the cheap fix is: an audience window follows announcements only while a console is
+    live, the console always follows the audience, and two role-less audience tabs ignore each other.
+    Cleaner but bigger: tag each announcement with its sender's role (present vs audience) and only
+    cross-follow when roles differ. Keep it in the pure relay layer; no new dependency.
+  - Open questions: should the console pair with the ONE audience window that opened it (a session
+    id) rather than every audience tab on the origin; and does re-selecting the current slide still
+    need to re-broadcast (the intentional `ts`-bump echo) once the follow is role-scoped.
+
 - [x] **Progress API for slides — "which page of how many"** — let a slide's own JS/TS read the deck's
       full slide list and its own position, demoed with a progress bar along the bottom of `geeklight`.
   - Done: `getProgress()` in `src/lib/presentation.ts` (the reactive companion to the existing

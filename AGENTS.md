@@ -20,12 +20,15 @@ through the booth** — install, test, build, and the **dev server**. Many hosts
 pnpm; the booth image does. Never assume host `pnpm` / `node` / bare `vite` exist. Details also
 live in `dev-run.sh` and `.booth/config.toml` — this section is the agent summary.
 
-| Goal | Command |
-| --- | --- |
-| Dev server (**booth only** — see Rule 6) | `./booth exec --run -- ./dev-run.sh` |
-| One-shot in the booth (tests, scripts, …) | `./booth exec --run -- <command>` |
-| Run the test suite | `./booth exec --run -- pnpm test` |
+| Goal                                              | Command                                                                                |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Dev server (**booth only** — see Rule 6)          | `./booth exec --run -- ./dev-run.sh`                                                   |
+| One-shot in the booth (tests, scripts, …)         | `./booth exec --run -- <command>`                                                      |
+| Run the test suite                                | `./booth exec --run -- pnpm test`                                                      |
 | Static build (into `docs/` via vite, or a folder) | `./booth exec --run -- pnpm build` or `./booth exec --run -- ./build-static.sh ./dist` |
+
+If you want a new copy (like multiple worktree setting), use `--port <new-booth-port>`  for example: `./booth exec --run --port 22000 -- ./dev-run.sh`.
+**NOTE: ** the slide will be accessible on `<booth-port> + 173`.
 
 **No host pnpm / Node fallback for agents.** Do not run `pnpm …`, `npm …`, or `vite …` on the host
 for this project — not for dev, not for tests, not for builds, not “just this once”. If Docker or
@@ -33,10 +36,10 @@ booth is broken, stop and tell the user; do not invent a host toolchain path.
 
 **Two different ports (easy to mix up):**
 
-| Port | What it is | How to set it |
-| --- | --- | --- |
+| Port              | What it is                                                                   | How to set it                                                                                                               |
+| ----------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | **Booth control** | Host → container **10000** (CodingBooth's own port; shown in `./booth list`) | `.booth/config.toml` → **`port = "NEXT"`** (recommended). CodingBooth picks a free host port when the booth is **created**. |
-| **Vite / slides** | Host → container **5173** (the slide site) | `run-args` in `.booth/config.toml`: `"--publish", "<host>:5173"` (stock default is **31173:5173**) |
+| **Vite / slides** | Host → container **5173** (the slide site)                                   | `run-args` in `.booth/config.toml`: `"--publish", "<host>:5173"` (stock default is **+173:5173**)                           |
 
 **Control port = `NEXT`.** That is enough for concurrent booths — no `CB_PORT`, no CLI `--port` in the
 usual recipe. A hard-coded `port = "31000"` collides when another booth already holds it; prefer
@@ -48,30 +51,11 @@ not.) There is **no** `GEEKPRESENT_PORT`; that name is obsolete. `exec` does **n
 ./booth exec --run -- ./dev-run.sh
 ```
 
-**Avoid port conflicts before creating a booth (local config only):**
-
-1. Check what is already running: `./booth list` (and note main GeekPresent stock **31000** /
-   Vite **31173** if present).
-2. Edit **this checkout’s** `.booth/config.toml` only:
-   - set `port = "NEXT"` (free control port on create — not a fixed `31000`);
-   - set `"--publish", "<free-host>:5173"` in `run-args` so Vite is not still `31173:5173`
-     (e.g. `32000:5173` for a worktree beside the main booth).
-3. **Do not `git add`, stage, or commit that `config.toml` change.** It is machine/worktree-local
-   until CodingBooth can reassign Vite expose properly. Leave it dirty in the working tree.
-4. Then create/start: `./booth exec --run -- ./dev-run.sh`.
-
-Ports are fixed at container **create** time; they cannot re-bind on a live container. If this
-project’s booth is already up, use *that* URL from `./booth list` — do not start a second one to
-"fix" the port (Rule 6).
-
-Open slides at `http://localhost:<vite-host-port>/slides/<name>.html` (e.g. stock
-`http://localhost:31173/slides/title.html`, or the publish host you set above). After create, read
-the control port from the booth banner / `./booth list` and the Vite URL from config’s publish
-mapping; **tell the user** both when they are not the stock defaults.
-
 **Booth name = folder name.** CodingBooth names the container after the project directory (e.g.
 worktree `…/worktree/view-source` → booth `view-source`). Check with `./booth list`. Still do
 **not** kill someone else's booth or the user's running dev to free a port (Rule 6).
+
+**In case of multiple instance**, the name would be **`<folder>-<port>`**
 
 > **Known gap (CodingBooth):** reassigning the Vite expose per concurrent booth without editing
 > `config.toml` is not clean yet. Relative `+OFFSET:5173` publish forms and/or config-driven expose
