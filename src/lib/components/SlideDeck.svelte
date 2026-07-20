@@ -57,7 +57,8 @@
 		keepChromeArmed,
 		requestTocOpen,
 		closeMoreMenu,
-		toggleMoreMenu
+		toggleMoreMenu,
+		moreMenuOpen
 	} from '$lib/stores/chromeArm';
 	import { chromeKeyIntent, isAdjustSaveChord } from '$lib/chrome/chromeArmCore';
 	import CodeBox from '$lib/components/CodeBox.svelte';
@@ -464,6 +465,15 @@
 	// centred popover over the hamburger (which looked like two menus fighting).
 	let printMenuOpen = false;
 
+	// The flyout opens on MOUSEENTER, so it needs a way out that does not depend on a matching
+	// mouseleave. When the ☰ shuts with the pointer parked on the PRINT row, the row goes
+	// pointer-events:none underneath it and the browser owes us no mouseleave — the latch would
+	// stay set, and the flyout would be sitting open the next time the ☰ opened. Its parent
+	// closing is the authoritative "you are gone".
+	moreMenuOpen.subscribe((open) => {
+		if (!open) printMenuOpen = false;
+	});
+
 	// Print the CURRENT slide, optionally with its <Note>. The notes toggle is a local
 	// override rather than a navigation, so it must be applied to the DOM/CSS BEFORE the
 	// (blocking) print opens — hence the `await tick()`. Cleared when the dialog closes.
@@ -489,14 +499,22 @@
 		if (browser) window.location.assign(`${base}/_handout/${deckName}.html${query}`);
 	}
 
-	/** Keyboard while the PRINT flyout is open: cCwWtT (case-sensitive). */
-	function onPrintMenuKey(e: KeyboardEvent) {
-		if (!printMenuOpen) return;
-		if (e.ctrlKey || e.metaKey || e.altKey) return;
+	/**
+	 * Keyboard while the PRINT flyout is open: cCwWtT (case-sensitive), plus Escape.
+	 *
+	 * Returns whether it CLAIMED the key. It used to return nothing and the caller treated
+	 * "flyout is open" as "the flyout owns the whole keyboard", so every unclaimed key —
+	 * Alt+., m, the arrows — was swallowed. That is only ever one stuck `printMenuOpen`
+	 * away from a deck that ignores the keyboard until the page is reloaded, and the flyout
+	 * opens on HOVER, which is exactly the kind of latch that gets stuck.
+	 */
+	function onPrintMenuKey(e: KeyboardEvent): boolean {
+		if (!printMenuOpen) return false;
+		if (e.ctrlKey || e.metaKey || e.altKey) return false;
 		if (e.key === 'Escape') {
 			e.preventDefault();
 			printMenuOpen = false;
-			return;
+			return true;
 		}
 		// Case-sensitive: lower = without notes, upper = with notes.
 		const map: Record<string, () => void> = {
@@ -508,9 +526,10 @@
 			T: () => openHandout('?grid&notes')
 		};
 		const act = map[e.key];
-		if (!act) return;
+		if (!act) return false;
 		e.preventDefault();
 		act();
+		return true;
 	}
 
 	/** This deck's window-fixed chrome overlay — the scope for chrome DOM lookups. */
@@ -532,11 +551,9 @@
 			return;
 		}
 
-		// PRINT submenu owns its alphabet while open (including Esc).
-		if (printMenuOpen) {
-			onPrintMenuKey(e);
-			return;
-		}
+		// PRINT submenu gets first refusal on its own alphabet (including Esc) — but only the
+		// keys it actually claims. Anything else falls through to the chrome mnemonics.
+		if (onPrintMenuKey(e)) return;
 
 		const intent = chromeKeyIntent(e, $chromeArmed);
 		if (intent === 'ignore') return;
