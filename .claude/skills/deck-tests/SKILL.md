@@ -93,6 +93,19 @@ Split by what the other one *cannot* see. Don't write the same assertions twice.
 - **`$app/*` aliased to `tests/stubs/`** — `$app/environment`, `$app/stores`, `$app/navigation`. There is no
   Kit runtime under vitest.
 
+## Asserting that something DID (or did not) navigate
+
+`tests/stubs/app-navigation.ts` records every `goto` href in `gotoCalls`; call `resetGoto()` in a
+`beforeEach`. That is the only way to see a component page the deck under jsdom — but it only works if
+`navigate()` actually reaches `goto`, and by default it does not: the one in `src/lib/utils/deckNav.ts` assigns
+`window.location.href` unless the deck opts into client-side paging. So the host must call
+`setViewTransitions(true)` before mounting (`tests/SlideDeckRelayHost.svelte` is the worked example;
+`tests/SlideDeckRelay.test.ts` uses it). Without that, a navigation assertion silently sees nothing and
+the test passes for the wrong reason.
+
+Mounting a `?present` console additionally needs `ResizeObserver` and `Element.getAnimations` stubs —
+jsdom has neither, and `PresenterView`/`PresenterAnim` use both. See `tests/PresenterAnim.test.ts`.
+
 ## Running
 
 ```bash

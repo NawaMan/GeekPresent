@@ -10,27 +10,52 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
 
 ## Tier 1 — closes clear gaps
 
-- [ ] **Two ordinary tabs of one deck lock-step each other (multi-tab sync bug)** — open the same
+- [x] **Two ordinary tabs of one deck lock-step each other (multi-tab sync bug)** — open the same
   deck in two browser tabs and paging in one pages the other; they should be independent, only the
   presenter console ↔ audience pair should move together.
-  - Why: it's a real surprise in normal use — a speaker (or a reader) with the deck open twice finds
-    one tab yanked to whatever slide the other is on. The cross-window relay was built for the
-    console↔audience lock-step, but it drives ANY two windows of the same deck, not just that pair.
-  - Root cause: `subscribeCurrentSlide` in `SlideDeck.svelte:762` is gated only on being the top
-    window (`window.self === window.top`), NOT on presenter role, and every window also
-    `publishCurrentSlide`s. So two plain audience tabs both announce and both follow through the one
-    shared `geekpresent:current:${deckKey}` key + `storage` events (`stores/presenter.ts`), and
-    lock-step. The `deckKey` namespace already keeps *different* decks apart — the missing axis is
-    WHO may drive whom within one deck.
-  - Approach: scope the follow to the presenter relationship rather than to "any other window". The
-    repo already knows a console is live — `publishConsoleAlive` / `consoleLive` (`SlideDeck.svelte`
-    ~799) — so the cheap fix is: an audience window follows announcements only while a console is
-    live, the console always follows the audience, and two role-less audience tabs ignore each other.
-    Cleaner but bigger: tag each announcement with its sender's role (present vs audience) and only
-    cross-follow when roles differ. Keep it in the pure relay layer; no new dependency.
-  - Open questions: should the console pair with the ONE audience window that opened it (a session
-    id) rather than every audience tab on the origin; and does re-selecting the current slide still
-    need to re-broadcast (the intentional `ts`-bump echo) once the follow is role-scoped.
+  - Done: `src/lib/utils/relayCore.ts` (pure, total — `consoleLiveCore`/`drawCore` discipline), the
+    role-aware `publishCurrentSlide` / `subscribeCurrentSlide` in `src/lib/stores/presenter.ts`, and
+    the two call sites in `src/lib/components/SlideDeck.svelte` (the publish at ~:345, the follow at
+    ~:775). Tests: `tests/relayCore.test.ts` (16), the role cases added to `tests/presenter.test.ts`,
+    and `tests/SlideDeckRelay.test.ts` (9) + `tests/SlideDeckRelayHost.svelte`.
+  - **The channel was a BROADCAST pretending to be a relationship.** `deckKey` already namespaced it
+    per deck ("which deck?"), but nothing answered "who may drive whom?": every top-level window both
+    `publishCurrentSlide`d and `subscribeCurrentSlide`d, gated only on `window.self === window.top`
+    (the iframe-preview guard). `present` was read solely to keep `?present` on the followed URL —
+    never to decide whether to publish or follow. So two audience tabs both announced and both
+    followed. They *converged* rather than ping-ponging, because the follower's echo was rejected by
+    the caller's `path === currentSlide` guard — which is exactly why it read as a silent yank rather
+    than an obvious loop.
+  - **The fix is one rule: follow only when the sender's role DIFFERS from your own.** Each
+    announcement carries `role: 'present' | 'audience'` alongside `{path, ts}`, and
+    `subscribeCurrentSlide` takes the subscriber's own role. Console ↔ audience cross-drive (the pair
+    the feature exists for); audience ↔ audience ignore each other (the bug); **console ↔ console
+    ignore each other too, which falls out for free** rather than needing its own case.
+  - **An untagged payload reads as `audience`** (`asRole`), so an older build of the deck left open in
+    another tab degrades to the old behaviour against a new one instead of falling silent: it can
+    still drive a console, and two untagged tabs still ignore each other. Junk can never mint a third
+    role — one that matched nothing would make a window unfollowable, one that matched everything
+    would restore the bug.
+  - **Settling the open questions.** The console pairs with EVERY audience tab on the origin, not the
+    one that opened it — a session id is a bigger change and pairing was not what was broken. And the
+    `ts`-bump re-broadcast on re-selecting the current slide is KEPT: it is how a console re-syncs a
+    drifted audience, and role-scoping is orthogonal to it (`subscribeCurrentSlide` still delivers a
+    same-path event; the caller still owns the `path !== mine` guard).
+  - **The test gap was the real lesson.** `tests/presenter.test.ts` exercised the channel primitives in
+    isolation, where publish/subscribe symmetry is *correct by design* — a channel should relay what
+    it is given — so no store-level test could ever have caught this, and nothing tested the call
+    sites at all. Hence `tests/SlideDeckRelay.test.ts`, which mounts real audience and `?present`
+    decks and asserts both halves of the wiring: what a deck WRITES carries its own role, and what it
+    DOES on an incoming announcement depends on the sender's. Verified by mutation — stubbing
+    `mayFollow` to `true` fails 8 tests, 3 of them at the component layer.
+  - To see a followed navigation at all, the host turns view transitions on (`setViewTransitions(true)`),
+    because `deckNav.navigate()` only routes through `goto` — which the `$app/navigation` stub now
+    records via `gotoCalls`/`resetGoto` — when a deck opts into client-side paging; otherwise it
+    assigns `window.location.href`, which jsdom cannot observe. The `?present` branch also needs
+    `ResizeObserver` and `Element.getAnimations` stubs (PresenterView/PresenterAnim), the
+    `PresenterAnim.test.ts` precedent.
+  - The existing `subscribeCurrentSlide` tests were updated rather than kept: they asserted the old
+    broadcast contract, which is the bug.
 
 - [x] **Progress API for slides — "which page of how many"** — let a slide's own JS/TS read the deck's
       full slide list and its own position, demoed with a progress bar along the bottom of `geeklight`.

@@ -24,6 +24,12 @@ import {
 // a real browser, fire only in OTHER windows — here we synthesize them). The
 // caller owns the `path !== mine` guard, so the subscriber delivers every event
 // for its key, including a same-path re-broadcast.
+//
+// The channel is ROLE-SCOPED (utils/relayCore): an announcement is delivered only
+// when its sender's role differs from the subscriber's. That is why the tests below
+// pass a sender role and a receiver role rather than trusting a bare path — a
+// console drives an audience window and vice versa, but two audience tabs of one
+// deck must ignore each other. They used to lock-step, which was the bug.
 
 function fireStorage(key: string | null, newValue: string | null) {
 	window.dispatchEvent(new StorageEvent('storage', { key: key ?? undefined, newValue: newValue ?? undefined }));
@@ -58,6 +64,14 @@ describe('publishCurrentSlide', () => {
 		expect(JSON.parse(localStorage.getItem('geekpresent:current:/slides/')!).path).toBe('a.html');
 		expect(JSON.parse(localStorage.getItem('geekpresent:current:/portrait/')!).path).toBe('b.html');
 	});
+	it('tags the announcement with the sender role, defaulting to audience', () => {
+		// The tag is what lets the listener decide whether it may be driven at all.
+		publishCurrentSlide('/slides/', 'a.html');
+		expect(JSON.parse(localStorage.getItem('geekpresent:current:/slides/')!).role).toBe('audience');
+		publishCurrentSlide('/slides/', 'b.html', 'present');
+		expect(JSON.parse(localStorage.getItem('geekpresent:current:/slides/')!).role).toBe('present');
+	});
+
 	it('ignores an empty path', () => {
 		publishCurrentSlide('/slides/', '');
 		expect(localStorage.getItem('geekpresent:current:/slides/')).toBeNull();
@@ -65,45 +79,89 @@ describe('publishCurrentSlide', () => {
 });
 
 describe('subscribeCurrentSlide', () => {
+	// A console announcing to an audience window — the pair the channel exists for.
+	const fromConsole = (path: string, ts = 1) => JSON.stringify({ path, ts, role: 'present' });
+
 	it('delivers the path from a storage event for its key', () => {
 		const cb = vi.fn();
-		const stop = subscribeCurrentSlide('/slides/', cb);
-		fireStorage('geekpresent:current:/slides/', JSON.stringify({ path: 'next.html', ts: 1 }));
+		const stop = subscribeCurrentSlide('/slides/', cb, 'audience');
+		fireStorage('geekpresent:current:/slides/', fromConsole('next.html'));
 		expect(cb).toHaveBeenCalledWith('next.html');
 		stop();
 	});
 
 	it('ignores events for a different deck key', () => {
 		const cb = vi.fn();
-		const stop = subscribeCurrentSlide('/slides/', cb);
-		fireStorage('geekpresent:current:/portrait/', JSON.stringify({ path: 'x.html', ts: 1 }));
+		const stop = subscribeCurrentSlide('/slides/', cb, 'audience');
+		fireStorage('geekpresent:current:/portrait/', fromConsole('x.html'));
 		expect(cb).not.toHaveBeenCalled();
 		stop();
 	});
 
 	it('delivers a same-path re-broadcast (guard lives in the caller)', () => {
+		// Deliberately preserved: re-selecting the current slide bumps `ts` and
+		// re-announces, and that echo is how a console re-syncs a drifted audience.
 		const cb = vi.fn();
-		const stop = subscribeCurrentSlide('/slides/', cb);
-		fireStorage('geekpresent:current:/slides/', JSON.stringify({ path: 'same.html', ts: 1 }));
-		fireStorage('geekpresent:current:/slides/', JSON.stringify({ path: 'same.html', ts: 2 }));
+		const stop = subscribeCurrentSlide('/slides/', cb, 'audience');
+		fireStorage('geekpresent:current:/slides/', fromConsole('same.html', 1));
+		fireStorage('geekpresent:current:/slides/', fromConsole('same.html', 2));
 		expect(cb).toHaveBeenCalledTimes(2);
 		stop();
 	});
 
 	it('ignores a cleared value and malformed JSON', () => {
 		const cb = vi.fn();
-		const stop = subscribeCurrentSlide('/slides/', cb);
+		const stop = subscribeCurrentSlide('/slides/', cb, 'audience');
 		fireStorage('geekpresent:current:/slides/', null);          // localStorage.clear()
 		fireStorage('geekpresent:current:/slides/', '{not json');   // corrupt payload
 		expect(cb).not.toHaveBeenCalled();
 		stop();
 	});
 
+	// The role scoping — the fix for two ordinary tabs lock-stepping each other.
+	it('does NOT deliver an announcement from a window of its own role', () => {
+		const cb = vi.fn();
+		const stop = subscribeCurrentSlide('/slides/', cb, 'audience');
+		fireStorage(
+			'geekpresent:current:/slides/',
+			JSON.stringify({ path: 'next.html', ts: 1, role: 'audience' })
+		);
+		expect(cb).not.toHaveBeenCalled();
+		stop();
+	});
+
+	it('drives the console from the audience window too (the pairing is mutual)', () => {
+		const cb = vi.fn();
+		const stop = subscribeCurrentSlide('/slides/', cb, 'present');
+		fireStorage(
+			'geekpresent:current:/slides/',
+			JSON.stringify({ path: 'next.html', ts: 1, role: 'audience' })
+		);
+		expect(cb).toHaveBeenCalledWith('next.html');
+		stop();
+	});
+
+	it('reads an untagged payload as audience, so an older tab still drives a console', () => {
+		const cb = vi.fn();
+		const stop = subscribeCurrentSlide('/slides/', cb, 'present');
+		fireStorage('geekpresent:current:/slides/', JSON.stringify({ path: 'old.html', ts: 1 }));
+		expect(cb).toHaveBeenCalledWith('old.html');
+		stop();
+	});
+
+	it('…but two untagged audience tabs still ignore each other', () => {
+		const cb = vi.fn();
+		const stop = subscribeCurrentSlide('/slides/', cb, 'audience');
+		fireStorage('geekpresent:current:/slides/', JSON.stringify({ path: 'old.html', ts: 1 }));
+		expect(cb).not.toHaveBeenCalled();
+		stop();
+	});
+
 	it('stops delivering after unsubscribe', () => {
 		const cb = vi.fn();
-		const stop = subscribeCurrentSlide('/slides/', cb);
+		const stop = subscribeCurrentSlide('/slides/', cb, 'audience');
 		stop();
-		fireStorage('geekpresent:current:/slides/', JSON.stringify({ path: 'after.html', ts: 1 }));
+		fireStorage('geekpresent:current:/slides/', fromConsole('after.html'));
 		expect(cb).not.toHaveBeenCalled();
 	});
 });

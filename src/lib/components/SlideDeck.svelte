@@ -101,6 +101,7 @@
 		consoleLive, publishConsoleAlive, subscribeConsoleAlive, loadConsoleBeat
 	} from '$lib/stores/presenter';
 	import { consoleIsLive, CONSOLE_BEAT_MS, CONSOLE_TTL_MS } from '$lib/utils/consoleLiveCore';
+	import { roleOf } from '$lib/utils/relayCore';
 	import Spotlight from '$lib/components/Spotlight.svelte';
 	import { setHighlight } from '$lib/stores/highlightTarget';
 	import { collectFinite, applyState } from '$lib/utils/slideAnim';
@@ -342,7 +343,12 @@
 	// <iframe> (a full deck instance); without this guard that iframe would publish
 	// ITS slide to the shared channel and drag every window onto the preview slide.
 	$: isTopWindow = browser && window.self === window.top;
-	$: if (isTopWindow && currentSlide) publishCurrentSlide(deckKey, currentSlide);
+	// Every announcement is TAGGED with this window's role, and the follow below only
+	// accepts a sender whose role differs. Without it the channel is a broadcast: two
+	// ordinary tabs of one deck both publish and both follow, so paging in either yanks
+	// the other. deckKey answers "which deck?"; the role answers "who may drive whom?".
+	$: relayRole = roleOf(present);
+	$: if (isTopWindow && currentSlide) publishCurrentSlide(deckKey, currentSlide, relayRole);
 	// Does THIS slide offer ADJUST? Its own pages.ts `adjust` flag, or the deck-wide
 	// `adjust` prop. Re-runs on every slide change, so paging off a ADJUST demo onto an
 	// ordinary slide takes the control away again. The sticky `?adjust` flag outranks
@@ -759,6 +765,14 @@
 		// two-window ping-pong converges. Route through the shared navigate() so a
 		// followed hop animates like a clicked one; keep the console's ?present flag.
 		// Skipped in an iframe preview (window.top !== self) — see isTopWindow above.
+		//
+		// `relayRole` is the SECOND gate, and the one that makes this a relationship
+		// rather than a broadcast: subscribeCurrentSlide drops any announcement from a
+		// window of our own role, so a console follows the audience and the audience
+		// follows a console, but two audience tabs (or two consoles) never move each
+		// other. A window's role is fixed for its lifetime — ?present can't change
+		// without a reload — so capturing it here rather than re-reading per event is
+		// exact, not an approximation.
 		const stopFollow = (window.self === window.top)
 			? subscribeCurrentSlide(deckKey, (path) => {
 				if (!path || path === currentSlide) return;
@@ -768,7 +782,7 @@
 				const leaving = pages.find((p) => p.path === currentSlide);
 				const kind = (direction === 'back' ? leaving?.transitionBack : leaving?.transition) ?? 'slide';
 				navigate(target, { viewTransitions, kind, direction });
-			})
+			}, relayRole)
 			: () => {};
 
 		// Apply relayed ANIMATE commands from the presenter console onto this window's

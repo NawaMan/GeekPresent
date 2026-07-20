@@ -1022,8 +1022,16 @@ two is how a persisted `0` or `false` springs back to its default on reload.
 **Cross-tab sync is a decision, not a default you inherit.** `persisted()` mirrors other tabs unless
 you pass `sync: false`. The presenter console is a second window onto the *same deck*, so sync means
 the speaker zooming in to inspect a slide also zooms the **audience's** screen. `displayMode`,
-`layoutMode` and `diagramScroll` all opt out for exactly that reason; a genuinely shared value (the
-current slide, say) wants it on. Choose per store.
+`layoutMode` and `diagramScroll` all opt out for exactly that reason; a genuinely shared value wants
+it on. Choose per store.
+
+> "Shared" rarely means *every* tab, though — and the current slide is the cautionary tale. It rides
+> its own hand-rolled relay (`stores/presenter.ts`, not `persisted()`), and that relay was a plain
+> broadcast: every window of a deck both announced and followed, so two ordinary tabs of one deck
+> lock-stepped each other. `deckKey` answered "which deck?"; nothing answered "who may drive whom?".
+> It now travels with the sender's ROLE and is followed only when that role differs from your own
+> (`utils/relayCore.ts`) — console ↔ audience move together, audience ↔ audience do not. Before you
+> sync a value across windows, decide which *pairs* of windows it is for, not just which store.
 
 `displayMode.ts`, `layoutMode.ts` and `diagramScroll.ts` are the worked examples — all three now sit
 on the factory. `displayMode` is the one to read if you need to migrate a *legacy* key: its old

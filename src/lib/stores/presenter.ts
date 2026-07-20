@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 import type { AnimState } from '$lib/utils/slideAnim';
+import { mayFollow, parseAnnouncement, type RelayRole } from '$lib/utils/relayCore';
 
 // Presenter View — a second window (opened with ?present) that mirrors the
 // audience deck: it shows the current slide's <Note>, big NAV buttons, a clock
@@ -34,11 +35,20 @@ const keyFor = (deckKey: string) => `geekpresent:current:${deckKey}`;
     pages.ts, e.g. "intro.html" — no flag). Written to localStorage; the OTHER
     window hears it via a `storage` event. Re-writing the same path with a fresh
     `ts` still fires the event, so re-selecting the current slide re-broadcasts.
-    Best-effort and a no-op off-browser. */
-export function publishCurrentSlide(deckKey: string, path: string): void {
+    Best-effort and a no-op off-browser.
+
+    `role` TAGS the announcement with the kind of window that sent it, which is what
+    lets the listener decide whether it may be driven by this sender at all — see
+    utils/relayCore. It is optional and defaults to 'audience' so an older caller
+    (and every existing test) keeps its meaning. */
+export function publishCurrentSlide(
+	deckKey: string,
+	path: string,
+	role: RelayRole = 'audience'
+): void {
 	if (!browser || !path) return;
 	try {
-		localStorage.setItem(keyFor(deckKey), JSON.stringify({ path, ts: Date.now() }));
+		localStorage.setItem(keyFor(deckKey), JSON.stringify({ path, ts: Date.now(), role }));
 	} catch {
 		// localStorage can throw (private mode / quota); sync is best-effort.
 	}
@@ -48,18 +58,27 @@ export function publishCurrentSlide(deckKey: string, path: string): void {
     Calls `cb(path)` with the bare slide path. `storage` events never fire in the
     window that wrote them, so a publisher never hears its own write — the caller
     still guards `path !== mine` to stop the follow ping-pong from looping.
-    Returns an unsubscribe; a no-op unsubscribe off-browser. */
-export function subscribeCurrentSlide(deckKey: string, cb: (path: string) => void): () => void {
+    Returns an unsubscribe; a no-op unsubscribe off-browser.
+
+    `me` is THIS window's role, and it is the fix for the multi-tab lock-step bug:
+    an announcement is delivered only when its sender's role DIFFERS from `me`, so
+    the console and its audience cross-drive while two ordinary audience tabs of one
+    deck ignore each other. Defaults to 'audience'; a sender that predates roles is
+    read as 'audience' too (relayCore.asRole), so this stays the old broadcast only
+    between two untagged windows. */
+export function subscribeCurrentSlide(
+	deckKey: string,
+	cb: (path: string) => void,
+	me: RelayRole = 'audience'
+): () => void {
 	if (!browser) return () => {};
 	const key = keyFor(deckKey);
 	const onStorage = (e: StorageEvent) => {
-		if (e.key !== key || !e.newValue) return;
-		try {
-			const { path } = JSON.parse(e.newValue) as { path?: string };
-			if (path) cb(path);
-		} catch {
-			// ignore malformed payloads
-		}
+		if (e.key !== key) return;
+		const announcement = parseAnnouncement(e.newValue);
+		if (!announcement) return; // absent, malformed, or pathless — ignore
+		if (!mayFollow(announcement.role, me)) return; // not our driver
+		cb(announcement.path);
 	};
 	window.addEventListener('storage', onStorage);
 	return () => window.removeEventListener('storage', onStorage);
