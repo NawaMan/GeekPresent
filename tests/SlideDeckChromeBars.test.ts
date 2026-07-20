@@ -1,13 +1,23 @@
 // SlideDeck's window-edge chrome bars are ON by default and opt-out via props —
 // `toolBar={false}` / `controlBar={false}`. The top bar holds more authoring/dev
 // rows (SOURCE/EDIT, ADJUST SAVE, …); the bottom bar is navigation (TOC + pager).
-import { render, cleanup } from '@testing-library/svelte';
+import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { get } from 'svelte/store';
 import SlideDeck from '$lib/components/SlideDeck.svelte';
 import { setPageUrl, resetPageUrl } from './stubs/app-stores';
+import {
+	chromeArmed,
+	moreMenuOpen,
+	openMoreMenu,
+	closeMoreMenu,
+	disarmChrome
+} from '../src/lib/stores/chromeArm';
 
 const pages = [{ path: 'stub.html', title: 'Stub' }];
+
+beforeEach(() => disarmChrome());
 
 async function mount(props: Record<string, unknown> = {}) {
 	setPageUrl('/slides/stub.html');
@@ -20,6 +30,47 @@ async function mount(props: Record<string, unknown> = {}) {
 afterEach(() => {
 	cleanup();
 	resetPageUrl();
+});
+
+// The PRINT flyout opens on MOUSEENTER, and `onChromeKeys` used to treat "flyout is open" as
+// "the flyout owns the whole keyboard" — every unclaimed key returned early. So a printMenuOpen
+// that never got its matching mouseleave (the ☰ shutting under the pointer leaves the row
+// pointer-events:none, and the browser owes you no mouseleave then) killed Alt+., M, and the
+// arrows for the rest of the page's life. Only a reload brought them back.
+describe('SlideDeck — a stuck PRINT flyout does not eat the keyboard', () => {
+	it('lets Alt+. through while the flyout is open', async () => {
+		const root = await mount();
+		const flyout = root.querySelector('.print-flyout');
+		expect(flyout).not.toBeNull();
+
+		// Pointer wanders onto PRINT: the flyout latches open.
+		await fireEvent.mouseEnter(flyout as Element);
+		await tick();
+
+		// Alt+. is not one of the flyout's keys (cCwWtT / Escape) — it must fall through.
+		await fireEvent.keyDown(window, { key: '.', code: 'Period', altKey: true });
+		await tick();
+		expect(get(chromeArmed)).toBe(true);
+
+		// And so must the M mnemonic.
+		await fireEvent.keyDown(window, { key: 'm', code: 'KeyM' });
+		await tick();
+		expect(get(moreMenuOpen)).toBe(true);
+	});
+
+	it('drops the flyout latch when the ☰ that contains it closes', async () => {
+		const root = await mount();
+		openMoreMenu();
+		await tick();
+		await fireEvent.mouseEnter(root.querySelector('.print-flyout') as Element);
+		await tick();
+		expect(root.querySelector('.print-flyout')?.classList.contains('open')).toBe(true);
+
+		// The menu shuts with the pointer still parked on PRINT — no mouseleave arrives.
+		closeMoreMenu();
+		await tick();
+		expect(root.querySelector('.print-flyout')?.classList.contains('open')).toBe(false);
+	});
 });
 
 describe('SlideDeck chrome bars — opt-out', () => {

@@ -56,7 +56,9 @@
 		disarmChrome,
 		keepChromeArmed,
 		requestTocOpen,
-		holdMoreMenuClosed
+		closeMoreMenu,
+		toggleMoreMenu,
+		moreMenuOpen
 	} from '$lib/stores/chromeArm';
 	import { chromeKeyIntent, isAdjustSaveChord } from '$lib/chrome/chromeArmCore';
 	import CodeBox from '$lib/components/CodeBox.svelte';
@@ -463,6 +465,15 @@
 	// centred popover over the hamburger (which looked like two menus fighting).
 	let printMenuOpen = false;
 
+	// The flyout opens on MOUSEENTER, so it needs a way out that does not depend on a matching
+	// mouseleave. When the ☰ shuts with the pointer parked on the PRINT row, the row goes
+	// pointer-events:none underneath it and the browser owes us no mouseleave — the latch would
+	// stay set, and the flyout would be sitting open the next time the ☰ opened. Its parent
+	// closing is the authoritative "you are gone".
+	moreMenuOpen.subscribe((open) => {
+		if (!open) printMenuOpen = false;
+	});
+
 	// Print the CURRENT slide, optionally with its <Note>. The notes toggle is a local
 	// override rather than a navigation, so it must be applied to the DOM/CSS BEFORE the
 	// (blocking) print opens — hence the `await tick()`. Cleared when the dialog closes.
@@ -488,14 +499,22 @@
 		if (browser) window.location.assign(`${base}/_handout/${deckName}.html${query}`);
 	}
 
-	/** Keyboard while the PRINT flyout is open: cCwWtT (case-sensitive). */
-	function onPrintMenuKey(e: KeyboardEvent) {
-		if (!printMenuOpen) return;
-		if (e.ctrlKey || e.metaKey || e.altKey) return;
+	/**
+	 * Keyboard while the PRINT flyout is open: cCwWtT (case-sensitive), plus Escape.
+	 *
+	 * Returns whether it CLAIMED the key. It used to return nothing and the caller treated
+	 * "flyout is open" as "the flyout owns the whole keyboard", so every unclaimed key —
+	 * Alt+., m, the arrows — was swallowed. That is only ever one stuck `printMenuOpen`
+	 * away from a deck that ignores the keyboard until the page is reloaded, and the flyout
+	 * opens on HOVER, which is exactly the kind of latch that gets stuck.
+	 */
+	function onPrintMenuKey(e: KeyboardEvent): boolean {
+		if (!printMenuOpen) return false;
+		if (e.ctrlKey || e.metaKey || e.altKey) return false;
 		if (e.key === 'Escape') {
 			e.preventDefault();
 			printMenuOpen = false;
-			return;
+			return true;
 		}
 		// Case-sensitive: lower = without notes, upper = with notes.
 		const map: Record<string, () => void> = {
@@ -507,14 +526,18 @@
 			T: () => openHandout('?grid&notes')
 		};
 		const act = map[e.key];
-		if (!act) return;
+		if (!act) return false;
 		e.preventDefault();
 		act();
+		return true;
 	}
 
+	/** This deck's window-fixed chrome overlay — the scope for chrome DOM lookups. */
+	let chromeOverlay: HTMLDivElement | undefined;
+
 	/**
-	 * Alt+. raises both window-edge bars; while armed, a/j/d/p/m/t pick a control.
-	 * Esc disarms chrome and closes the ☰ drop (blur). Print-menu keys win when open.
+	 * Alt+. raises both window-edge bars; while armed, a/j/z/p/m/t pick a control.
+	 * Esc disarms chrome and closes the ☰ drop. Print-menu keys win when open.
 	 */
 	function onChromeKeys(e: KeyboardEvent) {
 		// Ctrl/Cmd+S while ADJUST is active (offered AND on) writes the moved Blocks
@@ -528,11 +551,9 @@
 			return;
 		}
 
-		// PRINT submenu owns its alphabet while open (including Esc).
-		if (printMenuOpen) {
-			onPrintMenuKey(e);
-			return;
-		}
+		// PRINT submenu gets first refusal on its own alphabet (including Esc) — but only the
+		// keys it actually claims. Anything else falls through to the chrome mnemonics.
+		if (onPrintMenuKey(e)) return;
 
 		const intent = chromeKeyIntent(e, $chromeArmed);
 		if (intent === 'ignore') return;
@@ -543,8 +564,10 @@
 				armChrome();
 				return;
 			case 'disarm':
-				// Shut ☰ even if still hovered (CSS hold), drop focus, then un-arm bars.
-				holdMoreMenuClosed();
+				// Drop the ☰ open latch, drop focus (:focus-within is the other way in), then
+				// un-arm the bars. A pointer still resting on the menu keeps it open — that is
+				// plain hover, and moving the mouse away ends it.
+				closeMoreMenu();
 				if (browser && document.activeElement instanceof HTMLElement) {
 					const el = document.activeElement;
 					if (el.closest?.('.annot-menu') || el.classList?.contains('annot-hamburger')) {
@@ -571,9 +594,15 @@
 				keepChromeArmed();
 				return;
 			case 'more': {
-				// Focus the hamburger so :focus-within opens the ☰ drop.
-				const btn = document.querySelector<HTMLElement>('.annot-hamburger');
-				btn?.focus();
+				// A real toggle now — the drop's own `moreMenuOpen` latch, not a hope that
+				// focus lands and CSS reacts. Focus still moves to the ☰ when opening, so the
+				// panel is where Tab continues from; scoped to THIS deck's overlay, because a
+				// presenter console has a second toolbar mounted in the same document and a
+				// bare document.querySelector would happily focus the other one.
+				const opened = toggleMoreMenu();
+				const btn = chromeOverlay?.querySelector<HTMLElement>('.annot-hamburger');
+				if (opened) btn?.focus();
+				else btn?.blur();
 				keepChromeArmed();
 				return;
 			}
@@ -996,7 +1025,7 @@
      ANNOTATE toggle. Hidden by ?clean and in the presenter console (which has its own chrome).
      Each bar is also opt-out via `toolBar` / `controlBar` props (default on). -->
 {#if initialized && !clean && !present && (toolBar || controlBar)}
-<div class="overlay" class:fade-chrome={fadeChrome} style="--base-font:{baseFontSize};">
+<div class="overlay" class:fade-chrome={fadeChrome} style="--base-font:{baseFontSize};" bind:this={chromeOverlay}>
 	{#if toolBar}
 	<SlideToolbar {width} {height}>
 

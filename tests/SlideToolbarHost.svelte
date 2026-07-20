@@ -9,4 +9,10 @@
 	export let height = 1080;
 </script>
 
-<SlideToolbar {width} {height} />
+<!-- One ☰ row IS supplied: the drop's "picking a row puts the menu away" rule is caught by
+     bubbling off the panel, so it needs a real row inside the panel to fire from. -->
+<SlideToolbar {width} {height}>
+	{#snippet overviewBtn()}
+		<button type="button" class="annot-tool">OVERVIEW</button>
+	{/snippet}
+</SlideToolbar>
