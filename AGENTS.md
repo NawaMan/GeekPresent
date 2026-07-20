@@ -782,7 +782,7 @@ stay out of the audience's way. A speaker who is actively using one often wants 
   **t** TOC. Labels show the key at the end (`PRESENT (P)`, `FITTED (Z)`, `☰ (M)`, …). Esc
   disarms and closes ☰. Letter mnemonics do not fire while typing in a field. Pure core:
   `chrome/chromeArmCore.ts`.
-- **☰ menu groups.** Navigate (OVERVIEW **O**) · export (CAPTURE, PRINT with nested flyout
+- **☰ menu groups.** Navigate (OVERVIEW **O**, KIOSK) · export (CAPTURE, PRINT with nested flyout
   **cCwWtT**) · source (SOURCE, EDIT). PRINT opens on hover to the left of the row.
 - **Not the same as `fadeChrome`.** `fadeChrome` ghosts `.gp-chrome` opacity until pointed at;
   PIN is the tuck/untuck of the two window-edge bars. They compose: a pinned bar is fully seated
@@ -843,6 +843,32 @@ hidden under `?clean` / `?present`.
 > Access follows ANNOTATE's precedence (`capture/captureCore.ts`): `pnpm dev` > sticky
 > `?capture` / `?capture=off` > the deck's `capture` prop > off. A screenshot is the
 > speaker's decision; the slide has no opinion. Demo: `capture-slide.html`.
+
+### "Run this deck unattended (KIOSK / auto-advance)"
+
+A booth screen, lobby loop, or demo that pages itself. Offered like CAPTURE (deck prop /
+sticky `?kiosk` / always in `pnpm dev`); **running** is a separate session.
+
+```svelte
+<SlideDeck {pages} kiosk kioskStepMs={2000} kioskPageMs={6000} />
+```
+
+- **Enter:** ☰ → **KIOSK** opens a dialog (step pace, page pace, optional speaker notes) →
+  **Start**. Or open any slide with **`?kiosk`** to auto-start with current paces (unattended
+  link). **`?kiosk=off`** stops and revokes the sticky offer.
+- **Advance order (Space semantics, not →):** wait for finite CSS animations → reveal any
+  `<Steps>` / `activeSteps` build → if notes are on, one `<Note>` **child line at a time** →
+  page (and **loop** to the first visible slide at the end). Step dwell is faster than page;
+  a long note line holds at least a ~150 wpm read (`noteItemDwellMs`).
+- **One floating panel** (`KioskIndicator`): title bar is the transport (grip, pause ring,
+  phase, note **n/N**, ⚙ settings, × stop); body is the current note when notes are on.
+  Drag by the title bar; the body scrolls. Without notes the panel collapses to a compact pill.
+- **Exit is explicit only** — Pause / Stop / settings. Keys and pointer on the slide do not
+  break out (a booth must not stop because someone brushed the glass).
+- **Pure core:** `src/lib/kiosk/kioskCore.ts`. Session: `stores/kiosk.ts`. Runner:
+  `KioskRunner.svelte`. Note lines publish from `<Note>` while kiosk + show-notes is on
+  (source node stays visually hidden; the panel is window-fixed so it is not trapped under the
+  canvas `transform`).
 
 **Every slide to a PNG, offline** — `utils/capture-slides.sh` (for OG/social images, thumbnails,
 a contact sheet). It drives a real headless Chrome, so unlike the in-app button it captures

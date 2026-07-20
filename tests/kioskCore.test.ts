@@ -9,6 +9,9 @@ import {
 	kioskAction,
 	msToSeconds,
 	noteDwellMs,
+	noteItemDwellMs,
+	noteItemsFrom,
+	noteProgressLabel,
 	noteTextFrom,
 	pageDwellMs,
 	readKioskParam,
@@ -90,19 +93,46 @@ describe('wordsIn / note dwell', () => {
 	});
 });
 
-describe('kioskAction — Space semantics + anim gate', () => {
+describe('kioskAction — Space semantics + note steps + anim gate', () => {
 	it('waits while animations are busy', () => {
 		expect(kioskAction({ animBusy: true, hasNextStep: true })).toBe('wait');
-		expect(kioskAction({ animBusy: true, hasNextStep: false })).toBe('wait');
+		expect(kioskAction({ animBusy: true, hasNextStep: false, hasNoteItem: true })).toBe('wait');
 	});
 
-	it('reveals while a build has steps, else pages', () => {
-		expect(kioskAction({ animBusy: false, hasNextStep: true })).toBe('reveal');
-		expect(kioskAction({ animBusy: false, hasNextStep: false })).toBe('page');
+	it('reveals build before notes, notes before page', () => {
+		expect(kioskAction({ animBusy: false, hasNextStep: true, hasNoteItem: true })).toBe('reveal');
+		expect(kioskAction({ animBusy: false, hasNextStep: false, hasNoteItem: true })).toBe('note');
+		expect(kioskAction({ animBusy: false, hasNextStep: false, hasNoteItem: false })).toBe('page');
 	});
 });
 
-describe('noteTextFrom / dwellProgress', () => {
+describe('note items / progress / item dwell', () => {
+	it('splits .note direct children into lines', () => {
+		const note = document.createElement('div');
+		note.className = 'note';
+		note.innerHTML = '<p>First line</p><p>Second   line</p><p>  </p>';
+		expect(noteItemsFrom(note)).toEqual(['First line', 'Second line']);
+	});
+
+	it('falls back to whole text when there are no element children', () => {
+		const note = document.createElement('div');
+		note.textContent = '  lone blob  ';
+		expect(noteItemsFrom(note)).toEqual(['lone blob']);
+		expect(noteItemsFrom(null)).toEqual([]);
+	});
+
+	it('labels progress 1-based and total', () => {
+		expect(noteProgressLabel(0, 5)).toBe('1 / 5');
+		expect(noteProgressLabel(4, 5)).toBe('5 / 5');
+		expect(noteProgressLabel(0, 0)).toBe('');
+	});
+
+	it('noteItemDwellMs is at least stepMs and grows with words', () => {
+		expect(noteItemDwellMs('hi', 2000, DEFAULT_WPM)).toBe(2000);
+		const long = Array.from({ length: 150 }, () => 'word').join(' ');
+		expect(noteItemDwellMs(long, 2000, DEFAULT_WPM)).toBe(60_000);
+	});
+
 	it('reads .note text and is total for junk', () => {
 		const root = document.createElement('div');
 		root.innerHTML = '<div class="note"><p>Hello   world</p></div>';

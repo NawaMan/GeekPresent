@@ -74,7 +74,7 @@ export function noteDwellMs(
 	return Math.max(MIN_PACE_MS, Math.round((words / rate) * 60_000));
 }
 
-/** Effective page dwell: optional note estimate never goes *below* `pageMs`. */
+/** Effective page dwell when notes are *not* stepped one-by-one (legacy / no items). */
 export function pageDwellMs(opts: {
 	pageMs: number;
 	useNotes: boolean;
@@ -87,23 +87,62 @@ export function pageDwellMs(opts: {
 	return Math.max(floor, fromNotes);
 }
 
-/** What the auto-advance runner should do right now (Space semantics + anim gate). */
-export type KioskAction = 'wait' | 'reveal' | 'page';
+/**
+ * Dwell for one note item: at least the step pace, longer if the line needs a
+ * ~wpm read (so a long bullet is not blinked away at 2s).
+ */
+export function noteItemDwellMs(
+	text: string | null | undefined,
+	stepMs: number,
+	wpm: number = DEFAULT_WPM
+): number {
+	const floor = clampPaceMs(stepMs, DEFAULT_STEP_MS);
+	return Math.max(floor, noteDwellMs(text, wpm));
+}
+
+/** What the auto-advance runner should do right now. */
+export type KioskAction = 'wait' | 'reveal' | 'note' | 'page';
 
 /**
  * Decide the next kiosk action.
  *
- * 1. Finite slide animations still running → wait (don't cut the draw).
+ * 1. Finite slide animations still running → wait.
  * 2. A build still has a step (`activeSteps.hasNext`) → reveal (Space).
- * 3. Otherwise → page (or loop to first — the runner picks the href).
+ * 3. Speaker notes still have an item to show → note (one line at a time).
+ * 4. Otherwise → page (or loop to first — the runner picks the href).
  */
 export function kioskAction(state: {
 	animBusy: boolean;
 	hasNextStep: boolean;
+	/** True while useNotes and the current note index is still within items. */
+	hasNoteItem?: boolean;
 }): KioskAction {
 	if (state.animBusy === true) return 'wait';
 	if (state.hasNextStep === true) return 'reveal';
+	if (state.hasNoteItem === true) return 'note';
 	return 'page';
+}
+
+/** Normalize one note-line's text. */
+export function normalizeNoteLine(text: string | null | undefined): string {
+	if (text == null) return '';
+	return String(text).replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Split a `.note` element into ordered items (direct element children — the same
+ * "lines" the presenter checklist uses). Empty children dropped. If there are no
+ * element children with text, the whole note is one item (when non-empty).
+ */
+export function noteItemsFrom(noteEl: Element | null | undefined): string[] {
+	if (!noteEl) return [];
+	const kids = Array.from(noteEl.children)
+		.filter((c): c is HTMLElement => c instanceof HTMLElement)
+		.map((el) => normalizeNoteLine(el.textContent))
+		.filter((t) => t.length > 0);
+	if (kids.length > 0) return kids;
+	const whole = normalizeNoteLine(noteEl.textContent);
+	return whole ? [whole] : [];
 }
 
 /** Seconds ↔ ms helpers for the setup dialog (display in whole or .1 s). */
@@ -123,7 +162,24 @@ export function noteTextFrom(root: ParentNode | null | undefined): string {
 	if (!root || typeof (root as Element).querySelector !== 'function') return '';
 	const el = (root as Element).querySelector?.('.note');
 	if (!el) return '';
-	return (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+	return normalizeNoteLine(el.textContent);
+}
+
+/** Note items from a slide root (delegates to `noteItemsFrom` on `.note`). */
+export function noteItemsFromRoot(root: ParentNode | null | undefined): string[] {
+	if (!root || typeof (root as Element).querySelector !== 'function') return [];
+	const el = (root as Element).querySelector?.('.note');
+	return noteItemsFrom(el ?? null);
+}
+
+/** 1-based position string "2 / 5"; empty items → "". */
+export function noteProgressLabel(index0: number, total: number): string {
+	const t = Number(total);
+	const i = Number(index0);
+	if (!Number.isFinite(t) || t <= 0) return '';
+	if (!Number.isFinite(i) || i < 0) return `1 / ${Math.round(t)}`;
+	const pos = Math.min(Math.round(t), Math.max(1, Math.floor(i) + 1));
+	return `${pos} / ${Math.round(t)}`;
 }
 
 /** Progress 0..1 for the indicator ring (elapsed / dwell). Total ≤ 0 → 0. */

@@ -104,10 +104,10 @@
 			<label class="check">
 				<input type="checkbox" bind:checked={useNotes} />
 				<span>
-					Show speaker notes
+					Show speaker notes (one line at a time)
 					<span class="hint">
-						Bottom caption while kiosk runs; page dwell also lasts at least a
-						~150 wpm read of the note
+						Each &lt;Note&gt; child is a step (drag the panel; n/N progress).
+						Long lines hold longer (~150 wpm); then the deck pages.
 					</span>
 				</span>
 			</label>
@@ -140,6 +140,8 @@
 
 	.kiosk-dialog {
 		width: min(26rem, calc(100vw - 2rem));
+		max-height: min(90vh, 40rem);
+		overflow-y: auto;
 		padding: 1.25rem 1.35rem 1.1rem;
 		border-radius: 10px;
 		border: 1px solid var(--kiosk-edge, rgba(255, 255, 255, 0.18));

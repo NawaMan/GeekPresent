@@ -6,30 +6,41 @@ import {
 	kioskStatus,
 	startKiosk,
 	stopKiosk,
-	pauseKiosk,
-	kioskDialogOpen
+	kioskDialogOpen,
+	kioskPaceOverride,
+	setKioskNoteItems,
+	kioskNoteIndex,
+	advanceKioskNote,
+	clearKioskNotes
 } from '$lib/stores/kiosk';
 
-describe('KioskIndicator', () => {
+describe('KioskIndicator — combined transport + notes panel', () => {
 	beforeEach(() => {
 		stopKiosk();
 		kioskDialogOpen.set(false);
+		kioskPaceOverride.set({});
+		clearKioskNotes();
 	});
 
 	afterEach(() => {
 		cleanup();
 		stopKiosk();
+		clearKioskNotes();
+		kioskPaceOverride.set({});
 	});
 
 	it('is hidden when kiosk is off', () => {
 		const { container } = render(KioskIndicator);
-		expect(container.querySelector('.kiosk-ind')).toBeNull();
+		expect(container.querySelector('.kiosk-panel')).toBeNull();
 	});
 
-	it('shows while running and can pause / stop', async () => {
+	it('shows a compact bar while running (no notes) and can pause / stop', async () => {
 		startKiosk();
 		const { container, getByLabelText } = render(KioskIndicator);
-		expect(container.querySelector('.kiosk-ind')).not.toBeNull();
+		const panel = container.querySelector('.kiosk-panel');
+		expect(panel).not.toBeNull();
+		expect(panel?.classList.contains('has-note')).toBe(false);
+		expect(container.querySelector('.kiosk-note-body')).toBeNull();
 
 		await fireEvent.click(getByLabelText('Pause'));
 		expect(get(kioskStatus)).toBe('paused');
@@ -46,5 +57,24 @@ describe('KioskIndicator', () => {
 		const { getByLabelText } = render(KioskIndicator);
 		await fireEvent.click(getByLabelText('Kiosk settings'));
 		expect(get(kioskDialogOpen)).toBe(true);
+	});
+
+	it('folds the current note line into the same panel with n/N progress', async () => {
+		kioskPaceOverride.set({ useNotes: true });
+		startKiosk();
+		setKioskNoteItems(['First bullet', 'Second bullet', 'Third']);
+		const { container, findByText } = render(KioskIndicator);
+
+		const panel = container.querySelector('.kiosk-panel');
+		expect(panel?.classList.contains('has-note')).toBe(true);
+		expect(container.querySelector('.kiosk-note-body')?.textContent?.trim()).toBe('First bullet');
+		expect(container.querySelector('.note-count')?.textContent?.trim()).toBe('1 / 3');
+
+		// Advance as the runner would — body and count track the index.
+		expect(advanceKioskNote()).toBe(true);
+		expect(get(kioskNoteIndex)).toBe(1);
+		// Svelte store update → re-render
+		await findByText('Second bullet');
+		expect(container.querySelector('.note-count')?.textContent?.trim()).toBe('2 / 3');
 	});
 });

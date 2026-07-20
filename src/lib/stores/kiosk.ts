@@ -90,8 +90,55 @@ export const kioskDwellFraction: Writable<number> = writable(0);
 /** Indicator label: 'step' | 'page' | 'wait' | '' */
 export const kioskPhaseLabel: Writable<string> = writable('');
 
-/** Live speaker-note text for the kiosk caption (Note publishes; caption reads). */
-export const kioskNoteText: Writable<string> = writable('');
+/** Ordered note lines for the current slide (Note publishes; caption + runner read). */
+export const kioskNoteItems: Writable<string[]> = writable([]);
+
+/** 0-based index of the note line currently shown (and being dwelt on). */
+export const kioskNoteIndex: Writable<number> = writable(0);
+
+/** Panel position (viewport px). Remembered while the session runs. */
+export interface KioskNotesPos {
+	left: number;
+	top: number;
+}
+export const kioskNotesPos: Writable<KioskNotesPos | null> = writable(null);
+
+/** Replace the note list for this slide. Resets the index only when the list changes
+    (MutationObserver re-publishes often; we must not rewind mid-step). */
+export function setKioskNoteItems(items: string[]): void {
+	const list = Array.isArray(items)
+		? items.map((t) => String(t).trim()).filter((t) => t.length > 0)
+		: [];
+	const prev = get(kioskNoteItems);
+	const same = prev.length === list.length && prev.every((t, i) => t === list[i]);
+	if (same) return;
+	kioskNoteItems.set(list);
+	kioskNoteIndex.set(0);
+}
+
+/** Clear note state (kiosk off or note source unmounted). */
+export function clearKioskNotes(): void {
+	kioskNoteItems.set([]);
+	kioskNoteIndex.set(0);
+}
+
+/**
+ * Advance to the next note item. Returns true if there is still an item to show
+ * after the advance (or we were already mid-list); false if we left the last item
+ * (caller should page).
+ */
+export function advanceKioskNote(): boolean {
+	const items = get(kioskNoteItems);
+	const i = get(kioskNoteIndex);
+	if (items.length === 0) return false;
+	if (i + 1 < items.length) {
+		kioskNoteIndex.set(i + 1);
+		return true;
+	}
+	// Past the end — index === length so hasNoteItem goes false (no re-dwell).
+	kioskNoteIndex.set(items.length);
+	return false;
+}
 
 export function setCanKiosk(offered: boolean): void {
 	canKiosk.set(!!offered);
@@ -181,6 +228,7 @@ export function stopKiosk(): void {
 	kioskDwellFraction.set(0);
 	kioskPhaseLabel.set('');
 	kioskDialogOpen.set(false);
+	clearKioskNotes();
 }
 
 /** After a full page load: resume if the session still wants to run. */

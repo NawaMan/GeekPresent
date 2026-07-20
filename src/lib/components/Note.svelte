@@ -29,7 +29,8 @@
 	import { setHighlight } from '$lib/stores/highlightTarget';
 	import { printNotes } from '$lib/stores/printNotes';
 	import { getHandout } from '$lib/presentation';
-	import { kioskActive, kioskPaces, kioskNoteText } from '$lib/stores/kiosk';
+	import { kioskActive, kioskPaces, setKioskNoteItems, clearKioskNotes } from '$lib/stores/kiosk';
+	import { noteItemsFrom } from '$lib/kiosk/kioskCore';
 
 	/** Inline style for the root element, applied last so it wins. */
 	export let style: string = '';
@@ -57,9 +58,10 @@
 	// no console open $consoleLive is false and the below-slide note stays as the
 	// fallback. The presenter panel ($presenterMode) and print/handout are untouched —
 	// this drops ONLY the audience-window duplicate.
-	// Kiosk "use speaker notes": keep the note in the DOM for text (page dwell +
-	// caption store). The *visible* booth caption is a window-level component —
-	// fixed inside the scaled canvas would pin to the transform, not the window.
+	// Kiosk "use speaker notes": keep the note in the DOM so we can publish its
+	// *lines* (direct children — same as the presenter checklist) one-by-one.
+	// The caption is a window-level panel; fixed inside the scaled canvas would
+	// pin to the transform, not the window.
 	$: kioskShowNotes = $kioskActive && $kioskPaces.useNotes;
 	$: visible = handout
 		? handout.notes
@@ -72,30 +74,27 @@
 	$: slidePath = $page.url.pathname.replace(/\/+$/, '').split('/').pop() || '';
 	$: deckKey = browser ? deckKeyFromPath($page.url.pathname) : '/';
 
-	/** Publish note text for the window-level kiosk caption + dwell math. */
+	/** Publish ordered note lines for the kiosk caption + step clock. */
 	function publishKioskText(node: HTMLElement, opts: { enabled: boolean }) {
 		let enabled = opts.enabled;
 		const push = () => {
 			if (!enabled) return;
-			const t = (node.textContent ?? '').replace(/\s+/g, ' ').trim();
-			kioskNoteText.set(t);
+			setKioskNoteItems(noteItemsFrom(node));
 		};
-		// Slot content may arrive a tick later; observe rather than one-shot.
 		const mo = typeof MutationObserver !== 'undefined'
 			? new MutationObserver(push)
 			: null;
 		mo?.observe(node, { childList: true, subtree: true, characterData: true });
-		// microtask so slotted children are present
 		queueMicrotask(push);
 		return {
 			update(next: { enabled: boolean }) {
 				enabled = next.enabled;
 				if (enabled) push();
-				else kioskNoteText.set('');
+				else clearKioskNotes();
 			},
 			destroy() {
 				mo?.disconnect();
-				kioskNoteText.set('');
+				clearKioskNotes();
 			}
 		};
 	}

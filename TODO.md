@@ -1618,17 +1618,17 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
 
 - [x] **Kiosk / auto-advance** — a deck that plays itself: dwell on each slide, then page, and loop
       at the end. For a booth screen, a lobby loop, or an unattended demo.
-  - Done: pure `src/lib/kiosk/kioskCore.ts` (Space-semantics action, pace clamp, note word-count
-    dwell, sticky `?kiosk` offer); session state in `stores/kiosk.ts` (running/paused, wantsRun
-    across full-page nav, pace overrides, notes toggle); UI — `KioskDialog` (step/page seconds +
-    use-notes + Start/OK/Cancel/Stop), quiet `KioskIndicator` (ring, pause/resume, settings, stop),
-    `KioskRunner` (anim gate via `slideAnim.collectFinite`, reveal via `activeSteps.next`, page/loop
-    via `deckNav.navigate`). Wired into `SlideDeck` (`kiosk` / `kioskStepMs` / `kioskPageMs` /
-    `kioskWpm` props, ☰ → KIOSK row, chrome outside the toolBar gate so a bare booth still has
-    Pause/Stop) and the main slides layout ships `kiosk`. Defaults **2s step / 6s page**; optional
-    speaker-note page timing mounts `<Note>` as `.kiosk-measure` when FITTED. Exit is **explicit
-    only** (Pause/Stop/settings) — keys do not break out. Tests: `kioskCore.test.ts`,
-    `KioskDialog.test.ts`, `KioskIndicator.test.ts`, `KioskSsr.ssr.test.ts`. `--kiosk-*` role tokens.
+  - Done: pure `src/lib/kiosk/kioskCore.ts` (Space-semantics `wait|reveal|note|page`, pace clamp,
+    per-line note dwell, sticky `?kiosk` offer); session state in `stores/kiosk.ts` (running/paused,
+    wantsRun across full-page nav, pace overrides, note items/index); UI — `KioskDialog` (step/page
+    seconds + show-notes + Start/OK/Cancel/Stop), one floating `KioskIndicator` panel (title bar =
+    transport: grip, pause ring, phase, note **n/N**, settings, stop; body = current note line when
+    notes are on — draggable, scrollable), `KioskRunner` (anim gate via `slideAnim.collectFinite`,
+    reveal via `activeSteps.next`, note lines via published `<Note>` children, page/loop via
+    `deckNav.navigate`). Wired into `SlideDeck` (`kiosk` / `kioskStepMs` / `kioskPageMs` /
+    `kioskWpm`, ☰ → KIOSK). Defaults **2s step / 6s page**. Exit is **explicit only**. Tests:
+    `kioskCore.test.ts`, `KioskDialog.test.ts`, `KioskIndicator.test.ts`, `KioskSsr.ssr.test.ts`.
+    Docs: AGENTS.md playbook, README bullet. `--kiosk-*` role tokens.
 
 - [x] **`Quote`** — blockquote + attribution/avatar.
   - Done: `src/lib/components/Quote.svelte`, the Tier-3 companion to `Stat`/`Callout`

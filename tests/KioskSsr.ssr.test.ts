@@ -15,7 +15,7 @@ describe('Kiosk SSR', () => {
 
 	it('indicator renders nothing while off', () => {
 		const { body } = render(KioskIndicator);
-		expect(body).not.toContain('kiosk-ind');
+		expect(body).not.toContain('kiosk-panel');
 		expect(body).not.toContain('KIOSK');
 	});
 

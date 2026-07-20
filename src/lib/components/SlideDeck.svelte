@@ -97,7 +97,6 @@
 	import { getViewTransitions } from '$lib/presentation';
 	import KioskDialog from '$lib/components/KioskDialog.svelte';
 	import KioskIndicator from '$lib/components/KioskIndicator.svelte';
-	import KioskNotesCaption from '$lib/components/KioskNotesCaption.svelte';
 	import KioskRunner from '$lib/components/KioskRunner.svelte';
 	import {
 		canKiosk,
@@ -1302,7 +1301,6 @@
 {#if initialized && browser && !clean && !present}
 	<KioskDialog />
 	<KioskIndicator />
-	<KioskNotesCaption />
 	<KioskRunner
 		{pages}
 		currentSlide={currentSlide ?? ''}
