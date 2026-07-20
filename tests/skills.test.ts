@@ -37,10 +37,11 @@ function citedPaths(md: string): string[] {
 }
 
 describe('agent skills', () => {
-	it('ships the four GeekPresent convention skills alongside the TODO workflow ones', () => {
+	it('ships the four GeekPresent convention skills alongside the TODO and git workflow ones', () => {
 		expect(skillNames).toEqual([
 			'adjust-mode',
 			'deck-tests',
+			'land-branch',
 			'new-component',
 			'new-slide',
 			'pick-todo',
@@ -98,6 +99,19 @@ describe('agent skills', () => {
 		expect(skillBody('pick-todo')).toContain(recipe);
 		// Not just the command — the requirement that a branch is non-optional.
 		expect(skillBody('pick-todo')).toMatch(/make sure a branch/i);
+	});
+
+	// land-branch is the executable form of AGENTS.md's landing procedure. Its load-bearing
+	// part is the merge SHAPE — a real merge commit, never a squash — because a flattened
+	// branch cannot be un-flattened. Pin it on both sides so a drift into `--squash` fails
+	// here rather than quietly destroying a worktree's history. Same for the boundary that
+	// keeps landing from chaining into deleting the user's worktree unasked.
+	it("land-branch: keeps AGENTS.md's --no-ff merge and refuses to squash", () => {
+		const body = skillBody('land-branch');
+		expect(readFileSync(`${REPO}AGENTS.md`, 'utf8')).toContain('git merge --no-ff');
+		expect(body).toContain('git merge --no-ff');
+		expect(body).toMatch(/never[^a-z]*--squash/i);
+		expect(body).toMatch(/separate ask/i);
 	});
 
 	// The pre-build recap was added to stop the agent from vanishing into a build with no

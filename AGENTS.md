@@ -247,6 +247,7 @@ background.
 | `new-component` | adding a component — the `style`/`id`/`class` contract, a pure `*Core.ts`, role tokens |
 | `adjust-mode` | placing things at exact canvas pixels, `Connector` diagrams, SAVE, the style guard |
 | `deck-tests` | the test contract — the `dom` / `ssr` projects, and why prerender needs `svelte/server` |
+| `land-branch` | merging a worktree's branch into main — preflight, rebase, booth test, `--no-ff` |
 
 `tests/skills.test.ts` pins every repo path those skills cite, so a moved file fails the suite rather
 than misleading the next agent.
