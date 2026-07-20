@@ -57,7 +57,19 @@ describe('chromeKeyIntent', () => {
 		expect(chromeKeyIntent(key({ key: 'r' }), true)).toBe('ignore');
 		expect(chromeKeyIntent(key({ key: 'd' }), true)).toBe('ignore');
 		expect(chromeKeyIntent(key({ key: 'm' }), true)).toBe('more');
+		expect(chromeKeyIntent(key({ key: 'M' }), true)).toBe('more');
 		expect(chromeKeyIntent(key({ key: 't' }), true)).toBe('toc');
+	});
+
+	it('falls back to the physical key on a non-Latin layout', () => {
+		// Cyrillic layout: the M cap reports 'ь'. The cap the user pressed is still M.
+		expect(chromeKeyIntent(key({ key: 'ь', code: 'KeyM' }), true)).toBe('more');
+		expect(chromeKeyIntent(key({ key: 'ф', code: 'KeyA' }), true)).toBe('annotate');
+		// A Latin key still wins over the code, so Dvorak/Colemak get the cap they SEE.
+		expect(chromeKeyIntent(key({ key: 'm', code: 'KeyV' }), true)).toBe('more');
+		// Garbage in, 'ignore' out — never a throw.
+		expect(chromeKeyIntent(key({ key: '', code: '' }), true)).toBe('ignore');
+		expect(chromeKeyIntent(key({ key: 'ь', code: 'Digit1' }), true)).toBe('ignore');
 	});
 
 	it('Escape disarms / closes ☰ whether or not bars are Alt+.-armed', () => {

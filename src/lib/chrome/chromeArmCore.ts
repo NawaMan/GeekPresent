@@ -3,7 +3,7 @@
 //
 // Global letters fight typing and deck paging; so the model is:
 //   1. Alt+. raises both bars (arm)
-//   2. While armed, a/j/d/p/m/t pick a control
+//   2. While armed, a/j/z/p/m/t pick a control
 //   3. Esc (or timeout) disarms
 //
 // Total: garbage input → ignore, never throw.
@@ -50,6 +50,21 @@ export type ChromeKeyIntent =
 	| 'ignore';
 
 /**
+ * Which mnemonic letter a press means, '' for none.
+ *
+ * `e.key` first, so a remapped-but-Latin layout (Dvorak, Colemak) gives the letter the
+ * user actually SEES on the cap. A non-Latin layout reports its own script there, so fall
+ * back to the PHYSICAL key (`e.code === 'KeyM'`) — the same bargain Alt+. and Ctrl+S make.
+ * Total: garbage or absent key/code → '' → 'ignore'.
+ */
+function mnemonicLetter(e: KeyboardEvent): string {
+	const key = (e.key ?? '').toLowerCase();
+	if (/^[a-z]$/.test(key)) return key;
+	const code = e.code ?? '';
+	return /^Key[A-Z]$/.test(code) ? code.slice(3).toLowerCase() : '';
+}
+
+/**
  * What a key means for chrome arming / mnemonics.
  *
  * @param armed  are the bars currently raised for keyboard use?
@@ -80,7 +95,7 @@ export function chromeKeyIntent(e: KeyboardEvent, armed: boolean): ChromeKeyInte
 	if (e.ctrlKey || e.metaKey || e.altKey) return 'ignore';
 	if (e.defaultPrevented) return 'ignore';
 
-	switch (e.key.toLowerCase()) {
+	switch (mnemonicLetter(e)) {
 		case 'a':
 			return 'annotate';
 		case 'j':

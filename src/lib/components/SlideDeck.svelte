@@ -56,7 +56,8 @@
 		disarmChrome,
 		keepChromeArmed,
 		requestTocOpen,
-		holdMoreMenuClosed
+		closeMoreMenu,
+		toggleMoreMenu
 	} from '$lib/stores/chromeArm';
 	import { chromeKeyIntent, isAdjustSaveChord } from '$lib/chrome/chromeArmCore';
 	import CodeBox from '$lib/components/CodeBox.svelte';
@@ -512,9 +513,12 @@
 		act();
 	}
 
+	/** This deck's window-fixed chrome overlay — the scope for chrome DOM lookups. */
+	let chromeOverlay: HTMLDivElement | undefined;
+
 	/**
-	 * Alt+. raises both window-edge bars; while armed, a/j/d/p/m/t pick a control.
-	 * Esc disarms chrome and closes the ☰ drop (blur). Print-menu keys win when open.
+	 * Alt+. raises both window-edge bars; while armed, a/j/z/p/m/t pick a control.
+	 * Esc disarms chrome and closes the ☰ drop. Print-menu keys win when open.
 	 */
 	function onChromeKeys(e: KeyboardEvent) {
 		// Ctrl/Cmd+S while ADJUST is active (offered AND on) writes the moved Blocks
@@ -543,8 +547,10 @@
 				armChrome();
 				return;
 			case 'disarm':
-				// Shut ☰ even if still hovered (CSS hold), drop focus, then un-arm bars.
-				holdMoreMenuClosed();
+				// Drop the ☰ open latch, drop focus (:focus-within is the other way in), then
+				// un-arm the bars. A pointer still resting on the menu keeps it open — that is
+				// plain hover, and moving the mouse away ends it.
+				closeMoreMenu();
 				if (browser && document.activeElement instanceof HTMLElement) {
 					const el = document.activeElement;
 					if (el.closest?.('.annot-menu') || el.classList?.contains('annot-hamburger')) {
@@ -571,9 +577,15 @@
 				keepChromeArmed();
 				return;
 			case 'more': {
-				// Focus the hamburger so :focus-within opens the ☰ drop.
-				const btn = document.querySelector<HTMLElement>('.annot-hamburger');
-				btn?.focus();
+				// A real toggle now — the drop's own `moreMenuOpen` latch, not a hope that
+				// focus lands and CSS reacts. Focus still moves to the ☰ when opening, so the
+				// panel is where Tab continues from; scoped to THIS deck's overlay, because a
+				// presenter console has a second toolbar mounted in the same document and a
+				// bare document.querySelector would happily focus the other one.
+				const opened = toggleMoreMenu();
+				const btn = chromeOverlay?.querySelector<HTMLElement>('.annot-hamburger');
+				if (opened) btn?.focus();
+				else btn?.blur();
 				keepChromeArmed();
 				return;
 			}
@@ -996,7 +1008,7 @@
      ANNOTATE toggle. Hidden by ?clean and in the presenter console (which has its own chrome).
      Each bar is also opt-out via `toolBar` / `controlBar` props (default on). -->
 {#if initialized && !clean && !present && (toolBar || controlBar)}
-<div class="overlay" class:fade-chrome={fadeChrome} style="--base-font:{baseFontSize};">
+<div class="overlay" class:fade-chrome={fadeChrome} style="--base-font:{baseFontSize};" bind:this={chromeOverlay}>
 	{#if toolBar}
 	<SlideToolbar {width} {height}>
 

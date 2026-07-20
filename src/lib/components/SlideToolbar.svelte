@@ -28,7 +28,7 @@
 	import { browser } from '$app/environment';
 	import { annotationMode, canAnnotate } from '$lib/stores/annotation';
 	import { toolBarPinned } from '$lib/stores/chromePin';
-	import { chromeArmed, moreMenuHeldClosed, releaseMoreMenuHold } from '$lib/stores/chromeArm';
+	import { chromeArmed, moreMenuOpen, closeMoreMenu, toggleMoreMenu } from '$lib/stores/chromeArm';
 	import { overviewOpen } from '$lib/stores/overviewOpen';
 	import SizeMode from './SizeMode.svelte';
 	import type { Snippet } from 'svelte';
@@ -63,12 +63,33 @@
 		kioskItem
 	}: Props = $props();
 
-	// When OVERVIEW opens, force-close the ☰ drop: CSS :hover/:focus-within would otherwise
-	// keep it painted over the grid (the toolbar sits above the overview scrim).
+	// When OVERVIEW opens, shut the ☰ drop: it would otherwise stay painted over the grid
+	// (the toolbar sits above the overview scrim). Drop the open latch AND blur, because
+	// :focus-within is a second, independent way in.
 	$effect(() => {
-		if (browser && $overviewOpen && document.activeElement instanceof HTMLElement) {
-			document.activeElement.blur();
+		if (browser && $overviewOpen) {
+			closeMoreMenu();
+			if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
 		}
+	});
+
+	/** The menu root — so an outside click can tell "in the drop" from "elsewhere". */
+	let menuEl: HTMLDivElement | undefined = $state();
+
+	/**
+	 * A click anywhere outside the ☰ closes it, the way every other menu on the page behaves.
+	 * `pointerdown` (capture) rather than `click`, so the drop is gone before the press lands
+	 * on whatever is underneath. Only armed while the latch is actually open — an always-on
+	 * document listener for a menu nobody opened is the kind of thing that shows up in a
+	 * profile of a deck being paged through for an hour.
+	 */
+	$effect(() => {
+		if (!browser || !$moreMenuOpen) return;
+		const onDown = (e: PointerEvent) => {
+			if (!menuEl?.contains(e.target as Node)) closeMoreMenu();
+		};
+		document.addEventListener('pointerdown', onDown, true);
+		return () => document.removeEventListener('pointerdown', onDown, true);
 	});
 </script>
 
@@ -82,6 +103,7 @@
 		class="annot-tools no-print"
 		class:pinned={$toolBarPinned}
 		class:armed={$chromeArmed}
+		class:menu-open={$moreMenuOpen}
 		role="group"
 		aria-label="Slide tools"
 	>
@@ -150,22 +172,28 @@
 		<!-- The hamburger menu. Groups: navigate (OVERVIEW, KIOSK) · export (CAPTURE, PRINT) ·
 		     source (SOURCE, EDIT). Separators sit between groups; empty capture/kiosk leave a
 		     zero-height row so the sep still reads as group boundaries. -->
-		<!-- svelte-ignore a11y_no_static_element_interactions — mouseenter only clears Esc's
-		     "hold ☰ closed" latch so hover can open the menu again; no keyboard role needed. -->
-		<div
-			class="annot-menu"
-			class:menu-suppressed={$overviewOpen || $moreMenuHeldClosed}
-			role="presentation"
-			onmouseenter={() => releaseMoreMenuHold()}
-		>
+		<div class="annot-menu" class:menu-open={$moreMenuOpen} role="presentation" bind:this={menuEl}>
 			<button
 				type="button"
 				class="annot-hamburger"
 				aria-haspopup="menu"
+				aria-expanded={$moreMenuOpen}
 				aria-label="More tools (M)"
 				title="More — Overview, Kiosk, Capture, Print, Source, Edit"
+				onclick={() => toggleMoreMenu()}
 			>☰ (M)</button>
-			<div class="annot-drop" role="menu" aria-label="More tools">
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
+			<!-- Picking a row puts the menu away — the rows ACT (open OVERVIEW, print, …), they
+			     are not settings to leave sitting open. Caught by bubbling rather than wired per
+			     row, since the rows are SlideDeck's snippets. PRINT is the one exception and it
+			     already stops propagation, because its job is to open a submenu in here. -->
+			<div
+				class="annot-drop"
+				role="menu"
+				aria-label="More tools"
+				tabindex="-1"
+				onclick={() => closeMoreMenu()}
+			>
 				{@render overviewBtn?.()}
 				{@render kioskItem?.()}
 				<div class="menu-sep" role="separator"></div>
@@ -214,7 +242,8 @@
 	.annot-tools:hover,
 	.annot-tools:focus-within,
 	.annot-tools.pinned,
-	.annot-tools.armed {
+	.annot-tools.armed,
+	.annot-tools.menu-open {
 		transform: translateX(-50%) translateY(0);
 	}
 	/* Keyboard arm (Alt+.) — soft halo so the speaker sees chrome is "live" for mnemonics. */
@@ -289,7 +318,8 @@
 	}
 	.annot-hamburger:hover,
 	.annot-menu:hover .annot-hamburger,
-	.annot-menu:focus-within .annot-hamburger {
+	.annot-menu:focus-within .annot-hamburger,
+	.annot-menu.menu-open .annot-hamburger {
 		opacity: 1;
 		background: var(--annot-bar-hover, rgba(255, 255, 255, 0.1));
 	}
@@ -318,19 +348,15 @@
 		transform: translateY(-8px);
 		transition: opacity 150ms ease, transform 150ms ease;
 	}
+	/* Three independent ways in, OR'd: pointer, focus, and the `moreMenuOpen` latch that M
+	   and a click on ☰ set. No force-closed counterpart — closing is now the latch going
+	   false plus the pointer/focus leaving, so nothing has to out-shout a CSS state. */
 	.annot-menu:hover .annot-drop,
-	.annot-menu:focus-within .annot-drop {
+	.annot-menu:focus-within .annot-drop,
+	.annot-menu.menu-open .annot-drop {
 		opacity: 1;
 		pointer-events: auto;
 		transform: translateY(0);
-	}
-	/* OVERVIEW is open — keep the drop closed even if the pointer is still over ☰. */
-	.annot-menu.menu-suppressed .annot-drop,
-	.annot-menu.menu-suppressed:hover .annot-drop,
-	.annot-menu.menu-suppressed:focus-within .annot-drop {
-		opacity: 0;
-		pointer-events: none;
-		transform: translateY(-8px);
 	}
 
 	/* Group dividers: navigate | export | source. */

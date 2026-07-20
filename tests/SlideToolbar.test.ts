@@ -5,9 +5,12 @@
 import { render, cleanup, fireEvent, screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { get } from 'svelte/store';
+import { tick } from 'svelte';
 import SlideToolbarHost from './SlideToolbarHost.svelte';
 import { annotationMode, canAnnotate, resetAllInk } from '../src/lib/stores/annotation';
 import { toolBarPinned } from '../src/lib/stores/chromePin';
+import { armChrome, disarmChrome, moreMenuOpen, toggleMoreMenu } from '../src/lib/stores/chromeArm';
+import { overviewOpen } from '../src/lib/stores/overviewOpen';
 
 beforeEach(() => {
 	localStorage.clear();
@@ -15,6 +18,8 @@ beforeEach(() => {
 	canAnnotate.set(true);
 	annotationMode.set(false);
 	toolBarPinned.set(false);
+	disarmChrome();
+	overviewOpen.set(false);
 });
 
 afterEach(cleanup);
@@ -65,5 +70,92 @@ describe('SlideToolbar', () => {
 		await fireEvent.click(screen.getByLabelText('PIN on'));
 		expect(get(toolBarPinned)).toBe(false);
 		expect(bar?.classList.contains('pinned')).toBe(false);
+	});
+});
+
+// The ☰ drop used to have NO open state at all: it was pure CSS `:hover` / `:focus-within`, the
+// M mnemonic just focused the hamburger and hoped, and Esc fought back with a sticky
+// "held closed" flag that only a mouseenter could clear. These cover the real latch that
+// replaced all of that. `menu-open` is the class the CSS opens on.
+describe('SlideToolbar ☰ menu', () => {
+	const menu = () => document.querySelector('.annot-menu');
+	const isOpen = () => !!menu()?.classList.contains('menu-open');
+
+	it('opens and closes from a click on the hamburger', async () => {
+		render(SlideToolbarHost);
+		const burger = screen.getByLabelText('More tools (M)');
+		expect(isOpen()).toBe(false);
+		expect(burger.getAttribute('aria-expanded')).toBe('false');
+
+		await fireEvent.click(burger);
+		expect(get(moreMenuOpen)).toBe(true);
+		expect(isOpen()).toBe(true);
+		expect(burger.getAttribute('aria-expanded')).toBe('true');
+
+		await fireEvent.click(burger);
+		expect(isOpen()).toBe(false);
+	});
+
+	it('survives Esc — the M mnemonic still opens it afterwards', async () => {
+		// THE regression. Esc used to latch the drop closed until the pointer visited the menu,
+		// so from then on Alt+. raised the bars (a different store, so it all LOOKED fine) and
+		// M silently did nothing.
+		render(SlideToolbarHost);
+
+		toggleMoreMenu(); // M
+		await tick();
+		expect(isOpen()).toBe(true);
+
+		disarmChrome(); // Esc
+		await tick();
+		expect(isOpen()).toBe(false);
+
+		armChrome(); // Alt+.
+		toggleMoreMenu(); // M again — with no mouse anywhere near the bar
+		await tick();
+		expect(isOpen()).toBe(true);
+	});
+
+	it('closes when OVERVIEW takes the screen', async () => {
+		render(SlideToolbarHost);
+		toggleMoreMenu();
+		await tick();
+		expect(isOpen()).toBe(true);
+
+		overviewOpen.set(true);
+		await tick();
+		expect(isOpen()).toBe(false);
+	});
+
+	it('closes on a click outside, but not on one inside the panel', async () => {
+		render(SlideToolbarHost);
+		toggleMoreMenu();
+		await tick();
+
+		await fireEvent.pointerDown(document.querySelector('.annot-drop') as Element);
+		await tick();
+		expect(isOpen()).toBe(true);
+
+		await fireEvent.pointerDown(document.body);
+		await tick();
+		expect(isOpen()).toBe(false);
+	});
+
+	it('puts itself away when a row is picked', async () => {
+		render(SlideToolbarHost);
+		toggleMoreMenu();
+		await tick();
+
+		await fireEvent.click(screen.getByText('OVERVIEW'));
+		await tick();
+		expect(isOpen()).toBe(false);
+	});
+
+	it('keeps the bar seated while open, so the arm timeout cannot tuck it away', async () => {
+		render(SlideToolbarHost);
+		toggleMoreMenu();
+		await tick();
+		// `armed` is gone (the 5s timer owns it) but `menu-open` holds the same seat.
+		expect(document.querySelector('.annot-tools')?.classList.contains('menu-open')).toBe(true);
 	});
 });
