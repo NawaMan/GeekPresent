@@ -187,6 +187,18 @@
 	   last week. Warm, like every other "look here" cue in the deck. */
 	--annot-stale-edge: var(--ACCENT-WARM, #F0A33E);
 
+	/* Kiosk / auto-advance — booth chrome, bottom-left. Accent marks the dwell ring;
+	   danger is Stop. Idle opacity stays high so Pause/Stop stay findable mid-talk. */
+	--kiosk-panel-bg:  rgba(20, 22, 26, 0.96);
+	--kiosk-edge:      rgba(255, 255, 255, 0.28);
+	--kiosk-fg:        var(--INK, #D7DDE5);
+	--kiosk-accent:    var(--ACCENT, #3FA9F5);
+	--kiosk-on-accent: var(--ON-ACCENT, #0A1620);
+	--kiosk-danger:    var(--DANGER, #E5484D);
+	--kiosk-track:     rgba(255, 255, 255, 0.15);
+	--kiosk-scrim:     rgba(0, 0, 0, 0.55);
+	--kiosk-idle:      0.6;
+
 	/* ADJUST-mode style/geometry collision badge — the note a Block shows when the
 	   author's `style` tried to set a property the x/y/width/height props own (see
 	   layout/styleGuardCore.ts). Warm, like every other "look here" cue, and set

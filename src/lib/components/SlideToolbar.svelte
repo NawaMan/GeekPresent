@@ -47,6 +47,8 @@
 		captureItem?: Snippet;
 		printBtn?: Snippet;
 		sourceItem?: Snippet;
+		/** Kiosk / auto-advance menu row (empty when the deck does not offer it). */
+		kioskItem?: Snippet;
 	}
 
 	let {
@@ -57,7 +59,8 @@
 		adjustGroup,
 		captureItem,
 		printBtn,
-		sourceItem
+		sourceItem,
+		kioskItem
 	}: Props = $props();
 
 	// When OVERVIEW opens, force-close the ☰ drop: CSS :hover/:focus-within would otherwise
@@ -144,9 +147,9 @@
 
 		<span class="annot-bar-sep" aria-hidden="true"></span>
 
-		<!-- The hamburger menu. Groups: navigate (OVERVIEW) · export (CAPTURE, PRINT) ·
-		     source (SOURCE, EDIT). Separators sit between groups; empty capture leaves a
-		     zero-height row so the sep still reads as "navigate | export | source". -->
+		<!-- The hamburger menu. Groups: navigate (OVERVIEW, KIOSK) · export (CAPTURE, PRINT) ·
+		     source (SOURCE, EDIT). Separators sit between groups; empty capture/kiosk leave a
+		     zero-height row so the sep still reads as group boundaries. -->
 		<!-- svelte-ignore a11y_no_static_element_interactions — mouseenter only clears Esc's
 		     "hold ☰ closed" latch so hover can open the menu again; no keyboard role needed. -->
 		<div
@@ -160,10 +163,11 @@
 				class="annot-hamburger"
 				aria-haspopup="menu"
 				aria-label="More tools (M)"
-				title="More — Overview, Capture, Print, Source, Edit"
+				title="More — Overview, Kiosk, Capture, Print, Source, Edit"
 			>☰ (M)</button>
 			<div class="annot-drop" role="menu" aria-label="More tools">
 				{@render overviewBtn?.()}
+				{@render kioskItem?.()}
 				<div class="menu-sep" role="separator"></div>
 				{@render captureItem?.()}
 				{@render printBtn?.()}

@@ -95,6 +95,20 @@
 	import { captureFileName, readCaptureParam, refusalText, resolveCanCapture, readSticky } from '$lib/capture/captureCore';
 	import { saveAdjust } from '$lib/stores/adjustSave';
 	import { getViewTransitions } from '$lib/presentation';
+	import KioskDialog from '$lib/components/KioskDialog.svelte';
+	import KioskIndicator from '$lib/components/KioskIndicator.svelte';
+	import KioskNotesCaption from '$lib/components/KioskNotesCaption.svelte';
+	import KioskRunner from '$lib/components/KioskRunner.svelte';
+	import {
+		canKiosk,
+		kioskDeckDefaults,
+		setCanKiosk,
+		applyKioskParam,
+		bootKioskFromUrl,
+		resolveOffered as resolveKioskOffered,
+		openKioskDialog
+	} from '$lib/stores/kiosk';
+	import { DEFAULT_PAGE_MS, DEFAULT_STEP_MS, DEFAULT_WPM } from '$lib/kiosk/kioskCore';
 	import {
 		presenterMode, publishCurrentSlide, subscribeCurrentSlide, subscribeAnimCommand,
 		subscribeContinue, subscribeHighlight, deckKeyFromPath, openPresenterWindow,
@@ -246,6 +260,19 @@
 	   The slide is re-rendered, not upscaled, so it stays crisp. */
 	export let captureScale = 1;
 
+	/* Offer Kiosk / auto-advance (☰ → Kiosk, sticky `?kiosk`). Deck-wide speaker tool —
+	   same access shape as ANNOTATE / CAPTURE: vite dev always, sticky URL, or this prop.
+	   Available is not active: the mode starts off until the dialog's Start or `?kiosk`. */
+	export let kiosk = false;
+
+	/* Deck defaults for kiosk dwell (ms). The setup dialog can override per browser;
+	   step is for in-slide builds (Space-style), page is after the build finishes. */
+	export let kioskStepMs = DEFAULT_STEP_MS;
+	export let kioskPageMs = DEFAULT_PAGE_MS;
+
+	/* Words-per-minute when "use speaker notes for page timing" is on. */
+	export let kioskWpm = DEFAULT_WPM;
+
 	let viewport:  HTMLElement;
 	let container: HTMLElement;
 	let content:   HTMLElement;
@@ -382,6 +409,18 @@
 	$: canCapture = browser
 		? resolveCanCapture(import.meta.env.DEV, readSticky(localStorage.getItem('canCapture')), capture)
 		: false;
+
+	// Kiosk — offered like CAPTURE; running is a separate session (stores/kiosk).
+	// Sticky flag only here; auto-start is one-shot in onMount (bootKioskFromUrl).
+	$: if (browser) {
+		kioskDeckDefaults.set({
+			stepMs: kioskStepMs,
+			pageMs: kioskPageMs,
+			useNotes: false
+		});
+		applyKioskParam($page.url);
+		setCanKiosk(resolveKioskOffered(import.meta.env.DEV, kiosk));
+	}
 
 	// CAPTURE refuses out loud rather than sitting greyed out, exactly as SAVE does: a disabled
 	// button reads as "broken or missing", while one that answers when pressed teaches you why a
@@ -754,6 +793,10 @@
 		const onResize = () => adjustSize(false);
 		window.addEventListener('resize', onResize);
 
+		// Kiosk boot once per page load: ?kiosk starts, ?kiosk=off stops, else resume
+		// a session mid-loop after a full-page nav.
+		bootKioskFromUrl(new URL(window.location.href));
+
 		// The PRINT menu's "this slide + notes" grows the paper only for the print; once the
 		// dialog closes, the deck goes back to its screen self. `afterprint` fires whether the
 		// user printed or cancelled.
@@ -957,6 +1000,33 @@
 <div class="overlay" class:fade-chrome={fadeChrome} style="--base-font:{baseFontSize};">
 	{#if toolBar}
 	<SlideToolbar {width} {height}>
+
+		<!-- KIOSK — empty when the deck does not offer it (zero footprint). Opens the
+		     pace dialog; Start / ?kiosk arms the runner. -->
+		{#snippet kioskItem()}
+			{#if $canKiosk}
+				<button
+					type="button"
+					class="annot-tool"
+					title="Kiosk — auto-advance this deck (step, then page, then loop)"
+					on:click={() => {
+						openKioskDialog();
+						if (browser && document.activeElement instanceof HTMLElement) {
+							document.activeElement.blur();
+						}
+					}}
+				>
+					<span class="tool-ico" aria-hidden="true">
+						<!-- play-in-circle -->
+						<svg viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.4">
+							<circle cx="8" cy="8" r="6" />
+							<path d="M6.5 5.5v5l4.5-2.5z" fill="currentColor" stroke="none" />
+						</svg>
+					</span>
+					<span class="tool-label"><span class="tool-mn">K</span>IOSK</span>
+				</button>
+			{/if}
+		{/snippet}
 
 		<!-- PRESENT — the anchor. Ensures the presenter console is running (opens it, or
 		     re-focuses the existing one); it is not a mode, so it carries no on/off state.
@@ -1224,6 +1294,21 @@
 	<SlideMap {width} {height} rect={mapRect} />
 	{/if}
 </div>
+{/if}
+
+<!-- Kiosk chrome: fixed window UI (not scaled with the canvas). Stays available even
+     when toolBar/controlBar are off (a bare booth still needs Pause/Stop). Hidden under
+     ?clean / ?present. -->
+{#if initialized && browser && !clean && !present}
+	<KioskDialog />
+	<KioskIndicator />
+	<KioskNotesCaption />
+	<KioskRunner
+		{pages}
+		currentSlide={currentSlide ?? ''}
+		prefix="./"
+		wpm={kioskWpm}
+	/>
 {/if}
 
 <!-- Presenter console (this window loaded with ?present). Mounts OVER the hidden

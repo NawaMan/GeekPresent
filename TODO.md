@@ -1616,26 +1616,19 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
 
 ## Tier 3 — nice to have
 
-- [ ] **Kiosk / auto-advance** — a deck that plays itself: dwell on each slide, then page, and loop
+- [x] **Kiosk / auto-advance** — a deck that plays itself: dwell on each slide, then page, and loop
       at the end. For a booth screen, a lobby loop, or an unattended demo.
-  - Nothing in the deck self-runs — no autoplay, no loop, no dwell (grep for
-    autoplay/auto-advance/kiosk/loop in `SlideDeck`/`NavigationBar` is empty). Every advance today
-    is a human pressing → or Space. A conference-booth screen therefore needs a person standing at
-    it, which is exactly the case the `booth`/CodingBooth side of this project cares about.
-  - Approach: a sticky `?kiosk` URL flag, shaped like the two render flags `SlideDeck` already
-    owns (`?shot` at `:225`, and `?layout`) — same parse, same stickiness across navigation, so no
-    new concept enters the deck. Dwell per slide from `pages.ts` (the same metadata channel the
-    pacing item would use for `minutes` — worth landing them in one shape rather than two).
-  - The interesting half is *when it's allowed to page*, and both answers already exist in the repo:
-    a running `<Steps>` build must finish first — `utils/stepKeys.ts`'s `spaceIntent()` is already
-    the single arbiter of exactly this question ("reveal, or page?"), so kiosk consults it rather
-    than re-deciding — and a slide with a finite animation should let its `AnimationBar` clock run
-    out (`utils/slideAnim.ts` already knows the duration and ignores infinite loops).
-  - Pairs with View Transitions (`setViewTransitions(true)`): a kiosk loop is precisely where a
-    cross-slide morph earns its keep, and it's client-side `goto`, so no white flash between slides.
-  - Open questions: does it hide the chrome (a booth screen wants no nav bar — `.gp-chrome` /
-    `fadeChrome` already give the hook), and does any keypress or pointer move break out of kiosk
-    back to manual control, or does it need the flag removed?
+  - Done: pure `src/lib/kiosk/kioskCore.ts` (Space-semantics action, pace clamp, note word-count
+    dwell, sticky `?kiosk` offer); session state in `stores/kiosk.ts` (running/paused, wantsRun
+    across full-page nav, pace overrides, notes toggle); UI — `KioskDialog` (step/page seconds +
+    use-notes + Start/OK/Cancel/Stop), quiet `KioskIndicator` (ring, pause/resume, settings, stop),
+    `KioskRunner` (anim gate via `slideAnim.collectFinite`, reveal via `activeSteps.next`, page/loop
+    via `deckNav.navigate`). Wired into `SlideDeck` (`kiosk` / `kioskStepMs` / `kioskPageMs` /
+    `kioskWpm` props, ☰ → KIOSK row, chrome outside the toolBar gate so a bare booth still has
+    Pause/Stop) and the main slides layout ships `kiosk`. Defaults **2s step / 6s page**; optional
+    speaker-note page timing mounts `<Note>` as `.kiosk-measure` when FITTED. Exit is **explicit
+    only** (Pause/Stop/settings) — keys do not break out. Tests: `kioskCore.test.ts`,
+    `KioskDialog.test.ts`, `KioskIndicator.test.ts`, `KioskSsr.ssr.test.ts`. `--kiosk-*` role tokens.
 
 - [x] **`Quote`** — blockquote + attribution/avatar.
   - Done: `src/lib/components/Quote.svelte`, the Tier-3 companion to `Stat`/`Callout`

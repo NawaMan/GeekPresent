@@ -29,6 +29,7 @@
 	import { setHighlight } from '$lib/stores/highlightTarget';
 	import { printNotes } from '$lib/stores/printNotes';
 	import { getHandout } from '$lib/presentation';
+	import { kioskActive, kioskPaces, kioskNoteText } from '$lib/stores/kiosk';
 
 	/** Inline style for the root element, applied last so it wins. */
 	export let style: string = '';
@@ -56,13 +57,48 @@
 	// no console open $consoleLive is false and the below-slide note stays as the
 	// fallback. The presenter panel ($presenterMode) and print/handout are untouched —
 	// this drops ONLY the audience-window duplicate.
+	// Kiosk "use speaker notes": keep the note in the DOM for text (page dwell +
+	// caption store). The *visible* booth caption is a window-level component —
+	// fixed inside the scaled canvas would pin to the transform, not the window.
+	$: kioskShowNotes = $kioskActive && $kioskPaces.useNotes;
 	$: visible = handout
 		? handout.notes
-		: $printNotes || ($displayMode === 'SCALED' && !$consoleLive) || $presenterMode;
+		: $printNotes || ($displayMode === 'SCALED' && !$consoleLive) || $presenterMode || kioskShowNotes;
+	$: kioskSourceOnly =
+		kioskShowNotes &&
+		!($printNotes || ($displayMode === 'SCALED' && !$consoleLive) || $presenterMode || handout);
 
 	// The deck + slide this note belongs to — the key its check states persist under.
 	$: slidePath = $page.url.pathname.replace(/\/+$/, '').split('/').pop() || '';
 	$: deckKey = browser ? deckKeyFromPath($page.url.pathname) : '/';
+
+	/** Publish note text for the window-level kiosk caption + dwell math. */
+	function publishKioskText(node: HTMLElement, opts: { enabled: boolean }) {
+		let enabled = opts.enabled;
+		const push = () => {
+			if (!enabled) return;
+			const t = (node.textContent ?? '').replace(/\s+/g, ' ').trim();
+			kioskNoteText.set(t);
+		};
+		// Slot content may arrive a tick later; observe rather than one-shot.
+		const mo = typeof MutationObserver !== 'undefined'
+			? new MutationObserver(push)
+			: null;
+		mo?.observe(node, { childList: true, subtree: true, characterData: true });
+		// microtask so slotted children are present
+		queueMicrotask(push);
+		return {
+			update(next: { enabled: boolean }) {
+				enabled = next.enabled;
+				if (enabled) push();
+				else kioskNoteText.set('');
+			},
+			destroy() {
+				mo?.disconnect();
+				kioskNoteText.set('');
+			}
+		};
+	}
 
 	// Presenter check-off: give each note "line" (direct child element) a leading
 	// checkbox the speaker can tick as they cover it. Click toggles just that line;
@@ -158,7 +194,15 @@
 </script>
 
 {#if visible}
-<div class="note no-print {klass}" class:presenter={$presenterMode} id={id || undefined} style={style || undefined} use:checklist={{ enabled: $presenterMode, deckKey, slidePath }}>
+<div
+	class="note no-print {klass}"
+	class:presenter={$presenterMode}
+	class:kiosk-source={kioskSourceOnly}
+	id={id || undefined}
+	style={style || undefined}
+	use:checklist={{ enabled: $presenterMode, deckKey, slidePath }}
+	use:publishKioskText={{ enabled: kioskShowNotes }}
+>
 	<slot></slot>
 </div>
 {/if}
@@ -184,6 +228,22 @@
 
 	font-size: larger;
 	font-family: ui-sans-serif, system-ui, Segoe UI, Helvetica, Apple Color Emoji, Arial, sans-serif, Segoe UI Emoji, Segoe UI Symbol;
+}
+
+/* Kiosk text source only — caption is rendered outside the scaled canvas. */
+.note.kiosk-source {
+	position: absolute !important;
+	width: 1px !important;
+	height: 1px !important;
+	min-height: 0 !important;
+	max-height: none !important;
+	padding: 0 !important;
+	margin: -1px !important;
+	overflow: hidden !important;
+	clip: rect(0, 0, 0, 0) !important;
+	border: 0 !important;
+	white-space: nowrap !important;
+	pointer-events: none !important;
 }
 
 /* Presenter console: the note becomes the right-hand notes panel, pinned to the

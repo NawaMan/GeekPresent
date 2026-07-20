@@ -31,6 +31,9 @@
 	// they may circle a word on it. This deck ships it on: it is the docs deck, so the
 	// control it documents should be in reach on every slide, exactly as it would be in a
 	// real talk. Available, not active — the mode still starts off. See annotate-component.html.
+	//
+	// Kiosk is the same shape: deck-wide offer (`kiosk`), sticky `?kiosk` for unattended
+	// booth links, ☰ → Kiosk for the pace dialog. Defaults 2s step / 6s page.
 </script>
 
 <svelte:head>
@@ -50,6 +53,7 @@
 	fadeChrome
 	annotate
 	capture
+	kiosk
 >
 	<slot />
 </SlideDeck>
