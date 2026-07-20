@@ -82,8 +82,9 @@ Both auto-insert the nav bar. Slides are authored on a fixed **1920×1080** canv
 ## Verify
 
 - **The dev server is usually already up** (the user keeps it running, default port 31173) — assume it
-  exists and just ask them to open `http://localhost:31173/<deck>/<name>.html`. If it isn't up you *may*
-  start one **via the booth** (`./booth exec --run -- ./dev-run.sh`) and tell them the URL — but never
+  exists and just ask them to open `http://localhost:31173/<deck>/<name>.html`. In a worktree, or any
+  booth started with `--port <n>`, the port is `<n>+173` instead — check `./booth list`. If it isn't up
+  you *may* start one **via the booth** (`./booth exec --run -- ./dev-run.sh`) and tell them the URL — but never
   kill or restart a server you didn't start, and don't reach for a host `pnpm`. See AGENTS.md Rule 6.
 - What you *can* run unprompted:
   ```bash
@@ -92,6 +93,14 @@ Both auto-insert the nav bar. Slides are authored on a fixed **1920×1080** canv
   ```
 - Don't try to screenshot the deck in headless Chrome — it renders blank there (the deck's
   `initialized` flag never flips). Prove render with a test instead; see the `deck-tests` skill.
+- **Don't `curl` the slide URL and grep for your content — it is never there, even when everything
+  works.** `SlideDeck` gates SSR, so the served HTML is a shell and slides render client-side. A
+  200 with none of your text is the *expected* result, not a broken server. To check headlessly:
+  ```bash
+  curl -s localhost:31173/src/routes/<deck>/<name>.html/+page.svelte | grep 'your text'  # dev server compiles it
+  pnpm test                                                                              # the real check (dom + ssr)
+  ```
+  The module URL only proves Vite serves your source; `tests/*.ssr.test.ts` is what proves render.
 
 ## Checklist
 

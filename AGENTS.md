@@ -27,8 +27,18 @@ live in `dev-run.sh` and `.booth/config.toml` — this section is the agent summ
 | Run the test suite                                | `./booth exec --run -- pnpm test`                                                      |
 | Static build (into `docs/` via vite, or a folder) | `./booth exec --run -- pnpm build` or `./booth exec --run -- ./build-static.sh ./dist` |
 
-If you want a new copy (like multiple worktree setting), use `--port <new-booth-port>`  for example: `./booth exec --run --port 22000 -- ./dev-run.sh`.
-**NOTE: ** the slide will be accessible on `<booth-port> + 173`.
+**A second booth (a worktree, a parallel session) needs no flags at all.** The same command works
+from any worktree; `port = "NEXT:31000"` takes the next free slot and the slides follow at +173:
+
+```bash
+./booth exec --run -- ./dev-run.sh    # 1st: 31000/31173 · 2nd: 32000/32173 · …
+```
+
+**Read the port off `./booth list` — do not assume 31173, and do not hand-pick a port to "avoid"
+a collision.** `NEXT` already can't collide; a number you invent can. Use `--port <n>` only when you
+need a *predictable* port (reconnecting to a known booth, or giving the user a stable URL) — it sets
+control port, slides (`<n>+173`) and container name together. Never edit `.booth/config.toml` to
+make room.
 
 **No host pnpm / Node fallback for agents.** Do not run `pnpm …`, `npm …`, or `vite …` on the host
 for this project — not for dev, not for tests, not for builds, not “just this once”. If Docker or
@@ -38,29 +48,38 @@ booth is broken, stop and tell the user; do not invent a host toolchain path.
 
 | Port              | What it is                                                                   | How to set it                                                                                                               |
 | ----------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| **Booth control** | Host → container **10000** (CodingBooth's own port; shown in `./booth list`) | `.booth/config.toml` → **`port = "NEXT"`** (recommended). CodingBooth picks a free host port when the booth is **created**. |
+| **Booth control** | Host → container **10000** (CodingBooth's own port; shown in `./booth list`) | `.booth/config.toml` → **`port = "NEXT:31000"`** (shipped). First free port from 31000, chosen when the booth is **created**; override per-run with `--port`. |
 | **Vite / slides** | Host → container **5173** (the slide site)                                   | `run-args` in `.booth/config.toml`: `"--publish", "<host>:5173"` (stock default is **+173:5173**)                           |
 
-**Control port = `NEXT`.** That is enough for concurrent booths — no `CB_PORT`, no CLI `--port` in the
-usual recipe. A hard-coded `port = "31000"` collides when another booth already holds it; prefer
-`NEXT`. (CodingBooth still accepts CLI / env pin if someone needs a fixed number; agents should
-not.) There is **no** `GEEKPRESENT_PORT`; that name is obsolete. `exec` does **not** take `--port`.
-
-```bash
-# usual: config has port = "NEXT" → free control port; Vite host from run-args publish
-./booth exec --run -- ./dev-run.sh
-```
+**Why concurrent booths just work.** Config ships `port = "NEXT:31000"` with a *relative* expose
+(`"--publish", "+173:5173"`), so each booth takes the next free control port and its slides track it
+at +173 — verified with two worktrees at once (31000/31173 and 32000/32173, no flags). `exec` also
+takes `--port` (CodingBooth ≥ 0.62.0) when you want a specific number. There is **no**
+`GEEKPRESENT_PORT`; that name is obsolete.
 
 **Booth name = folder name.** CodingBooth names the container after the project directory (e.g.
 worktree `…/worktree/view-source` → booth `view-source`). Check with `./booth list`. Still do
 **not** kill someone else's booth or the user's running dev to free a port (Rule 6).
 
-**In case of multiple instance**, the name would be **`<folder>-<port>`**
+**A second booth from the same folder** gets the port appended — `GeekPresent` on 31000, then
+`GeekPresent-12000`. A worktree is its own folder, so its booth is just the folder name
+(`…/worktree/view-source` → `view-source`), no suffix.
 
-> **Known gap (CodingBooth):** reassigning the Vite expose per concurrent booth without editing
-> `config.toml` is not clean yet. Relative `+OFFSET:5173` publish forms and/or config-driven expose
-> are the proper fix on the CodingBooth side — until then, agents edit local publish as above and
-> **never commit** those port picks.
+**Once two booths share one folder, `exec` needs `--name`.** It will not guess between them:
+
+```text
+Error: multiple booths match code path "/home/nawa/dev/git/GeekPresent"
+(GeekPresent, GeekPresent-12000). Use --name.
+```
+
+```bash
+./booth list                                        # read the exact NAME column
+./booth exec --run --name GeekPresent -- pnpm test   # then target one
+```
+
+**Pick the booth you started, or ask** — the other one is likely the user's running dev, and Rule 6
+says don't disturb it. Working from a worktree sidesteps this entirely: its own folder, its own
+booth, no ambiguity.
 
 ### Session = linked worktree + branch (GitKraken-visible)
 
@@ -72,15 +91,32 @@ branch, registered with the main clone so GitKraken lists it.
 mkdir -p worktree
 git worktree add worktree/<name> -b <name>    # branch + linked checkout in one step
 cd worktree/<name>
-grok                                          # start the session HERE — do NOT use grok -w / --worktree
+claude                                        # or grok / your agent CLI — start it HERE, from inside
 ```
+
+Start the agent **inside** the folder git already made. Do not use an agent CLI's own worktree
+feature to create it (see below).
 
 | Piece | Value | Notes |
 | --- | --- | --- |
-| Working tree | `<repo>/worktree/<name>/` | Open this in the editor / Grok / GitKraken |
+| Working tree | `<repo>/worktree/<name>/` | Open this in the editor / agent CLI / GitKraken |
 | Branch | `<name>` (same as the folder) | Created by `-b <name>`; already checked out |
 | Git bookkeeping | `<repo>/.git/worktrees/<name>/` | Auto; **never** open or check out files here |
 | Gitignore | `/worktree/` in `.gitignore` | Nested under main → must be ignored (already present) |
+
+**First run in a fresh worktree.** A new worktree has no `node_modules/` and no `.svelte-kit/`, and
+`tsconfig.json` extends `./.svelte-kit/tsconfig.json` — so `pnpm test` fails on a confusing
+`MODULE_NOT_FOUND` for `tsconfig.json` until SvelteKit has synced. Non-TTY `exec` also makes pnpm
+abort its deps check. Both are one-time; this line handles them:
+
+```bash
+./booth exec --run -e CI=true -e npm_config_verify_deps_before_run=false \
+  -- sh -c 'pnpm exec svelte-kit sync && pnpm test'
+```
+
+Neither is a worktree or booth problem — any fresh checkout needs the same. After that, plain
+`./booth exec --run -- pnpm test` works. (Verified in a worktree booth: 142 files, 2439 tests, all
+passing.)
 
 Check that GitKraken will see it (open the **main** repo, not only the worktree path):
 
@@ -96,14 +132,24 @@ A healthy linked worktree has a **file** `.git` pointing at the main repo (not a
 gitdir: /…/GeekPresent/.git/worktrees/<name>
 ```
 
-**Do not** use `grok --worktree=…` / `grok -w` / Ctrl+W to create the isolation for this project.
-Those often produce a **standalone clone** under `~/.grok/worktrees/…` (full `.git/` directory).
-Standalone clones are **invisible** to GitKraken’s worktree list for the main repo. If one already
-exists and the user wants GitKraken: move work aside, `git worktree add worktree/<name> <branch>`
-from main, re-apply any uncommitted edits, delete the standalone.
+**Do not let an agent CLI create the isolation for this project.** Most of them ship a worktree
+feature that puts the checkout somewhere *outside* `<repo>/worktree/` — under the tool's own home
+directory, or a temp dir:
 
-Optional: Grok’s home-dir bucket can still be redirected so accidental Grok paths resolve under
-the repo (does **not** make a standalone into a linked worktree):
+- **Grok** — `grok --worktree=…` / `grok -w` / Ctrl+W → often a **standalone clone** under
+  `~/.grok/worktrees/…` (a full `.git/` directory, not a linked worktree)
+- **Claude Code** — `EnterWorktree`, or an agent spawned with `isolation: "worktree"` → a linked
+  worktree, but in a scratch location of its choosing
+
+Either way the checkout is **invisible** to GitKraken's worktree list for the main repo, which is
+the whole point of the recipe above. Use `git worktree add worktree/<name>` yourself and start the
+agent inside it.
+
+If one already exists and the user wants GitKraken: move work aside, `git worktree add
+worktree/<name> <branch>` from main, re-apply any uncommitted edits, delete the stray checkout.
+
+Optional: an agent CLI's home-dir bucket can be redirected so accidental paths resolve under the
+repo (this does **not** convert a standalone clone into a linked worktree):
 
 ```bash
 # from main clone — only if you want the path alias
@@ -113,6 +159,35 @@ ln -sfn "$(pwd)/worktree" ~/.grok/worktrees/git-geekpresent
 When the user asks for “a session”, “a worktree”, or a feature checkout: run the recipe above
 (or confirm `worktree/<name>` already exists and is linked), then work **inside** that folder.
 Keep `/worktree/` in `.gitignore`.
+
+### Cleaning up after a session
+
+**Clean up only what you created, and only when the user says the work is done.** A worktree holds
+real work — an unmerged branch and possibly uncommitted edits — so removing one is destructive and
+is the user's call, never a tidy-up you do on your own initiative.
+
+Most booths need no teardown: without `--keep-alive` the container is `--rm` and disappears when its
+command ends. Only `--keep-alive` / `--daemon` booths persist, and those are the ones that pile up:
+
+```bash
+./booth list                        # what is actually running, and from which CODE PATH
+./booth stop   --name <booth>       # stop a booth you started (add --force if it will not)
+./booth remove --name <booth>       # then remove the container if it lingers
+```
+
+Then, **from the main clone** (never from inside the worktree you are deleting):
+
+```bash
+git worktree remove worktree/<name>   # refuses if there are uncommitted changes — do NOT --force
+git branch -d <name>                  # -d only; refuses to drop unmerged work
+git worktree list                     # confirm it is gone
+```
+
+`--force` on either command silently discards work. If git refuses, that refusal is the point:
+stop and tell the user what is unmerged or uncommitted, and let them decide.
+
+**If you started a booth, say so and leave it running** unless asked to stop it. Once two booths
+share a folder it is no longer obvious which is yours — and Rule 6 says never kill the user's dev.
 
 ### Already in a worktree → stay on the feature branch
 
@@ -389,13 +464,17 @@ are load-bearing when you touch anything nearby:
    **`./booth exec --run -- ./dev-run.sh`** (see *Quick start for agents*). Check `./booth list`
    first: if this project's booth already has Vite up, use that URL — do not start a second one,
    and **never** kill someone else's booth or their running dev. Vite is always container
-   `:5173`; the host URL is the `"--publish", "HOST:5173"` mapping in `.booth/config.toml` (stock
-   `http://localhost:31173/…`). Tell the user the full URL. Tests and static builds also go
+   `:5173`; the host port is the booth's control port **+173** (stock `http://localhost:31173/…`,
+   or `<port>+173` if you started it with `--port`). Confirm with `./booth list` and tell the user
+   the full URL. Tests and static builds also go
    **only** through the booth (`./booth exec --run -- pnpm test`, `./booth exec --run -- pnpm build`
-   / `./build-static.sh …`) — not host `pnpm`. **Worktree caveat:** a booth started from a git
-   *worktree* fails with `fatal: not a git repository`, because the worktree's `.git` points into
-   the main repo's `.git`, which the container does not mount — run the booth from a normal clone,
-   or stop and tell the user rather than reaching for a host toolchain.
+   / `./build-static.sh …`) — not host `pnpm`. **Worktrees work** (CodingBooth ≥ 0.63.0): run the
+   same command from the worktree, no flags — it gets its own booth and its own ports automatically
+   (see *Quick start*); read the URL off `./booth list`. Git does **not** work *inside*
+   a worktree booth — `git` / `lazygit` / `gh` there report `fatal: not a git repository`, because
+   the worktree's `.git` is a pointer into the main repo's `.git`, which the container doesn't
+   mount. That is known and harmless: run git on the host, which is where you commit anyway. (Only
+   the booth *startup* used to die on this; ≥ 0.63.0 no longer does.)
 7. **Verify before declaring done.** Cover the change with a test (`tests/*.test.ts`, or
    `tests/*.ssr.test.ts` for prerender behavior) and/or have the user check the slide in dev. The
    build is static, so also sanity-check it isn't relying on any server feature.
