@@ -12,6 +12,12 @@ form. `$ARGUMENTS` is the branch (default: the branch checked out in the worktre
 your own initiative, and never because "the change is done". Do **not** push afterwards, and do
 **not** clean up the worktree, unless separately asked. Both are their own decisions.
 
+**This skill's own Proposal before code gate** (replaces the generic `AGENTS.md` form — do not
+stack both): after the read-only preflight below, report as **Problem · Diagnostic · Approach**
+(what is being landed, clean/behind/conflict verdict, the exact rebase→test→`--no-ff` plan) and
+**wait** before stash / rebase / merge. The user's original "land this" is not enough once
+preflight can change the plan (conflicts, dirty main, branch behind).
+
 ## 0. Preflight — establish the shape before touching anything
 
 Every command here is read-only. Run them all, then report what you found.
@@ -24,8 +30,9 @@ git log --oneline <branch>..main      # is the branch behind? (non-empty ⇒ reb
 git merge-tree --write-tree main <branch> >/dev/null; echo $?   # 0 = clean, 1 = conflicts
 ```
 
-`merge-tree` is a genuine dry run — it writes nothing to the index or working tree. Report its
-verdict before proposing the merge; "this will conflict" is much cheaper said now.
+`merge-tree` is a genuine dry run — it writes nothing to the index or working tree. Fold the
+verdict into the **Problem · Diagnostic · Approach** report and **wait** before step 1; "this will
+conflict" is much cheaper said now than mid-rebase.
 
 **Check where the worktree actually lives.** It must be `<repo>/worktree/<name>` — a linked
 worktree whose `.git` is a *file* containing `gitdir: …`. If an agent CLI put it somewhere else

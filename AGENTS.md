@@ -13,6 +13,59 @@ Read the `README.md` first for the user-facing overview. This file is the *opera
 Get the environment and git shape right before editing. Wrong port / wrong host / wrong branch
 wastes a whole session.
 
+**Two hard stops before any feature edit (Rules 0 and 0b):**
+
+1. **Proposal before code** — post Problem · Diagnostic · Approach, then wait (Rule 0).
+2. **Linked worktree** — feature work is **not** edited on `main`. Before the first substantive
+   write: either you are already under `worktree/<name>/`, or you create that checkout and work
+   **only** there. **"Yes" / "go ahead" / "Let's go" authorises the *work*, not the *checkout*.**
+   It is never permission to edit the main clone. Full text: Rule 0b and *Session = linked
+   worktree + branch* below.
+
+### Proposal before code — study, discuss, then edit
+
+**Default for any change that is not pure Q&A.** Research is fine (read files, search, run
+read-only commands). **Writing is not** — no source edits, no scaffolding, no "I'll start while
+I explain" — until you have posted a short proposal and the user has replied.
+
+Post **three headings, a few sentences each**, then **stop and wait**:
+
+1. **Problem** — restate what the user wants in plain language, so a mismatch surfaces before
+   code.
+2. **Diagnostic** — what you found in the tree: what already exists, what is the outlier, which
+   constraint bites. Put 1–2 clarifying questions *here* when something is still ambiguous.
+3. **Approach** — how you intend to do it, including deliberate non-goals and open choices the
+   user should pick. **When the change will touch source**, Approach **must** name the checkout
+   in one explicit line — either:
+   - **Worktree:** `worktree/<name>` + branch `<name>` (this is the default for feature work), or
+   - **Main / here:** only if the user already opted out ("here", "on main", "no worktree") or
+     the change is a pure docs/typo one-liner they want on main.
+
+   A proposal that describes the code change but **omits the checkout** is incomplete — fix it
+   before asking for a green light. After green light, if you are still on the main clone and
+   Approach said worktree, **create the worktree first**; do not start writing on main.
+
+
+Proceed only when the user agrees, picks an option, or explicitly green-lights
+("do it", "implement", "yes", "go ahead"). One approval covers that plan — not every later
+surprise; if the approach has to change, re-propose the delta.
+
+**Skip the gate when:**
+
+- Pure questions / orientation with **no** code change
+- The user already approved this approach in the **same thread**
+- They explicitly skip it ("just implement", "no plan", "don't discuss")
+- Mechanical follow-through of an **already-agreed** plan (the next step of work already green-lit)
+- A skill's **own** gate already covers the same wait — but **not every skill menu is enough**.
+  - `land-branch`: preflight report *as* Problem · Diagnostic · Approach, then wait (replaces a
+    second copy of the form).
+  - `pick-todo`: the menu only chooses *which* feature. After the pick you **still** post
+    Problem · Diagnostic · Approach and wait — a one-line pitch is not a plan.
+
+This is Rule 0 under *Rules you must follow*. **Rule 0b (worktree isolation) is not skipped by a
+green light** — it is a separate pre-edit check. Skills that implement things restate both at the
+top so they are hard to miss when a skill is loaded alone.
+
 ### CodingBooth — how to run things
 
 This repo ships a **CodingBooth** wrapper (`./booth` + `.booth/`). **Agents run everything
@@ -160,6 +213,28 @@ When the user asks for “a session”, “a worktree”, or a feature checkout:
 (or confirm `worktree/<name>` already exists and is linked), then work **inside** that folder.
 Keep `/worktree/` in `.gitignore`.
 
+**Default for feature work: use a linked worktree** (`worktree/<name>` + branch `<name>`) — this
+is **Rule 0b**, not a soft preference. Unless the user says otherwise ("here", "on main", "no
+worktree") or you are **already** inside one, **stop before the first substantive edit** and create
+the checkout from the main clone root:
+
+```bash
+mkdir -p worktree
+git worktree add worktree/<name> -b <name>
+cd worktree/<name>
+```
+
+Prefer a short name from the task (`mnemonic-underline`). Tell the user the path and branch. Do
+**not** use the agent CLI's own worktree feature (see above). `pick-todo` asks, and defaults the
+answer to worktree. Do **not** invent a worktree for pure Q&A, docs-only nits the user wants on
+main, or a one-line fix they explicitly want in place.
+
+**Pre-edit self-check (feature work) — fail closed:**
+
+- [ ] `pwd` is under `…/worktree/<name>/` **or** the user opted out of isolation
+- [ ] `git branch --show-current` is **not** `main` / `master` (unless the user opted out)
+- If either box fails: **do not write**. Create or enter the worktree first, then continue.
+
 ### Landing a worktree's branch into main
 
 Merging is a deliberate act, same bar as any commit/push (Rule 8) — only when the user asks to
@@ -231,15 +306,20 @@ Then:
 Still **do not** `git commit`, `git push`, or open the PR unless the user asks (Rule 8). Creating
 or switching the branch is the exception.
 
-If you are on a normal day-to-day clone of `main` (no `worktree/<name>` path, no feature
-session), do **not** invent a branch unless the user asks or the change is clearly a long-lived
-feature they want isolated.
+If you are on a normal day-to-day clone of `main` (no `worktree/<name>` path) and the change is
+**feature work** (new component, multi-file behaviour, anything `pick-todo` would offer), **Rule 0b
+applies** — create the worktree recipe above before the first write; opt out only when the user says
+so. Skip isolation for pure Q&A, tiny docs/typo fixes, or an explicit "do it here / on main".
+**"Go ahead" on a plan is not an opt-out.**
 
 ## Skills — the executable half of this file
 
 The recurring jobs are also shipped as **skills** in `.claude/skills/`, each a checklist that ends in a
 working, tested artifact. Prefer the skill when one matches; come back here for the prose and the
-background.
+background. Implementation skills still obey **Proposal before code** (Rule 0) and **feature work
+in a linked worktree** (Rule 0b) — restate both at the top when a skill is loaded alone.
+`pick-todo`'s menu is only the first gate (which feature); after the pick it still requires the full
+form. `land-branch` folds the form into its preflight report.
 
 | skill | use it when |
 |---|---|
@@ -248,6 +328,8 @@ background.
 | `adjust-mode` | placing things at exact canvas pixels, `Connector` diagrams, SAVE, the style guard |
 | `deck-tests` | the test contract — the `dom` / `ssr` projects, and why prerender needs `svelte/server` |
 | `land-branch` | merging a worktree's branch into main — preflight, rebase, booth test, `--no-ff` |
+| `pick-todo` | "what's next?" — shortlist open `TODO.md` items, user picks, then build |
+| `todo` | record an idea in `TODO.md` only — never implement |
 
 `tests/skills.test.ts` pins every repo path those skills cite, so a moved file fails the suite rather
 than misleading the next agent.
@@ -469,6 +551,30 @@ are load-bearing when you touch anything nearby:
 
 ## Rules you must follow
 
+0. **Proposal before code.** For any change that is not pure Q&A: research read-only, post
+   **Problem · Diagnostic · Approach** (a few sentences each), and **wait** for the user before the
+   first substantive edit. Full text, skips, and skill exceptions are under *Quick start for
+   agents* → *Proposal before code*. Do not treat "the user described a feature" as permission to
+   start writing. Approach must name the **checkout** (worktree vs main) when source will change.
+0b. **Feature work runs in a linked worktree — never on main by default.** Before the first
+   substantive edit of feature work (new/changed behaviour, multi-file work, anything a playbook
+   or implementation skill would do):
+   1. If path is already `…/worktree/<name>/` (or `.git` is a `gitdir:` file), stay there; ensure
+      the branch name matches the folder.
+   2. Else if on the main clone: from the **main clone root**,
+      `mkdir -p worktree && git worktree add worktree/<name> -b <name>`, then **cd into that
+      folder** and only edit there. Prefer a short name from the task. Tell the user the path and
+      branch.
+   3. Do **not** use the agent CLI's own worktree (`grok -w` / `isolation: "worktree"` / Claude
+      EnterWorktree) — those checkouts are invisible to GitKraken for this repo.
+
+   **Skip isolation only when:** pure Q&A; docs/typo one-liners the user wants on main; the user
+   said "here" / "on main" / "no worktree"; or you are already inside a linked worktree.
+
+   **"Go ahead" on a plan is not permission to edit main.** It authorises the *work*, not the
+   *checkout*. If Approach forgot isolation and you are still on main, stop, create the worktree
+   (or ask for a name), and edit only there. Full recipe: *Quick start* → *Session = linked
+   worktree + branch*. Pre-edit self-check lives there too — fail closed.
 1. **Keep `pages.ts` in sync.** Any time you add, remove, or rename a slide folder, update *that
    presentation's* `pages.ts` (e.g. `src/routes/slides/pages.ts`) to match. A slide folder with no
    `pages.ts` entry is an orphan.
@@ -504,15 +610,20 @@ are load-bearing when you touch anything nearby:
    tree. Don't `git add`, `git commit`, or `git push` on your own initiative — "the change is done"
    is not permission to commit it. When the user asks for a commit message, use `/commit-msg`.
    **Exception — worktrees:** if this checkout is a git worktree, **do** create/switch to a
-   feature branch early (see *Session = linked worktree + branch* above) so the user can
-   push and open a PR; still do not commit or push that branch unless asked.
+   feature branch early (Rule 0b / *Session = linked worktree + branch*) so the user can
+   push and open a PR; still do not commit or push that branch unless asked. Creating the
+   worktree itself is Rule 0b and does **not** require a separate commit request.
 
 ---
 
 ## Playbooks
 
-> When a request is ambiguous (where the blog lives, which slides to keep, etc.), **ask 1–2
-> clarifying questions first**, then proceed.
+> **Proposal before code (Rule 0) + worktree isolation (Rule 0b).** Match the request to a playbook,
+> research as needed, then post **Problem · Diagnostic · Approach** (Approach names the checkout)
+> and **wait** — do not start the numbered steps until the user green-lights. After green light,
+> still create `worktree/<name>` before editing if you are on main (unless they opted out). When
+> something is still ambiguous (where the blog lives, which slides to keep, etc.), put **1–2
+> clarifying questions inside Diagnostic**, not instead of the three headings.
 
 ### "Start me from scratch — keep only a Title page and a Content page"
 

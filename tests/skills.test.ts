@@ -114,14 +114,50 @@ describe('agent skills', () => {
 		expect(body).toMatch(/separate ask/i);
 	});
 
-	// The pre-build recap was added to stop the agent from vanishing into a build with no
-	// checkpoint — but a recap that grows into a mini design doc defeats the point (the
-	// user doesn't want to read one). Pin the brevity constraint itself, not just its
-	// existence, so a future edit can't quietly drop the cap back to "however long".
-	it('pick-todo: pre-build recap has an explicit brevity cap', () => {
+	// pick-todo: after the menu pick, full Proposal before code still waits — a one-line
+	// pitch is not a plan. Worktree is the default isolation unless the user opts out.
+	it('pick-todo: discuss after pick; default to worktree', () => {
 		const body = skillBody('pick-todo');
-		expect(body).toContain('compact recap');
-		expect(body).toMatch(/~?40 words/);
-		expect(body).toMatch(/no sub-bullets/);
+		expect(body).toMatch(/Proposal before code/i);
+		expect(body).toMatch(/Two gates/i);
+		expect(body).toMatch(/not detailed enough|not a plan|blank check/i);
+		expect(body).toMatch(/Default to worktree/i);
+		// Must not tell the agent the pick is enough to start writing.
+		expect(body).not.toMatch(/Once they choose, the ambiguity is gone/i);
+		expect(body).not.toMatch(/Default to "here"/i);
+	});
+
+	// Proposal-before-code is the house "discuss first" gate. It lived only in the user's
+	// head until agents kept jumping straight to edits; pin both the AGENTS.md rule and
+	// that every skill still points at it (or names its own replacing gate), so a skill
+	// rewrite cannot silently drop the wait.
+	it('AGENTS.md and skills: Proposal before code (Problem · Diagnostic · Approach)', () => {
+		const agents = readFileSync(`${REPO}AGENTS.md`, 'utf8');
+		expect(agents).toContain('### Proposal before code');
+		expect(agents).toMatch(/0\.\s+\*\*Proposal before code\.\*\*/);
+		expect(agents).toContain('**Problem**');
+		expect(agents).toContain('**Diagnostic**');
+		expect(agents).toContain('**Approach**');
+		expect(agents).toMatch(/stop and wait/i);
+		// Feature work defaults to a linked worktree unless the user opts out.
+		expect(agents).toMatch(/Default for feature work: use a linked worktree/i);
+
+		// Implementation / mutation skills must surface the gate when loaded alone.
+		for (const name of [
+			'new-slide',
+			'new-component',
+			'adjust-mode',
+			'deck-tests',
+			'land-branch',
+			'pick-todo'
+		]) {
+			expect(skillBody(name)).toMatch(/Proposal before code/i);
+		}
+		// pick-todo: menu is gate 1; full form after pick is still required.
+		expect(skillBody('pick-todo')).toMatch(/still/i);
+		// todo records only — must not invent a build path that skips Rule 0.
+		expect(skillBody('todo')).toMatch(/Not an implementation skill/i);
+		// land-branch must wait after preflight, not treat "land this" as a blank check.
+		expect(skillBody('land-branch')).toMatch(/wait/i);
 	});
 });

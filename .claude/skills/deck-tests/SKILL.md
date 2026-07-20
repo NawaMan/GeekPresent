@@ -5,6 +5,11 @@ description: The GeekPresent test contract — the dom and ssr vitest projects, 
 
 # The test contract
 
+**Proposal before code** (see `AGENTS.md` → *Proposal before code* / Rule 0; **Rule 0b** — feature work in a linked worktree, not on main) applies when this skill
+is used to **change product code or invent a new test shape** beyond the checklist below. Adding the
+usual `*.test.ts` / `*.ssr.test.ts` pair for work the user already green-lit is mechanical
+follow-through — no second wall. Read-only "why is this test blank?" diagnosis skips the gate.
+
 Two vitest **projects**, joined by `vitest.workspace.ts`. `pnpm test` runs both.
 
 | | `dom` (`vitest.config.ts`) | `ssr` (`vitest.ssr.config.ts`) |

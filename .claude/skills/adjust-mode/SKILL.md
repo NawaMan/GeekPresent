@@ -5,6 +5,11 @@ description: Place elements at exact canvas pixels with Block/ImageBlock and ADJ
 
 # Place things visually (ADJUST mode)
 
+**Proposal before code** (see `AGENTS.md` → *Proposal before code* / Rule 0; **Rule 0b** — feature work in a linked worktree, not on main) when this skill leads to
+**edits** (wiring `Block`s, changing SAVE/access, new draggable behaviour). Read-only teaching —
+"how does ADJUST work?" — skips the gate. When editing: research, post **Problem · Diagnostic ·
+Approach**, wait.
+
 When a slide positions things at exact canvas pixels, **don't guess the numbers**. Wrap the element in a
 `Block` (or `ImageBlock` for a picture), drag it in the browser, and copy the resulting tag back into the
 source.

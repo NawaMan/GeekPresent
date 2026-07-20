@@ -5,6 +5,14 @@ description: Add a reusable author-facing component to $lib/components — the s
 
 # Add a reusable component
 
+**Proposal before code** (see `AGENTS.md` → *Proposal before code* / Rule 0; **Rule 0b** — feature work in a linked worktree, not on main). Research read-only,
+then post **Problem · Diagnostic · Approach** (a few sentences each) and **wait** before adding
+files under `src/lib/components/` or a demo slide. The Approach must name the pure `*Core` module,
+role tokens, and demo slide — not "I'll figure it out while coding". Skips: pure Q&A, same-thread
+approval, explicit "just do it", or mechanical follow-through of an already-agreed plan.
+
+**Before the first edit (Rule 0b):** if you are on the main clone and this is feature work, create `worktree/<name>` (`git worktree add worktree/<name> -b <name>`) and work only there — unless the user said "here" / "on main" / "no worktree". "Go ahead" is not an opt-out.
+
 Lives at `src/lib/components/<Name>.svelte`, imported as `$lib/components/<Name>.svelte`.
 
 **No new dependencies.** Charts, diagrams and QR symbols here are own-math Svelte, deliberately. A

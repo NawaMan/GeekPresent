@@ -5,6 +5,13 @@ description: Author a slide in a GeekPresent deck — route folder, the mandator
 
 # Add a slide
 
+**Proposal before code** (see `AGENTS.md` → *Proposal before code* / Rule 0; **Rule 0b** — feature work in a linked worktree, not on main). Research read-only,
+then post **Problem · Diagnostic · Approach** (a few sentences each) and **wait** before creating
+route folders or editing `pages.ts`. Skips: pure Q&A, same-thread approval, explicit "just do it",
+or mechanical follow-through of an already-agreed plan.
+
+**Before the first edit (Rule 0b):** if you are on the main clone and this is feature work, create `worktree/<name>` (`git worktree add worktree/<name> -b <name>`) and work only there — unless the user said "here" / "on main" / "no worktree". "Go ahead" is not an opt-out.
+
 A slide is **a route folder, not a file**. Getting that wrong is the single most common way a slide
 looks fine in dev and then 404s or vanishes from the deck.
 

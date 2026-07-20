@@ -8,6 +8,10 @@ description: Add an item to this project's TODO.md, in the house style. Use when
 `$ARGUMENTS` is the thing to record. Write it into **`TODO.md` at the repo root**. Record only:
 no source edits, no marking anything `[x]`.
 
+**Not an implementation skill.** Recording a TODO does not require the full Problem · Diagnostic ·
+Approach wait gate. Do still refuse to *build* the idea here — if the user actually wants it
+implemented, point them at building it (or `pick-todo`) and follow `AGENTS.md` Rule 0 there.
+
 ## 1. Check it isn't already done
 
 `TODO.md` is 1300+ lines and mostly *completed* entries — and it lags the code. Before writing:

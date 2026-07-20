@@ -6,15 +6,21 @@ description: Study the project and TODO.md, propose a few open features worth bu
 # Pick a feature to implement
 
 Propose a short menu of open `TODO.md` features, each with a credible one-sentence approach, let the
-user pick, and then **build the one they picked** — all in this one invocation.
+user pick, **discuss the pick** (full Proposal before code), then build — never jump from a menu
+click straight into edits.
 
-**The menu comes first, and nothing precedes it.** Until the user has chosen, do not edit source, do
-not scaffold, do not mark anything `[x]` — even if one candidate looks trivial and even if you are
-confident which one they will take. Research and read all you like; just don't write. The point of
-the skill is that the user chooses what gets built, so choosing must come before building.
+**Two gates, in order — both wait for the user:**
 
-Once they choose, the ambiguity is gone: go implement it. Don't stop to ask for confirmation, don't
-hand back a plan, don't wait for a fresh request.
+1. **Menu** — until the user has chosen, do not edit source, scaffold, or mark anything `[x]`.
+   Research and read all you like; just don't write. Each candidate gets a grounded one-sentence
+   approach (not a design doc — the menu is a shortlist, not the plan).
+2. **Proposal before code** (see `AGENTS.md` / Rule 0; **Rule 0b** — feature work in a linked worktree, not on main) — a menu pitch is **not** detailed enough
+   to build from. After the pick, re-research the chosen item against the real code, then post
+   **Problem · Diagnostic · Approach** (a few sentences each) and **wait**. The TODO line and the
+   one-sentence pitch often lag the tree or hide open questions; discussion is the rule, not the
+   exception. Do **not** treat the pick as a blank check to implement.
+
+Only after the user green-lights that proposal do you enter step 6 (build).
 
 ## 1. Orient (skip what you already know)
 
@@ -87,33 +93,38 @@ design doc.
 Then call `AskUserQuestion` with the candidates as options so the pick is one click, and include the
 size in each option's description. If a candidate's real choice is a *design question* (per step 2),
 make that the question instead — deciding it is more valuable than a vague yes. Add a second, short
-question in the same call: build directly here, or in an isolated **worktree** (new branch, own
-booth/ports — see `AGENTS.md`'s "Session = linked worktree + branch")? Default to "here" unless
-already inside a worktree.
+question in the same call: **isolated worktree** (new branch, own booth/ports — see `AGENTS.md`'s
+"Session = linked worktree + branch"), or build directly here? **Default to worktree** unless the
+user is already inside one, or they explicitly want the main clone ("here", "on main", "no
+worktree"). Feature work on this project is isolated by default; main is the opt-out.
 
-## 5. Build the pick
+## 5. Discuss the pick (Proposal before code — wait)
 
-The answer to that question is the go-ahead. Before touching files, post a **compact recap** — 3
-short lines, ~40 words total, no headers, no sub-bullets, no code, nothing restated from the menu
-pitch: **Problem** (what's broken/missing), **Direction** (the approach), **Expected result** (what
-"done" looks like). If a line needs a second sentence to make sense, it's too long — cut it, don't
-split it. This is not a confirmation gate — don't wait for a reply, don't ask "sound good?"; it's a
-checkpoint so the user can interrupt if you're about to build the wrong thing, nothing more.
+A pick is only "which feature", not "how". Re-read the TODO entry and the code it will touch, then
+post the full **Problem · Diagnostic · Approach** form from `AGENTS.md` Rule 0 (and Rule 0b for isolation) — not the menu's
+one-liners recycled. Approach **must** name the checkout (worktree default, or main if they opted
+out). Surface open questions, what already exists, and deliberate non-goals. **Stop and wait** for
+agreement (or a revised approach). Do not create a worktree, edit source, or mark `TODO.md` until
+that green light. Green light still means **create the worktree first** when isolation was chosen
+(Rule 0b) — it is not permission to edit main.
 
-If the user chose a worktree, **set it up before anything else in this step, and make sure a branch
-gets created with it** — `git worktree add worktree/<name> -b <name>` from the main clone (per
-`AGENTS.md`) does both in one call; if you end up doing it any other way, creating the worktree
-without also creating/checking-out a matching branch is a mistake, not a shortcut. Then do the rest
-of this step from inside it. Implement the chosen item now, in this same turn, to the definition of
-done in step 3 — component, demo slide, DOM test, SSR test — following the approach you pitched. If
-the pitch named a default for an open design question, that default is what the user agreed to;
-build it that way rather than re-opening the question.
+If the user picked *Other* and typed something outside the menu, that is still only a pick — scout
+it, then the same Problem · Diagnostic · Approach wait applies.
 
-Two things the menu phase deliberately withheld, now due:
+## 6. Build the pick
+
+Only after step 5 is green-lit. Before the first edit, if a worktree was chosen (the default),
+**set it up first and make sure a branch is created with it** —
+`git worktree add worktree/<name> -b <name>` from the main clone (per `AGENTS.md`) does both in one
+call; a worktree without a matching branch is a mistake, not a shortcut. Then do the rest of this
+step from inside it.
+
+Implement the agreed approach to the definition of done in step 3 — component, demo slide, DOM
+test, SSR test. Defaults the user accepted in step 5 are binding; do not re-open settled questions
+mid-build without re-proposing the delta.
+
+Two things the menu/discuss phases withheld, now due:
 - **Check the box.** Mark the item `[x]` in `TODO.md` and rewrite its entry into the house style of a
   completed entry — a `Done:` bullet naming the files that landed — the way every other finished item
   reads.
 - **Verify.** Build and run the tests; a feature is not done because the diff exists.
-
-If the user picked *Other* and typed something outside the menu, that is still a pick — build it,
-scouting further first if the item was one you had not researched.
