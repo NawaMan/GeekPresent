@@ -160,6 +160,27 @@ When the user asks for “a session”, “a worktree”, or a feature checkout:
 (or confirm `worktree/<name>` already exists and is linked), then work **inside** that folder.
 Keep `/worktree/` in `.gitignore`.
 
+### Landing a worktree's branch into main
+
+Merging is a deliberate act, same bar as any commit/push (Rule 8) — only when the user asks to
+land/merge a worktree's work, never on your own initiative. The procedure:
+
+1. **In the main clone**, stash anything uncommitted so main is clean before the merge:
+   `git stash` (skip if main is already clean).
+2. **In the worktree**, rebase the feature branch onto main: `git rebase main`. Resolve any
+   conflicts as they come up. If the rebase touched code the tests cover, rerun the suite before
+   continuing — that worktree's own booth (`./booth list` for its name, then `./booth exec --run
+   --name <name> -- pnpm test`), never the host.
+3. **From the main clone**, `git merge --no-ff <branch>`. Always a real merge commit — **never
+   squash** (`git merge --squash`) and never fast-forward-only — so the worktree's commit history
+   is kept, not flattened.
+4. If step 1 stashed anything, `git stash apply` (not `pop`) to restore it, confirm the working
+   tree looks right, then `git stash drop`. Apply-then-drop leaves the stash recoverable if
+   restoring it onto the just-merged main conflicts — `pop` would have already discarded it.
+
+Landing and cleanup are separate asks: only move on to *Cleaning up after a session* below once the
+user confirms the merge is done and they want the worktree removed too — don't chain them unasked.
+
 ### Cleaning up after a session
 
 **Clean up only what you created, and only when the user says the work is done.** A worktree holds

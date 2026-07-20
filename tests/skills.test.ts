@@ -87,4 +87,27 @@ describe('agent skills', () => {
 		expect(skillBody('adjust-mode')).toContain('src/lib/stores/blockAnchors.ts');
 		expect(skillBody('deck-tests')).toContain('svelte/server');
 	});
+
+	// pick-todo offers to build in an isolated worktree. That recipe is spelled out once,
+	// in AGENTS.md — the skill must keep quoting it verbatim, not a paraphrase that could
+	// drift into "just add a worktree" and silently drop the branch. If AGENTS.md's own
+	// recipe ever changes, this fails on the skill side instead of shipping a stale one.
+	it('pick-todo: worktree offer quotes AGENTS.md\'s own worktree+branch recipe', () => {
+		const recipe = 'git worktree add worktree/<name> -b <name>';
+		expect(readFileSync(`${REPO}AGENTS.md`, 'utf8')).toContain(recipe);
+		expect(skillBody('pick-todo')).toContain(recipe);
+		// Not just the command — the requirement that a branch is non-optional.
+		expect(skillBody('pick-todo')).toMatch(/make sure a branch/i);
+	});
+
+	// The pre-build recap was added to stop the agent from vanishing into a build with no
+	// checkpoint — but a recap that grows into a mini design doc defeats the point (the
+	// user doesn't want to read one). Pin the brevity constraint itself, not just its
+	// existence, so a future edit can't quietly drop the cap back to "however long".
+	it('pick-todo: pre-build recap has an explicit brevity cap', () => {
+		const body = skillBody('pick-todo');
+		expect(body).toContain('compact recap');
+		expect(body).toMatch(/~?40 words/);
+		expect(body).toMatch(/no sub-bullets/);
+	});
 });

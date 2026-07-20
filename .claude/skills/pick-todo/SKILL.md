@@ -94,17 +94,20 @@ already inside a worktree.
 ## 5. Build the pick
 
 The answer to that question is the go-ahead. Before touching files, post a **compact recap** — 3
-lines, no headers, no re-explaining the menu: **Problem** (what's broken/missing, one line),
-**Direction** (the approach you're taking, one line), **Expected result** (what "done" looks like,
-one line). This is not a confirmation gate — don't wait for a reply, don't ask "sound good?"; it's a
+short lines, ~40 words total, no headers, no sub-bullets, no code, nothing restated from the menu
+pitch: **Problem** (what's broken/missing), **Direction** (the approach), **Expected result** (what
+"done" looks like). If a line needs a second sentence to make sense, it's too long — cut it, don't
+split it. This is not a confirmation gate — don't wait for a reply, don't ask "sound good?"; it's a
 checkpoint so the user can interrupt if you're about to build the wrong thing, nothing more.
 
-If the user chose a worktree, set it up first (`git worktree add worktree/<name> -b <name>` from the
-main clone, per `AGENTS.md`), then do the rest of this step from inside it. Then implement the chosen
-item now, in this same turn, to the definition of done in step 3 — component, demo slide, DOM test,
-SSR test — following the approach you pitched. If the pitch named a default for an open design
-question, that default is what the user agreed to; build it that way rather than re-opening the
-question.
+If the user chose a worktree, **set it up before anything else in this step, and make sure a branch
+gets created with it** — `git worktree add worktree/<name> -b <name>` from the main clone (per
+`AGENTS.md`) does both in one call; if you end up doing it any other way, creating the worktree
+without also creating/checking-out a matching branch is a mistake, not a shortcut. Then do the rest
+of this step from inside it. Implement the chosen item now, in this same turn, to the definition of
+done in step 3 — component, demo slide, DOM test, SSR test — following the approach you pitched. If
+the pitch named a default for an open design question, that default is what the user agreed to;
+build it that way rather than re-opening the question.
 
 Two things the menu phase deliberately withheld, now due:
 - **Check the box.** Mark the item `[x]` in `TODO.md` and rewrite its entry into the house style of a

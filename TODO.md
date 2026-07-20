@@ -936,6 +936,30 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
 
 ## Chrome & legibility
 
+- [ ] **Toolbar mnemonic doesn't expand into the ☰ hamburger menu** — the ☰ dropdown rows
+  (OVERVIEW / CAPTURE / PRINT / SOURCE) show underlined mnemonic letters, but pressing one while
+  chrome is armed does nothing: it neither opens the collapsed hamburger nor fires the row.
+  - Why: a keyboard user reads the underline and presses the letter, and gets silence — the
+    advertised affordance is a lie for every item that lives in the drop. Only OVERVIEW appears to
+    work, and only by accident: it has its OWN global `o` listener (`overviewPageCore.overviewKeyIntent`),
+    independent of the mnemonic system, so the ☰ rows that rely on the mnemonic system alone are dead
+    from the keyboard.
+  - Root cause: `chromeKeyIntent` (`chrome/chromeArmCore.ts`) only maps the BAR-level letters —
+    a/j/z/p/t and `m` — and `m`'s `'more'` intent merely *focuses* `.annot-hamburger` so
+    `:focus-within` opens the drop (`SlideDeck.svelte:529`). There is no intent for the row letters,
+    so while armed they fall through to `'ignore'` and the menu never expands, let alone activates a
+    row.
+  - Approach: teach the mnemonic model that a ☰-item letter both OPENS the drop and triggers its row.
+    Cleanest is to add intents (overview/capture/print/source) to `chromeKeyIntent` and, in
+    `onChromeKeys`, run the same focus-the-hamburger path `'more'` uses (or a `holdMoreMenuOpen`)
+    THEN fire the row's own handler — the rows are real buttons, so resolving the letter to the row
+    and `.click()`ing it after the drop opens also works. Keep the alphabet collision-free (PRINT
+    already uses R because P is PRESENT) and the guards unchanged (armed, no modifier chord, not a
+    typing target).
+  - Open questions: should the ☰ letters require chrome ARMED first (consistent with the rest) or
+    fire globally like OVERVIEW's `o` does today; and once the drop is open, does focus land on the
+    activated row so the PRINT flyout's own keys take over seamlessly.
+
 - [x] **`SlideDeck fadeChrome`** — fade the deck's own controls until pointed at.
   - Opt-in prop. NAV, TOC, DISPLAY, the minimap and the LAYOUT toggle drop to 12% opacity
     and lift to full on `:hover` / `:focus-within`. Wanted most where chrome sits over
@@ -2057,6 +2081,26 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     no-render). No new role tokens — it reuses the `--draw-*` family.
 
 ## Authoring / LAYOUT mode
+
+- [ ] **Convert an annotation to a shape (when SAVE is allowed)** — promote a live ANNOTATE ink
+  stroke into a persistent Draw shape written back to source, so a mark drawn on stage stops being
+  ephemeral ink and becomes an authored slide element.
+  - Why: ANNOTATE ink is deliberately transient and per-slide (the `inkBook`, keyed by pathname);
+    Draw shapes are source. Today the only bridge is redrawing the mark by hand as a `<Polyline>`. A
+    "keep this" promotion turns a good live annotation — an underline, a circled term, a scrawled
+    arrow — into a permanent element in one step, exactly when the author already has SAVE in front
+    of them.
+  - Approach: it's a mapping, not new geometry. An ANNOTATE stroke is already `Point[]` + a tool +
+    colour (`annotate/annotateCore.ts`, the `inkBook` in `stores/annotation.ts`), and `Polyline`'s
+    source form is literally `points: Point[]` with `smooth`/`close` — so emit a `<Polyline points={…}
+    smooth …>` (a pen → a smoothed line, a highlighter → a fat low-opacity band) and hand it to the
+    SAME shape change registry SAVE already patches (the one Draw shapes report to via
+    `registerPathSource`). Carry the stroke's colour to a `stroke` / `--draw-*` role token, not a
+    frozen hex. Gate the action on the SAVE-allowed flag (`canLayout`), and on success drop the
+    promoted stroke from the `inkBook` so the mark doesn't paint twice.
+  - Open questions: does the stroke leave the ink layer immediately (default) or stay as ink until
+    SAVE actually lands; how a highlighter band maps (a fat translucent `Polyline` vs a `Rect`); and
+    whether it's a per-stroke "keep as shape" on tap/click or a bulk "promote all ink on this slide".
 
 - [x] **Ctrl+S saves while in ADJUST mode** — trap the browser's Save shortcut and route it to
   ADJUST's SAVE instead of the "save this webpage" dialog.
