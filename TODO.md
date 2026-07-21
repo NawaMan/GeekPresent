@@ -1273,24 +1273,42 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     named `deploy` Block, a Save button a plain top banner), registered in `pages.ts` beside
     Note-driven Highlight with `adjust: true` so "drag the box, the spotlight follows" is live.
 
-- [ ] **`Cursor` — a fake mouse pointer that demonstrates a UI without a live app** — an author-
+- [x] **`Cursor` — a fake mouse pointer that demonstrates a UI without a live app** — an author-
   placed pointer glyph that sits at a point, glides between named targets, and flashes a click
   ripple, so a slide can *show* a hover → click → drag instead of cutting to a screen recording.
-  - Why: demoing an interaction today means a `Video` (heavy, re-record on every UI change) or hand-
-    waving over a static shot. A scriptable cursor makes the gesture part of the slide's own
-    timeline — it scrubs, holds and replays with everything else, and it re-times for free when the
-    talk does.
-  - Approach: it's a `Sprite` wearing a pointer, not a new engine — reuse the unified Draw + Sprite
-    path (the `polyline` path kind already carries a sprite between points) for the motion, aim the
-    endpoints at boxes by name through `stores/blockAnchors.ts` exactly as `Connector`/`Spotlight`
-    do, and ride the `AnimationBar` keyframe clock (`Canvas`/`Terminal`/`Sprite` discipline) so
-    hold/seek/replay come free. The click ripple is an opt-in, SSR-inert reveal keyed to a path
-    checkpoint; colours/size are `--cursor-*` role tokens in `roles.css`. Done = component + a demo
-    slide that *is* the docs + a DOM test + an SSR test (glyph prerenders, no `NaN` in the path).
-  - Open questions: a standalone `<Cursor>` vs. just a pointer preset/glyph on `Sprite` (if the path
-    engine already does everything, the cursor may be one glyph + a ripple layer, not a component);
-    how a "click" is authored — a keyframe marker on the path, or a `Steps`-style beat; and whether
-    hover/drag want distinct pointer states or just the move + ripple to start.
+  - Done: `src/lib/draw/Cursor.svelte` — home is `draw/`, not `components/`, and the demo lives in
+    the `animation/` deck, not `slides/`: like every other Sprite/Rect/Line rider it must live
+    inside a `<Draw>`, so it follows that family's precedent rather than the generic component
+    skill's default. Timing/geometry in `src/lib/draw/cursorCore.ts` (pure, `drawCore`/
+    `connectorCore` discipline).
+  - **Settles the open questions.** A standalone `<Cursor>` — but a thin one: it's a `Sprite`
+    wearing a pointer, not a new engine. `path` waypoints (a Block `name`, resolved live through
+    the SAME `blockAnchors` registry `Connector`/`Spotlight` read, or a literal `[x, y]`) become
+    generated `SpriteStop[]`, forwarded to a **`lock`ed `<Sprite>`** underneath — Sprite's own
+    escape hatch for calculated geometry: *"never registers: cannot be selected, listed or
+    copied — ADJUST simply doesn't know it exists."* That resolves the standalone-vs-preset
+    question cleanly — there is exactly one source of truth for Copy (the `<Cursor>` tag itself),
+    and nothing on the Sprite side to save. An unresolved name drops the whole flight
+    (Connector's rule), never a glyph stranded at a fallback point. **Click is a keyframe
+    marker** (`{ at: "save-btn", click: true }`), not a `Steps`-style beat — the flight already
+    rides one continuous `AnimationBar` timeline, so a marker needs no second clock. **Deliberate
+    non-goal:** no distinct hover/drag pointer states — just move + a ripple, which is what every
+    use so far needs; easy to extend later without breaking the API.
+  - The ripple is ONE static `@keyframes` shared by every click marker (only `animation-delay`
+    varies, computed as `delay + animate·pct` — the exact real-time offset Sprite's own generated
+    `animation: … <animate>s <ease> <delay>s both;` places that stop at), and honours
+    `prefers-reduced-motion` — a flourish, not the taught content, unlike the flight itself (which
+    Sprite deliberately never mutes). `--cursor-fill` / `--cursor-outline` / `--cursor-ripple`
+    role tokens in `roles.css`, warm "look here" accent matching Spotlight/Toast.
+  - Tests: `cursorCore` unit-tested directly in `tests/cursorCore.test.ts` (0/1/N targets, garbage
+    size/delay/animate, click subset, no NaN); DOM coverage in `tests/DrawCursor.test.ts`
+    (base pose + generated keyframes, ripple timing, a single-waypoint static cursor, re-routing
+    when the named target moves, dropping the whole flight when it's unresolved, zero ADJUST
+    chrome even with ADJUST on); SSR in `tests/DrawCursorSsr.ssr.test.ts` (the same guarantees
+    proven through `svelte/server`, since `SlideDeck` gates real slide markup behind `onMount` and
+    a built page ships blank). Demo: `src/routes/animation/cursor-component.html/` — a pointer
+    glides from rest onto a fake "File" button, clicks it, glides to "Save", clicks that; flip
+    ADJUST and drag either button to watch the flight re-route live.
 
 - [x] **`Terminal`** — fake console: typed command + output, riding the `AnimationBar` keyframe clock.
   - Done: `src/lib/components/Terminal.svelte`, with the schedule in

@@ -1,0 +1,117 @@
+// Cursor — a fake pointer built on a LOCKED Sprite. The flight resolves
+// waypoints (Block names or literal points) through the same blockAnchors
+// registry Connector reads, so it re-routes with a dragged/removed target,
+// and it must grow ZERO ADJUST chrome of its own (the locked Sprite
+// underneath is the whole point — nothing to select, list or copy besides
+// the <Cursor> tag itself). Prerender coverage is DrawCursorSsr.ssr.test.ts.
+import { render } from '@testing-library/svelte';
+import { tick } from 'svelte';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { blockAnchors } from '../src/lib/stores/blockAnchors';
+import { canAdjust, adjustMode } from '../src/lib/stores/adjustMode';
+import DrawCursorHost from './DrawCursorHost.svelte';
+
+const spriteEl = (c: HTMLElement) => c.querySelector('.sprite-el') as HTMLElement | null;
+const ripples = (c: HTMLElement) => c.querySelectorAll('circle.cursor-ripple');
+const keyframeStyle = (c: HTMLElement) =>
+	Array.from(c.querySelectorAll('style'))
+		.map((s) => s.textContent ?? '')
+		.find((t) => t.includes('@keyframes draw-sprite-')) ?? '';
+
+beforeEach(() => {
+	blockAnchors.set(new Map());
+	canAdjust.set(false);
+	adjustMode.set(false);
+});
+
+describe('Cursor rendering', () => {
+	it('flies a locked Sprite from a literal point onto the named target', async () => {
+		const { container } = render(DrawCursorHost);
+		await tick();
+		// Base pose (0%): the literal [100, 100] start, box 40 → top-left [80, 80].
+		const el = spriteEl(container);
+		expect(el).not.toBeNull();
+		expect(el!.style.left).toBe('80px');
+		expect(el!.style.top).toBe('80px');
+		// 100%: target centre (500+100, 300+50) = (600, 350) → top-left [580, 330].
+		const css = keyframeStyle(container);
+		expect(css).toContain('left:80px; top:80px;');
+		expect(css).toContain('100% { left:580px; top:330px;');
+		expect(css).not.toContain('NaN');
+		expect(el!.style.animation).toContain('draw-sprite-');
+	});
+
+	it('flashes a click ripple timed to the arrival, delay + animate·pct included', async () => {
+		const { container } = render(DrawCursorHost);
+		await tick();
+		const rs = ripples(container);
+		expect(rs).toHaveLength(1); // only the marked waypoint gets a ripple
+		const ring = rs[0] as SVGCircleElement;
+		expect(ring.getAttribute('cx')).toBe('600');
+		expect(ring.getAttribute('cy')).toBe('350');
+		// delay 0.2 + animate 1.5 * pct(1.0, the last of 2 targets) = 1.7s.
+		expect(ring.style.animationDelay).toBe('1.7s');
+	});
+
+	it('a single-waypoint path is a static cursor — no flight, ripple fires at delay', async () => {
+		const { container } = render(DrawCursorHost, { props: { legs: 'one' } });
+		await tick();
+		// No @keyframes: Sprite needs ≥2 stops to animate.
+		expect(keyframeStyle(container)).toBe('');
+		const el = spriteEl(container);
+		expect(el!.style.left).toBe('580px'); // sitting on the target, box 40
+		expect(el!.style.top).toBe('330px');
+		const ring = ripples(container)[0] as SVGCircleElement;
+		expect(ring.style.animationDelay).toBe('0.2s'); // no flight, so just the hold
+	});
+
+	it('re-routes when the named target moves — the flight follows it', async () => {
+		const { container, rerender } = render(DrawCursorHost);
+		await tick();
+		expect(keyframeStyle(container)).toContain('100% { left:580px; top:330px;');
+
+		await rerender({ targetX: 900, targetY: 700 });
+		await tick();
+		// New centre (900+100, 700+50) = (1000, 750) → top-left [980, 730].
+		expect(keyframeStyle(container)).toContain('100% { left:980px; top:730px;');
+		expect(ripples(container)[0].getAttribute('cx')).toBe('1000');
+	});
+
+	it('drops the whole flight when the named target is unresolved — never a stranded glyph', async () => {
+		const { container, rerender } = render(DrawCursorHost, { props: { showTarget: false } });
+		await tick();
+		expect(spriteEl(container)).toBeNull();
+		expect(container.querySelector('.draw-cursor')).toBeNull();
+		expect(ripples(container)).toHaveLength(0);
+
+		// ...and it comes back once the Block (re)registers.
+		await rerender({ showTarget: true });
+		await tick();
+		expect(spriteEl(container)).not.toBeNull();
+	});
+
+	it('never eats pointer input: the root is aria-hidden and the Sprite surface is inert', async () => {
+		const { container } = render(DrawCursorHost);
+		await tick();
+		expect(container.querySelector('.draw-cursor')?.getAttribute('aria-hidden')).toBe('true');
+		const fo = container.querySelector('foreignObject')!;
+		expect(fo.style.pointerEvents).toBe('none');
+	});
+});
+
+describe('Cursor in ADJUST mode', () => {
+	beforeEach(() => {
+		canAdjust.set(true);
+		adjustMode.set(true);
+	});
+
+	it('grows zero ADJUST chrome — the locked Sprite is not selectable', async () => {
+		const { container } = render(DrawCursorHost);
+		await tick();
+		expect(container.querySelector('.draw-handle')).toBeNull();
+		expect(container.querySelector('.sprite-hit')).toBeNull();
+		expect(container.querySelector('.sprite-box')).toBeNull();
+		// It still flies.
+		expect(spriteEl(container)).not.toBeNull();
+	});
+});

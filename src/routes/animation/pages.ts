@@ -13,6 +13,7 @@ export const pages = [
     { path: "path-move.html",         title: "Path — Keyframed Geometry" },
     { path: "draw-progress.html",     title: "Draw — Keyframed Progress" },
     { path: "draw-sprite.html",       title: "Draw — Flying Sprite" },
+    { path: "cursor-component.html",  title: "Cursor — Fake Pointer" },
     { path: "sprite-curve.html",      title: "Sprite — Following a Curve" },
     { path: "sprite-polyline.html",   title: "Sprite — Riding a Polyline" },
     { path: "sprite-delay.html",      title: "Sprite — Staggered Timing" },

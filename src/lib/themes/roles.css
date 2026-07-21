@@ -131,6 +131,15 @@
 	--toast-scrim:  var(--BACKDROP, #000000);
 	--toast-ring:   var(--ACCENT-WARM, #F0A33E);
 
+	/* Cursor — the fake mouse pointer that demos a UI without a live app. The
+	   glyph reads in the same warm "look here" accent as Spotlight/Toast (it IS
+	   a pointer, after all), with a dark outline so it stays legible over any
+	   backdrop it glides across; the click ripple echoes the glyph's own colour
+	   by default. Fallbacks are the dark default. */
+	--cursor-fill:    var(--ACCENT-WARM, #F0A33E);
+	--cursor-outline: rgba(0, 0, 0, 0.55);
+	--cursor-ripple:  var(--ACCENT-WARM, #F0A33E);
+
 	/* Annotation — the speaker's ink (see components/Annotate.svelte). The pen reads in
 	   the same warm "look here" accent the Spotlight ring uses, since it is the same act:
 	   pointing at something. Its glow is a dark halo, not a coloured one — ink lands on
