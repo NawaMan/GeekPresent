@@ -5,10 +5,14 @@
   and glyph metrics are computed in untransformed CSS pixels, so inside the
   canvas the caret drifts. Here there is no scale: 1 CSS px = 1 layout px.
 
-  SAVE  — write buffer via /__geekpresent/source-save; window stays open.
-  REFRESH — re-read disk via /__geekpresent/source-load (picks up ADJUST SAVE /
-            IDE edits). Warns if the buffer differs from disk.
-  CLOSE — leave the editor.
+  SAVE    — Ctrl/Cmd+S, or Alt+. then s — write buffer; window stays open.
+  REFRESH — Ctrl/Cmd+Shift+R, or Alt+. then r — re-read disk. Confirms if buffer ≠ disk.
+  CLOSE   — Esc, or Alt+. then c — leave the editor; confirms if the buffer is dirty.
+
+  Alt+. arms R/S/C for a few seconds (amber bar). Using any of those letters, or
+  pressing Alt+. again, ends arm mode — so SAVE does not leave C live for a stray close.
+
+  Keys are taken in the CAPTURE phase so Monaco cannot swallow Esc / the armed letters.
 -->
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
@@ -22,6 +26,7 @@
 		parseSourceEditPayload,
 		type SourceEditPayload
 	} from '$lib/source/sourceEditSession';
+	import { sourceEditKeyIntent } from '$lib/source/sourceEditKeyCore';
 
 	let payload: SourceEditPayload | null = null;
 	/** Baseline last loaded or saved — used for SAVE's NONE check. */
@@ -40,6 +45,29 @@
 	let actionTimer: ReturnType<typeof setTimeout> | undefined;
 	const notAllowedTip = 'Save not allowed in this setup.';
 	const refreshNotAllowedTip = 'Refresh not allowed in this setup.';
+
+	// Mini chrome-arm for this window only (same idea as the deck's Alt+.).
+	// While armed, r/s/c fire even with the caret inside Monaco. One letter ends arm mode.
+	let keysArmed = false;
+	let armTimer: ReturnType<typeof setTimeout> | undefined;
+	const ARM_MS = 5000;
+
+	function armKeys() {
+		keysArmed = true;
+		clearTimeout(armTimer);
+		armTimer = setTimeout(() => {
+			keysArmed = false;
+			armTimer = undefined;
+		}, ARM_MS);
+	}
+
+	function disarmKeys() {
+		keysArmed = false;
+		if (armTimer) {
+			clearTimeout(armTimer);
+			armTimer = undefined;
+		}
+	}
 
 	function flashAction(label: string, ms: number, opts?: { refused?: boolean; tip?: string }) {
 		actionLabel = label;
@@ -158,7 +186,20 @@
 		flashAction('RELOADED', 1600);
 	}
 
+	function isDirty(): boolean {
+		if (!payload) return false;
+		if (codeRef?.isDirty?.()) return true;
+		const buf = codeRef?.getValue?.();
+		return typeof buf === 'string' && buf !== baseline;
+	}
+
 	function onClose() {
+		if (isDirty()) {
+			const ok = confirm(
+				'You have unsaved edits in the source editor.\n\nClose without saving?'
+			);
+			if (!ok) return;
+		}
 		window.close();
 		setTimeout(() => {
 			if (!window.closed) {
@@ -170,25 +211,54 @@
 		}, 100);
 	}
 
+	/**
+	 * Capture-phase listener: Monaco steals Esc (and would steal bare r/s/c while
+	 * the caret is in the buffer). Decisions live in sourceEditKeyCore (pure, tested).
+	 */
 	function onKeydown(event: KeyboardEvent) {
-		if ((event.ctrlKey || event.metaKey) && (event.key === 's' || event.key === 'S')) {
-			event.preventDefault();
-			onSave();
+		const intent = sourceEditKeyIntent(event, keysArmed);
+		if (intent === 'ignore') return;
+
+		event.preventDefault();
+		event.stopPropagation();
+
+		switch (intent) {
+			case 'arm-toggle':
+				if (keysArmed) disarmKeys();
+				else armKeys();
+				return;
+			case 'save':
+				// Armed letter is one-shot; Ctrl+S does not need arm state.
+				disarmKeys();
+				onSave();
+				return;
+			case 'refresh':
+				disarmKeys();
+				onRefresh();
+				return;
+			case 'close':
+				disarmKeys();
+				onClose();
+				return;
 		}
-		// Ctrl/Cmd+R is browser reload of this window — leave it alone.
 	}
 
 	onMount(() => {
 		readFromStorage();
 		window.addEventListener('message', onMessage);
-		window.addEventListener('keydown', onKeydown);
+		// Capture = true: run before Monaco's bubble handlers.
+		window.addEventListener('keydown', onKeydown, true);
 		return () => {
 			window.removeEventListener('message', onMessage);
-			window.removeEventListener('keydown', onKeydown);
+			window.removeEventListener('keydown', onKeydown, true);
+			disarmKeys();
 		};
 	});
 
-	onDestroy(() => clearTimeout(actionTimer));
+	onDestroy(() => {
+		clearTimeout(actionTimer);
+		disarmKeys();
+	});
 
 	$: pathLabel = payload?.path || '(no file loaded — open EDIT from a slide)';
 	$: canSave = payload?.canSave ?? false;
@@ -203,24 +273,24 @@
 </svelte:head>
 
 <div class="shell">
-	<header class="bar">
+	<header class="bar" class:armed={keysArmed}>
 		<div class="path" title={pathLabel}>{pathLabel}</div>
 		<div class="actions">
 			<button
 				type="button"
 				class="btn refresh"
 				disabled={!payload}
-				title="REFRESH — reload this file from disk (warns if the buffer differs)"
+				title="REFRESH — Ctrl+Shift+R, or Alt+. then R (confirms if the buffer differs)"
 				on:click={onRefresh}
-			>REFRESH</button>
+			><span class="mn">R</span>EFRESH</button>
 			<span class="action-wrap" class:refused={actionRefused}>
 				<button
 					type="button"
 					class="btn save"
 					disabled={!payload}
-					title="SAVE — write this buffer back to the slide's +page.svelte"
+					title="SAVE — Ctrl+S, or Alt+. then S"
 					on:click={onSave}
-				>SAVE</button>
+				><span class="mn">S</span>AVE</button>
 				{#if showFlash}
 					<span class="action-pop">
 						{#if actionLabel !== 'SAVE'}
@@ -235,9 +305,9 @@
 			<button
 				type="button"
 				class="btn close"
-				title="CLOSE — leave the editor (does not save)"
+				title="CLOSE — Esc, or Alt+. then C (confirms if unsaved)"
 				on:click={onClose}
-			>CLOSE</button>
+			><span class="mn">C</span>LOSE</button>
 		</div>
 	</header>
 
@@ -287,6 +357,14 @@
 		border-bottom: 1px solid #333;
 		min-height: 3em;
 		box-sizing: border-box;
+		transition: box-shadow 120ms ease;
+	}
+	/* Alt+. armed — same cue as the deck tool bar so R/S/C read as live. */
+	.bar.armed {
+		box-shadow: inset 0 0 0 2px color-mix(in srgb, #f0a33e 55%, transparent);
+	}
+	.bar.armed .btn .mn {
+		color: #f0a33e;
 	}
 	.path {
 		min-width: 0;
@@ -328,6 +406,12 @@
 	}
 	.btn.refresh {
 		color: #7fd9ff;
+	}
+	/* Mnemonic letter on the bar buttons (R / S / C) — same underline cue as deck chrome. */
+	.btn .mn {
+		text-decoration: underline;
+		text-underline-offset: 0.15em;
+		text-decoration-thickness: 1px;
 	}
 	.action-wrap {
 		position: relative;

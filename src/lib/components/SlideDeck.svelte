@@ -56,11 +56,24 @@
 		disarmChrome,
 		keepChromeArmed,
 		requestTocOpen,
+		requestDisplayMenu,
+		openMoreMenu,
 		closeMoreMenu,
 		toggleMoreMenu,
 		moreMenuOpen
 	} from '$lib/stores/chromeArm';
-	import { chromeKeyIntent, isAdjustSaveChord } from '$lib/chrome/chromeArmCore';
+	import {
+		chromeKeyIntent,
+		moreMenuKeyIntent,
+		isAdjustSaveChord,
+		isChromeTypingTarget
+	} from '$lib/chrome/chromeArmCore';
+	import {
+		arrowDir,
+		focusIndexOf,
+		nextNavIndex,
+		toolbarNavZone
+	} from '$lib/chrome/chromeToolbarNavCore';
 	import CodeBox from '$lib/components/CodeBox.svelte';
 
 	// Deck-level SOURCE CodeBox (slides without ViewSource). Opened by openPageSource
@@ -513,6 +526,7 @@
 		if (e.ctrlKey || e.metaKey || e.altKey) return false;
 		if (e.key === 'Escape') {
 			e.preventDefault();
+			// Back one level: close the PRINT flyout only (☰ can stay for another pick).
 			printMenuOpen = false;
 			return true;
 		}
@@ -529,15 +543,191 @@
 		if (!act) return false;
 		e.preventDefault();
 		act();
+		// A real destination was picked — put the whole ☰ away (flyout already cleared
+		// itself inside printThisSlide / openHandout).
+		closeMoreMenu();
 		return true;
 	}
 
 	/** This deck's window-fixed chrome overlay — the scope for chrome DOM lookups. */
 	let chromeOverlay: HTMLDivElement | undefined;
 
+	/** Focusable controls on the top bar (PIN … ☰), not rows inside the ☰ drop. */
+	function barFocusables(): HTMLElement[] {
+		const root = chromeOverlay?.querySelector('.annot-tools');
+		if (!root) return [];
+		const nodes = root.querySelectorAll(
+			':scope > button, :scope > .save-btn > button, :scope > .mode button, :scope > .annot-menu > .annot-hamburger'
+		);
+		return [...nodes].filter((el): el is HTMLElement => el instanceof HTMLElement && !(el as HTMLButtonElement).disabled);
+	}
+
+	/** Enabled ☰ drop rows (OVERVIEW / KIOSK / …). */
+	function moreFocusables(): HTMLElement[] {
+		const drop = chromeOverlay?.querySelector('.annot-drop');
+		if (!drop) return [];
+		return [...drop.querySelectorAll('button.annot-tool')].filter(
+			(el): el is HTMLElement => el instanceof HTMLElement && !(el as HTMLButtonElement).disabled
+		);
+	}
+
+	/** PRINT flyout destinations. */
+	function printFocusables(): HTMLElement[] {
+		const sub = chromeOverlay?.querySelector('.print-sub');
+		if (!sub) return [];
+		return [...sub.querySelectorAll('button')].filter(
+			(el): el is HTMLElement => el instanceof HTMLElement && !(el as HTMLButtonElement).disabled
+		);
+	}
+
+	function focusToolbarEl(el: HTMLElement | null | undefined) {
+		if (!el) return;
+		el.focus();
+		el.scrollIntoView?.({ block: 'nearest' });
+	}
+
 	/**
-	 * Alt+. raises both window-edge bars; while armed, a/j/z/p/m/t pick a control.
-	 * Esc disarms chrome and closes the ☰ drop. Print-menu keys win when open.
+	 * Arrow roving focus on the raised tool bar / ☰ drop / PRINT flyout.
+	 * Returns true when the key was claimed (so deck paging must not move).
+	 * Yields to SizeMode while its zoom menu is open.
+	 */
+	function onToolbarArrows(e: KeyboardEvent): boolean {
+		const dir = arrowDir(e);
+		if (!dir) return false;
+		if (isChromeTypingTarget(e.target)) return false;
+
+		const tools = chromeOverlay?.querySelector('.annot-tools');
+		if (!tools) return false;
+
+		// DISPLAY zoom menu owns ↑/↓ while open.
+		if (tools.querySelector('.mode.expanded')) return false;
+
+		const bar = barFocusables();
+		const more = moreFocusables();
+		const print = printFocusables();
+		const ae = browser ? (document.activeElement as HTMLElement | null) : null;
+		const hamburger = tools.querySelector('.annot-hamburger') as HTMLElement | null;
+		const drop = tools.querySelector('.annot-drop');
+		const printSub = tools.querySelector('.print-sub');
+		const printRow = tools.querySelector('.print-flyout > .annot-tool') as HTMLElement | null;
+
+		const zone = toolbarNavZone({
+			armed: $chromeArmed,
+			moreOpen: $moreMenuOpen,
+			printOpen: printMenuOpen,
+			sizeMenuOpen: false,
+			focusInPrint: !!(printSub && ae && printSub.contains(ae)),
+			focusInMoreDrop: !!(drop && ae && drop.contains(ae)),
+			focusOnHamburger: !!(hamburger && ae && (ae === hamburger || hamburger.contains(ae))),
+			focusOnBar: !!(ae && tools.contains(ae) && !(drop && drop.contains(ae)))
+		});
+		if (zone === 'none') return false;
+
+		if (zone === 'bar') {
+			// ↓ on ☰ opens the drop and focuses the first row.
+			if (dir === 'down' && hamburger && ae && (ae === hamburger || hamburger.contains(ae))) {
+				e.preventDefault();
+				openMoreMenu();
+				keepChromeArmed();
+				queueMicrotask(() => focusToolbarEl(moreFocusables()[0] ?? hamburger));
+				return true;
+			}
+			if (dir !== 'left' && dir !== 'right') return false;
+			const i = focusIndexOf(bar, ae);
+			const next = nextNavIndex('bar', dir, i, bar.length);
+			if (next == null || !bar.length) return false;
+			e.preventDefault();
+			focusToolbarEl(bar[next]);
+			keepChromeArmed();
+			return true;
+		}
+
+		if (zone === 'more') {
+			const onHamburger = !!(hamburger && ae && (ae === hamburger || hamburger.contains(ae)));
+			const inDrop = !!(drop && ae && drop.contains(ae));
+
+			// ←/→ while focus is still on a top-bar control (drop open but not focused):
+			// keep walking the bar rather than trapping in "more" zone.
+			if ((dir === 'left' || dir === 'right') && !onHamburger && !inDrop) {
+				const i = focusIndexOf(bar, ae);
+				const next = nextNavIndex('bar', dir, i, bar.length);
+				if (next == null || !bar.length) return false;
+				e.preventDefault();
+				focusToolbarEl(bar[next]);
+				keepChromeArmed();
+				return true;
+			}
+
+			// → on PRINT opens the flyout and focuses its first destination.
+			if (dir === 'right' && ae && ae.closest?.('.print-flyout')) {
+				e.preventDefault();
+				printMenuOpen = true;
+				keepChromeArmed();
+				queueMicrotask(() => focusToolbarEl(printFocusables()[0] ?? printRow));
+				return true;
+			}
+			// ← from a row → ☰; ← on ☰ → previous bar control.
+			if (dir === 'left') {
+				if (inDrop) {
+					e.preventDefault();
+					focusToolbarEl(hamburger);
+					keepChromeArmed();
+					return true;
+				}
+				if (onHamburger) {
+					const i = focusIndexOf(bar, hamburger);
+					const next = nextNavIndex('bar', 'left', i, bar.length);
+					if (next == null) return false;
+					e.preventDefault();
+					focusToolbarEl(bar[next]);
+					keepChromeArmed();
+					return true;
+				}
+			}
+			if (dir === 'right' && onHamburger) {
+				const i = focusIndexOf(bar, hamburger);
+				const next = nextNavIndex('bar', 'right', i, bar.length);
+				if (next == null) return false;
+				e.preventDefault();
+				focusToolbarEl(bar[next]);
+				keepChromeArmed();
+				return true;
+			}
+
+			let i = focusIndexOf(more, ae);
+			if (onHamburger) i = -1;
+			const next = nextNavIndex('more', dir, i, more.length);
+			if (next == null) return false;
+			e.preventDefault();
+			if (next < 0) focusToolbarEl(hamburger);
+			else focusToolbarEl(more[next]);
+			keepChromeArmed();
+			return true;
+		}
+
+		if (zone === 'print') {
+			const i = focusIndexOf(print, ae);
+			const next = nextNavIndex('print', dir, i, print.length);
+			if (next == null) return false;
+			e.preventDefault();
+			if (next < 0) {
+				printMenuOpen = false;
+				focusToolbarEl(printRow);
+			} else {
+				focusToolbarEl(print[next]);
+			}
+			keepChromeArmed();
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Alt+. raises both window-edge bars; while armed, a/j/z/p/m/t pick a bar control
+	 * and o/k/c/r/s/e pick a ☰ row (opening the drop if needed). Arrow keys rove focus
+	 * along the bar and the ☰ drop. Esc disarms chrome and closes the ☰ drop.
+	 * Print-menu keys win when that flyout is open.
 	 */
 	function onChromeKeys(e: KeyboardEvent) {
 		// Ctrl/Cmd+S while ADJUST is active (offered AND on) writes the moved Blocks
@@ -555,6 +745,48 @@
 		// keys it actually claims. Anything else falls through to the chrome mnemonics.
 		if (onPrintMenuKey(e)) return;
 
+		// Arrow roving on the raised bar / ☰ (before letter mnemonics and before deck paging).
+		if (onToolbarArrows(e)) return;
+
+		// ☰ rows (underlined O/K/C/R/S/E): while the drop is open, or while chrome is
+		// armed so a letter can open the drop and fire the row. Handled before bar
+		// letters so they never collide (bar uses a/j/z/p/m/t).
+		const moreIntent = moreMenuKeyIntent(e, $moreMenuOpen, $chromeArmed);
+		if (moreIntent !== 'ignore') {
+			e.preventDefault();
+			// Ensure the drop is latched open for PRINT (and any brief paint of a row).
+			if (!$moreMenuOpen) openMoreMenu();
+			switch (moreIntent) {
+				case 'overview':
+					overviewOpen.set(true);
+					closeMoreMenu();
+					break;
+				case 'kiosk':
+					if ($canKiosk) openKioskDialog();
+					closeMoreMenu();
+					break;
+				case 'capture':
+					if (canCapture) onCapture();
+					closeMoreMenu();
+					break;
+				case 'print':
+					// Leave ☰ open; open the PRINT flyout so cCwWtT can take over.
+					printMenuOpen = true;
+					keepChromeArmed();
+					break;
+				case 'source':
+					if ($pageSourceCanView) openPageSource();
+					closeMoreMenu();
+					break;
+				case 'edit':
+					if ($pageSourceCanEdit) openPageSourceEdit();
+					closeMoreMenu();
+					break;
+			}
+			keepChromeArmed();
+			return;
+		}
+
 		const intent = chromeKeyIntent(e, $chromeArmed);
 		if (intent === 'ignore') return;
 		e.preventDefault();
@@ -562,15 +794,20 @@
 		switch (intent) {
 			case 'arm':
 				armChrome();
+				// Land focus on the first bar control so ←/→ have a starting point.
+				queueMicrotask(() => focusToolbarEl(barFocusables()[0]));
 				return;
 			case 'disarm':
-				// Drop the ☰ open latch, drop focus (:focus-within is the other way in), then
-				// un-arm the bars. A pointer still resting on the menu keeps it open — that is
-				// plain hover, and moving the mouse away ends it.
+				// Drop the ☰ open latch, then un-arm. Alt+. puts focus on the top bar so ←/→
+				// work; that focus keeps the top bar seated via CSS `:focus-within` even after
+				// `armed` is false — so Esc must blur ANY focus inside the chrome overlay
+				// (top tool bar or bottom control bar), not only the ☰. A pointer still
+				// hovering a bar keeps that bar open — plain hover, leave to tuck.
 				closeMoreMenu();
+				printMenuOpen = false;
 				if (browser && document.activeElement instanceof HTMLElement) {
 					const el = document.activeElement;
-					if (el.closest?.('.annot-menu') || el.classList?.contains('annot-hamburger')) {
+					if (el.closest?.('.overlay') || el.closest?.('.annot-tools') || el.closest?.('.ctrl-bar')) {
 						el.blur();
 					}
 				}
@@ -585,9 +822,9 @@
 				keepChromeArmed();
 				return;
 			case 'display':
-				// Toggle FITTED ↔ SCALED @ 100% — the two modes the DISPLAY control offers first.
-				displayMode.update((m) => (m === 'FITTED' ? 'SCALED' : 'FITTED'));
-				keepChromeArmed();
+				// Open (toggle) the DISPLAY zoom menu — same control a click on FITTED (Z)
+				// opens — so ↑/↓ can walk the presets. Does not flip FITTED/SCALED by itself.
+				requestDisplayMenu();
 				return;
 			case 'present':
 				openPresenter();
@@ -1066,7 +1303,7 @@
 				class="annot-anchor"
 				title="PRESENT — open speaker console"
 				on:click={openPresenter}
-			>PRESENT (P)</button>
+			><span class="tool-mn">P</span>RESENT</button>
 		{/snippet}
 
 		<!-- ADJUST — the old ADJUST toggle, moved into the menu and renamed. A sub-toggle
@@ -1087,7 +1324,7 @@
 						? 'ADJUST — placing blocks by hand (click to stop)'
 						: 'ADJUST — drag and resize blocks at exact pixels'}
 					on:click={() => adjustMode.update((v) => !v)}
-				>ADJUST (J)</button>
+				>AD<span class="tool-mn">J</span>UST</button>
 				<!-- Save writes moved Blocks back to source via the vite-dev endpoint. Shown
 				     whenever ADJUST is on, and it fires in BOTH worlds — it isn't greyed out
 				     where it can't write. It answers on click instead: the verdict flashes as a
@@ -1243,7 +1480,6 @@
 					</svg>
 				</span>
 				<span class="tool-label"><span class="tool-mn">O</span>VERVIEW</span>
-				<kbd class="tool-kbd">O</kbd>
 			</button>
 		{/snippet}
 		<!-- SOURCE / EDIT — deck chrome in dev; ViewSource also offers them in builds. -->

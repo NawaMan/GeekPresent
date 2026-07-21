@@ -54,7 +54,22 @@ describe('SlideToolbar', () => {
 		const display = document.querySelector('.mode.inline');
 		expect(display).toBeTruthy();
 		// FITTED is the default label (no persisted mode in a cleared localStorage).
-		expect(display?.textContent).toContain('FITTED');
+		// Z is not in the word, so the trailing chip stays: "FITTED (Z)".
+		expect(display?.textContent).toContain('FITTED (Z)');
+	});
+
+	it('underlines in-word mnemonics and keeps chips only for Z/M', () => {
+		render(SlideToolbarHost);
+
+		const annotate = screen.getByLabelText('ANNOTATE off');
+		expect(annotate.textContent).toBe('ANNOTATE');
+		expect(annotate.querySelector('.tool-mn')?.textContent).toBe('A');
+		expect(annotate.textContent).not.toContain('(A)');
+
+		// ☰ has no M in the glyph — chip stays.
+		const more = screen.getByLabelText('More tools (M)');
+		expect(more.textContent).toContain('☰ (M)');
+		expect(more.querySelector('.tool-mn')).toBeNull();
 	});
 
 	it('pins the bar fully open and unpins back to auto-hide', async () => {
@@ -149,6 +164,21 @@ describe('SlideToolbar ☰ menu', () => {
 		await fireEvent.click(screen.getByText('OVERVIEW'));
 		await tick();
 		expect(isOpen()).toBe(false);
+	});
+
+	it('dismisses even when focus was inside the menu (focus-within would otherwise stick)', async () => {
+		render(SlideToolbarHost);
+		const burger = screen.getByLabelText('More tools (M)');
+		toggleMoreMenu();
+		await tick();
+		burger.focus();
+		expect(isOpen()).toBe(true);
+
+		// Latch closed — without the blur effect, :focus-within would keep the drop open.
+		await import('../src/lib/stores/chromeArm').then((m) => m.closeMoreMenu());
+		await tick();
+		expect(isOpen()).toBe(false);
+		expect(document.activeElement === burger).toBe(false);
 	});
 
 	it('keeps the bar seated while open, so the arm timeout cannot tuck it away', async () => {

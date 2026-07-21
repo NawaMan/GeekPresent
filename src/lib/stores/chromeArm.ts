@@ -29,6 +29,12 @@ export const moreMenuOpen = writable(false);
  */
 export const tocOpenRequest = writable(0);
 
+/**
+ * Bump to ask SizeMode to toggle its zoom menu (open state is local to SizeMode;
+ * this is the one-way request channel for the z mnemonic).
+ */
+export const displayMenuRequest = writable(0);
+
 let armTimer: ReturnType<typeof setTimeout> | undefined;
 
 /** How long bars stay raised after Alt+. or a mnemonic that re-arms (ms). */
@@ -79,5 +85,11 @@ export function keepChromeArmed(ms: number = CHROME_ARM_MS): void {
 /** Ask the TOC to open (and keep chrome raised). */
 export function requestTocOpen(): void {
 	tocOpenRequest.update((n) => n + 1);
+	armChrome();
+}
+
+/** Ask DISPLAY (SizeMode) to toggle its zoom menu (and keep chrome raised). */
+export function requestDisplayMenu(): void {
+	displayMenuRequest.update((n) => n + 1);
 	armChrome();
 }

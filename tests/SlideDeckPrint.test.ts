@@ -115,8 +115,8 @@ describe('SlideDeck — the PRINT menu', () => {
 	});
 	afterEach(() => vi.unstubAllGlobals());
 
-	// Match the tool, not its decorated label: the chrome appends a mnemonic key hint
-	// and a "▸" submenu marker (e.g. "PRINT ▸", "OVERVIEW O"), so find by prefix.
+	// Match the tool, not its decorated label: the chrome may underline a mnemonic
+	// letter and add a "▸" submenu marker (e.g. "PRINT ▸", "OVERVIEW"), so find by prefix.
 	const printButton = (root: ParentNode) =>
 		[...root.querySelectorAll('.annot-tool')].find(
 			(b) => b.textContent?.trim().startsWith('PRINT')

@@ -49,25 +49,40 @@
 		stopKiosk();
 	}
 
+	/**
+	 * Esc cancels, Enter starts/OK — even when focus is in a number field (the fields
+	 * are paces, not multi-line text). Must listen on `window` in capture: a div
+	 * on:keydown only fires when that node is focused, and the scrim never is.
+	 */
 	function onKey(e: KeyboardEvent) {
+		if (!$kioskDialogOpen) return;
 		if (e.key === 'Escape') {
 			e.preventDefault();
+			e.stopPropagation();
 			onCancel();
-		} else if (e.key === 'Enter' && !e.shiftKey) {
-			const t = e.target as HTMLElement | null;
-			if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+		} else if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
 			e.preventDefault();
+			e.stopPropagation();
 			onOk();
 		}
 	}
+
+	// Focus the panel when it opens so assistive tech lands on the dialog, and so
+	// a stray Tab starts inside it rather than behind the scrim.
+	let dialogEl: HTMLDivElement | undefined;
+	$: if (browser && $kioskDialogOpen && dialogEl) {
+		// tick-free: next microtask after the node exists
+		queueMicrotask(() => dialogEl?.focus());
+	}
 </script>
+
+<svelte:window on:keydown={onKey} />
 
 {#if browser && $kioskDialogOpen}
 	<!-- svelte-ignore a11y_no_static_element_interactions — backdrop dismiss -->
 	<div
 		class="kiosk-scrim no-print gp-chrome"
 		role="presentation"
-		on:keydown={onKey}
 		on:click|self={onCancel}
 	>
 		<div
@@ -76,6 +91,7 @@
 			aria-modal="true"
 			aria-labelledby="kiosk-dialog-title"
 			tabindex="-1"
+			bind:this={dialogEl}
 		>
 			<h2 id="kiosk-dialog-title">Kiosk / auto-advance</h2>
 			<p class="lead">

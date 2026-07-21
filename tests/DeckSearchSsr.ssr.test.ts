@@ -19,7 +19,10 @@ const docs = [{ path: 'a.html', title: 'Intro', text: 'SENTINEL-BODY-TEXT' }];
 describe('TOC search (SSR)', () => {
 	it('prerenders the TOC toggle', () => {
 		const { body } = render(TableOfContent, { props: { pages, deck: 'slides', docs } });
-		expect(body).toContain('Table of Contents');
+		// Mnemonic underlines the T, so the raw HTML splits the word; the visible
+		// label (tags stripped) is still "Table of Contents".
+		expect(body).toContain('chrome-mn');
+		expect(body.replace(/<[^>]+>/g, '')).toContain('Table of Contents');
 	});
 
 	it('does NOT prerender the search box (menu is closed on the server)', () => {

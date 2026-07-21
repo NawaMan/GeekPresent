@@ -412,7 +412,10 @@ than misleading the next agent.
   unscaled `/_source-edit` popup. A mounted ViewSource still supplies `?raw` bytes and works on
   a static host. EDIT opens `/_source-edit` for typing (Monaco's caret drifts under the canvas
   CSS scale); **SAVE** / **REFRESH** / **CLOSE** as before — SAVE is NOT ALLOWED on a static
-  host. On a Text (no tool bar) ViewSource keeps the classic corner `</> Source` button)
+  host. In the edit window: **Ctrl/Cmd+S** SAVE, **Ctrl/Cmd+Shift+R** REFRESH, **Esc** CLOSE
+  (dirty confirm); **Alt+.** arms **r**/**s**/**c** (one letter ends arm mode; Alt+. again
+  cancels). Capture-phase so Monaco cannot swallow Esc. On a Text (no tool bar) ViewSource
+  keeps the classic corner `</> Source` button)
   and `SourceView` (the same control, Shiki instead of Monaco for the in-slide panel — use it
   on any slide reached by a CLIENT-SIDE navigation, i.e. a View-Transition deck or an appendix
   with `transition`, because Monaco's CDN loader renders blank after a `goto`; EDIT still opens
@@ -911,12 +914,25 @@ stay out of the audience's way. A speaker who is actively using one often wants 
   **on**) drop the top authoring cluster or the bottom TOC/pager for a bare canvas. Independent
   of PIN. Hidden either way under `?clean` / `?present`.
 - **Alt+. (⌥. on macOS) raises both bars for keyboard.** Temporary arm (~5s, amber halo) — not
-  a pin. While armed: **a** ANNOTATE, **j** ADJUST, **z** zoom/display, **p** PRESENT, **m** ☰,
-  **t** TOC. Labels show the key at the end (`PRESENT (P)`, `FITTED (Z)`, `☰ (M)`, …). Esc
-  disarms and closes ☰. Letter mnemonics do not fire while typing in a field. Pure core:
-  `chrome/chromeArmCore.ts`.
-- **☰ menu groups.** Navigate (OVERVIEW **O**, KIOSK) · export (CAPTURE, PRINT with nested flyout
-  **cCwWtT**) · source (SOURCE, EDIT). PRINT opens on hover to the left of the row.
+  a pin. While armed: **a** ANNOTATE, **j** ADJUST, **z** open DISPLAY zoom menu, **p** PRESENT,
+  **m** ☰, **t** TOC. When the letter lives in the word it is underlined (`PRESENT`, `ANNOTATE`,
+  `ADJUST`, Table of Contents); when it does not, a trailing chip remains (`FITTED (Z)`,
+  `☰ (M)`). **z** opens (toggles) the zoom menu — ↑/↓ / Home/End walk the presets, **c** jumps
+  to the CUSTOM % field, Enter applies, Esc closes — it does **not** flip FITTED/SCALED by itself.
+  Esc also disarms chrome and closes ☰. Letter mnemonics do not fire while typing in a field.
+  Pure core: `chrome/chromeArmCore.ts` + `chrome/sizeModeCore.ts` + `chrome/chromeToolbarNavCore.ts`
+  + `chrome/mnemonicCore.ts` (+ `source/sourceEditKeyCore.ts` for the EDIT window).
+- **Arrow roving while chrome is up.** ←/→ walk the top bar (PIN · PRESENT · ANNOTATE · … · ☰);
+  ↓ on ☰ opens the drop and focuses the first row; ↑/↓ walk ☰ rows (↑ off the first returns to
+  ☰); → on PRINT opens its flyout; ← leaves a flyout or drop back toward the bar. Enter activates
+  the focused control. Yields to the DISPLAY zoom menu while that menu is open. Prevents deck
+  paging from stealing the arrows.
+- **☰ menu groups.** Navigate (OVERVIEW **O**, KIOSK **K**) · export (CAPTURE **C**, PRINT **R**
+  with nested flyout **cCwWtT**) · source (SOURCE **S**, EDIT **E**). After **m** opens the drop
+  (or while chrome is armed), those letters activate the row. Picking a row (or a PRINT
+  destination) closes ☰; focus inside the menu is blurred so CSS `:focus-within` cannot stick it
+  open. PRINT opens on hover or **r**, then the flyout's own keys take over (Esc closes only the
+  flyout). **Kiosk** dialog: **Enter** starts/OK, **Esc** cancels (window-level, works from fields).
 - **Not the same as `fadeChrome`.** `fadeChrome` ghosts `.gp-chrome` opacity until pointed at;
   PIN is the tuck/untuck of the two window-edge bars. They compose: a pinned bar is fully seated
   even when fade would otherwise dim other chrome.
@@ -929,8 +945,9 @@ stay out of the audience's way. A speaker who is actively using one often wants 
 One prop, and a **CAPTURE** entry appears in the top-centre tool bar's **hamburger (☰) menu** —
 hover the ☰ at the bar's right end for OVERVIEW / CAPTURE / PRINT / SOURCE / EDIT (grouped with
 separators). It downloads the current slide as a PNG. (The bar itself is
-`📌 │ PRESENT (P) │ ANNOTATE (A) │ ADJUST (J) │ FITTED (Z) │ ☰ (M)`: pin and mode toggles sit in
-the open; navigation/output/source tools live behind the hamburger.) **PRINT** opens a nested
+`📌 │ PRESENT │ ANNOTATE │ ADJUST │ FITTED (Z) │ ☰ (M)`: pin and mode toggles sit in
+the open (mnemonic letter underlined in-word when it fits; `(Z)` / `(M)` only when it does not);
+navigation/output/source tools live behind the hamburger.) **PRINT** opens a nested
 flyout on hover — Current slide / + notes, Whole deck / + notes, Thumbnail grid / Notes grid
 (mnemonics **cCwWtT**). CAPTURE only appears when the deck offers it (`capture`); the whole bar is
 hidden under `?clean` / `?present`.

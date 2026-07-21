@@ -32,6 +32,14 @@ async function open(pages: Array<Page>) {
 }
 
 describe('TableOfContent', () => {
+	it('underlines the T mnemonic and does not append (T)', () => {
+		render(TableOfContent, { props: { pages: deck } });
+		const toggle = screen.getByRole('button', { name: /Table of Contents/i });
+		expect(toggle.getAttribute('aria-label')).toBe('Table of Contents');
+		expect(toggle.querySelector('.chrome-mn')?.textContent).toBe('T');
+		expect(toggle.textContent).not.toContain('(T)');
+	});
+
 	it('lists the deck, and omits a hidden appendix', async () => {
 		await open(deck);
 
