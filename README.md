@@ -437,6 +437,7 @@ The nav bar (FIRST / PREV / NEXT / LAST), the **Table of Contents**, and the **O
 | Alt+. (⌥. on Mac) | Raise both chrome bars briefly for letter mnemonics |
 | a / j / z / p / m / t | While bars raised: ANNOTATE / ADJUST / open zoom menu / PRESENT / ☰ / TOC (underlined in the label when the letter fits; else a trailing chip). Zoom menu: ↑/↓, **c** → custom %, Enter |
 | o / k / c / r / s / e | While bars raised or ☰ open: OVERVIEW / KIOSK / CAPTURE / PRINT / SOURCE / EDIT (PRINT is **r**; then flyout **cCwWtT**) |
+| ← / → / ↑ / ↓ (chrome up) | Rove focus on the tool bar and ☰ rows (↓ opens ☰ from the hamburger; Enter activates) |
 | Escape      | Close Overview / ToC / Box / ☰ / Kiosk dialog; disarm chrome raise |
 | Enter (Kiosk dialog) | Start / OK |
 | (in EDIT window) Ctrl+S / Ctrl+Shift+R / Esc | SAVE / REFRESH / CLOSE; Alt+. then r/s/c same (one-shot arm) |

@@ -73,6 +73,31 @@ describe('SlideDeck — a stuck PRINT flyout does not eat the keyboard', () => {
 	});
 });
 
+describe('SlideDeck chrome bars — Esc after Alt+.', () => {
+	it('blurs top-bar focus so both bars tuck (not only the bottom one)', async () => {
+		// Alt+. focuses the first top-bar control for arrow roving. Esc used to clear
+		// `chromeArmed` but leave that focus in place — CSS `:focus-within` kept the TOP
+		// bar seated while the bottom bar (no focus) tucked. Both must go away.
+		const root = await mount();
+		await fireEvent.keyDown(window, { key: '.', code: 'Period', altKey: true });
+		await tick();
+		await tick();
+		expect(get(chromeArmed)).toBe(true);
+
+		const tools = root.querySelector('.annot-tools');
+		const first = tools?.querySelector('button') as HTMLElement | null;
+		// Simulate the arm microtask having focused a top-bar control.
+		first?.focus();
+		expect(tools?.contains(document.activeElement as Node)).toBe(true);
+
+		await fireEvent.keyDown(window, { key: 'Escape' });
+		await tick();
+		expect(get(chromeArmed)).toBe(false);
+		expect(tools?.contains(document.activeElement as Node)).toBe(false);
+		expect(get(moreMenuOpen)).toBe(false);
+	});
+});
+
 describe('SlideDeck chrome bars — opt-out', () => {
 	it('shows both bars by default', async () => {
 		const root = await mount();

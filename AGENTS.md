@@ -920,7 +920,13 @@ stay out of the audience's way. A speaker who is actively using one often wants 
   `☰ (M)`). **z** opens (toggles) the zoom menu — ↑/↓ / Home/End walk the presets, **c** jumps
   to the CUSTOM % field, Enter applies, Esc closes — it does **not** flip FITTED/SCALED by itself.
   Esc also disarms chrome and closes ☰. Letter mnemonics do not fire while typing in a field.
-  Pure core: `chrome/chromeArmCore.ts` + `chrome/sizeModeCore.ts`.
+  Pure core: `chrome/chromeArmCore.ts` + `chrome/sizeModeCore.ts` + `chrome/chromeToolbarNavCore.ts`
+  + `chrome/mnemonicCore.ts` (+ `source/sourceEditKeyCore.ts` for the EDIT window).
+- **Arrow roving while chrome is up.** ←/→ walk the top bar (PIN · PRESENT · ANNOTATE · … · ☰);
+  ↓ on ☰ opens the drop and focuses the first row; ↑/↓ walk ☰ rows (↑ off the first returns to
+  ☰); → on PRINT opens its flyout; ← leaves a flyout or drop back toward the bar. Enter activates
+  the focused control. Yields to the DISPLAY zoom menu while that menu is open. Prevents deck
+  paging from stealing the arrows.
 - **☰ menu groups.** Navigate (OVERVIEW **O**, KIOSK **K**) · export (CAPTURE **C**, PRINT **R**
   with nested flyout **cCwWtT**) · source (SOURCE **S**, EDIT **E**). After **m** opens the drop
   (or while chrome is armed), those letters activate the row. Picking a row (or a PRINT
