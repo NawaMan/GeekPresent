@@ -1311,7 +1311,9 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     ADJUST and drag either button to watch the flight re-route live.
   - **Extended: chained scripts (`warpTo`/`moveTo`/`around`) and note-triggered playback
     (`startOn`).** `script` composes commands instead of an evenly-timed `path` — an instant cut,
-    a there-and-back bounce repeated `times` times, an orbit of `times` laps around a centre (a
+    a direct one-way move whose `times` (default 1) counts ALTERNATING legs — 2 is a
+    there-and-back "shake" ending where it started, 3 goes-back-goes ending at the target again
+    — an orbit of `times` laps around a centre (a
     Block name works there too). None of it needed a new `PathShape`: CSS `animation-iteration-
     count`/`direction` can't loop just one leg of a chain and continue to the next, so every
     repeat/bounce/lap is baked directly into the generated stop list by a new pure
@@ -1353,7 +1355,8 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     entirely — the plain `opacity: 0` base rule already covers both the "before" and "after"
     resting state correctly on its own.
   - Tests: `cursorScriptCore.test.ts` (single-command static pose, warpTo's instant cut,
-    moveTo's bounce-and-return with the position it hands to the NEXT command, around's entry
+    moveTo's default one-way arrival vs. its opt-in alternating-leg shake (and which position it
+    hands to the NEXT command depending on leg parity), around's entry
     angle and per-lap ripples, degenerate rx/ry, full NaN-safety); `presenter.test.ts`'s new
     "trigger pulse channel" describe (distinct key, empty name is a no-op, re-checking re-fires,
     malformed payloads ignored); `tests/NoteTrigger.test.ts` + `NoteTriggerHost.svelte` (fires on
@@ -1364,7 +1367,7 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     unrelated triggers ignored, matching trigger plays, replay is a new element not a resume).
     Demo: `src/routes/animation/cursor-script.html/` — a cursor idles until a button (or, in the
     presenter console, a checked note line) fires `startOn="fly"`, then warps to a rest point,
-    bounces on a Menu button twice, and orbits a dial once with a click.
+    moves directly to one point, shakes at a second, and orbits a dial once with a click.
 
 - [x] **`Terminal`** — fake console: typed command + output, riding the `AnimationBar` keyframe clock.
   - Done: `src/lib/components/Terminal.svelte`, with the schedule in

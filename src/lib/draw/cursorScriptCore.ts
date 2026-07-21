@@ -17,10 +17,14 @@
 //     `path`.
 //   - warpTo(at): an instant cut — two stops ~WARP_SECONDS apart, so the
 //     browser has no time to interpolate. Becomes the new "current" point.
-//   - moveTo(at, {times, period}): THERE-AND-BACK, `times` full round trips
-//     of `period` seconds each. Ends back where it started — "current"
-//     is unchanged, so a moveTo is a pure emphasis gesture that never
-//     moves the flight's actual position.
+//   - moveTo(at, {times, period}): `times` ONE-WAY LEGS, alternating
+//     direction, starting toward `at` — leg 1 arrives at `at`, leg 2
+//     returns to wherever the command started, leg 3 arrives again, and so
+//     on. times=1 (the default) is therefore a single direct arrival, NOT
+//     a round trip — "current" becomes `at`. times=2 is exactly one
+//     there-and-back "shake", ending back where the command started, so
+//     "current" is unchanged. Odd `times` ends at `at`; even `times` ends
+//     at the start — pick accordingly when chaining what comes next.
 //   - around(at, rx, ry, {times, period}): `at` is the ORBIT CENTRE.
 //     Entry angle is computed from the CURRENT point relative to the
 //     centre (so entering the loop is a natural swoop onto the ring, not
@@ -49,9 +53,10 @@ export interface CursorWarpCommand extends CommandCommon {
 export interface CursorMoveCommand extends CommandCommon {
 	kind: 'moveTo';
 	at: CursorAt;
-	/** Round trips to make. Default 1. */
+	/** One-way legs, alternating toward/away from `at`. Default 1 — a
+	 *  single direct arrival, no return. */
 	times?: number;
-	/** Seconds per round trip. Default 3. */
+	/** Seconds per leg. Default 3. */
 	period?: number;
 }
 
@@ -126,15 +131,22 @@ export function compileScript(commands: ResolvedCursorCommand[], size: number): 
 			const to = safePoint(cmd.at);
 			const times = Math.max(1, Math.round(finite(cmd.times, 1)));
 			const period = Math.max(0, finite(cmd.period, 3));
-			const half = period / 2;
-			const home = pos; // a bounce always returns HERE — "current" never moves.
-			for (let k = 0; k < times; k++) {
-				t += half;
-				frames.push({ t, x: to[0], y: to[1] });
-				if (cmd.click) ripples.push({ x: to[0], y: to[1], delaySec: t });
-				t += half;
-				frames.push({ t, x: home[0], y: home[1] });
+			const home = pos; // where this command departs FROM
+			// `times` counts LEGS, alternating direction, starting toward the
+			// target: leg 1 arrives at `at`, leg 2 returns to `home`, leg 3
+			// arrives at `at` again, and so on. times=1 (the default) is
+			// therefore a single one-way arrival — NOT a round trip; times=2
+			// is exactly one there-and-back "shake", ending back at `home`.
+			for (let leg = 1; leg <= times; leg++) {
+				const toTarget = leg % 2 === 1;
+				const dest = toTarget ? to : home;
+				t += period;
+				frames.push({ t, x: dest[0], y: dest[1] });
+				if (cmd.click && toTarget) ripples.push({ x: to[0], y: to[1], delaySec: t });
 			}
+			// Odd leg count ends AT the target (so a chain naturally continues
+			// from there); even leg count ends back at `home` (a pure shake).
+			pos = times % 2 === 1 ? to : home;
 		} else {
 			// around: entry angle from the CURRENT point relative to the centre,
 			// so the loop is entered smoothly rather than snapping to angle 0.

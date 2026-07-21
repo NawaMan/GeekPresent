@@ -38,45 +38,67 @@ describe('compileScript — warpTo', () => {
 	});
 });
 
-describe('compileScript — moveTo (there-and-back)', () => {
-	it('bounces to the target and back, ending where it started', () => {
+describe('compileScript — moveTo (one-way legs, alternating)', () => {
+	it('times=1 (the default) is a single direct arrival — no return', () => {
 		const cmds: ResolvedCursorCommand[] = [
 			{ kind: 'warpTo', at: [100, 100], click: false },
 			{ kind: 'moveTo', at: [300, 100], times: 1, period: 2, click: true }
 		];
 		const r = compileScript(cmds, 40);
 		expect(r.totalSeconds).toBe(2);
-		// start (0%) → out (50%, the target) → back (100%, home again).
-		expect(r.stops.map((s) => s.pct)).toEqual([0, 50, 100]);
+		expect(r.stops.map((s) => s.pct)).toEqual([0, 100]);
 		expect(r.stops[0]).toMatchObject({ x: 80, y: 80 });
-		expect(r.stops[1]).toMatchObject({ x: 280, y: 80 });
-		expect(r.stops[2]).toMatchObject({ x: 80, y: 80 }); // back home
-		expect(r.ripples).toEqual([{ x: 300, y: 100, delaySec: 1 }]);
+		expect(r.stops[1]).toMatchObject({ x: 280, y: 80 }); // arrives, stays
+		expect(r.ripples).toEqual([{ x: 300, y: 100, delaySec: 2 }]);
 	});
 
-	it('repeats `times` round trips, one ripple per outward arrival', () => {
+	it('times=2 is one there-and-back shake, ending back where it started', () => {
+		const cmds: ResolvedCursorCommand[] = [
+			{ kind: 'warpTo', at: [0, 0], click: false },
+			{ kind: 'moveTo', at: [100, 0], times: 2, period: 2, click: true }
+		];
+		const r = compileScript(cmds, 20);
+		expect(r.totalSeconds).toBe(4); // 2 legs × 2s
+		expect(r.stops.map((s) => s.pct)).toEqual([0, 50, 100]);
+		expect(r.stops[1]).toMatchObject({ x: 90, y: -10 }); // leg 1: arrives
+		expect(r.stops[2]).toMatchObject({ x: -10, y: -10 }); // leg 2: back home
+		// Only ONE arrival at the target — the return leg isn't a "click".
+		expect(r.ripples).toEqual([{ x: 100, y: 0, delaySec: 2 }]);
+	});
+
+	it('times=3 alternates to/from/to, ending at the target with two ripples', () => {
 		const cmds: ResolvedCursorCommand[] = [
 			{ kind: 'warpTo', at: [0, 0], click: false },
 			{ kind: 'moveTo', at: [100, 0], times: 3, period: 2, click: true }
 		];
 		const r = compileScript(cmds, 20);
-		expect(r.totalSeconds).toBe(6); // 3 round trips × 2s
-		expect(r.ripples).toHaveLength(3);
-		expect(r.ripples.map((p) => p.delaySec)).toEqual([1, 3, 5]);
-		// A command after the bounce would resume from [0, 0] — "current" never moved.
+		expect(r.totalSeconds).toBe(6); // 3 legs × 2s
+		expect(r.stops.map((s) => s.pct)).toEqual([0, 33.33, 66.67, 100]);
+		expect(r.stops[r.stops.length - 1]).toMatchObject({ x: 90, y: -10 }); // ends AT the target
+		expect(r.ripples).toHaveLength(2); // legs 1 and 3 — the two arrivals
+		expect(r.ripples.map((p) => p.delaySec)).toEqual([2, 6]);
 	});
 
-	it('a subsequent command continues from the pre-bounce position, not the target', () => {
+	it('an ODD leg count hands the target off as "current" to what comes next', () => {
 		const cmds: ResolvedCursorCommand[] = [
 			{ kind: 'warpTo', at: [0, 0], click: false },
-			{ kind: 'moveTo', at: [900, 900], times: 1, period: 1, click: false },
-			{ kind: 'warpTo', at: [50, 50], click: false }
+			{ kind: 'moveTo', at: [100, 0], times: 1, period: 1, click: false }, // odd → current = [100,0]
+			{ kind: 'moveTo', at: [500, 500], times: 2, period: 1, click: false } // its "home" reveals current
 		];
 		const r = compileScript(cmds, 20);
-		// The final warpTo departs from [0,0] (home after the bounce), so its
-		// pre-warp pose is still [0,0], not [900,900].
-		const secondToLast = r.stops[r.stops.length - 2];
-		expect(secondToLast).toMatchObject({ x: -10, y: -10 }); // [0,0] − 20/2
+		const last = r.stops[r.stops.length - 1]; // leg 2 of the 2nd moveTo returns "home"
+		expect(last).toMatchObject({ x: 90, y: -10 }); // [100,0] − 10, not [0,0]
+	});
+
+	it('an EVEN leg count hands "home" (unchanged) off to what comes next', () => {
+		const cmds: ResolvedCursorCommand[] = [
+			{ kind: 'warpTo', at: [0, 0], click: false },
+			{ kind: 'moveTo', at: [100, 0], times: 2, period: 1, click: false }, // even → current = [0,0]
+			{ kind: 'moveTo', at: [500, 500], times: 2, period: 1, click: false }
+		];
+		const r = compileScript(cmds, 20);
+		const last = r.stops[r.stops.length - 1];
+		expect(last).toMatchObject({ x: -10, y: -10 }); // still [0,0] − 10
 	});
 });
 

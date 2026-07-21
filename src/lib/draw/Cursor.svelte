@@ -35,9 +35,10 @@
 
   CHAINING (`script`): a list of warpTo/moveTo/around commands instead of an
   evenly-timed waypoint list — see cursorScriptCore.ts for the full contract
-  (there-and-back bounces, orbit laps, an instant warp). It compiles to the
-  SAME generated `stops`, so it rides the same locked Sprite; `around` needs
-  no new Draw PathShape because the ellipse is sampled into literal stops by
+  (a direct one-way move by default, an opt-in there-and-back shake at
+  `times` ≥ 2, orbit laps, an instant warp). It compiles to the SAME
+  generated `stops`, so it rides the same locked Sprite; `around` needs no
+  new Draw PathShape because the ellipse is sampled into literal stops by
   the compiler, not ridden as a shape.
 
   STARTING FROM A NOTE (`startOn`): a checked `<Note data-trigger="name">`

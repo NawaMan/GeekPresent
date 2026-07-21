@@ -32,12 +32,15 @@
 <ContentPage
 	title="Cursor — Scripts &amp; Note Triggers"
 	subtitle="chained warpTo/moveTo/around, started by a checked speaker note"
+	style="font-size: 0.9em"
 >
 	<div style="line-height: 1.5em;">
 		<p>
 			<code>script</code> chains commands instead of an evenly-timed
 			<code>path</code>: <Label>warpTo</Label> cuts instantly, <Label>moveTo</Label>
-			bounces there-and-back <code>times</code> times (an emphasis shake), and
+			moves there directly by default (<code>times: 1</code>) — set <code>times: 2</code>
+			for a there-and-back "shake" instead, alternating with every further
+			<code>times</code> and landing back where it started on an EVEN count — and
 			<Label>around</Label> orbits a centre — a Block name works there too —
 			for <code>times</code> laps. Every repeat is baked into ONE generated
 			flight, so it still rides the plain locked <code>Sprite</code> underneath.
@@ -71,16 +74,18 @@
 
 <!-- The stage: a bounce target and an orbit centre. Ordinary Blocks — the
      script only knows them by name. -->
-<Block name="menu-btn" x={520} y={860} width={220} height={90} grid={10}>
+<Block name="menu-btn" x={1110} y={830} width={220} height={90} grid={10}>
 	<div class="btn">Menu</div>
 </Block>
-<Block name="dial" x={1180} y={780} width={200} height={200} grid={10}>
+<Block name="dial" x={1480} y={760} width={200} height={200} grid={10}>
 	<div class="dial">◎</div>
 </Block>
 
-<button class="fire" style="left: 520px; top: 980px;" on:click={() => fireTrigger('fly')}>
-	Fire trigger →
-</button>
+<Block name="fire-btn" x={1110} y={960} width={220} height={60} grid={10}>
+	<button class="fire" on:click={() => fireTrigger('fly')}>
+		Fire trigger →
+	</button>
+</Block>
 
 <Draw
 	title="A pointer that waits, then bounces and orbits on cue"
@@ -90,8 +95,9 @@
 	<Cursor
 		startOn="fly"
 		script={[
-			{ kind: 'warpTo', at: [860, 500] },
-			{ kind: 'moveTo', at: 'menu-btn', times: 2, period: 0.8 },
+			{ kind: 'warpTo', at: [860,  500] },
+			{ kind: 'moveTo', at: [1110, 830], period: 0.8 },
+			{ kind: 'moveTo', at: [1330, 830], times: 2, period: 0.8 },
 			{ kind: 'around', at: 'dial', rx: 90, ry: 90, times: 1, period: 1.8, click: true }
 		]}
 	/>
@@ -146,6 +152,7 @@
 		background: color-mix(in srgb, #f0a33e 22%, transparent);
 		color: #c0f1ff;
 		cursor: pointer;
+		width: 100%;
 	}
 	.fire:hover {
 		background: color-mix(in srgb, #f0a33e 34%, transparent);
