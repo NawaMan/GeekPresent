@@ -282,8 +282,16 @@ git worktree list                     # confirm it is gone
 `--force` on either command silently discards work. If git refuses, that refusal is the point:
 stop and tell the user what is unmerged or uncommitted, and let them decide.
 
-**If you started a booth, say so and leave it running** unless asked to stop it. Once two booths
-share a folder it is no longer obvious which is yours — and Rule 6 says never kill the user's dev.
+**A dev server you started only to verify your OWN change is yours to tear down — stop it when the
+check is done** (`./booth stop --name <booth>`), don't leave it running for the user to clean up.
+That is the common case: you spun up `./dev-run.sh` to eyeball a slide or watch a behaviour, and
+once you (or the user) have confirmed it, the task no longer needs it. This is different from a dev
+server the user asked you to run *for them* — say so and **leave that one up**, with its URL. Either
+way, **never stop a booth you did not start**: once two share a folder it is no longer obvious which
+is yours, and Rule 6 says never kill the user's dev. When in doubt which it is, ask before stopping.
+
+Persistent non-dev booths (`--keep-alive` / `--daemon`, the ones that pile up) still follow the
+default above: **say so and leave them running** unless asked to stop them.
 
 ### Already in a worktree → stay on the feature branch
 
@@ -604,7 +612,10 @@ are load-bearing when you touch anything nearby:
    and **never** kill someone else's booth or their running dev. Vite is always container
    `:5173`; the host port is the booth's control port **+173** (stock `http://localhost:31173/…`,
    or `<port>+173` if you started it with `--port`). Confirm with `./booth list` and tell the user
-   the full URL. Tests and static builds also go
+   the full URL. **A server you started only to verify your own change is transient — stop it when
+   the check is done** (`./booth stop --name <booth>`; see *Cleaning up after a session*), rather
+   than leaving it for the user; leave it up only when they asked for a server to use themselves.
+   Tests and static builds also go
    **only** through the booth (`./booth exec --run -- pnpm test`, `./booth exec --run -- pnpm build`
    / `./build-static.sh …`) — not host `pnpm`. **Worktrees work** (CodingBooth ≥ 0.63.0): run the
    same command from the worktree, no flags — it gets its own booth and its own ports automatically
