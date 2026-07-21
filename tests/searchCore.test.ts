@@ -105,6 +105,61 @@ describe('searchDocs', () => {
 		expect(bodyHit.snippet).toContain('backpressure');
 	});
 
+	// Slides are named for what they are, and the name is often what you remember
+	// — "the guard slide" rather than any word printed on it.
+	it('matches the file name, and shows it as the reason', () => {
+		const named = [{ path: 'adjust-styles-guard.html', title: 'Keeping Edits Honest', text: 'nothing here' }];
+		const hit = searchDocs(named, 'guard')[0];
+		expect(hit.path).toBe('adjust-styles-guard.html');
+		expect(hit.where).toBe('path');
+		expect(hit.snippet).toBe('adjust-styles-guard.html');
+	});
+
+	// Every slide's path ends in `.html`, so matching the extension would make
+	// "html" — and every prefix of it — return the entire deck.
+	it('does not let the .html extension match', () => {
+		expect(searchDocs(docs, 'html')).toEqual([]);
+	});
+
+	it('matches a 1-based page number, as a substring of its digits', () => {
+		const numbered = [
+			{ path: 'a.html', title: 'Intro', text: 'x', number: 1 },
+			{ path: 'b.html', title: 'Backpressure', text: 'x', number: 12 },
+			{ path: 'c.html', title: 'Wrap Up', text: 'x', number: 21 }
+		];
+		// "1" is a substring of "1", "12" and "21" alike.
+		expect(searchDocs(numbered, '1').map((h) => h.path)).toEqual(['a.html', 'b.html', 'c.html']);
+		const hit = searchDocs(numbered, '12')[0];
+		expect(hit.path).toBe('b.html');
+		expect(hit.where).toBe('number');
+		expect(hit.snippet).toBe('#12');
+		expect(hit.number).toBe(12);
+	});
+
+	it('a doc with no number cannot match numerically', () => {
+		const noNumber = [{ path: 'a.html', title: 'Intro', text: 'x' }];
+		expect(searchDocs(noNumber, '1')).toEqual([]);
+	});
+
+	it('prefers a title match, then a file-name match, then a number, then the body', () => {
+		const mixed = [
+			{ path: 'intro.html', title: 'Intro', text: 'no', number: 9 },
+			{ path: 'guard.html', title: 'Honest Edits', text: 'guard rails everywhere', number: 9 },
+			{ path: 'x.html', title: 'Nine Lives', text: 'no digits win here', number: 9 }
+		];
+		expect(searchDocs(mixed, 'intro')[0].where).toBe('title');
+		expect(searchDocs(mixed, 'guard')[0].where).toBe('path');
+		// "9" is not in any title or file name here, so it falls to the number match.
+		expect(searchDocs(mixed, '9').map((h) => h.where)).toEqual(['number', 'number', 'number']);
+	});
+
+	// The number rides along on a hit even when something ELSE is what matched —
+	// so a result row can show its position regardless of why it matched.
+	it('carries the page number on every hit, not just number-where ones', () => {
+		const numbered = [{ path: 'b.html', title: 'Backpressure Deep Dive', text: 'x', number: 3 }];
+		expect(searchDocs(numbered, 'deep dive')[0].number).toBe(3);
+	});
+
 	it('marks a title match as such and gives it no snippet', () => {
 		const hit = searchDocs(docs, 'deep dive')[0];
 		expect(hit.path).toBe('b.html');

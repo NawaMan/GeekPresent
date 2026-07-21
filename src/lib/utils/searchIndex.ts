@@ -24,11 +24,15 @@ export function slideText(deck: string, path: string): string {
 }
 
 /** Pair a deck's `pages` with their indexed body text, ready for searchDocs.
-    Titles come from pages.ts (what the TOC shows); text comes from the index. */
+    Titles come from pages.ts (what the TOC shows); text comes from the index;
+    `number` is the 1-based position in the array as PASSED — a caller filters
+    first (e.g. `visiblePages`) if hidden appendices should not get a number, or
+    passes the raw list to number by the same reckoning it renders. */
 export function deckSearchDocs(deck: string, pages: Array<Page>): SearchDoc[] {
-	return (pages ?? []).map((p) => ({
+	return (pages ?? []).map((p, i) => ({
 		path: p.path,
 		title: p.title,
-		text: slideText(deck, p.path)
+		text: slideText(deck, p.path),
+		number: i + 1
 	}));
 }

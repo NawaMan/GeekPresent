@@ -27,6 +27,11 @@
 // NOTHING. So a blind Space can never skip past an unfinished build (the "no skip-
 // past" the arrows deliberately don't promise): it defers to the build every time.
 //
+// Once the TOC jump menu is open, ↑/↓/Enter browse it (tocDown/tocUp/tocSelect) —
+// the console's own twin of an audience TOC's arrow browsing, so the menu is not
+// mouse-only. The menu's own search box claims those keys itself once focused
+// (stopPropagation); this is the fallback for browsing without the caret there.
+//
 // Total: garbage input → 'ignore', never throws.
 
 import { isChromeTypingTarget } from './chromeArmCore';
@@ -40,6 +45,9 @@ export type PresenterKeyIntent =
 	| 'next'
 	| 'prev'
 	| 'continue'
+	| 'tocUp'
+	| 'tocDown'
+	| 'tocSelect'
 	| 'ignore';
 
 /**
@@ -48,10 +56,15 @@ export type PresenterKeyIntent =
  * @param inkOffered  is the ink-reset control shown at all? (`$canAnnotate` in the
  *   view) — when the pen was never offered, A is inert rather than toggling a menu
  *   that isn't there.
+ * @param tocOpen  is the TOC jump menu currently open? While it is, ↑/↓/Enter walk
+ *   its rows instead of doing nothing — the fallback for browsing it without the
+ *   caret in its search box, which claims those keys itself (stopPropagation)
+ *   once focused.
  */
 export function presenterKeyIntent(
 	e: KeyboardEvent,
-	inkOffered: boolean = false
+	inkOffered: boolean = false,
+	tocOpen: boolean = false
 ): PresenterKeyIntent {
 	const k = (e?.key ?? '').toLowerCase();
 
@@ -66,6 +79,14 @@ export function presenterKeyIntent(
 	// (Shift is NOT a chord here — Shift+Space is a real console gesture.)
 	if (e.ctrlKey || e.metaKey || e.altKey) return 'ignore';
 	if (e.defaultPrevented) return 'ignore';
+
+	// TOC browsing takes ↑/↓/Enter before anything else claims them, but only
+	// while the menu is actually open — a closed menu has no rows to walk.
+	if (tocOpen) {
+		if (k === 'arrowdown') return 'tocDown';
+		if (k === 'arrowup') return 'tocUp';
+		if (k === 'enter') return 'tocSelect';
+	}
 
 	// Paging. Space defers to the build via a CONTINUE relay ('continue'); Shift+Space
 	// walks the deck back; the arrows page outright, never stepping (stepKeys' rule).
