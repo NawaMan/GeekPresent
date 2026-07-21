@@ -12,6 +12,7 @@ const reload = (initial: number, codec: Codec<number> = numberCodec()) =>
 
 beforeEach(() => {
 	localStorage.clear();
+	sessionStorage.clear();
 });
 
 afterEach(() => {
@@ -123,6 +124,30 @@ describe('persisted — the other tab', () => {
 		const count = persisted(KEY, 0, { codec: numberCodec(), sync: false });
 		storageEvent(KEY, '12');
 		expect(get(count)).toBe(0);
+	});
+});
+
+describe('persisted — session storage', () => {
+	const sessionReload = (initial: number) =>
+		persisted<number>(KEY, initial, { codec: numberCodec(), storage: 'session', sync: false });
+
+	it('writes to sessionStorage, not localStorage', () => {
+		const count = persisted(KEY, 0, {
+			codec: numberCodec(),
+			storage: 'session',
+			sync: false
+		});
+		count.set(7);
+		expect(sessionStorage.getItem(KEY)).toBe('7');
+		expect(localStorage.getItem(KEY)).toBeNull();
+		expect(get(sessionReload(0))).toBe(7);
+	});
+
+	it('does not adopt a localStorage value under the same key', () => {
+		// The kiosk bug: wantsRun lived in localStorage, so a past Start resurrected
+		// the runner on every later visit. Session stores must ignore that ghost.
+		localStorage.setItem(KEY, '1');
+		expect(get(sessionReload(0))).toBe(0);
 	});
 });
 

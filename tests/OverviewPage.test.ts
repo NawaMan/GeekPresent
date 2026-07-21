@@ -131,6 +131,129 @@ describe('OverviewPage — opening it', () => {
 	});
 });
 
+describe('OverviewPage — filter box', () => {
+	const searchBox = () =>
+		screen.getByRole('searchbox', {
+			name: /Filter overview by title, file name, or page number/i
+		}) as HTMLInputElement;
+
+	it('filters tiles by title without renumbering', async () => {
+		stubObserver();
+		render(OverviewPageHost);
+		await openGrid();
+
+		await fireEvent.input(searchBox(), { target: { value: 'out' } });
+		await tick();
+
+		expect([...document.querySelectorAll('.tile .name')].map((n) => n.textContent)).toEqual([
+			'Outro'
+		]);
+		// Deck number stays 3 — filter does not renumber the visible set.
+		expect([...document.querySelectorAll('.tile .num')].map((n) => n.textContent)).toEqual([
+			'3'
+		]);
+		expect(screen.getByText('1 of 3')).toBeTruthy();
+	});
+
+	it('filters by file name and by page number as a string', async () => {
+		stubObserver();
+		render(OverviewPageHost);
+		await openGrid();
+
+		await fireEvent.input(searchBox(), { target: { value: 'intro.html' } });
+		await tick();
+		expect([...document.querySelectorAll('.tile .name')].map((n) => n.textContent)).toEqual([
+			'Intro'
+		]);
+
+		await fireEvent.input(searchBox(), { target: { value: '2' } });
+		await tick();
+		// Page 2 is Intro in the host deck.
+		expect([...document.querySelectorAll('.tile .num')].map((n) => n.textContent)).toEqual([
+			'2'
+		]);
+	});
+
+	it('shows a no-matches status and restores the full grid when cleared', async () => {
+		stubObserver();
+		render(OverviewPageHost);
+		await openGrid();
+
+		await fireEvent.input(searchBox(), { target: { value: 'zzzz-nope' } });
+		await tick();
+		expect(screen.getByRole('status').textContent).toMatch(/No slides match/);
+		expect(document.querySelectorAll('.tile').length).toBe(0);
+
+		await fireEvent.input(searchBox(), { target: { value: '' } });
+		await tick();
+		expect(document.querySelectorAll('.tile').length).toBe(3);
+		expect(screen.getByText('3 slides')).toBeTruthy();
+	});
+
+	it('Escape clears the query first, then closes the grid', async () => {
+		stubObserver();
+		render(OverviewPageHost);
+		await openGrid();
+
+		await fireEvent.input(searchBox(), { target: { value: 'intro' } });
+		await tick();
+		expect(document.querySelectorAll('.tile').length).toBe(1);
+
+		// First Escape: clear filter, grid stays open.
+		await fireEvent.keyDown(window, { key: 'Escape' });
+		await tick();
+		expect(scrim()).not.toBeNull();
+		expect(searchBox().value).toBe('');
+		expect(document.querySelectorAll('.tile').length).toBe(3);
+
+		// Second Escape: close.
+		await fireEvent.keyDown(window, { key: 'Escape' });
+		expect(scrim()).toBeNull();
+	});
+
+	it('Tab moves focus from a tile into the filter box and back', async () => {
+		stubObserver();
+		render(OverviewPageHost);
+		await openGrid();
+		await tick();
+
+		const outro = screen.getByRole('button', { name: /Outro/ }) as HTMLElement;
+		outro.focus();
+		expect(document.activeElement).toBe(outro);
+
+		press(outro, 'Tab');
+		await tick();
+		expect(document.activeElement).toBe(searchBox());
+
+		press(searchBox(), 'Tab');
+		await tick();
+		// Back onto a visible tile (current/first/previous preferred).
+		expect((document.activeElement as HTMLElement)?.classList.contains('tile')).toBe(true);
+	});
+
+	it('keeps the caret in the filter box while the grid rearranges', async () => {
+		stubObserver();
+		// Current slide is Intro (page 2). Filtering to "out" drops Intro from the
+		// set — the old bug re-planted focus onto Outro and yanked the caret.
+		render(OverviewPageHost, { props: { currentPath: 'intro.html' } });
+		await openGrid();
+		await tick();
+
+		const box = searchBox();
+		box.focus();
+		expect(document.activeElement).toBe(box);
+
+		await fireEvent.input(box, { target: { value: 'ou' } });
+		await tick();
+		await tick(); // second tick: deferred focus re-seat must NOT fire
+
+		expect(document.activeElement).toBe(box);
+		expect([...document.querySelectorAll('.tile .name')].map((n) => n.textContent)).toEqual([
+			'Outro'
+		]);
+	});
+});
+
 describe('OverviewPage — lazy mounting', () => {
 	it('boots ONE document (the slide we are on) and leaves the rest as cards', async () => {
 		stubObserver();

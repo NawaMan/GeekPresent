@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	currentTileDirection,
+	filterOverviewTiles,
 	gridColumnCount,
 	gridRowsPerPage,
 	isTypingTarget,
@@ -108,6 +109,82 @@ describe('overviewPageTiles — the deck as a grid', () => {
 		expect(overviewPageTiles([], 'x.html')).toEqual([]);
 		expect(overviewPageTiles(null as unknown as Array<Page>, 'x.html')).toEqual([]);
 		expect(overviewPageTiles(undefined as unknown as Array<Page>, '')).toEqual([]);
+	});
+});
+
+describe('filterOverviewTiles — title, file name, page number as strings', () => {
+	const tiles = overviewPageTiles(
+		[
+			{ path: 'title.html', title: 'Title' },
+			{ path: 'intro.html', title: 'Intro' },
+			{ path: 'backpressure-deep.html', title: 'Backpressure Deep Dive' },
+			{ path: 'outro.html', title: 'Outro' },
+			{ path: 'slide-10.html', title: 'Ten' },
+			{ path: 'slide-12.html', title: 'Twelve' }
+		],
+		'intro.html'
+	);
+
+	it('returns the full list for an empty or whitespace query', () => {
+		expect(filterOverviewTiles(tiles, '')).toEqual(tiles);
+		expect(filterOverviewTiles(tiles, '   ')).toEqual(tiles);
+	});
+
+	it('matches title case-insensitively', () => {
+		expect(filterOverviewTiles(tiles, 'deep dive').map((t) => t.path)).toEqual([
+			'backpressure-deep.html'
+		]);
+		expect(filterOverviewTiles(tiles, 'TITLE').map((t) => t.path)).toEqual(['title.html']);
+	});
+
+	it('matches file name (path and stem without .html)', () => {
+		expect(filterOverviewTiles(tiles, 'intro.html').map((t) => t.path)).toEqual(['intro.html']);
+		expect(filterOverviewTiles(tiles, 'backpressure-deep').map((t) => t.path)).toEqual([
+			'backpressure-deep.html'
+		]);
+	});
+
+	it('matches page number as a substring of the number string', () => {
+		// "1" hits 1 (Title), 5 (slide-10 → number 5), and 6 (slide-12 → number 6)?
+		// Numbers are 1..6 in list order: title=1, intro=2, backpressure=3, outro=4, ten=5, twelve=6.
+		// So "1" matches only page 1. "2" matches page 2 only in this deck of 6.
+		// Build a denser case for multi-digit substring:
+		const dense = overviewPageTiles(
+			Array.from({ length: 15 }, (_, i) => ({
+				path: `p${i + 1}.html`,
+				title: `P${i + 1}`
+			})),
+			''
+		);
+		// "1" matches 1, 10, 11, 12, 13, 14, 15
+		expect(filterOverviewTiles(dense, '1').map((t) => t.number)).toEqual([
+			1, 10, 11, 12, 13, 14, 15
+		]);
+		expect(filterOverviewTiles(dense, '12').map((t) => t.number)).toEqual([12]);
+	});
+
+	it('keeps deck order and original numbers (does not renumber filtered hits)', () => {
+		const hits = filterOverviewTiles(tiles, 'o'); // Outro, intro? Intro has no o... "Intro" has no 'o'? I-n-t-r-o yes
+		// title "Intro", "Outro", path might also match
+		expect(hits.every((t, _i, arr) => {
+			const full = tiles.find((x) => x.path === t.path);
+			return full && full.number === t.number;
+		})).toBe(true);
+		// Order is deck order, not relevance
+		const idx = hits.map((h) => tiles.findIndex((t) => t.path === h.path));
+		expect(idx).toEqual([...idx].sort((a, b) => a - b));
+	});
+
+	it('is total — junk tiles or query do not throw', () => {
+		expect(filterOverviewTiles(null as unknown as typeof tiles, 'x')).toEqual([]);
+		expect(filterOverviewTiles(undefined as unknown as typeof tiles, 'x')).toEqual([]);
+		// @ts-expect-error total guard
+		expect(filterOverviewTiles(tiles, null)).toEqual(tiles);
+		expect(
+			filterOverviewTiles([{ path: 'x.html', title: undefined, number: 1 } as never], 'x').map(
+				(t) => t.path
+			)
+		).toEqual(['x.html']);
 	});
 });
 

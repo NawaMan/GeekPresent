@@ -69,6 +69,37 @@ export function overviewPageTiles(pages: Array<Page>, currentPath: string): Over
 }
 
 /**
+ * Narrow the overview grid to tiles matching `query`.
+ *
+ * Case-insensitive substring match against title, file name (`path` and its stem
+ * without `.html`), and the tile's page number treated as a string — so `"1"`
+ * matches pages 1, 10, 11, 12… and `"intro"` matches both `intro.html` and a
+ * title containing "Intro". An empty or whitespace query returns the full list
+ * (the grid is unfiltered); junk input yields `[]` rather than throwing.
+ *
+ * Deliberately lighter than TOC full-text search: Overview filters what you can
+ * already see on a tile (label + number + path), not body prose.
+ */
+export function filterOverviewTiles(tiles: OverviewTile[], query: string): OverviewTile[] {
+	const list = Array.isArray(tiles) ? tiles : [];
+	const q = (typeof query === 'string' ? query : '').trim().toLowerCase();
+	if (!q) return list;
+	return list.filter((t) => {
+		if (!t) return false;
+		const title = typeof t.title === 'string' ? t.title : '';
+		const path = typeof t.path === 'string' ? t.path : '';
+		const stem = path.replace(/\.html$/i, '');
+		const num = String(t.number ?? '');
+		return (
+			title.toLowerCase().includes(q) ||
+			path.toLowerCase().includes(q) ||
+			stem.toLowerCase().includes(q) ||
+			num.includes(q)
+		);
+	});
+}
+
+/**
  * Is this key press the user TYPING?
  *
  * Deliberately NARROWER than stepKeys' `isInteractiveTarget`, and the difference

@@ -36,15 +36,23 @@ import { type Codec, jsonCodec } from '$lib/utils/stateCore';
   remembered value arrives on hydration, one tick after the page paints.
 */
 
+/** Which Web Storage bucket to use. `local` survives browser restarts;
+    `session` survives full-page navigations in the same tab but clears when the
+    tab closes — right for "keep running across slide loads, not across visits". */
+export type PersistedStorage = 'local' | 'session';
+
 /** Options for a persisted store. */
 export interface PersistedOptions<T> {
 	/** How the value is turned into a string and back. Defaults to JSON. */
 	codec?: Codec<T>;
-	/** Mirror writes from other tabs/windows into this store. Default `true`. */
+	/** Mirror writes from other tabs/windows into this store. Default `true`.
+	    Only meaningful for `storage: 'local'` (sessionStorage is per-tab). */
 	sync?: boolean;
+	/** `local` (default) or `session`. */
+	storage?: PersistedStorage;
 }
 
-/** A `writable` mirrored to `localStorage` under `key`.
+/** A `writable` mirrored to Web Storage under `key` (localStorage by default).
 
     On the server (and if anything at all goes wrong in the browser) it degrades to a
     plain in-memory writable holding `initial` — a deck that cannot persist still runs;
@@ -53,8 +61,9 @@ export interface PersistedOptions<T> {
 export function persisted<T>(key: string, initial: T, options: PersistedOptions<T> = {}): Writable<T> {
 	const codec = options.codec ?? jsonCodec<T>();
 	const sync = options.sync !== false;
+	const storageKind: PersistedStorage = options.storage === 'session' ? 'session' : 'local';
 
-	const store = writable<T>(load(key, initial, codec));
+	const store = writable<T>(load(key, initial, codec, storageKind));
 
 	if (!browser) return store;
 
@@ -63,13 +72,15 @@ export function persisted<T>(key: string, initial: T, options: PersistedOptions<
 	// working in memory.
 	store.subscribe((value) => {
 		try {
-			localStorage.setItem(key, codec.write(value));
+			webStorage(storageKind)?.setItem(key, codec.write(value));
 		} catch {
 			/* storage unavailable or full — the deck runs anyway, it just forgets */
 		}
 	});
 
-	if (sync) {
+	// Cross-tab sync only applies to localStorage. sessionStorage is tab-private and
+	// the `storage` event never carries another tab's session writes to us.
+	if (sync && storageKind === 'local') {
 		window.addEventListener('storage', (event: StorageEvent) => {
 			if (event.key !== key) return;
 			// `newValue === null` is the key being REMOVED (another tab cleared it, or the
@@ -89,13 +100,22 @@ export function persisted<T>(key: string, initial: T, options: PersistedOptions<
 	return store;
 }
 
+function webStorage(kind: PersistedStorage): Storage | null {
+	if (!browser) return null;
+	try {
+		return kind === 'session' ? sessionStorage : localStorage;
+	} catch {
+		return null;
+	}
+}
+
 /** Read the key once, at construction. Every failure — no browser, no key, a codec that
     refuses the string, a `getItem` that throws behind a storage policy — lands on
     `initial`, so this function is total and the store always starts with a usable value. */
-function load<T>(key: string, initial: T, codec: Codec<T>): T {
+function load<T>(key: string, initial: T, codec: Codec<T>, storageKind: PersistedStorage): T {
 	if (!browser) return initial;
 	try {
-		const raw = localStorage.getItem(key);
+		const raw = webStorage(storageKind)?.getItem(key) ?? null;
 		if (raw === null) return initial;
 		const parsed = codec.read(raw);
 		return parsed === null ? initial : parsed;
