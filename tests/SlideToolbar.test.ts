@@ -54,7 +54,22 @@ describe('SlideToolbar', () => {
 		const display = document.querySelector('.mode.inline');
 		expect(display).toBeTruthy();
 		// FITTED is the default label (no persisted mode in a cleared localStorage).
-		expect(display?.textContent).toContain('FITTED');
+		// Z is not in the word, so the trailing chip stays: "FITTED (Z)".
+		expect(display?.textContent).toContain('FITTED (Z)');
+	});
+
+	it('underlines in-word mnemonics and keeps chips only for Z/M', () => {
+		render(SlideToolbarHost);
+
+		const annotate = screen.getByLabelText('ANNOTATE off');
+		expect(annotate.textContent).toBe('ANNOTATE');
+		expect(annotate.querySelector('.tool-mn')?.textContent).toBe('A');
+		expect(annotate.textContent).not.toContain('(A)');
+
+		// ☰ has no M in the glyph — chip stays.
+		const more = screen.getByLabelText('More tools (M)');
+		expect(more.textContent).toContain('☰ (M)');
+		expect(more.querySelector('.tool-mn')).toBeNull();
 	});
 
 	it('pins the bar fully open and unpins back to auto-hide', async () => {

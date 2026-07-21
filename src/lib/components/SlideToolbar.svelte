@@ -153,7 +153,7 @@
 					? 'ANNOTATE — drawing (click to put the pen down)'
 					: 'ANNOTATE — draw on this slide'}
 			onclick={() => annotationMode.update((v) => !v)}
-		>ANNOTATE (A)</button>
+		><span class="tool-mn">A</span>NNOTATE</button>
 
 		<!-- ADJUST + SAVE, slotted from SlideDeck (which owns the layout store). The snippet carries
 		     the separator before them, so a deck that doesn't offer ADJUST leaves no dangling
@@ -264,8 +264,9 @@
 
 	/* PRESENT — a plain bar button (slotted from SlideDeck, dressed via :global). Half-faded at
 	   rest, full on its own hover; a click opens the console. It owns no menu now. */
-	/* ☰ menu-row mnemonics (O/C/P/S/E) keep underlines; bar labels use "NAME (K)" form. */
-	.annot-drop :global(.tool-mn) {
+	/* Mnemonic underline — bar toggles (PRESENT / ANNOTATE / ADJUST) and ☰ rows (O/C/R/S/E/K)
+	   share this. Letters that are NOT in the word keep a trailing chip instead: FITTED (Z), ☰ (M). */
+	.annot-tools :global(.tool-mn) {
 		text-decoration: underline;
 		text-underline-offset: 0.18em;
 		text-decoration-thickness: 1px;
@@ -289,8 +290,7 @@
 		border: 0;
 		background: transparent;
 		color: var(--annot-toggle-fg, #F0A33E);
-		/* A word button, like .annot-tab: its label ("PRESENT (P)") must stay on one line —
-		   a bar squeezed narrow would otherwise wrap "(P)" under the word. */
+		/* Word buttons must stay on one line (same bargain as FITTED (Z) / ☰ (M) chips). */
 		white-space: nowrap;
 	}
 	.annot-tools :global(.annot-anchor:hover),

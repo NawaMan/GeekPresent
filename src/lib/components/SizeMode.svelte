@@ -47,7 +47,8 @@
 	$: isFitted = $displayMode === 'FITTED';
 	$: factor   = $displayFactor;
 	$: label    = isFitted ? 'FITTED' : pct(factor);
-	// Inline tool-bar: key in parentheses at the end — "FITTED (Z)" / "100% (Z)" (Zoom).
+	// Inline tool-bar: Z (zoom) is not in "FITTED" / "100%", so keep a trailing chip —
+	// "FITTED (Z)" / "100% (Z)" — unlike PRESENT/ANNOTATE/ADJUST which underline in-word.
 	// hoverText must match text so CtrlBtn's hover swap does not drop the key chip.
 	$: barLabel = inline ? `${label} (Z)` : label;
 

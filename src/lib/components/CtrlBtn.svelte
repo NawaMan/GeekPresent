@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { mnMarkup } from '$lib/chrome/mnemonicCore';
 
     export let text       = 'Btn';
     export let hoverText  = '';
@@ -19,17 +20,10 @@
 		}
 	});
 
-	/** Split label around the first case-insensitive match of `mnemonic`. */
-	function mnParts(label: string, letter: string): { before: string; hit: string; after: string } | null {
-		const L = String(letter ?? '').slice(0, 1);
-		if (!L || !label) return null;
-		const i = label.toLowerCase().indexOf(L.toLowerCase());
-		if (i < 0) return null;
-		return { before: label.slice(0, i), hit: label.slice(i, i + 1), after: label.slice(i + 1) };
-	}
-
-	$: textMn = mnParts(text, mnemonic);
-	$: hoverMn = mnParts(hoverText || text, mnemonic);
+	// Contiguous HTML so the letter is not split from the rest of the word in the
+	// a11y tree (see mnMarkup). Plain text when no mnemonic.
+	$: textHtml = mnemonic ? mnMarkup(text, mnemonic) : '';
+	$: hoverHtml = mnemonic ? mnMarkup(hoverText || text, mnemonic) : '';
 </script>
 
 <style>
@@ -48,7 +42,7 @@
 		text-align: center;
 		font-weight: bold;
 		/* Keep the label on ONE line — a chrome button squeezed narrow (the tool bar's
-		   "FITTED (Z)", a pager's "PREV") must never wrap its key hint under the word. */
+		   "FITTED (Z)" chip, a pager's "PREV") must never wrap a key hint under the word. */
 		white-space: nowrap;
 
 		/* Default (in-page) look: prominent / eye-catching — a filled accent-blue
@@ -123,22 +117,26 @@
 	}
 </style>
 
+<!-- When a mnemonic splits the label across a span, set aria-label to the full
+     word so the accessible name stays "Table of Contents" (not a letter-split
+     reading). Visual underline is decorative. -->
 <button
 	disabled={isDisabled}
 	class:chrome={chrome}
 	class:selected={isSelected}
 	class:hidden={!isVisible}
+	aria-label={mnemonic ? text : undefined}
 	on:click>
-	<span class="text">
-		{#if textMn}
-			{textMn.before}<span class="chrome-mn">{textMn.hit}</span>{textMn.after}
+	<span class="text" aria-hidden={mnemonic ? 'true' : undefined}>
+		{#if mnemonic}
+			{@html textHtml}
 		{:else}
 			{text}
 		{/if}
 	</span>
-	<span class="hover-text">
-		{#if hoverMn}
-			{hoverMn.before}<span class="chrome-mn">{hoverMn.hit}</span>{hoverMn.after}
+	<span class="hover-text" aria-hidden={mnemonic ? 'true' : undefined}>
+		{#if mnemonic}
+			{@html hoverHtml}
 		{:else}
 			{hoverText}
 		{/if}

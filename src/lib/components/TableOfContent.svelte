@@ -139,8 +139,9 @@
 <div class="toc gp-chrome no-print" class:expanded={$isContentVisible} class:bar bind:this={tocRef}>
 	<CtrlBtn
 		chrome
-		text="Table of Contents (T)"
-		hoverText="Table of Contents (T)"
+		text="Table of Contents"
+		hoverText="Table of Contents"
+		mnemonic="T"
 		on:click={toggleTableOfContent}
 		isSelected={$isContentVisible}
 	/>

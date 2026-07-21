@@ -912,8 +912,10 @@ stay out of the audience's way. A speaker who is actively using one often wants 
   of PIN. Hidden either way under `?clean` / `?present`.
 - **Alt+. (⌥. on macOS) raises both bars for keyboard.** Temporary arm (~5s, amber halo) — not
   a pin. While armed: **a** ANNOTATE, **j** ADJUST, **z** zoom/display, **p** PRESENT, **m** ☰,
-  **t** TOC. Labels show the key at the end (`PRESENT (P)`, `FITTED (Z)`, `☰ (M)`, …). Esc
-  disarms and closes ☰. Letter mnemonics do not fire while typing in a field. Pure core:
+  **t** TOC. When the letter lives in the word it is underlined (`PRESENT`, `ANNOTATE`,
+  `ADJUST`, Table of Contents); when it does not, a trailing chip remains (`FITTED (Z)`,
+  `☰ (M)`). Esc disarms and closes ☰. Letter mnemonics do not fire while typing in a field.
+  Pure core:
   `chrome/chromeArmCore.ts`.
 - **☰ menu groups.** Navigate (OVERVIEW **O**, KIOSK) · export (CAPTURE, PRINT with nested flyout
   **cCwWtT**) · source (SOURCE, EDIT). PRINT opens on hover to the left of the row.
@@ -929,8 +931,9 @@ stay out of the audience's way. A speaker who is actively using one often wants 
 One prop, and a **CAPTURE** entry appears in the top-centre tool bar's **hamburger (☰) menu** —
 hover the ☰ at the bar's right end for OVERVIEW / CAPTURE / PRINT / SOURCE / EDIT (grouped with
 separators). It downloads the current slide as a PNG. (The bar itself is
-`📌 │ PRESENT (P) │ ANNOTATE (A) │ ADJUST (J) │ FITTED (Z) │ ☰ (M)`: pin and mode toggles sit in
-the open; navigation/output/source tools live behind the hamburger.) **PRINT** opens a nested
+`📌 │ PRESENT │ ANNOTATE │ ADJUST │ FITTED (Z) │ ☰ (M)`: pin and mode toggles sit in
+the open (mnemonic letter underlined in-word when it fits; `(Z)` / `(M)` only when it does not);
+navigation/output/source tools live behind the hamburger.) **PRINT** opens a nested
 flyout on hover — Current slide / + notes, Whole deck / + notes, Thumbnail grid / Notes grid
 (mnemonics **cCwWtT**). CAPTURE only appears when the deck offers it (`capture`); the whole bar is
 hidden under `?clean` / `?present`.

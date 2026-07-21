@@ -1066,7 +1066,7 @@
 				class="annot-anchor"
 				title="PRESENT — open speaker console"
 				on:click={openPresenter}
-			>PRESENT (P)</button>
+			><span class="tool-mn">P</span>RESENT</button>
 		{/snippet}
 
 		<!-- ADJUST — the old ADJUST toggle, moved into the menu and renamed. A sub-toggle
@@ -1087,7 +1087,7 @@
 						? 'ADJUST — placing blocks by hand (click to stop)'
 						: 'ADJUST — drag and resize blocks at exact pixels'}
 					on:click={() => adjustMode.update((v) => !v)}
-				>ADJUST (J)</button>
+				>AD<span class="tool-mn">J</span>UST</button>
 				<!-- Save writes moved Blocks back to source via the vite-dev endpoint. Shown
 				     whenever ADJUST is on, and it fires in BOTH worlds — it isn't greyed out
 				     where it can't write. It answers on click instead: the verdict flashes as a
