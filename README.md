@@ -435,7 +435,7 @@ The nav bar (FIRST / PREV / NEXT / LAST), the **Table of Contents**, and the **O
 | O           | Open the Overview Page grid  |
 | E           | Toggle Overview **EDIT** deck (while Overview is open; dev) |
 | Alt+. (⌥. on Mac) | Raise both chrome bars briefly for letter mnemonics |
-| a / j / z / p / m / t | While bars raised: ANNOTATE / ADJUST / zoom / PRESENT / ☰ / TOC (underlined in the label when the letter fits; else a trailing chip) |
+| a / j / z / p / m / t | While bars raised: ANNOTATE / ADJUST / open zoom menu / PRESENT / ☰ / TOC (underlined in the label when the letter fits; else a trailing chip). Zoom menu: ↑/↓, **c** → custom %, Enter |
 | Escape      | Close Overview / ToC / Box / ☰; disarm chrome raise |
 
 `Space` advances a `<Steps>` build while one is running and pages the deck once it's spent, so a

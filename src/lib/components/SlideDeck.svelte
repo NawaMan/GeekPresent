@@ -56,6 +56,7 @@
 		disarmChrome,
 		keepChromeArmed,
 		requestTocOpen,
+		requestDisplayMenu,
 		closeMoreMenu,
 		toggleMoreMenu,
 		moreMenuOpen
@@ -585,9 +586,9 @@
 				keepChromeArmed();
 				return;
 			case 'display':
-				// Toggle FITTED ↔ SCALED @ 100% — the two modes the DISPLAY control offers first.
-				displayMode.update((m) => (m === 'FITTED' ? 'SCALED' : 'FITTED'));
-				keepChromeArmed();
+				// Open (toggle) the DISPLAY zoom menu — same control a click on FITTED (Z)
+				// opens — so ↑/↓ can walk the presets. Does not flip FITTED/SCALED by itself.
+				requestDisplayMenu();
 				return;
 			case 'present':
 				openPresenter();

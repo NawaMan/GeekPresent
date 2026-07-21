@@ -911,12 +911,13 @@ stay out of the audience's way. A speaker who is actively using one often wants 
   **on**) drop the top authoring cluster or the bottom TOC/pager for a bare canvas. Independent
   of PIN. Hidden either way under `?clean` / `?present`.
 - **Alt+. (⌥. on macOS) raises both bars for keyboard.** Temporary arm (~5s, amber halo) — not
-  a pin. While armed: **a** ANNOTATE, **j** ADJUST, **z** zoom/display, **p** PRESENT, **m** ☰,
-  **t** TOC. When the letter lives in the word it is underlined (`PRESENT`, `ANNOTATE`,
+  a pin. While armed: **a** ANNOTATE, **j** ADJUST, **z** open DISPLAY zoom menu, **p** PRESENT,
+  **m** ☰, **t** TOC. When the letter lives in the word it is underlined (`PRESENT`, `ANNOTATE`,
   `ADJUST`, Table of Contents); when it does not, a trailing chip remains (`FITTED (Z)`,
-  `☰ (M)`). Esc disarms and closes ☰. Letter mnemonics do not fire while typing in a field.
-  Pure core:
-  `chrome/chromeArmCore.ts`.
+  `☰ (M)`). **z** opens (toggles) the zoom menu — ↑/↓ / Home/End walk the presets, **c** jumps
+  to the CUSTOM % field, Enter applies, Esc closes — it does **not** flip FITTED/SCALED by itself.
+  Esc also disarms chrome and closes ☰. Letter mnemonics do not fire while typing in a field.
+  Pure core: `chrome/chromeArmCore.ts` + `chrome/sizeModeCore.ts`.
 - **☰ menu groups.** Navigate (OVERVIEW **O**, KIOSK) · export (CAPTURE, PRINT with nested flyout
   **cCwWtT**) · source (SOURCE, EDIT). PRINT opens on hover to the left of the row.
 - **Not the same as `fadeChrome`.** `fadeChrome` ghosts `.gp-chrome` opacity until pointed at;
