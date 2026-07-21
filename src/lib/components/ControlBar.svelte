@@ -26,6 +26,7 @@
 	import { animBarSlot, hostedAnim } from '$lib/stores/localChrome';
 	import { controlBarPinned } from '$lib/stores/chromePin';
 	import { chromeArmed } from '$lib/stores/chromeArm';
+	import { overviewOpen } from '$lib/stores/overviewOpen';
 
 	interface Props {
 		/** The Table of Contents flyout (SlideDeck supplies <TableOfContent bar />). */
@@ -56,8 +57,10 @@
 		class="ctrl-bar no-print"
 		class:pinned={$controlBarPinned}
 		class:armed={$chromeArmed}
+		class:overview-open={$overviewOpen}
 		role="group"
 		aria-label="Slide controls"
+		aria-hidden={$overviewOpen ? 'true' : undefined}
 	>
 		<!-- PIN — latch THIS bar fully out of its auto-hide tuck. Independent of the top tool
 		     bar's pin (see stores/chromePin). Icon-only (pushpin SVG); aria-label + title
@@ -161,6 +164,18 @@
 		box-shadow:
 			0 -3px 14px rgba(0, 0, 0, 0.4),
 			0 0 0 2px color-mix(in srgb, var(--ctrl-bar-fg, var(--annot-toggle-fg, #F0A33E)) 55%, transparent);
+	}
+
+	/* OVERVIEW owns the screen — hide the control bar completely (mirror of SlideToolbar). */
+	.ctrl-bar.overview-open,
+	.ctrl-bar.overview-open:hover,
+	.ctrl-bar.overview-open:focus-within,
+	.ctrl-bar.overview-open.pinned,
+	.ctrl-bar.overview-open.armed {
+		transform: translateX(-50%) translateY(120%);
+		opacity: 0;
+		visibility: hidden;
+		pointer-events: none;
 	}
 
 	/* PIN — icon toggle matching the tool bar's pin look, dressed for this bar's shared

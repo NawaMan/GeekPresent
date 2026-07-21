@@ -113,8 +113,10 @@
 		class:pinned={$toolBarPinned}
 		class:armed={$chromeArmed}
 		class:menu-open={$moreMenuOpen}
+		class:overview-open={$overviewOpen}
 		role="group"
 		aria-label="Slide tools"
+		aria-hidden={$overviewOpen ? 'true' : undefined}
 	>
 		<!-- PIN — latch THIS bar fully out of its auto-hide tuck. Independent of the bottom
 		     ControlBar's pin (see stores/chromePin). Icon-only (pushpin SVG); aria-label +
@@ -254,6 +256,21 @@
 	.annot-tools.armed,
 	.annot-tools.menu-open {
 		transform: translateX(-50%) translateY(0);
+	}
+
+	/* OVERVIEW owns the screen — hide the window tool bar completely (not just tuck).
+	   The overlay sits at z-index 50 above the canvas-space overview scrim (45), so
+	   without this the peek strip and a pinned bar would paint over the grid. */
+	.annot-tools.overview-open,
+	.annot-tools.overview-open:hover,
+	.annot-tools.overview-open:focus-within,
+	.annot-tools.overview-open.pinned,
+	.annot-tools.overview-open.armed,
+	.annot-tools.overview-open.menu-open {
+		transform: translateX(-50%) translateY(-120%);
+		opacity: 0;
+		visibility: hidden;
+		pointer-events: none;
 	}
 	/* Keyboard arm (Alt+.) — soft halo so the speaker sees chrome is "live" for mnemonics. */
 	.annot-tools.armed {

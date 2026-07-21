@@ -3,7 +3,10 @@
 
   Offered (canKiosk) follows the same sticky-URL pattern as ANNOTATE / CAPTURE.
   Running is a *session* preference: OK in the dialog or `?kiosk` starts it and
-  survives full-page slide loads (`kioskWantsRun`); Stop / `?kiosk=off` clears it.
+  survives full-page slide loads (`kioskWantsRun` in **sessionStorage**); Stop /
+  `?kiosk=off` clears it. It must NOT live in localStorage — that made a past
+  Start resurrect kiosk on every later visit ("started by default"). Session
+  storage keeps a mid-loop full-page nav running, and clears when the tab closes.
   Paces and the notes toggle are remembered across reloads so a booth keeps its
   tuning; they do not cross-tab-sync (a second tab editing paces should not yank
   the lobby screen mid-loop — same bargain as displayMode).
@@ -37,11 +40,23 @@ export const kioskActive: Readable<boolean> = derived(
 	($s) => $s === 'running' || $s === 'paused'
 );
 
-/** Survives full-page nav so a non-ViewTransition deck keeps auto-advancing. */
+/** Survives full-page nav in this tab so a non-ViewTransition deck keeps
+    auto-advancing — sessionStorage, not localStorage (see file header). */
 export const kioskWantsRun = persisted('geekpresent:kiosk:wantsRun', false, {
 	codec: booleanCodec(),
-	sync: false
+	sync: false,
+	storage: 'session'
 });
+
+// Drop a leftover localStorage flag from older builds so it cannot confuse
+// debugging (or a future reader that mistakes the key for still being active).
+if (browser) {
+	try {
+		localStorage.removeItem('geekpresent:kiosk:wantsRun');
+	} catch {
+		/* private mode */
+	}
+}
 
 export interface KioskPaces {
 	stepMs: number;

@@ -11,6 +11,12 @@
   NavigationBar's `window`-level pager before it ever sees them, so a speaker can
   browse the WHOLE deck with the keyboard alone without paging the live slide away.
 
+  A filter box in the head narrows the grid by title, file name, or page number
+  (substring, case-insensitive — pure `filterOverviewTiles`). It does NOT autofocus
+  on open: the grid keeps first claim on the arrows. Tab moves in/out of the box
+  (from a tile → search, from search → the focused tile); Escape clears a query
+  before it closes the overlay.
+
   Phase 1 also offers EDIT DECK (dev only): add a slide (scaffold + pages.ts) or
   unlist one. Static hosts show the control and refuse with NOT ALLOWED — same
   bargain as ADJUST SAVE. See specs/DECK-EDIT-1.md.
@@ -56,6 +62,7 @@
 	import { getViewTransitions } from '$lib/presentation';
 	import {
 		overviewPageTiles,
+		filterOverviewTiles,
 		tileScale,
 		overviewPageKeyIntent,
 		mountedTiles,
@@ -64,7 +71,8 @@
 		gridColumnCount,
 		gridRowsPerPage,
 		moveFocus,
-		overviewGridKeyIntent
+		overviewGridKeyIntent,
+		isTypingTarget
 	} from '$lib/utils/overviewPageCore';
 	import type { Page } from '$lib/utils/navigate';
 
@@ -90,9 +98,14 @@
 	// the `o` key: the OVERVIEW item in the audience tool flyout, and the OVERVIEW
 	// button in the presenter console's bar (PresenterView). See stores/overviewOpen.
 
-
-	$: tiles = overviewPageTiles(pages, currentPath);
-	$: currentNumber = tiles.find((t) => t.isCurrent)?.number ?? 0;
+	// Filter: title / file name / page number (string substring). Empty → full grid.
+	// Does not autofocus — Tab moves in/out so arrows still own the grid on open.
+	let query = '';
+	let searchRef: HTMLInputElement | undefined;
+	$: allTiles = overviewPageTiles(pages, currentPath);
+	$: tiles = filterOverviewTiles(allTiles, query);
+	$: searching = query.trim().length > 0;
+	$: currentNumber = allTiles.find((t) => t.isCurrent)?.number ?? 0;
 
 	// Which tiles have been seen near the viewport. `seen` is the raw observation;
 	// `mounted` folds in the current slide (always live). Reassigned, not mutated,
@@ -155,11 +168,60 @@
 	// Arrow keys move which tile is FOCUSED; only Enter actually navigates (jump()
 	// below). Moving focus, scrolling, Home/End, PageUp/PageDown, Space-to-current —
 	// none of it touches anywhere but this window, the same way hovering a tile
-	// with the mouse never did: browsing stays invisible, a commit is not.
+	// with the mouse never did: browsing is invisible, a commit is not.
+	//
+	// `focusedNumber` is the tile's DECK number (label), not a dense index — with a
+	// filter active the visible set is sparse (e.g. tiles 2 and 12), so moves go
+	// through a dense index into `tiles` and map back to the real number.
 	let focusedNumber = 0;
 
 	function focusTile(n: number) {
 		tileNodes.get(n)?.focus();
+	}
+
+	/** Pick a tile number that is currently visible — preferred, else first match. */
+	function visibleFocusTarget(preferred = focusedNumber): number {
+		if (preferred > 0 && tiles.some((t) => t.number === preferred)) return preferred;
+		if (currentNumber > 0 && tiles.some((t) => t.number === currentNumber)) return currentNumber;
+		return tiles[0]?.number ?? 0;
+	}
+
+	function focusSearch() {
+		searchRef?.focus();
+		searchRef?.select?.();
+	}
+
+	/** Tab in/out of the filter box. From a tile → search; from search → tile. */
+	function onSearchKeydown(e: KeyboardEvent) {
+		// Swallow every keystroke so NavigationBar's window pager never sees arrows
+		// typed in the box (same bargain as the TOC search field).
+		e.stopPropagation();
+		if (e.key === 'Tab') {
+			e.preventDefault();
+			const n = visibleFocusTarget();
+			if (n > 0) {
+				focusedNumber = n;
+				// Defer so the input finishes its own blur before the tile takes focus.
+				tick().then(() => focusTile(n));
+			}
+			return;
+		}
+		if (e.key === 'Escape') {
+			e.preventDefault();
+			if (searching) {
+				query = '';
+				return;
+			}
+			if (showAddForm) {
+				cancelAddForm();
+				return;
+			}
+			if ($overviewEditMode) {
+				leaveEdit();
+				return;
+			}
+			close();
+		}
 	}
 
 	/** The grid's live column count — a responsive `auto-fill` layout, not a fixed
@@ -170,16 +232,26 @@
 	}
 
 	/** How many rows currently fit the grid's visible height — PageUp/PageDown's
-	    step size. Measures row height from tile 1 vs. the first tile of row 2. */
+	    step size. Measures row height from the first two VISIBLE rows (filter-aware). */
 	function liveRowsPerPage(columns: number): number {
-		if (!gridRef) return 1;
-		const rowOneTop = tileNodes.get(1)?.getBoundingClientRect().top;
-		const rowTwoTop = tileNodes.get(columns + 1)?.getBoundingClientRect().top;
+		if (!gridRef || tiles.length === 0) return 1;
+		const rowOneTop = tileNodes.get(tiles[0].number)?.getBoundingClientRect().top;
+		const second = tiles[columns];
+		const rowTwoTop = second
+			? tileNodes.get(second.number)?.getBoundingClientRect().top
+			: undefined;
 		const rowHeight = rowOneTop != null && rowTwoTop != null ? rowTwoTop - rowOneTop : 0;
 		return gridRowsPerPage(gridRef.getBoundingClientRect().height, rowHeight);
 	}
 
 	function onGridKeydown(e: KeyboardEvent) {
+		// Tab leaves the roving group for the filter box (and back via onSearchKeydown).
+		if (e.key === 'Tab') {
+			e.preventDefault();
+			e.stopPropagation();
+			focusSearch();
+			return;
+		}
 		const intent = overviewGridKeyIntent(e);
 		if (intent === 'ignore' || tiles.length === 0) return;
 		// Claimed HERE, in the bubble phase, at the focused tile — the same trick
@@ -189,19 +261,23 @@
 		e.preventDefault();
 		e.stopPropagation();
 		if (intent === 'commit') {
-			const tile = tiles[focusedNumber - 1];
+			const tile = tiles.find((t) => t.number === focusedNumber) ?? tiles[0];
 			if (tile) jump(tile.path, tile.number);
 			return;
 		}
 		if (intent === 'toCurrent') {
-			if (currentNumber > 0) {
+			if (currentNumber > 0 && tiles.some((t) => t.number === currentNumber)) {
 				focusedNumber = currentNumber;
 				focusTile(focusedNumber);
 			}
 			return;
 		}
+		// Dense index among the *visible* tiles, then map back to deck number.
+		const dense = tiles.findIndex((t) => t.number === focusedNumber);
+		const from = dense >= 0 ? dense + 1 : 1;
 		const columns = liveColumns();
-		focusedNumber = moveFocus(focusedNumber || 1, tiles.length, columns, liveRowsPerPage(columns), intent);
+		const nextDense = moveFocus(from, tiles.length, columns, liveRowsPerPage(columns), intent);
+		focusedNumber = tiles[nextDense - 1]?.number ?? 0;
 		focusTile(focusedNumber);
 	}
 
@@ -268,6 +344,7 @@
 		overviewEditMode.set(false);
 		statusMsg = '';
 		pendingOpenPath = '';
+		query = '';
 		overviewOpen.set(false);
 	}
 
@@ -425,10 +502,10 @@
 		navigate(`./${path}${present ? '?present' : ''}`, { viewTransitions, kind: 'slide', direction });
 	}
 
-	// `o` opens the grid, Escape closes it (or steps out of form → edit → grid).
+	// `o` opens the grid, Escape closes it (or steps out of form → edit → filter → close).
 	// While open, `e` toggles EDIT deck mode (mnemonic on the EDIT button).
 	function handleGlobalKeydown(event: KeyboardEvent) {
-		// Layered Esc while the grid is open: form → leave EDIT → close.
+		// Layered Esc while the grid is open: form → leave EDIT → clear filter → close.
 		if (
 			event.key === 'Escape' &&
 			$overviewOpen &&
@@ -444,6 +521,11 @@
 			if ($overviewEditMode) {
 				event.preventDefault();
 				leaveEdit();
+				return;
+			}
+			if (searching) {
+				event.preventDefault();
+				query = '';
 				return;
 			}
 		}
@@ -497,6 +579,17 @@
 		overviewEditMode.set(false);
 		showAddForm = false;
 		focusedNumber = 0;
+		query = '';
+	}
+
+	// When the filter drops the focused tile out of the visible set, only update
+	// the *logical* roving index — never call focusTile here. Planting DOM focus
+	// while the speaker types in the filter box is what yanked the caret out on
+	// every rearrange.
+	$: if (browser && $overviewOpen && tiles.length > 0) {
+		if (!focusedNumber || !tiles.some((t) => t.number === focusedNumber)) {
+			focusedNumber = visibleFocusTarget(0);
+		}
 	}
 
 	// The observer can only exist once the grid is in the DOM; tear it down on close
@@ -509,20 +602,31 @@
 		}
 	}
 
+	/** True when the caret is in the filter box or the add-slide form — DOM focus
+	    must stay put; only the logical tile index may move under a filter. */
+	function shouldPlantTileFocus(): boolean {
+		if (!browser) return false;
+		const active = document.activeElement as HTMLElement | null;
+		if (!active) return true;
+		if (isTypingTarget(active)) return false;
+		if (searchRef && (active === searchRef || searchRef.contains(active))) return false;
+		if (active.closest?.('.add-form-wrap')) return false;
+		return true;
+	}
+
 	// Where the current tile sits: on open (after the grid's tiles are actually in
 	// the DOM — `tick()` waits for that), and again whenever `currentNumber` moves
 	// (deck navigation while the grid happens to stay mounted, e.g. an EDIT-mode add).
-	// The same tick also seeds (or re-validates) the keyboard focus and plants it on
-	// a real tile, so the very first arrow key press is already scoped inside the
-	// grid — see onGridKeydown's stopPropagation for why that scoping matters.
+	// Seeds keyboard focus onto a real tile ONLY when the speaker is not already
+	// typing in the filter / form — see shouldPlantTileFocus.
 	$: if (browser && $overviewOpen && gridRef) {
 		currentNumber;
 		tick().then(() => {
 			updateCurrentDirection();
 			if (!focusedNumber || !tiles.some((t) => t.number === focusedNumber)) {
-				focusedNumber = currentNumber > 0 ? currentNumber : (tiles[0]?.number ?? 0);
+				focusedNumber = visibleFocusTarget(currentNumber);
 			}
-			if (focusedNumber) focusTile(focusedNumber);
+			if (focusedNumber && shouldPlantTileFocus()) focusTile(focusedNumber);
 		});
 	}
 </script>
@@ -551,7 +655,25 @@
 	>
 		<div class="head">
 			<span class="head-title">{$overviewEditMode ? 'EDIT DECK' : 'OVERVIEW PAGE'}</span>
-			<span class="head-count">{tiles.length} slides</span>
+			<span class="head-count">
+				{#if searching}
+					{tiles.length} of {allTiles.length}
+				{:else}
+					{allTiles.length} slides
+				{/if}
+			</span>
+			<!-- Deliberately not autofocus: the grid keeps first claim on the arrows
+			     on open; Tab moves in/out of this box. -->
+			<input
+				class="search"
+				type="search"
+				placeholder="Filter title, file, #…"
+				aria-label="Filter overview by title, file name, or page number"
+				bind:this={searchRef}
+				bind:value={query}
+				on:keydown={onSearchKeydown}
+				on:click|stopPropagation
+			/>
 			{#if statusMsg || pendingOpenPath}
 				<span class="head-status" class:err={statusKind === 'error'} class:ok={statusKind === 'ok'}>
 					{statusMsg}
@@ -611,7 +733,7 @@
 					{#if $overviewEditMode}
 						ADD · + between · × unlist · <kbd>E</kbd> done · <kbd>Esc</kbd>
 					{:else}
-						arrows move · <kbd>↵</kbd> select · <kbd>Space</kbd> current · <kbd>E</kbd> edit · <kbd>Esc</kbd> close
+						arrows move · <kbd>Tab</kbd> filter · <kbd>↵</kbd> select · <kbd>Space</kbd> current · <kbd>Esc</kbd>
 					{/if}
 				</span>
 			</span>
@@ -660,7 +782,7 @@
 					<span>After</span>
 					<select bind:value={addAfter} disabled={busy}>
 						<option value="">(end of deck)</option>
-						{#each tiles as t}
+						{#each allTiles as t}
 							<option value={t.path}>{t.number}. {t.title}</option>
 						{/each}
 					</select>
@@ -679,6 +801,9 @@
 			</div>
 		{/if}
 
+		{#if searching && tiles.length === 0}
+			<p class="no-matches" role="status">No slides match “{query.trim()}”.</p>
+		{:else}
 		<!-- svelte-ignore a11y_no_static_element_interactions — the keydown listener
 		     coordinates roving focus among the real interactive elements (the tile
 		     <button>s); it never turns the div itself into a control. -->
@@ -754,6 +879,7 @@
 				</div>
 			{/each}
 		</div>
+		{/if}
 	</div>
 {/if}
 
@@ -806,6 +932,36 @@
 		/* cosmetic */
 		color: var(--overview-page-dim-fg, #8A99A8);
 		font-size: 0.8em;
+	}
+	.search {
+		/* functional */
+		flex: 0 1 16em;
+		min-width: 8em;
+		/* cosmetic */
+		font: inherit;
+		font-size: 0.85em;
+		color: var(--overview-page-head-fg, #E6EDF3);
+		background: var(--overview-page-tile-bg, #14181D);
+		border: 1.5px solid var(--overview-page-tile-border, #2B3440);
+		border-radius: 4px;
+		padding: 0.3em 0.65em;
+	}
+	.search::placeholder {
+		color: var(--overview-page-dim-fg, #8A99A8);
+	}
+	.search:focus {
+		outline: none;
+		border-color: var(--overview-page-tile-hover-border, #2980B9);
+	}
+	.no-matches {
+		/* functional */
+		flex: 1;
+		margin: 0;
+		/* cosmetic */
+		color: var(--overview-page-dim-fg, #8A99A8);
+		font-size: 1.05em;
+		text-align: center;
+		align-self: center;
 	}
 	.head-status {
 		/* functional */
