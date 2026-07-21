@@ -3,6 +3,7 @@ import { tick } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import TableOfContent from '$lib/components/TableOfContent.svelte';
 import { pages as slidesPages } from '../src/routes/slides/pages.ts';
+import { setPageUrl, resetPageUrl } from './stubs/app-stores';
 
 // The live half of full-deck search: the filter box grown inside the TOC overlay.
 // Docs are INJECTED here (the `docs` prop), so the UI wiring is tested against
@@ -27,7 +28,18 @@ const box = (root: ParentNode) => root.querySelector('input.search') as HTMLInpu
 const rowTitles = (root: ParentNode) =>
 	[...root.querySelectorAll('.content ol li a')].map((a) => a.textContent?.trim().split('\n')[0]);
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+	vi.restoreAllMocks();
+	resetPageUrl();
+});
+
+/** Which row the ↑/↓ cursor is on, by title. */
+const selectedTitle = (root: ParentNode) => {
+	const row = root.querySelector('.content ol li.selected');
+	if (!row) return undefined;
+	// A result row carries its snippet inside the same <a>; the plain list does not.
+	return (row.querySelector('.hit-title') ?? row).textContent?.trim();
+};
 
 describe('TOC full-deck search', () => {
 	it('shows the whole list before anything is typed', async () => {
@@ -106,6 +118,129 @@ describe('TOC full-deck search', () => {
 			n.textContent?.trim()
 		);
 		expect(hitTitles).toEqual(['Full-Deck Search']);
+	});
+
+	it('matches the slide file name, not just its title and body', async () => {
+		const named = [{ path: 'adjust-styles-guard.html', title: 'Keeping Edits Honest' }];
+		const namedDocs = [{ ...named[0], text: 'nothing about it here' }];
+		const { container } = render(TableOfContent, {
+			props: { pages: named, docs: namedDocs }
+		});
+		await openToc(container);
+		await fireEvent.input(box(container), { target: { value: 'guard' } });
+
+		expect(container.querySelector('.results .hit-title')?.textContent?.trim()).toBe(
+			'Keeping Edits Honest'
+		);
+		// The row says WHY it matched, since the name is not otherwise on screen.
+		expect(container.querySelector('.results .snippet')?.textContent).toBe(
+			'adjust-styles-guard.html'
+		);
+	});
+
+	it('walks the results with ↑/↓, wrapping at both ends', async () => {
+		const { container } = render(TableOfContent, { props: { pages, docs } });
+		await openToc(container);
+		await fireEvent.input(box(container), { target: { value: 'backpressure' } });
+		// Two hits: Backpressure (title), Wrap Up (body). Nothing selected until a press.
+		expect(selectedTitle(container)).toBeUndefined();
+
+		await fireEvent.keyDown(box(container), { key: 'ArrowDown' });
+		expect(selectedTitle(container)).toBe('Backpressure');
+		await fireEvent.keyDown(box(container), { key: 'ArrowDown' });
+		expect(selectedTitle(container)).toBe('Wrap Up');
+		await fireEvent.keyDown(box(container), { key: 'ArrowDown' });
+		expect(selectedTitle(container)).toBe('Backpressure');
+		await fireEvent.keyDown(box(container), { key: 'ArrowUp' });
+		expect(selectedTitle(container)).toBe('Wrap Up');
+	});
+
+	it('drops the cursor when the query changes, so it never points at a stale row', async () => {
+		const { container } = render(TableOfContent, { props: { pages, docs } });
+		await openToc(container);
+		await fireEvent.input(box(container), { target: { value: 'backpressure' } });
+		await fireEvent.keyDown(box(container), { key: 'ArrowDown' });
+		expect(selectedTitle(container)).toBe('Backpressure');
+
+		await fireEvent.input(box(container), { target: { value: 'buffers' } });
+		expect(selectedTitle(container)).toBeUndefined();
+	});
+
+	// In the unfiltered list the cursor starts where you ARE, so ↓ is "the next slide".
+	it('starts the cursor at the current slide in the plain list', async () => {
+		setPageUrl('/slides/b.html');
+		const { container } = render(TableOfContent, { props: { pages, docs } });
+		await openToc(container);
+
+		await fireEvent.keyDown(box(container), { key: 'ArrowDown' });
+		expect(selectedTitle(container)).toBe('Wrap Up');
+		await fireEvent.keyDown(box(container), { key: 'ArrowUp' });
+		expect(selectedTitle(container)).toBe('Backpressure');
+	});
+
+	it('Enter opens the row under the cursor and closes the menu', async () => {
+		const { container } = render(TableOfContent, { props: { pages, docs } });
+		await openToc(container);
+		await fireEvent.input(box(container), { target: { value: 'backpressure' } });
+		await fireEvent.keyDown(box(container), { key: 'ArrowDown' });
+		await fireEvent.keyDown(box(container), { key: 'ArrowDown' });
+
+		// Enter navigates by clicking the row's own <a> — same href, same router path as
+		// a mouse click. jsdom won't follow it, so catch the click instead.
+		const clicked: string[] = [];
+		const catcher = (e: Event) => {
+			e.preventDefault();
+			clicked.push((e.target as HTMLElement).closest('a')?.getAttribute('href') ?? '');
+		};
+		document.addEventListener('click', catcher, true);
+		try {
+			await fireEvent.keyDown(box(container), { key: 'Enter' });
+		} finally {
+			document.removeEventListener('click', catcher, true);
+		}
+		expect(clicked).toEqual(['./c.html']);
+		await tick();
+		expect(container.querySelector('.content')).toBeNull();
+	});
+
+	// Type, then Enter — without first pressing ↓. The top hit is the obvious intent.
+	it('Enter with no cursor takes the top hit', async () => {
+		const { container } = render(TableOfContent, { props: { pages, docs } });
+		await openToc(container);
+		await fireEvent.input(box(container), { target: { value: 'queues' } });
+
+		const clicked: string[] = [];
+		const catcher = (e: Event) => {
+			e.preventDefault();
+			clicked.push((e.target as HTMLElement).closest('a')?.getAttribute('href') ?? '');
+		};
+		document.addEventListener('click', catcher, true);
+		try {
+			await fireEvent.keyDown(box(container), { key: 'Enter' });
+		} finally {
+			document.removeEventListener('click', catcher, true);
+		}
+		expect(clicked).toEqual(['./b.html']);
+	});
+
+	// The deck's own ↑/↓ handlers live on window with no input-focus guard; an OPEN
+	// TOC has to claim the keys, and a shut one has to hand them straight back.
+	it('claims ↑/↓ only while open', async () => {
+		const { container } = render(TableOfContent, { props: { pages, docs } });
+		const seen: boolean[] = [];
+		const onWindowKey = (e: KeyboardEvent) => seen.push(e.defaultPrevented);
+		window.addEventListener('keydown', onWindowKey);
+		try {
+			await fireEvent.keyDown(window, { key: 'ArrowDown' });
+			expect(seen).toEqual([false]);
+
+			await openToc(container);
+			await fireEvent.keyDown(window, { key: 'ArrowDown' });
+			expect(seen[1]).toBe(true);
+			expect(selectedTitle(container)).toBe('Intro');
+		} finally {
+			window.removeEventListener('keydown', onWindowKey);
+		}
 	});
 
 	it('keeps typing keys from reaching the deck (arrows page slides unguarded)', async () => {

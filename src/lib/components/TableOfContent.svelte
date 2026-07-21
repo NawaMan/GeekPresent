@@ -11,6 +11,9 @@
 	import type { Page } from '$lib/utils/navigate';
 	import { currentSlidePath } from '$lib/utils/progressCore';
 	import { searchDocs, type SearchDoc } from '$lib/utils/searchCore';
+	// The same row-selection arithmetic the presenter console's jump menu walks with
+	// ↑/↓ — one implementation, so the two menus can't drift on where the cursor lands.
+	import { stepTocSelection } from '$lib/chrome/presenterTocCore';
 	import { deckSearchDocs } from '$lib/utils/searchIndex';
 	import { tocOpenRequest } from '$lib/stores/chromeArm';
 
@@ -46,6 +49,49 @@
 	$: searchable = docs ?? deckSearchDocs(deck, listed);
 	$: hits = searchDocs(searchable, query);
 	$: searching = query.trim().length > 0;
+
+	// ↑/↓ walk the rows on screen — whichever list is showing — and Enter opens the
+	// one under the cursor. `selected` is an index into `rows`; -1 means "cursor not
+	// placed yet", which is the state a fresh query starts in (so ↓ lands on the top
+	// hit). In the unfiltered list the cursor instead starts where you ARE, so ↓/↑
+	// step to the next/previous slide.
+	let selected = -1;
+	let cursorQuery = '';
+	$: rows = searching ? hits : listed;
+	// Any edit to the query invalidates the cursor: the rows underneath it changed.
+	$: if (query !== cursorQuery) {
+		cursorQuery = query;
+		selected = -1;
+	}
+	$: origin = searching ? -1 : listed.findIndex((p) => p.path === currentPath);
+
+	function moveSelection(delta: number) {
+		selected = stepTocSelection(selected < 0 ? origin : selected, delta, rows.length);
+	}
+	// Enter follows the cursor by clicking the row's own <a> — so keyboard and mouse
+	// take the exact same path through SvelteKit's router (and the same href), rather
+	// than this growing a second, drifting way to navigate.
+	function openSelection() {
+		// Enter straight after typing takes the top hit — the cursor need not be placed
+		// first. In the unfiltered list there is no such default: Enter there would open
+		// the slide you are already on.
+		const at = selected < 0 && searching ? 0 : selected;
+		const links = tocRef?.querySelectorAll<HTMLAnchorElement>('.scroll ol li a');
+		const link = links?.[at];
+		if (!link) return false;
+		link.click();
+		turnOffTableOfContent();
+		return true;
+	}
+	// The ↑/↓/Enter half of the key handling, shared by the input and the window
+	// listener so the cursor works whether or not the box still has focus.
+	// Returns whether the key was ours to keep.
+	function handleListKeydown(event: KeyboardEvent) {
+		if (event.key === 'ArrowDown')    { moveSelection(1);  return true; }
+		if (event.key === 'ArrowUp')      { moveSelection(-1); return true; }
+		if (event.key === 'Enter')        { return openSelection(); }
+		return false;
+	}
 
 	/** Show the extra link above the slide list. Off by default — only decks that
 	    want it (e.g. a text.html article view, or a "back to home" link) enable it. */
@@ -86,10 +132,16 @@
 	// listener on the deck, since they all (rightly) skip an already-handled event.
 	// A closed menu has no business claiming a key it is not using.
 	function handleGlobalKeydown(event: KeyboardEvent) {
-		if (event.key === 'Escape' && $isContentVisible) {
+		if (!$isContentVisible) return;
+		if (event.key === 'Escape') {
 			event.preventDefault();
 			escapeStep();
+			return;
 		}
+		// An open TOC owns ↑/↓/Enter: they walk its rows instead of paging the deck
+		// (NavigationBar listens on the same window, unguarded). Only while open —
+		// a shut menu has no business claiming a key it is not using.
+		if (handleListKeydown(event)) event.preventDefault();
 	}
 	// The deck's own key handlers live on `window`: NavigationBar pages on the
 	// arrow keys with NO input-focus guard, so a bare cursor-move in this box would
@@ -100,19 +152,28 @@
 		if (event.key === 'Escape') {
 			event.preventDefault();
 			escapeStep();
+			return;
 		}
+		// ↑/↓ move the row cursor rather than the caret (a search input would jump it
+		// to either end of the text); Enter opens the row under it.
+		if (handleListKeydown(event)) event.preventDefault();
 	}
 	// Put the caret in the box the moment the menu opens, so it is type-to-search.
 	function focusOnMount(node: HTMLInputElement) {
 		node.focus();
 	}
-	// Bring the highlighted (current) row into view when the menu opens — a deck deep
-	// past the fold would otherwise hide the very mark this adds. `nearest` scrolls the
-	// list, not the page.
+	// Bring the highlighted row into view — the current slide when the menu opens, and
+	// afterwards whichever row ↑/↓ moved the cursor to; a deck deep past the fold would
+	// otherwise hide the very mark this adds. Updating (not just mounting) is what lets
+	// the cursor scroll the list as it walks. `nearest` scrolls the list, not the page.
 	function scrollActiveIntoView(node: HTMLElement, active: boolean) {
-		if (active && typeof node.scrollIntoView === 'function') {
-			node.scrollIntoView({ block: 'nearest' });
-		}
+		const reveal = (on: boolean) => {
+			if (on && typeof node.scrollIntoView === 'function') {
+				node.scrollIntoView({ block: 'nearest' });
+			}
+		};
+		reveal(active);
+		return { update: reveal };
 	}
 	function handleClickOutside(event: MouseEvent) {
 		if (tocRef && !tocRef.contains(event.target as Node)) {
@@ -168,9 +229,13 @@
 			{#if searching}
 				{#if hits.length}
 				<ol class="results" aria-label="Search results">
-					{#each hits as { path, title, snippet }}
-						<li class:current={path === currentPath}>
-							<a href={`./${path}`} aria-current={path === currentPath ? 'page' : undefined}>
+					{#each hits as { path, title, snippet }, i}
+						<li class:current={path === currentPath} class:selected={i === selected}>
+							<a
+								href={`./${path}`}
+								aria-current={path === currentPath ? 'page' : undefined}
+								use:scrollActiveIntoView={i === selected}
+							>
 								<span class="hit-title">{title}</span>
 								{#if snippet}<span class="snippet">{snippet}</span>{/if}
 							</a>
@@ -182,12 +247,12 @@
 				{/if}
 			{:else}
 			<ol>
-				{#each listed as { path, title }}
-					<li class:current={path === currentPath}>
+				{#each listed as { path, title }, i}
+					<li class:current={path === currentPath} class:selected={i === selected}>
 						<a
 							href={`./${path}`}
 							aria-current={path === currentPath ? 'page' : undefined}
-							use:scrollActiveIntoView={path === currentPath}
+							use:scrollActiveIntoView={selected < 0 ? path === currentPath : i === selected}
 						>{title}</a>
 					</li>
 				{/each}
@@ -318,6 +383,18 @@
 		font-weight: 600;
 	}
 	.toc .content ol li.current:hover {
+		background-color: var(--toc-current-bg, #CFE3F5);
+	}
+
+	/* The ↑/↓ keyboard cursor. Drawn as an inset outline so it reads on a plain row,
+	   on a hovered row and on the current-slide tint alike — a second background
+	   colour would fight the one already there. */
+	.toc .content ol li.selected {
+		outline: 2px solid var(--toc-selected-outline, #2980B9);
+		outline-offset: -2px;
+		background-color: var(--toc-row-hover-bg, #DDDDDD);
+	}
+	.toc .content ol li.selected.current {
 		background-color: var(--toc-current-bg, #CFE3F5);
 	}
 

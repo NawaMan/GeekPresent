@@ -65,6 +65,9 @@
 	   accent itself as the ink. color-mix keeps it a wash whatever the theme's accent. */
 	--toc-current-bg:    color-mix(in srgb, var(--ACCENT, #2980B9) 20%, var(--toc-bg, #EEEEEE));
 	--toc-current-fg:    var(--ACCENT, #2980B9);
+	/* The ↑/↓ keyboard cursor. It has to be legible ON TOP of the current-slide tint
+	   (the cursor often starts there), so it is an outline rather than a second fill. */
+	--toc-selected-outline: var(--ACCENT, #2980B9);
 
 	/* Deck overview — the all-slides grid (OverviewPage.svelte). A near-opaque scrim over
 	   the canvas, so the tiles (which are the real slides) carry the colour and the
