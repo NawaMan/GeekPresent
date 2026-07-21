@@ -20,7 +20,7 @@
 	import { navigate } from '$lib/utils/deckNav';
 	import { getViewTransitions } from '$lib/presentation';
 	import { activeSteps } from '$lib/stores/activeSteps';
-	import { collectFinite, sampleFraction } from '$lib/utils/slideAnim';
+	import { collectFinite, isPlaying, sampleFraction } from '$lib/utils/slideAnim';
 	import {
 		kioskStatus,
 		kioskPaces,
@@ -62,7 +62,12 @@
 		if (!root) return false;
 		const anims = collectFinite(root);
 		if (!anims.length) return false;
-		return sampleFraction(anims) < 0.999;
+		// Busy means something is actually advancing on the clock — not merely "the
+		// playhead hasn't reached the end." A group parked at a frame (a Terminal held
+		// at its ▶ button, an un-scrubbed animation) is *waiting*, not busy; treating it
+		// as busy freezes the loop on a human gate that will never trip itself. A parked
+		// Terminal that registered a build gets driven instead, via the `reveal` branch.
+		return isPlaying(anims) && sampleFraction(anims) < 0.999;
 	}
 
 	function targetForPage(): string | null {

@@ -96,6 +96,7 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { getMode } from '$lib/presentation';
 	import { activeSteps } from '$lib/stores/activeSteps';
+	import { kioskActive } from '$lib/stores/kiosk';
 	import { spaceIntent } from '$lib/utils/stepKeys';
 	// Driving a group of staggered animations is one problem with one implementation,
 	// shared with AnimationBar and the presenter console. (Do not inline `a.play()`.)
@@ -192,7 +193,10 @@
 	// outright (see the media query below), so `ready` goes false and the chrome — which
 	// could not drive anything — never renders. No matchMedia needed.
 	$: hasTransport = animating && controls && ready && duration > 0;
-	$: showOverlay = hasTransport && !playing && playhead <= 0;
+	// While the kiosk is running it drives the session itself (via the activeSteps build),
+	// so the ▶ button is not a gate the viewer must clear — hide it rather than flash a
+	// dead play button on a booth screen for the first step's dwell.
+	$: showOverlay = hasTransport && !playing && playhead <= 0 && !$kioskActive;
 
 	$: build = {
 		hasNext: nextCheckpoint(markers, playhead) !== null,
