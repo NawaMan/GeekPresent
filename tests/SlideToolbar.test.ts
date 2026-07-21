@@ -166,6 +166,21 @@ describe('SlideToolbar ☰ menu', () => {
 		expect(isOpen()).toBe(false);
 	});
 
+	it('dismisses even when focus was inside the menu (focus-within would otherwise stick)', async () => {
+		render(SlideToolbarHost);
+		const burger = screen.getByLabelText('More tools (M)');
+		toggleMoreMenu();
+		await tick();
+		burger.focus();
+		expect(isOpen()).toBe(true);
+
+		// Latch closed — without the blur effect, :focus-within would keep the drop open.
+		await import('../src/lib/stores/chromeArm').then((m) => m.closeMoreMenu());
+		await tick();
+		expect(isOpen()).toBe(false);
+		expect(document.activeElement === burger).toBe(false);
+	});
+
 	it('keeps the bar seated while open, so the arm timeout cannot tuck it away', async () => {
 		render(SlideToolbarHost);
 		toggleMoreMenu();

@@ -57,11 +57,16 @@
 		keepChromeArmed,
 		requestTocOpen,
 		requestDisplayMenu,
+		openMoreMenu,
 		closeMoreMenu,
 		toggleMoreMenu,
 		moreMenuOpen
 	} from '$lib/stores/chromeArm';
-	import { chromeKeyIntent, isAdjustSaveChord } from '$lib/chrome/chromeArmCore';
+	import {
+		chromeKeyIntent,
+		moreMenuKeyIntent,
+		isAdjustSaveChord
+	} from '$lib/chrome/chromeArmCore';
 	import CodeBox from '$lib/components/CodeBox.svelte';
 
 	// Deck-level SOURCE CodeBox (slides without ViewSource). Opened by openPageSource
@@ -514,6 +519,7 @@
 		if (e.ctrlKey || e.metaKey || e.altKey) return false;
 		if (e.key === 'Escape') {
 			e.preventDefault();
+			// Back one level: close the PRINT flyout only (☰ can stay for another pick).
 			printMenuOpen = false;
 			return true;
 		}
@@ -530,6 +536,9 @@
 		if (!act) return false;
 		e.preventDefault();
 		act();
+		// A real destination was picked — put the whole ☰ away (flyout already cleared
+		// itself inside printThisSlide / openHandout).
+		closeMoreMenu();
 		return true;
 	}
 
@@ -537,8 +546,9 @@
 	let chromeOverlay: HTMLDivElement | undefined;
 
 	/**
-	 * Alt+. raises both window-edge bars; while armed, a/j/z/p/m/t pick a control.
-	 * Esc disarms chrome and closes the ☰ drop. Print-menu keys win when open.
+	 * Alt+. raises both window-edge bars; while armed, a/j/z/p/m/t pick a bar control
+	 * and o/k/c/r/s/e pick a ☰ row (opening the drop if needed). Esc disarms chrome
+	 * and closes the ☰ drop. Print-menu keys win when that flyout is open.
 	 */
 	function onChromeKeys(e: KeyboardEvent) {
 		// Ctrl/Cmd+S while ADJUST is active (offered AND on) writes the moved Blocks
@@ -555,6 +565,45 @@
 		// PRINT submenu gets first refusal on its own alphabet (including Esc) — but only the
 		// keys it actually claims. Anything else falls through to the chrome mnemonics.
 		if (onPrintMenuKey(e)) return;
+
+		// ☰ rows (underlined O/K/C/R/S/E): while the drop is open, or while chrome is
+		// armed so a letter can open the drop and fire the row. Handled before bar
+		// letters so they never collide (bar uses a/j/z/p/m/t).
+		const moreIntent = moreMenuKeyIntent(e, $moreMenuOpen, $chromeArmed);
+		if (moreIntent !== 'ignore') {
+			e.preventDefault();
+			// Ensure the drop is latched open for PRINT (and any brief paint of a row).
+			if (!$moreMenuOpen) openMoreMenu();
+			switch (moreIntent) {
+				case 'overview':
+					overviewOpen.set(true);
+					closeMoreMenu();
+					break;
+				case 'kiosk':
+					if ($canKiosk) openKioskDialog();
+					closeMoreMenu();
+					break;
+				case 'capture':
+					if (canCapture) onCapture();
+					closeMoreMenu();
+					break;
+				case 'print':
+					// Leave ☰ open; open the PRINT flyout so cCwWtT can take over.
+					printMenuOpen = true;
+					keepChromeArmed();
+					break;
+				case 'source':
+					if ($pageSourceCanView) openPageSource();
+					closeMoreMenu();
+					break;
+				case 'edit':
+					if ($pageSourceCanEdit) openPageSourceEdit();
+					closeMoreMenu();
+					break;
+			}
+			keepChromeArmed();
+			return;
+		}
 
 		const intent = chromeKeyIntent(e, $chromeArmed);
 		if (intent === 'ignore') return;
@@ -1244,7 +1293,6 @@
 					</svg>
 				</span>
 				<span class="tool-label"><span class="tool-mn">O</span>VERVIEW</span>
-				<kbd class="tool-kbd">O</kbd>
 			</button>
 		{/snippet}
 		<!-- SOURCE / EDIT — deck chrome in dev; ViewSource also offers them in builds. -->

@@ -412,7 +412,10 @@ than misleading the next agent.
   unscaled `/_source-edit` popup. A mounted ViewSource still supplies `?raw` bytes and works on
   a static host. EDIT opens `/_source-edit` for typing (Monaco's caret drifts under the canvas
   CSS scale); **SAVE** / **REFRESH** / **CLOSE** as before — SAVE is NOT ALLOWED on a static
-  host. On a Text (no tool bar) ViewSource keeps the classic corner `</> Source` button)
+  host. In the edit window: **Ctrl/Cmd+S** SAVE, **Ctrl/Cmd+Shift+R** REFRESH, **Esc** CLOSE
+  (dirty confirm); **Alt+.** arms **r**/**s**/**c** (one letter ends arm mode; Alt+. again
+  cancels). Capture-phase so Monaco cannot swallow Esc. On a Text (no tool bar) ViewSource
+  keeps the classic corner `</> Source` button)
   and `SourceView` (the same control, Shiki instead of Monaco for the in-slide panel — use it
   on any slide reached by a CLIENT-SIDE navigation, i.e. a View-Transition deck or an appendix
   with `transition`, because Monaco's CDN loader renders blank after a `goto`; EDIT still opens
@@ -918,8 +921,12 @@ stay out of the audience's way. A speaker who is actively using one often wants 
   to the CUSTOM % field, Enter applies, Esc closes — it does **not** flip FITTED/SCALED by itself.
   Esc also disarms chrome and closes ☰. Letter mnemonics do not fire while typing in a field.
   Pure core: `chrome/chromeArmCore.ts` + `chrome/sizeModeCore.ts`.
-- **☰ menu groups.** Navigate (OVERVIEW **O**, KIOSK) · export (CAPTURE, PRINT with nested flyout
-  **cCwWtT**) · source (SOURCE, EDIT). PRINT opens on hover to the left of the row.
+- **☰ menu groups.** Navigate (OVERVIEW **O**, KIOSK **K**) · export (CAPTURE **C**, PRINT **R**
+  with nested flyout **cCwWtT**) · source (SOURCE **S**, EDIT **E**). After **m** opens the drop
+  (or while chrome is armed), those letters activate the row. Picking a row (or a PRINT
+  destination) closes ☰; focus inside the menu is blurred so CSS `:focus-within` cannot stick it
+  open. PRINT opens on hover or **r**, then the flyout's own keys take over (Esc closes only the
+  flyout). **Kiosk** dialog: **Enter** starts/OK, **Esc** cancels (window-level, works from fields).
 - **Not the same as `fadeChrome`.** `fadeChrome` ghosts `.gp-chrome` opacity until pointed at;
   PIN is the tuck/untuck of the two window-edge bars. They compose: a pinned bar is fully seated
   even when fade would otherwise dim other chrome.

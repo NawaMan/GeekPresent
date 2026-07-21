@@ -50,4 +50,19 @@ describe('KioskDialog', () => {
 		expect(get(kioskStatus)).toBe('off');
 		expect(get(kioskDialogOpen)).toBe(false);
 	});
+
+	it('Escape cancels and Enter starts', async () => {
+		openKioskDialog();
+		render(KioskDialog);
+		expect(get(kioskDialogOpen)).toBe(true);
+
+		await fireEvent.keyDown(window, { key: 'Escape' });
+		expect(get(kioskDialogOpen)).toBe(false);
+		expect(get(kioskStatus)).toBe('off');
+
+		openKioskDialog();
+		await fireEvent.keyDown(window, { key: 'Enter' });
+		expect(get(kioskStatus)).toBe('running');
+		expect(get(kioskDialogOpen)).toBe(false);
+	});
 });

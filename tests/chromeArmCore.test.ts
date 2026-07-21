@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	chromeKeyIntent,
+	moreMenuKeyIntent,
 	isAdjustSaveChord,
 	isChromeTypingTarget
 } from '../src/lib/chrome/chromeArmCore';
@@ -80,6 +81,46 @@ describe('chromeKeyIntent', () => {
 	it('ignores mnemonics while typing even when armed', () => {
 		const input = { tagName: 'INPUT' } as unknown as EventTarget;
 		expect(chromeKeyIntent(key({ key: 'a', target: input }), true)).toBe('ignore');
+	});
+});
+
+describe('moreMenuKeyIntent — ☰ row letters', () => {
+	it('is idle when chrome is unarmed and the drop is closed', () => {
+		expect(moreMenuKeyIntent(key({ key: 'c' }), false, false)).toBe('ignore');
+		expect(moreMenuKeyIntent(key({ key: 'r' }), false, false)).toBe('ignore');
+	});
+
+	it('maps O/K/C/R/S/E while the drop is open (even if arm timed out)', () => {
+		expect(moreMenuKeyIntent(key({ key: 'o' }), true, false)).toBe('overview');
+		expect(moreMenuKeyIntent(key({ key: 'k' }), true, false)).toBe('kiosk');
+		expect(moreMenuKeyIntent(key({ key: 'c' }), true, false)).toBe('capture');
+		expect(moreMenuKeyIntent(key({ key: 'C' }), true, false)).toBe('capture');
+		// PRINT is R — P is PRESENT on the bar.
+		expect(moreMenuKeyIntent(key({ key: 'r' }), true, false)).toBe('print');
+		expect(moreMenuKeyIntent(key({ key: 's' }), true, false)).toBe('source');
+		expect(moreMenuKeyIntent(key({ key: 'e' }), true, false)).toBe('edit');
+	});
+
+	it('also fires while chrome is armed with the drop still closed', () => {
+		// Alt+. then c should open ☰ and run CAPTURE — the underline is not a lie.
+		expect(moreMenuKeyIntent(key({ key: 'c' }), false, true)).toBe('capture');
+		expect(moreMenuKeyIntent(key({ key: 'r' }), false, true)).toBe('print');
+	});
+
+	it('does not claim bar-level letters (those stay on chromeKeyIntent)', () => {
+		expect(moreMenuKeyIntent(key({ key: 'm' }), true, true)).toBe('ignore');
+		expect(moreMenuKeyIntent(key({ key: 'a' }), true, true)).toBe('ignore');
+		expect(moreMenuKeyIntent(key({ key: 'p' }), true, true)).toBe('ignore');
+	});
+
+	it('ignores typing targets and modifier chords', () => {
+		const input = { tagName: 'INPUT' } as unknown as EventTarget;
+		expect(moreMenuKeyIntent(key({ key: 'c', target: input }), true, true)).toBe('ignore');
+		expect(moreMenuKeyIntent(key({ key: 'c', ctrlKey: true }), true, true)).toBe('ignore');
+	});
+
+	it('falls back to the physical key on a non-Latin layout', () => {
+		expect(moreMenuKeyIntent(key({ key: 'с', code: 'KeyC' }), true, false)).toBe('capture');
 	});
 });
 

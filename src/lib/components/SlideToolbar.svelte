@@ -63,6 +63,9 @@
 		kioskItem
 	}: Props = $props();
 
+	/** The menu root — so an outside click can tell "in the drop" from "elsewhere". */
+	let menuEl: HTMLDivElement | undefined = $state();
+
 	// When OVERVIEW opens, shut the ☰ drop: it would otherwise stay painted over the grid
 	// (the toolbar sits above the overview scrim). Drop the open latch AND blur, because
 	// :focus-within is a second, independent way in.
@@ -73,8 +76,14 @@
 		}
 	});
 
-	/** The menu root — so an outside click can tell "in the drop" from "elsewhere". */
-	let menuEl: HTMLDivElement | undefined = $state();
+	// Closing the latch is not enough if focus is still inside ☰ — CSS `:focus-within`
+	// would keep the drop painted. Any time the latch goes false, blur menu focus so a
+	// keyboard pick (m then k) actually dismisses the panel.
+	$effect(() => {
+		if (!browser || $moreMenuOpen) return;
+		const ae = document.activeElement;
+		if (ae instanceof HTMLElement && menuEl?.contains(ae)) ae.blur();
+	});
 
 	/**
 	 * A click anywhere outside the ☰ closes it, the way every other menu on the page behaves.

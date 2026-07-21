@@ -936,29 +936,11 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
 
 ## Chrome & legibility
 
-- [ ] **Toolbar mnemonic doesn't expand into the ☰ hamburger menu** — the ☰ dropdown rows
-  (OVERVIEW / CAPTURE / PRINT / SOURCE) show underlined mnemonic letters, but pressing one while
-  chrome is armed does nothing: it neither opens the collapsed hamburger nor fires the row.
-  - Why: a keyboard user reads the underline and presses the letter, and gets silence — the
-    advertised affordance is a lie for every item that lives in the drop. Only OVERVIEW appears to
-    work, and only by accident: it has its OWN global `o` listener (`overviewPageCore.overviewKeyIntent`),
-    independent of the mnemonic system, so the ☰ rows that rely on the mnemonic system alone are dead
-    from the keyboard.
-  - Root cause: `chromeKeyIntent` (`chrome/chromeArmCore.ts`) only maps the BAR-level letters —
-    a/j/z/p/t and `m` — and `m`'s `'more'` intent merely *focuses* `.annot-hamburger` so
-    `:focus-within` opens the drop (`SlideDeck.svelte:529`). There is no intent for the row letters,
-    so while armed they fall through to `'ignore'` and the menu never expands, let alone activates a
-    row.
-  - Approach: teach the mnemonic model that a ☰-item letter both OPENS the drop and triggers its row.
-    Cleanest is to add intents (overview/capture/print/source) to `chromeKeyIntent` and, in
-    `onChromeKeys`, run the same focus-the-hamburger path `'more'` uses (or a `holdMoreMenuOpen`)
-    THEN fire the row's own handler — the rows are real buttons, so resolving the letter to the row
-    and `.click()`ing it after the drop opens also works. Keep the alphabet collision-free (PRINT
-    already uses R because P is PRESENT) and the guards unchanged (armed, no modifier chord, not a
-    typing target).
-  - Open questions: should the ☰ letters require chrome ARMED first (consistent with the rest) or
-    fire globally like OVERVIEW's `o` does today; and once the drop is open, does focus land on the
-    activated row so the PRINT flyout's own keys take over seamlessly.
+- [x] **Toolbar mnemonic expands into the ☰ hamburger menu** — Alt+. → m (or a row letter)
+  opens the drop; O/K/C/R/S/E fire OVERVIEW / KIOSK / CAPTURE / PRINT / SOURCE / EDIT.
+  - `moreMenuKeyIntent` in `chromeArmCore.ts`; PRINT uses **R** (P is PRESENT). While the PRINT
+    flyout is open, cCwWtT still own the keys first. Row letters work while the drop is open
+    (even if arm timed out) and while chrome is armed with the drop still closed.
 
 - [x] **`SlideDeck fadeChrome`** — fade the deck's own controls until pointed at.
   - Opt-in prop. NAV, TOC, DISPLAY, the minimap and the LAYOUT toggle drop to 12% opacity

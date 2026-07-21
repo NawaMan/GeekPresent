@@ -3,8 +3,10 @@
 //
 // Global letters fight typing and deck paging; so the model is:
 //   1. Alt+. raises both bars (arm)
-//   2. While armed, a/j/z/p/m/t pick a control
-//   3. Esc (or timeout) disarms
+//   2. While armed, a/j/z/p/m/t pick a bar control
+//   3. ☰ rows (o/k/c/r/s/e) fire while armed OR while the more menu is open —
+//      so Alt+. → m → c runs CAPTURE, and a bare Alt+. → c does too
+//   4. Esc (or timeout) disarms
 //
 // Total: garbage input → ignore, never throw.
 
@@ -49,6 +51,16 @@ export type ChromeKeyIntent =
 	| 'toc'
 	| 'ignore';
 
+/** ☰ dropdown row letters (underlined on the rows). Collision-free with the bar alphabet. */
+export type MoreMenuKeyIntent =
+	| 'overview'
+	| 'kiosk'
+	| 'capture'
+	| 'print'
+	| 'source'
+	| 'edit'
+	| 'ignore';
+
 /**
  * Which mnemonic letter a press means, '' for none.
  *
@@ -65,7 +77,43 @@ function mnemonicLetter(e: KeyboardEvent): string {
 }
 
 /**
- * What a key means for chrome arming / mnemonics.
+ * ☰ row mnemonic while the more menu is open, or while chrome is armed (so the
+ * letter both opens the drop and runs the row — the underline is not a lie).
+ *
+ * Alphabet: O OVERVIEW · K KIOSK · C CAPTURE · R PRINT · S SOURCE · E EDIT.
+ * PRINT uses R because P is PRESENT on the bar. Case-insensitive; print flyout
+ * case-sensitive keys (cCwWtT) are handled separately once PRINT is open.
+ */
+export function moreMenuKeyIntent(
+	e: KeyboardEvent,
+	moreOpen: boolean,
+	armed: boolean
+): MoreMenuKeyIntent {
+	if (!moreOpen && !armed) return 'ignore';
+	if (isChromeTypingTarget(e.target)) return 'ignore';
+	if (e.ctrlKey || e.metaKey || e.altKey) return 'ignore';
+	if (e.defaultPrevented) return 'ignore';
+
+	switch (mnemonicLetter(e)) {
+		case 'o':
+			return 'overview';
+		case 'k':
+			return 'kiosk';
+		case 'c':
+			return 'capture';
+		case 'r':
+			return 'print';
+		case 's':
+			return 'source';
+		case 'e':
+			return 'edit';
+		default:
+			return 'ignore';
+	}
+}
+
+/**
+ * What a key means for chrome arming / bar-level mnemonics.
  *
  * @param armed  are the bars currently raised for keyboard use?
  */
