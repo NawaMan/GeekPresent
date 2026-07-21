@@ -61,11 +61,20 @@
 
 	/** A Block `name` or a literal canvas point. */
 	export type CursorAt = string | Point;
-	/** A waypoint: where to go, and whether arriving there flashes a ripple. */
+	/** A waypoint: where to go, whether arriving there flashes a ripple, and
+	 *  an optional per-waypoint size override (falls back to Cursor's own
+	 *  `size` prop). */
 	export interface CursorWaypoint {
 		at: CursorAt;
 		click?: boolean;
+		size?: number;
 	}
+	/** Built-in glyph presets — `arrow` (default) is the pointer path;
+	 *  `dot`/`ring` are simple vector shapes for a laser-pointer-style cue.
+	 *  For anything else (an emoji, custom art), use the default slot
+	 *  instead — presets and `children` are mutually exclusive; `children`
+	 *  wins if both are given. */
+	export type CursorShape = 'arrow' | 'dot' | 'ring';
 </script>
 
 <script lang="ts">
@@ -73,7 +82,7 @@
 	import { blockAnchors } from '$lib/stores/blockAnchors';
 	import { lastTrigger } from '$lib/stores/triggers';
 	import Sprite from './Sprite.svelte';
-	import { cursorRippleRadius, cursorRipples, cursorSpriteStops } from './cursorCore';
+	import { cursorRipples, cursorSpriteStops } from './cursorCore';
 	import { compileScript, type CursorCommand, type ResolvedCursorCommand } from './cursorScriptCore';
 
 	interface Props {
@@ -98,10 +107,15 @@
 		 *  Ignored when `script` is set — each command already has its own
 		 *  pacing; a whole-flight easing curve would fight it. */
 		ease?: string;
-		/** Glyph box size, canvas px. */
+		/** Default glyph box size, canvas px — the ambient size at the start
+		 *  of the flight. A `path` waypoint's own `size`, or a `script`
+		 *  command's own `size`, overrides it from that point on. */
 		size?: number;
 		/** Extra static rotation (deg) on the glyph, e.g. to match custom art. */
 		rotate?: number;
+		/** Built-in glyph preset — `arrow` (default) / `dot` / `ring`. Ignored
+		 *  when `children` is given. */
+		shape?: CursorShape;
 		/** The name of a trigger pulse (stores/triggers) that starts this
 		 *  flight — fired by a checked `<Note data-trigger="…">` line, or
 		 *  directly via `fireTrigger(name)`. Unset (default): the flight
@@ -133,6 +147,7 @@
 		ease = 'ease-in-out',
 		size = 40,
 		rotate = 0,
+		shape = 'arrow',
 		startOn = '',
 		name = '',
 		children,
@@ -163,19 +178,42 @@
 	const pathTargets = $derived(
 		pathUnresolved
 			? []
-			: resolvedPath.map((p, i) => ({ x: p![0], y: p![1], click: !!waypoints[i].click }))
+			: resolvedPath.map((p, i) => ({
+					x: p![0],
+					y: p![1],
+					click: !!waypoints[i].click,
+					size: waypoints[i].size
+				}))
 	);
 
 	// --- script mode: chained warpTo/moveTo/around commands ---------------
 	const usingScript = $derived(!!script && script.length > 0);
 	function resolveCommand(cmd: CursorCommand): ResolvedCursorCommand | null {
+		const click = !!cmd.click;
+		if (cmd.kind === 'attention')
+			return {
+				kind: 'attention',
+				times: cmd.times ?? 1,
+				period: cmd.period ?? 0.5,
+				scale: cmd.scale ?? 1.4,
+				click,
+				size: cmd.size
+			};
 		const at = resolvePoint(cmd.at);
 		if (!at) return null;
-		const click = !!cmd.click;
-		if (cmd.kind === 'warpTo') return { kind: 'warpTo', at, click };
+		if (cmd.kind === 'warpTo') return { kind: 'warpTo', at, click, size: cmd.size };
 		if (cmd.kind === 'moveTo')
-			return { kind: 'moveTo', at, times: cmd.times ?? 1, period: cmd.period ?? 3, click };
-		return { kind: 'around', at, rx: cmd.rx, ry: cmd.ry, times: cmd.times ?? 1, period: cmd.period ?? 3, click };
+			return { kind: 'moveTo', at, times: cmd.times ?? 1, period: cmd.period ?? 3, click, size: cmd.size };
+		return {
+			kind: 'around',
+			at,
+			rx: cmd.rx,
+			ry: cmd.ry,
+			times: cmd.times ?? 1,
+			period: cmd.period ?? 3,
+			click,
+			size: cmd.size
+		};
 	}
 	const resolvedScript = $derived(usingScript ? (script ?? []).map(resolveCommand) : null);
 	// An unresolved name drops the WHOLE script — Connector's rule, same as `path`.
@@ -197,9 +235,8 @@
 	const ripples = $derived(
 		usingScript
 			? (scriptResult?.ripples ?? []).map((r) => ({ ...r, delaySec: r.delaySec + safeDelay }))
-			: cursorRipples(pathTargets, delay, animate)
+			: cursorRipples(pathTargets, delay, animate, size)
 	);
-	const rippleR = $derived(cursorRippleRadius(size));
 	const hasFlight = $derived(stops.length > 0);
 
 	// --- startOn: idle until a matching named pulse, then play once; a
@@ -233,6 +270,25 @@
 	</svg>
 {/snippet}
 
+{#snippet dotGlyph()}
+	<svg viewBox="0 0 24 24" width="100%" height="100%" class="cursor-glyph">
+		<circle
+			cx="12"
+			cy="12"
+			r="8"
+			fill="var(--cursor-fill, #F0A33E)"
+			stroke="var(--cursor-outline, rgba(0, 0, 0, 0.55))"
+			stroke-width="1.4"
+		/>
+	</svg>
+{/snippet}
+
+{#snippet ringGlyph()}
+	<svg viewBox="0 0 24 24" width="100%" height="100%" class="cursor-glyph">
+		<circle cx="12" cy="12" r="8" fill="none" stroke="var(--cursor-fill, #F0A33E)" stroke-width="2.5" />
+	</svg>
+{/snippet}
+
 {#snippet flight(paused: boolean, showRipples: boolean)}
 	<Sprite
 		lock
@@ -246,7 +302,15 @@
 		orient={false}
 		{stops}
 	>
-		{#if children}{@render children()}{:else}{@render pointerGlyph()}{/if}
+		{#if children}
+			{@render children()}
+		{:else if shape === 'dot'}
+			{@render dotGlyph()}
+		{:else if shape === 'ring'}
+			{@render ringGlyph()}
+		{:else}
+			{@render pointerGlyph()}
+		{/if}
 	</Sprite>
 	{#if showRipples}
 		{#each ripples as r, i (i)}
@@ -254,7 +318,7 @@
 				class="cursor-ripple"
 				cx={r.x}
 				cy={r.y}
-				r={rippleR}
+				r={r.r}
 				style="animation-delay:{r.delaySec}s"
 			/>
 		{/each}

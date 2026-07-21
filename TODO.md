@@ -1368,6 +1368,30 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     Demo: `src/routes/animation/cursor-script.html/` — a cursor idles until a button (or, in the
     presenter console, a checked note line) fires `startOn="fly"`, then warps to a rest point,
     moves directly to one point, shakes at a second, and orbits a dial once with a click.
+  - **Further extended: an `attention` action, per-command `size`, and glyph `shape` presets.**
+    `attention({times, period, scale})` is the cursor calling attention to ITSELF — a size pulse
+    IN PLACE (bigger then back to normal, `times` times), never moving "current". No new Sprite
+    machinery: a stop already carries `w`/`h` per frame, so a pulse is just two extra stops at
+    the SAME x/y with a bigger box — the exact mechanism `size` overrides reuse too. Any command
+    (including `attention` itself) can carry its own `size`, which becomes AMBIENT — in force for
+    every command after it until one of them sets its own again — so a flight can grow or shrink
+    mid-route, not just sit at one fixed size. `path` waypoints gained the same per-waypoint
+    `size` for symmetry. A ripple's radius now follows whichever size was active at ITS
+    checkpoint (an `attention` ripple uses the PEAK size) rather than one shared radius for the
+    whole flight — `CursorRipple` gained an `r` field, computed once at the point of creation in
+    both `cursorCore.ts` and `cursorScriptCore.ts`, rather than re-derived at render time.
+  - `shape="arrow" | "dot" | "ring"` swaps the built-in glyph without hand-authoring SVG; a custom
+    glyph via the default slot still overrides everything (mutually exclusive, slot wins).
+  - Tests: `cursorScriptCore.test.ts` (a lone pulse's peak/settle stops and ripple, repeated
+    pulses, the degenerate first-command case, size carried forward across commands, a garbage
+    size left alone); `cursorCore.test.ts` (a waypoint's own size overriding the shared box and
+    driving its own ripple radius); `DrawCursor.test.ts`/`DrawCursorSsr.ssr.test.ts` extended with
+    `DrawCursorAttentionHost.svelte` (ambient size carried from a `warpTo` into the pulse, the
+    three `shape` presets) and `DrawCursorPathSizeHost.svelte` (per-waypoint size in `path` mode).
+    Demo: `cursor-script.html`'s flight now lands at an overridden size and finishes with two
+    attention pulses; a small static gallery at the bottom shows all three `shape` presets side
+    by side. Verified live in a real browser (glyph presets render correctly, the flight completes
+    and settles with no console errors) on top of the numeric keyframe assertions.
 
 - [x] **`Terminal`** — fake console: typed command + output, riding the `AnimationBar` keyframe clock.
   - Done: `src/lib/components/Terminal.svelte`, with the schedule in

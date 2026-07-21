@@ -15,6 +15,18 @@ describe('cursorSpriteStops', () => {
 		expect(s).toEqual([{ pct: 0, x: 480, y: 280, w: 40, h: 40, rot: 0 }]);
 	});
 
+	it("a target's own size overrides the shared box for just that stop", () => {
+		const s = cursorSpriteStops(
+			[
+				{ x: 100, y: 100, click: false },
+				{ x: 500, y: 500, click: false, size: 80 }
+			],
+			40
+		);
+		expect(s[0]).toMatchObject({ x: 80, y: 80, w: 40, h: 40 });
+		expect(s[1]).toMatchObject({ x: 460, y: 460, w: 80, h: 80 });
+	});
+
 	it('evenly spaces N targets 0..100%, box top-left = centre − size/2', () => {
 		const s = cursorSpriteStops(
 			[
@@ -56,7 +68,8 @@ describe('cursorRipples', () => {
 					{ x: 100, y: 100, click: false }
 				],
 				0,
-				1
+				1,
+				40
 			)
 		).toEqual([]);
 	});
@@ -69,17 +82,24 @@ describe('cursorRipples', () => {
 				{ x: 400, y: 100, click: true }
 			],
 			0.5,
-			2
+			2,
+			40
 		);
 		expect(r).toEqual([
-			{ x: 200, y: 100, delaySec: 0.5 + 2 * 0.5 }, // 2nd of 3 targets → pct 0.5
-			{ x: 400, y: 100, delaySec: 0.5 + 2 * 1 } // last target → pct 1
+			{ x: 200, y: 100, r: cursorRippleRadius(40), delaySec: 0.5 + 2 * 0.5 }, // 2nd of 3 → pct 0.5
+			{ x: 400, y: 100, r: cursorRippleRadius(40), delaySec: 0.5 + 2 * 1 } // last → pct 1
 		]);
 	});
 
 	it('a single clicked target fires at just the hold — there is no flight to time against', () => {
-		const r = cursorRipples([{ x: 10, y: 20, click: true }], 0.3, 5);
-		expect(r).toEqual([{ x: 10, y: 20, delaySec: 0.3 }]);
+		const r = cursorRipples([{ x: 10, y: 20, click: true }], 0.3, 5, 40);
+		expect(r).toEqual([{ x: 10, y: 20, r: cursorRippleRadius(40), delaySec: 0.3 }]);
+	});
+
+	it("a target's own size drives ITS ripple radius, not the shared default", () => {
+		const r = cursorRipples([{ x: 10, y: 20, click: true, size: 100 }], 0, 1, 40);
+		expect(r[0].r).toBe(cursorRippleRadius(100));
+		expect(r[0].r).not.toBe(cursorRippleRadius(40));
 	});
 
 	it('is NaN-safe: garbage delay/animate never produce a negative or NaN offset', () => {
@@ -89,7 +109,8 @@ describe('cursorRipples', () => {
 				{ x: 10, y: 10, click: true }
 			],
 			NaN,
-			-5
+			-5,
+			40
 		);
 		expect(Number.isFinite(r[0].delaySec)).toBe(true);
 		expect(r[0].delaySec).toBeGreaterThanOrEqual(0);
