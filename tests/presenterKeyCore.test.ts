@@ -44,6 +44,33 @@ describe('presenterKeyIntent — the three console mnemonics', () => {
 	});
 });
 
+describe('presenterKeyIntent — TOC browsing (↑/↓/Enter) while the menu is open', () => {
+	it('walks the rows only while the menu is open', () => {
+		expect(presenterKeyIntent(key({ key: 'ArrowDown' }), false, true)).toBe('tocDown');
+		expect(presenterKeyIntent(key({ key: 'ArrowUp' }), false, true)).toBe('tocUp');
+		expect(presenterKeyIntent(key({ key: 'Enter' }), false, true)).toBe('tocSelect');
+	});
+
+	it('does nothing with those keys while the menu is closed', () => {
+		expect(presenterKeyIntent(key({ key: 'ArrowDown' }), false, false)).toBe('ignore');
+		expect(presenterKeyIntent(key({ key: 'Enter' }), false, false)).toBe('ignore');
+	});
+
+	it('still lets ←/→ page the deck even while the menu is open', () => {
+		expect(presenterKeyIntent(key({ key: 'ArrowRight' }), false, true)).toBe('next');
+		expect(presenterKeyIntent(key({ key: 'ArrowLeft' }), false, true)).toBe('prev');
+	});
+
+	it('still lets T close the menu (toggle) while it is open', () => {
+		expect(presenterKeyIntent(key({ key: 't' }), false, true)).toBe('toc');
+	});
+
+	it('never fires while typing, even with the menu open (the search box owns its own keys)', () => {
+		const input = { tagName: 'INPUT' } as unknown as EventTarget;
+		expect(presenterKeyIntent(key({ key: 'ArrowDown', target: input }), false, true)).toBe('ignore');
+	});
+});
+
 describe('presenterKeyIntent — paging keys', () => {
 	it('arrows page the deck (→ next, ← prev), never step', () => {
 		expect(presenterKeyIntent(key({ key: 'ArrowRight' }))).toBe('next');

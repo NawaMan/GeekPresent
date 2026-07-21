@@ -46,6 +46,10 @@
 	import { overviewOpen } from '$lib/stores/overviewOpen';
 	import type { Page } from '$lib/utils/navigate';
 	import type { AnimState } from '$lib/utils/slideAnim';
+	import { base } from '$app/paths';
+	import { searchDocs } from '$lib/utils/searchCore';
+	import { deckSearchDocs } from '$lib/utils/searchIndex';
+	import { stepTocSelection } from '$lib/chrome/presenterTocCore';
 
 	/** This deck's slide list (for nav, the TOC, and the current/next lookup). */
 	export let pages: Array<Page> = [];
@@ -68,6 +72,11 @@
 	$: nextSrc = nextPage ? `./${nextPage.path}?clean` : '';
 
 	$: deckKey = browser ? deckKeyFromPath($page.url.pathname) : '/';
+	// The deck's bare folder name (e.g. "slides") — SlideDeck derives it the same
+	// way — used to key the same build-time search index the audience TOC reads.
+	$: deckName = browser
+		? ($page.url.pathname.replace(base, '').split('/').filter(Boolean)[0] ?? '')
+		: '';
 
 	function kindFor(direction: 'forward' | 'back'): string {
 		return (direction === 'back' ? currentPage?.transitionBack : currentPage?.transition) ?? 'slide';
@@ -103,6 +112,83 @@
 	// TOC jump menu (opens upward from the bar).
 	let tocOpen = false;
 	let tocRef: HTMLElement;
+
+	// TOC search + keyboard browsing — a search box plus ↑/↓/Enter, reusing the
+	// pure search/selection cores (searchCore, presenterTocCore) rather than
+	// re-deriving the logic; only the markup differs (this menu opens upward
+	// from the bar and shows each slide's number, matching PresenterView's own
+	// popover style).
+	let tocQuery = '';
+	let tocSelected = -1;
+	let tocCursorQuery = '';
+	interface TocRow {
+		path: string;
+		title: string;
+		number?: number;
+		snippet?: string;
+	}
+	// This menu already lists hidden appendices (unlike the audience TOC/
+	// OVERVIEW, which filter them out) — search must find them too, numbered
+	// exactly as the rows below already are (position in the raw `pages`).
+	$: tocDocs = deckSearchDocs(deckName, pages);
+	$: tocHits = searchDocs(tocDocs, tocQuery);
+	$: tocSearching = tocQuery.trim().length > 0;
+	$: tocRows = (
+		tocSearching
+			? tocHits.map((h) => ({ path: h.path, title: h.title, number: h.number, snippet: h.snippet }))
+			: pages.map((p, i) => ({ path: p.path, title: p.title, number: i + 1 }))
+	) as TocRow[];
+	// The cursor starts on the current slide when browsing unfiltered, and
+	// nowhere once a query narrows the list — so ↓ lands on the top hit.
+	$: tocOrigin = tocSearching ? -1 : currentIndex;
+	// Any edit to the query invalidates the cursor: the rows underneath it changed.
+	$: if (tocQuery !== tocCursorQuery) {
+		tocCursorQuery = tocQuery;
+		tocSelected = -1;
+	}
+	// Closing the menu (Esc, T again, a click outside, or a jump) always clears
+	// the search — the next open starts fresh, exactly like the audience TOC.
+	$: if (!tocOpen) {
+		tocQuery = '';
+		tocSelected = -1;
+	}
+	function moveTocSelection(delta: number) {
+		tocSelected = stepTocSelection(tocSelected < 0 ? tocOrigin : tocSelected, delta, tocRows.length);
+	}
+	// Enter follows the cursor; straight after typing (cursor unplaced) it takes
+	// the top hit.
+	function commitTocSelection() {
+		const at = tocSelected < 0 && tocSearching ? 0 : tocSelected;
+		const row = tocRows[at];
+		if (row) jump(row.path);
+	}
+	// ↑/↓/Enter/Esc while the caret is in the search box: stopPropagation so the
+	// window-level handler (onKeydown / presenterKeyIntent) never doubles up on
+	// them — this box owns them outright once it has focus.
+	function handleTocSearchKeydown(e: KeyboardEvent) {
+		e.stopPropagation();
+		if (e.key === 'Escape') {
+			e.preventDefault();
+			if (tocQuery) tocQuery = '';
+			else tocOpen = false;
+			return;
+		}
+		if (e.key === 'ArrowDown') { e.preventDefault(); moveTocSelection(1); return; }
+		if (e.key === 'ArrowUp')   { e.preventDefault(); moveTocSelection(-1); return; }
+		if (e.key === 'Enter')     { e.preventDefault(); commitTocSelection(); }
+	}
+	// Type-to-search: put the caret in the box the moment the menu opens.
+	function focusTocInput(node: HTMLInputElement) {
+		node.focus();
+	}
+	// Keep the keyboard cursor's row in view as ↑/↓ walk past the fold.
+	function scrollTocRowIntoView(node: HTMLElement, active: boolean) {
+		const reveal = (on: boolean) => {
+			if (on && typeof node.scrollIntoView === 'function') node.scrollIntoView({ block: 'nearest' });
+		};
+		reveal(active);
+		return { update: reveal };
+	}
 
 	// Note check-off reset menu.
 	let checksOpen = false;
@@ -161,7 +247,7 @@
 		overviewOpen.set(true);
 	}
 	function onKeydown(e: KeyboardEvent) {
-		switch (presenterKeyIntent(e, $canAnnotate)) {
+		switch (presenterKeyIntent(e, $canAnnotate, tocOpen)) {
 			case 'close':
 				closeMenus();
 				break;
@@ -201,6 +287,18 @@
 			case 'continue':
 				e.preventDefault();
 				doContinue();
+				break;
+			case 'tocUp':
+				e.preventDefault();
+				moveTocSelection(-1);
+				break;
+			case 'tocDown':
+				e.preventDefault();
+				moveTocSelection(1);
+				break;
+			case 'tocSelect':
+				e.preventDefault();
+				commitTocSelection();
 				break;
 		}
 	}
@@ -412,15 +510,38 @@
 			<CtrlBtn text={tocOpen ? 'ToC ▾' : 'ToC ▴'} mnemonic="T" isSelected={tocOpen} on:click={() => (tocOpen = !tocOpen)} />
 			{#if tocOpen}
 			<div class="toc-menu">
-				<ol>
-					{#each pages as p, i}
-						<li>
-							<button type="button" class:current={p.path === currentPath} on:click={() => jump(p.path)}>
-								<span class="n">{i + 1}</span><span class="t">{p.title}</span>
-							</button>
-						</li>
-					{/each}
-				</ol>
+				<input
+					class="search"
+					type="search"
+					placeholder="Search slides…"
+					aria-label="Search slides"
+					bind:value={tocQuery}
+					on:keydown={handleTocSearchKeydown}
+					use:focusTocInput
+				/>
+				<div class="toc-scroll">
+					{#if tocSearching && tocRows.length === 0}
+					<p class="no-matches">No slides match "{tocQuery.trim()}".</p>
+					{:else}
+					<ol>
+						{#each tocRows as row, i}
+							<li>
+								<button
+									type="button"
+									class:current={row.path === currentPath}
+									class:selected={i === tocSelected}
+									on:click={() => jump(row.path)}
+									use:scrollTocRowIntoView={i === tocSelected}
+								>
+									<span class="n">{row.number ?? ''}</span>
+									<span class="t">{row.title}</span>
+									{#if row.snippet}<span class="snip">{row.snippet}</span>{/if}
+								</button>
+							</li>
+						{/each}
+					</ol>
+					{/if}
+				</div>
 			</div>
 			{/if}
 		</div>
@@ -688,13 +809,21 @@
 		left: 0;
 		min-width: 22em;
 		max-height: 60vh;
-		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
 		background: #eef1f4;
 		color: #14181d;
 		border: 1.5px solid #3a4450;
 		border-radius: 6px;
 		box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
 		font-size: 0.62em; /* back down from the 1.5rem lever to a readable list */
+	}
+	/* Only the list scrolls — the search box (like the audience TOC's) stays
+	   reachable however long the results run. */
+	.toc-menu .toc-scroll {
+		overflow-y: auto;
+		min-height: 0;
 	}
 	.toc-menu ol {
 		margin: 0;
@@ -725,6 +854,40 @@
 		width: 1.8em;
 		text-align: right;
 		opacity: 0.6;
+	}
+	.toc-menu li button .t {
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+	.toc-menu li button .snip {
+		flex: none;
+		max-width: 12em;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		opacity: 0.6;
+	}
+	/* The ↑/↓ keyboard cursor — an inset outline so it reads over both a plain
+	   row and the current-slide tint, same trick the audience TOC uses. */
+	.toc-menu li button.selected {
+		outline: 2px solid #2980b9;
+		outline-offset: -2px;
+	}
+	.toc-menu .search {
+		display: block;
+		width: 100%;
+		box-sizing: border-box;
+		margin: 4px;
+		padding: 0.3em 0.5em;
+		font: inherit;
+		color: #14181d;
+		background: #fff;
+		border: 1.5px solid #b3bcc6;
+		border-radius: 4px;
+	}
+	.toc-menu .no-matches {
+		margin: 0.5em 0.9em;
+		opacity: 0.7;
 	}
 
 	/* Checks reset menu — a short column of actions (reuses .toc-menu's popover). */

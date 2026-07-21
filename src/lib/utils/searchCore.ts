@@ -12,22 +12,30 @@
 // a string function you can unit-test with hand-written input.
 
 /** One searchable slide: its route `path` (as in pages.ts), its `title` (the
-    same string the TOC shows), and `text` — the visible prose of its source with
-    tags and script blocks stripped out. */
+    same string the TOC shows), its `text` — the visible prose of its source with
+    tags and script blocks stripped out — and its 1-based `number`, the slide's
+    position in the deck's linear order (the same number OVERVIEW and the console
+    ToC show). `number` is optional so a caller with no notion of position (a
+    hand-written test doc, say) still type-checks. */
 export interface SearchDoc {
 	path: string;
 	title: string;
 	text: string;
+	number?: number;
 }
 
-/** A match. `where` says whether the query hit the slide's title or its body;
-    `snippet` is a short window of body text around the first body hit (empty for
-    a title-only match, since the title is already shown). */
+/** A match. `where` says whether the query hit the slide's title, its file name
+    (the route path), its page number, or its body; `snippet` is a short window
+    of body text around the first body hit (empty for a title match, since the
+    title is already shown; the file name for a path hit, "#N" for a number hit
+    — so the row can show WHY it matched). `number`, when the doc carried one,
+    rides along on every hit regardless of what actually matched. */
 export interface SearchHit {
 	path: string;
 	title: string;
 	snippet: string;
-	where: 'title' | 'body';
+	where: 'title' | 'path' | 'number' | 'body';
+	number?: number;
 }
 
 const SCRIPT_OR_STYLE = /<(script|style)\b[\s\S]*?<\/\1>/gi;
@@ -95,12 +103,26 @@ export function snippetAround(text: string, needle: string, radius = 48): string
 	return `${lead}${text.slice(start, end).trim()}${tail}`;
 }
 
+/** The part of a slide's route path a search should match: the file name without
+    its `.html` extension. Slides are named for what they are
+    (`adjust-styles-guard.html`), so the name is real, searchable metadata — but
+    keeping the extension in would make "html" (and every prefix of it) match the
+    whole deck. Total. */
+export function searchablePath(path: unknown): string {
+	if (typeof path !== 'string') return '';
+	return path.replace(/\.html?$/i, '');
+}
+
 /** Filter `docs` to those matching `query` (a case-insensitive substring of the
-    title or the body), in deck order. A title hit comes back with an empty
-    snippet; a body-only hit carries a snippet around the match. An empty or
-    whitespace query returns no hits — the caller shows the full list instead, so
-    an untouched search box leaves the TOC exactly as it was. Total: a doc with a
-    missing title/text is treated as empty rather than throwing. */
+    title, the file name, the 1-based page number, or the body), in deck order.
+    A title hit comes back with an empty snippet; a file-name hit shows the file
+    name as its snippet; a number hit shows "#N"; a body-only hit carries a
+    snippet around the match. Numeric matching is a substring of the number's
+    digits, same as every other field — "1" finds pages 1, 10-19, 21… — and a doc
+    with no `number` simply can't match that way. An empty or whitespace query
+    returns no hits — the caller shows the full list instead, so an untouched
+    search box leaves the TOC exactly as it was. Total: a doc with a missing
+    title/text is treated as empty rather than throwing. */
 export function searchDocs(docs: SearchDoc[], query: string): SearchHit[] {
 	const q = (typeof query === 'string' ? query : '').trim().toLowerCase();
 	if (!q) return [];
@@ -109,10 +131,16 @@ export function searchDocs(docs: SearchDoc[], query: string): SearchHit[] {
 		if (!doc) continue;
 		const title = typeof doc.title === 'string' ? doc.title : '';
 		const text = typeof doc.text === 'string' ? doc.text : '';
+		const name = searchablePath(doc.path);
+		const number = Number.isFinite(doc.number) ? (doc.number as number) : undefined;
 		if (title.toLowerCase().includes(q)) {
-			hits.push({ path: doc.path, title, snippet: '', where: 'title' });
+			hits.push({ path: doc.path, title, snippet: '', where: 'title', number });
+		} else if (name.toLowerCase().includes(q)) {
+			hits.push({ path: doc.path, title, snippet: doc.path, where: 'path', number });
+		} else if (number != null && String(number).includes(q)) {
+			hits.push({ path: doc.path, title, snippet: `#${number}`, where: 'number', number });
 		} else if (text.toLowerCase().includes(q)) {
-			hits.push({ path: doc.path, title, snippet: snippetAround(text, q), where: 'body' });
+			hits.push({ path: doc.path, title, snippet: snippetAround(text, q), where: 'body', number });
 		}
 	}
 	return hits;
