@@ -33,6 +33,23 @@
   every ripple looks the same. It honours prefers-reduced-motion — the flash
   is a flourish, not the taught content, unlike the flight itself.
 
+  CHAINING (`script`): a list of warpTo/moveTo/around commands instead of an
+  evenly-timed waypoint list — see cursorScriptCore.ts for the full contract
+  (there-and-back bounces, orbit laps, an instant warp). It compiles to the
+  SAME generated `stops`, so it rides the same locked Sprite; `around` needs
+  no new Draw PathShape because the ellipse is sampled into literal stops by
+  the compiler, not ridden as a shape.
+
+  STARTING FROM A NOTE (`startOn`): a checked `<Note data-trigger="name">`
+  line fires a named pulse (stores/triggers, relayed console → audience by
+  stores/presenter's publishTrigger/subscribeTrigger, exactly like the
+  note-driven Spotlight highlight). `startOn="name"` makes Cursor wait —
+  idle, at its first pose, `paused` on the Sprite underneath — until that
+  pulse arrives, then play once; a fresh pulse (re-checking the line)
+  replays it from the top via a keyed remount, since resuming a PAUSED
+  animation can't restart one that already finished. Unset (default): the
+  flight autoplays on mount, unchanged from before.
+
   Deliberately NOT in this pass: distinct hover/drag pointer states — just
   move + a click ripple, which is what every use so far has needed. The glyph
   itself is swappable via the default slot (an emoji, a custom SVG) for a
@@ -53,25 +70,45 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { blockAnchors } from '$lib/stores/blockAnchors';
+	import { lastTrigger } from '$lib/stores/triggers';
 	import Sprite from './Sprite.svelte';
 	import { cursorRippleRadius, cursorRipples, cursorSpriteStops } from './cursorCore';
+	import { compileScript, type CursorCommand, type ResolvedCursorCommand } from './cursorScriptCore';
 
 	interface Props {
 		/** Where the pointer travels: ≥1 entries, each a Block name, a literal
 		 *  [x, y], or a `{ at, click }` waypoint. Two or more animate a glide
 		 *  across them (evenly timed); one is a static cursor with no flight.
-		 *  A name not yet registered drops the WHOLE flight (Connector's rule). */
-		path: (CursorAt | CursorWaypoint)[];
-		/** Seconds for the whole glide across every leg (evenly split). */
+		 *  A name not yet registered drops the WHOLE flight (Connector's rule).
+		 *  Ignored when `script` is set. */
+		path?: (CursorAt | CursorWaypoint)[];
+		/** A CHAINED flight instead of an evenly-timed waypoint list —
+		 *  warpTo/moveTo/around commands, each with its own timing (see
+		 *  cursorScriptCore.ts). Takes precedence over `path`; when set, the
+		 *  script's own per-command durations drive the flight and `animate`
+		 *  is ignored. */
+		script?: CursorCommand[];
+		/** Seconds for the whole glide across every leg (evenly split).
+		 *  Ignored when `script` is set. */
 		animate?: number;
 		/** Seconds to hold at the first point before departing. */
 		delay?: number;
-		/** CSS timing function for the whole flight (default ease-in-out). */
+		/** CSS timing function for the whole flight (default ease-in-out).
+		 *  Ignored when `script` is set — each command already has its own
+		 *  pacing; a whole-flight easing curve would fight it. */
 		ease?: string;
 		/** Glyph box size, canvas px. */
 		size?: number;
 		/** Extra static rotation (deg) on the glyph, e.g. to match custom art. */
 		rotate?: number;
+		/** The name of a trigger pulse (stores/triggers) that starts this
+		 *  flight — fired by a checked `<Note data-trigger="…">` line, or
+		 *  directly via `fireTrigger(name)`. Unset (default): the flight
+		 *  autoplays on mount, scrubbable by AnimationBar — today's
+		 *  behaviour. Set: the cursor sits idle at its first pose until the
+		 *  named pulse arrives, then plays once; a fresh pulse (re-checking
+		 *  the line) replays it from the top. */
+		startOn?: string;
 		/** Shown only in devtools/tests — Cursor has no ADJUST handles of its
 		 *  own (the Sprite underneath is locked), so this is not a Copy name. */
 		name?: string;
@@ -89,11 +126,13 @@
 
 	let {
 		path,
+		script,
 		animate = 1.2,
 		delay = 0,
 		ease = 'ease-in-out',
 		size = 40,
 		rotate = 0,
+		startOn = '',
 		name = '',
 		children,
 		style = '',
@@ -102,11 +141,6 @@
 	}: Props = $props();
 
 	const anchors = $derived($blockAnchors);
-
-	function normalize(w: CursorAt | CursorWaypoint): CursorWaypoint {
-		return typeof w === 'object' && !Array.isArray(w) ? w : { at: w };
-	}
-	const waypoints = $derived((path ?? []).map(normalize));
 
 	/** A name resolves to its Block's live centre; an unregistered name is
 	 *  null — the whole flight then renders nothing (Connector's rule). */
@@ -117,18 +151,73 @@
 		}
 		return at;
 	}
-	const resolved = $derived(waypoints.map((w) => resolvePoint(w.at)));
-	const unresolved = $derived(path?.length > 0 && resolved.some((p) => p === null));
 
-	const targets = $derived(
-		unresolved
+	// --- path mode: the original, evenly-timed waypoint list --------------
+	function normalize(w: CursorAt | CursorWaypoint): CursorWaypoint {
+		return typeof w === 'object' && !Array.isArray(w) ? w : { at: w };
+	}
+	const waypoints = $derived((path ?? []).map(normalize));
+	const resolvedPath = $derived(waypoints.map((w) => resolvePoint(w.at)));
+	const pathUnresolved = $derived((path?.length ?? 0) > 0 && resolvedPath.some((p) => p === null));
+	const pathTargets = $derived(
+		pathUnresolved
 			? []
-			: resolved.map((p, i) => ({ x: p![0], y: p![1], click: !!waypoints[i].click }))
+			: resolvedPath.map((p, i) => ({ x: p![0], y: p![1], click: !!waypoints[i].click }))
 	);
 
-	const stops = $derived(cursorSpriteStops(targets, size));
-	const ripples = $derived(cursorRipples(targets, delay, animate));
+	// --- script mode: chained warpTo/moveTo/around commands ---------------
+	const usingScript = $derived(!!script && script.length > 0);
+	function resolveCommand(cmd: CursorCommand): ResolvedCursorCommand | null {
+		const at = resolvePoint(cmd.at);
+		if (!at) return null;
+		const click = !!cmd.click;
+		if (cmd.kind === 'warpTo') return { kind: 'warpTo', at, click };
+		if (cmd.kind === 'moveTo')
+			return { kind: 'moveTo', at, times: cmd.times ?? 1, period: cmd.period ?? 3, click };
+		return { kind: 'around', at, rx: cmd.rx, ry: cmd.ry, times: cmd.times ?? 1, period: cmd.period ?? 3, click };
+	}
+	const resolvedScript = $derived(usingScript ? (script ?? []).map(resolveCommand) : null);
+	// An unresolved name drops the WHOLE script — Connector's rule, same as `path`.
+	const scriptUnresolved = $derived(!!resolvedScript && resolvedScript.some((c) => c === null));
+	const scriptResult = $derived(
+		resolvedScript && !scriptUnresolved
+			? compileScript(resolvedScript as ResolvedCursorCommand[], size)
+			: null
+	);
+
+	// --- unified: whichever mode is active drives the flight ---------------
+	const stops = $derived(usingScript ? (scriptResult?.stops ?? []) : cursorSpriteStops(pathTargets, size));
+	const effectiveAnimate = $derived(usingScript ? (scriptResult?.totalSeconds ?? 0) : animate);
+	const safeDelay = $derived(Number.isFinite(delay) ? delay : 0);
+	// A script's ripples are timed relative to ITS OWN start (compileScript
+	// doesn't know about Cursor's outer `delay`); path mode's cursorRipples
+	// already folds `delay` in. Fold it in here too, so both modes agree on
+	// what a ripple's delaySec means: seconds from MOUNT.
+	const ripples = $derived(
+		usingScript
+			? (scriptResult?.ripples ?? []).map((r) => ({ ...r, delaySec: r.delaySec + safeDelay }))
+			: cursorRipples(pathTargets, delay, animate)
+	);
 	const rippleR = $derived(cursorRippleRadius(size));
+	const hasFlight = $derived(stops.length > 0);
+
+	// --- startOn: idle until a matching named pulse, then play once; a
+	// fresh pulse (re-checking the note line) replays from the top.
+	//
+	// `firedTs` LATCHES the last MATCHING pulse's timestamp rather than just
+	// mirroring $lastTrigger — otherwise an unrelated, LATER trigger firing
+	// (a different Cursor's startOn) would flip this one back to "idle" the
+	// moment $lastTrigger's single module-wide slot moved on to a new name.
+	//
+	// The effect never runs during SSR (Svelte effects are client-only), so
+	// a startOn Cursor always prerenders idle/paused — no autoplay leaks
+	// into the built markup.
+	const armed = $derived(!!startOn);
+	let firedTs = $state<number | null>(null);
+	$effect(() => {
+		const p = $lastTrigger;
+		if (p && startOn && p.name === startOn) firedTs = p.ts;
+	});
 </script>
 
 {#snippet pointerGlyph()}
@@ -143,11 +232,22 @@
 	</svg>
 {/snippet}
 
-{#if targets.length > 0}
-	<g id={id || undefined} class="draw-cursor {klass}" style={style || undefined} aria-hidden="true">
-		<Sprite lock {name} {animate} {delay} {ease} {size} {rotate} orient={false} stops={stops}>
-			{#if children}{@render children()}{:else}{@render pointerGlyph()}{/if}
-		</Sprite>
+{#snippet flight(paused: boolean, showRipples: boolean)}
+	<Sprite
+		lock
+		{paused}
+		{name}
+		animate={effectiveAnimate}
+		delay={safeDelay}
+		{ease}
+		{size}
+		{rotate}
+		orient={false}
+		{stops}
+	>
+		{#if children}{@render children()}{:else}{@render pointerGlyph()}{/if}
+	</Sprite>
+	{#if showRipples}
 		{#each ripples as r, i (i)}
 			<circle
 				class="cursor-ripple"
@@ -157,6 +257,26 @@
 				style="animation-delay:{r.delaySec}s"
 			/>
 		{/each}
+	{/if}
+{/snippet}
+
+{#if hasFlight}
+	<g id={id || undefined} class="draw-cursor {klass}" style={style || undefined} aria-hidden="true">
+		{#if !armed}
+			{@render flight(false, true)}
+		{:else if firedTs !== null}
+			{#key firedTs}
+				{@render flight(false, true)}
+			{/key}
+		{:else}
+			<!-- Idle: frozen at the first pose, and — crucially — the ripples
+			     aren't mounted at all, not merely delayed. A ripple's own
+			     animation-delay counts down from MOUNT, independent of the
+			     Sprite's paused state; if it were sitting in the DOM this
+			     whole time, it would fire out of sync with a flight that
+			     hasn't actually started yet. -->
+			{@render flight(true, false)}
+		{/if}
 	</g>
 {/if}
 
@@ -168,7 +288,13 @@
 		opacity: 0;
 		transform-box: fill-box;
 		transform-origin: center;
-		animation: cursor-ripple-pulse 0.6s ease-out both;
+		/* No fill-mode: with `both`/`backwards`, the browser applies the 0%
+		   keyframe's styles DURING animation-delay, which would make every
+		   ripple visible (a static translucent ring) from mount until its
+		   delay elapses — exactly the "before the checkpoint" leak this
+		   component promises not to have. Plain `opacity: 0` above already
+		   covers the resting state correctly, before AND after. */
+		animation: cursor-ripple-pulse 0.6s ease-out;
 	}
 	@keyframes cursor-ripple-pulse {
 		0% {

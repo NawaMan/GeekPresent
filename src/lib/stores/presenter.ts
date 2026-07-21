@@ -182,6 +182,44 @@ export function subscribeHighlight(deckKey: string, cb: (name: string | null) =>
 	return () => window.removeEventListener('storage', onStorage);
 }
 
+// TRIGGER relay — the note-driven "start this" pulse. A <Note> line's
+// checkbox, when checked and carrying `data-trigger="name"`, publishes that
+// name here; the audience window hears it (SlideDeck) and calls
+// `fireTrigger`, so any listener (a <Cursor startOn="name">, today) reacts.
+// A PULSE channel like CONTINUE, not a persistent state like HIGHLIGHT — a
+// note check is a one-off "now", so every publish carries a fresh `ts` and
+// the receiver is handed the name on every fire, including a repeat of the
+// same name (re-checking a line replays it).
+const triggerKeyFor = (deckKey: string) => `geekpresent:trigger:${deckKey}`;
+
+/** Fire a named trigger pulse to the OTHER window for this deck. */
+export function publishTrigger(deckKey: string, name: string): void {
+	if (!browser || !name) return;
+	try {
+		localStorage.setItem(triggerKeyFor(deckKey), JSON.stringify({ name, ts: Date.now() }));
+	} catch {
+		// best-effort
+	}
+}
+
+/** Subscribe to trigger pulses for this deck. `cb` gets the fired name.
+    Returns an unsubscribe. */
+export function subscribeTrigger(deckKey: string, cb: (name: string) => void): () => void {
+	if (!browser) return () => {};
+	const key = triggerKeyFor(deckKey);
+	const onStorage = (e: StorageEvent) => {
+		if (e.key !== key || !e.newValue) return;
+		try {
+			const { name } = JSON.parse(e.newValue) as { name: string };
+			if (typeof name === 'string' && name) cb(name);
+		} catch {
+			// A malformed payload is ignored, never thrown.
+		}
+	};
+	window.addEventListener('storage', onStorage);
+	return () => window.removeEventListener('storage', onStorage);
+}
+
 // CONSOLE PRESENCE — a heartbeat, so an audience window can tell whether a ?present
 // console is actually open (and thus already showing the notes) vs one that was
 // closed. Same publish/subscribe + fresh `ts` shape as the relays above, but it is

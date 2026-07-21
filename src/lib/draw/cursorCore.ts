@@ -8,7 +8,12 @@
 // (or empty) result, never `NaNpx`.
 
 import { finite } from './drawCore';
-import type { SpriteStop } from './types';
+import type { Point, SpriteStop } from './types';
+
+/** A Block `name` (resolved live through blockAnchors, the same registry
+ *  Connector/Spotlight read) or a literal canvas point. Shared by both
+ *  Cursor's `path` waypoint list and its `script` command list. */
+export type CursorAt = string | Point;
 
 /** One already-resolved waypoint: a canvas-px centre point, plus whether the
  *  pointer should flash a ripple on arrival. */

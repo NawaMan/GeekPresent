@@ -10,6 +10,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { blockAnchors } from '../src/lib/stores/blockAnchors';
 import { canAdjust, adjustMode } from '../src/lib/stores/adjustMode';
 import DrawCursorHost from './DrawCursorHost.svelte';
+import DrawCursorScriptHost from './DrawCursorScriptHost.svelte';
+import DrawCursorTriggerHost from './DrawCursorTriggerHost.svelte';
+import { lastTrigger, fireTrigger } from '../src/lib/stores/triggers';
 
 const spriteEl = (c: HTMLElement) => c.querySelector('.sprite-el') as HTMLElement | null;
 const ripples = (c: HTMLElement) => c.querySelectorAll('circle.cursor-ripple');
@@ -113,5 +116,96 @@ describe('Cursor in ADJUST mode', () => {
 		expect(container.querySelector('.sprite-box')).toBeNull();
 		// It still flies.
 		expect(spriteEl(container)).not.toBeNull();
+	});
+});
+
+describe('Cursor — script mode (warpTo/moveTo/around chaining)', () => {
+	it('compiles the chain into one flight, resolving a named orbit centre', async () => {
+		const { container } = render(DrawCursorScriptHost);
+		await tick();
+		const el = spriteEl(container);
+		expect(el).not.toBeNull();
+		// Base pose: the literal warpTo [700, 250], box 40 → top-left [680, 230].
+		expect(el!.style.left).toBe('680px');
+		expect(el!.style.top).toBe('230px');
+		const css = keyframeStyle(container);
+		expect(css).not.toBe('');
+		expect(css).not.toContain('NaN');
+		// One full lap returns to the entry angle: centre (700,350) + (0, -50) → [680, 280].
+		expect(css).toContain('100% { left:680px; top:280px;');
+	});
+
+	it('flashes exactly one ripple, at the completed lap', async () => {
+		const { container } = render(DrawCursorScriptHost);
+		await tick();
+		const rs = ripples(container);
+		expect(rs).toHaveLength(1);
+		expect((rs[0] as SVGCircleElement).getAttribute('cx')).toBe('700');
+		expect((rs[0] as SVGCircleElement).getAttribute('cy')).toBe('300');
+	});
+
+	it('drops the whole script when the named centre is unresolved', async () => {
+		const { container, rerender } = render(DrawCursorScriptHost, { props: { showDial: false } });
+		await tick();
+		expect(spriteEl(container)).toBeNull();
+
+		await rerender({ showDial: true });
+		await tick();
+		expect(spriteEl(container)).not.toBeNull();
+	});
+});
+
+describe('Cursor — startOn (note-triggered)', () => {
+	beforeEach(() => lastTrigger.set(null));
+
+	it('sits idle at its first pose, paused, with no ripple mounted', async () => {
+		const { container } = render(DrawCursorTriggerHost);
+		await tick();
+		const el = spriteEl(container);
+		expect(el).not.toBeNull();
+		expect(el!.style.left).toBe('80px'); // [100,100] − size/2
+		expect(el!.style.animationPlayState).toBe('paused');
+		expect(ripples(container)).toHaveLength(0);
+	});
+
+	it('an unrelated trigger name leaves it idle', async () => {
+		const { container } = render(DrawCursorTriggerHost);
+		await tick();
+		fireTrigger('something-else');
+		await tick();
+		expect(spriteEl(container)!.style.animationPlayState).toBe('paused');
+	});
+
+	it('the matching trigger starts it playing, with its ripple now mounted', async () => {
+		const { container } = render(DrawCursorTriggerHost);
+		await tick();
+		fireTrigger('go');
+		await tick();
+		const el = spriteEl(container);
+		expect(el!.style.animationPlayState).not.toBe('paused');
+		expect(ripples(container)).toHaveLength(1);
+	});
+
+	it('a fresh pulse replays from the top — a new element, not a resume', async () => {
+		const { container } = render(DrawCursorTriggerHost);
+		await tick();
+		fireTrigger('go');
+		await tick();
+		const first = spriteEl(container);
+		fireTrigger('go');
+		await tick();
+		const second = spriteEl(container);
+		expect(second).not.toBeNull();
+		expect(second).not.toBe(first); // keyed remount, not the same node resuming
+	});
+
+	it('a later, unrelated pulse does not re-pause an already-started Cursor', async () => {
+		const { container } = render(DrawCursorTriggerHost);
+		await tick();
+		fireTrigger('go');
+		await tick();
+		fireTrigger('something-else');
+		await tick();
+		expect(spriteEl(container)!.style.animationPlayState).not.toBe('paused');
 	});
 });

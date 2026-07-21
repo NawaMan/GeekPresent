@@ -1309,6 +1309,62 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     a built page ships blank). Demo: `src/routes/animation/cursor-component.html/` — a pointer
     glides from rest onto a fake "File" button, clicks it, glides to "Save", clicks that; flip
     ADJUST and drag either button to watch the flight re-route live.
+  - **Extended: chained scripts (`warpTo`/`moveTo`/`around`) and note-triggered playback
+    (`startOn`).** `script` composes commands instead of an evenly-timed `path` — an instant cut,
+    a there-and-back bounce repeated `times` times, an orbit of `times` laps around a centre (a
+    Block name works there too). None of it needed a new `PathShape`: CSS `animation-iteration-
+    count`/`direction` can't loop just one leg of a chain and continue to the next, so every
+    repeat/bounce/lap is baked directly into the generated stop list by a new pure
+    `src/lib/draw/cursorScriptCore.ts` (`compileScript`, NaN-safe, unit-tested in
+    `tests/cursorScriptCore.test.ts`) — which is also why `around` samples its ellipse into
+    literal stops rather than riding a shape; entry angle is computed from the flight's CURRENT
+    point relative to the centre, so entering an orbit is a swoop onto the ring, not a snap to a
+    fixed angle.
+  - `startOn="name"` waits for a **named trigger pulse** — fired by a checked
+    `<Note data-trigger="name">` line in the presenter console, or directly via `fireTrigger()` —
+    instead of autoplaying. New plumbing, mirroring the existing note-driven HIGHLIGHT relay
+    exactly: `stores/triggers.ts` (a local `lastTrigger` pulse store, like `highlightTarget.ts`)
+    + `publishTrigger`/`subscribeTrigger` in `stores/presenter.ts` (a pulse channel like
+    CONTINUE, not a persistent state like HIGHLIGHT — a note check is a one-off "now", so a
+    fresh `ts` on every publish means re-checking the same line always re-fires) + `SlideDeck`
+    bridging the relay into the local store, top-window only. `Note.svelte`'s checklist action
+    fires the pulse on a plain check-ON only — NOT on Shift's cumulative catch-up, and not on
+    unchecking — because neither of those is "the speaker doing this live."
+  - Sprite gained one new prop for this, `paused` (`animation-play-state`, purely additive —
+    every existing Sprite keeps autoplaying on mount). A `startOn` Cursor sits idle at its first
+    pose (paused, ripples not even MOUNTED — a ripple's own delay ticks from mount independent of
+    the Sprite's pause, so if it existed in the DOM the whole idle wait it would fire out of sync
+    with a flight that hasn't started) until a MATCHING pulse's timestamp latches locally; a
+    fresh pulse (re-checking the line) replays from the top via a keyed remount, since resuming a
+    paused animation can't restart one that already finished. The latch (not a raw comparison
+    against the single module-wide `lastTrigger` slot) matters: a LATER, unrelated trigger firing
+    must not re-pause an already-started Cursor. `$effect` never runs during SSR, so a `startOn`
+    Cursor always prerenders idle — confirmed live in a real browser (not just jsdom): the
+    animation's own generated keyframe name changes on every fire (`draw-sprite-1` →
+    `draw-sprite-2` → `draw-sprite-3`), proving each press is a genuine fresh instance, not a
+    resume.
+  - **Found and fixed a pre-existing bug while wiring this up:** the ripple's
+    `animation-fill-mode: both` made it apply its 0% keyframe (opacity 0.9) DURING
+    `animation-delay` — CSS backwards-fill — so every ripple was actually visible as a static
+    translucent ring from mount until its delay elapsed, not the "SSR-inert reveal keyed to a
+    checkpoint" the component's own doc comment promised. Invisible in jsdom (which doesn't
+    compute fill-mode-driven values) and in the original DOM/SSR tests (which check style TEXT,
+    not paint), which is exactly why it shipped unnoticed. Fixed by dropping the fill-mode
+    entirely — the plain `opacity: 0` base rule already covers both the "before" and "after"
+    resting state correctly on its own.
+  - Tests: `cursorScriptCore.test.ts` (single-command static pose, warpTo's instant cut,
+    moveTo's bounce-and-return with the position it hands to the NEXT command, around's entry
+    angle and per-lap ripples, degenerate rx/ry, full NaN-safety); `presenter.test.ts`'s new
+    "trigger pulse channel" describe (distinct key, empty name is a no-op, re-checking re-fires,
+    malformed payloads ignored); `tests/NoteTrigger.test.ts` + `NoteTriggerHost.svelte` (fires on
+    check-ON, not on uncheck or Shift-cumulative, re-checking fires again); `DrawSprite.test.ts`
+    (paused freezes at base pose via `animation-play-state`); `DrawCursor.test.ts` /
+    `DrawCursorSsr.ssr.test.ts` extended with `DrawCursorScriptHost.svelte` (a named orbit centre,
+    resolved and dropped like any `path` name) and `DrawCursorTriggerHost.svelte` (idle/paused,
+    unrelated triggers ignored, matching trigger plays, replay is a new element not a resume).
+    Demo: `src/routes/animation/cursor-script.html/` — a cursor idles until a button (or, in the
+    presenter console, a checked note line) fires `startOn="fly"`, then warps to a rest point,
+    bounces on a Menu button twice, and orbits a dial once with a click.
 
 - [x] **`Terminal`** — fake console: typed command + output, riding the `AnimationBar` keyframe clock.
   - Done: `src/lib/components/Terminal.svelte`, with the schedule in

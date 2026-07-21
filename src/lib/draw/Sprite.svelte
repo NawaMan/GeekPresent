@@ -171,6 +171,13 @@
 		 *  (e.g. sampled from a curve) that aren't meant to be hand-edited, where
 		 *  dozens of ghosts would only bury the shapes that ARE editable. */
 		lock?: boolean;
+		/** Freeze the flight at its current frame (CSS `animation-play-state:
+		 *  paused`) — for a Sprite driven by an external trigger rather than
+		 *  autoplay-on-mount (e.g. `<Cursor startOn>`). Purely a playback
+		 *  toggle; the generated keyframes are untouched, so flipping it back
+		 *  off resumes exactly where the timeline says it should. Default
+		 *  false — every existing Sprite keeps playing on mount. */
+		paused?: boolean;
 		children?: Snippet;
 		/** Inline style for the root element, applied last so it wins. */
 		style?: string;
@@ -199,6 +206,7 @@
 		grid = 1,
 		group = false,
 		lock = false,
+		paused = false,
 		children,
 		style = '',
 		id = '',
@@ -414,7 +422,7 @@
 			`width:${round(base.w)}px; height:${round(base.h)}px; ` +
 			`transform-origin:${origin}; transform:rotate(${round(base.rot)}deg)${base.flip ? ' scaleX(-1)' : ''};` +
 			`${fontFor(base.h) != null ? ` font-size:${fontFor(base.h)}px;` : ''}` +
-			`${animSecs ? ` animation:${animName} ${animSecs}s ${easeFn}${delaySecs ? ` ${delaySecs}s` : ''} both;` : ''}`
+			`${animSecs ? ` animation:${animName} ${animSecs}s ${easeFn}${delaySecs ? ` ${delaySecs}s` : ''} both;${paused ? ' animation-play-state:paused;' : ''}` : ''}`
 	);
 
 	// --- ADJUST-mode editing chrome ------------------------------------------
@@ -445,6 +453,7 @@
 		`${origin !== '50% 50%' ? ` origin="${origin}"` : ''}` +
 		`${group ? ' group' : ''}` +
 		`${lock ? ' lock' : ''}` +
+		`${paused ? ' paused' : ''}` +
 		` stops={[${list.map(stopLiteral).join(', ')}]}>`;
 
 	// Path-mode serialization: the tag carries the curve's LITERAL points, so
@@ -478,6 +487,7 @@
 		`${origin !== '50% 50%' ? ` origin="${origin}"` : ''}` +
 		`${group ? ' group' : ''}` +
 		`${lock ? ' lock' : ''}` +
+		`${paused ? ' paused' : ''}` +
 		`>`;
 
 	// Source (prop) stops resolved the same way, for the "Copy changed" OLD side.
