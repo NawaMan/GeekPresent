@@ -18,6 +18,7 @@
 	import Curve from '$lib/draw/Curve.svelte';
 	import Arc from '$lib/draw/Arc.svelte';
 	import Sprite from '$lib/draw/Sprite.svelte';
+	import Cursor from '$lib/draw/Cursor.svelte';
 	import Connector from '$lib/components/Connector.svelte';
 	import Block from '$lib/components/Block.svelte';
 
@@ -77,6 +78,10 @@
 			<Block name="api" x={0} y={0} width={100} height={50}>API</Block>
 			<Block name="db" x={300} y={0} width={100} height={50}>DB</Block>
 			<Connector from="api" to="db" {style} {id} class={klass} />
+		{:else if which === 'Cursor'}
+			<!-- Cursor renders nothing at all without a resolvable target
+			     (Connector's rule too) — a literal point always has a flight. -->
+			<Cursor path={[[10, 10]]} {style} {id} class={klass} />
 		{/if}
 	</Draw>
 {/if}

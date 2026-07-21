@@ -38,7 +38,7 @@
 <ContentPage
 	title="Cursor — Scripts &amp; Note Triggers"
 	subtitle="chained warpTo/moveTo/around, started by a checked speaker note"
-	style="font-size: 0.9em"
+	style="font-size: 0.78em"
 >
 	<div style="line-height: 1.5em;">
 		<p>
@@ -129,17 +129,17 @@
      default), dot, ring — each a single-point `path` so there is no
      flight, just the glyph. -->
 <Draw title="Cursor shape presets" name="cursor-shapes">
-	<Cursor name="shape-arrow" shape="arrow" path={[[220, 800]]} size={44} />
-	<Cursor name="shape-dot" shape="dot" path={[[380, 800]]} size={44} />
-	<Cursor name="shape-ring" shape="ring" path={[[540, 800]]} size={44} />
+	<Cursor name="shape-arrow" shape="arrow" path={[[1200, 600]]} size={44} />
+	<Cursor name="shape-dot" shape="dot" path={[[1405, 600]]} size={44} />
+	<Cursor name="shape-ring" shape="ring" path={[[1600, 600]]} size={44} />
 </Draw>
-<Block x={165} y={840} width={110} height={36} grid={10}>
+<Block x={1140} y={630} width={110} height={36} grid={10}>
 	<div class="shape-label">arrow</div>
 </Block>
-<Block x={325} y={840} width={110} height={36} grid={10}>
+<Block x={1350} y={630} width={110} height={36} grid={10}>
 	<div class="shape-label">dot</div>
 </Block>
-<Block x={485} y={840} width={110} height={36} grid={10}>
+<Block x={1550} y={630} width={110} height={36} grid={10}>
 	<div class="shape-label">ring</div>
 </Block>
 

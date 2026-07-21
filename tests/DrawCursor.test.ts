@@ -251,6 +251,14 @@ describe('Cursor — attention (a size pulse in place)', () => {
 		const ringCircle = ring.container.querySelector('.cursor-glyph circle');
 		expect(ringCircle?.getAttribute('fill')).toBe('none');
 	});
+
+	it('an unknown shape value falls back to the arrow, never a blank glyph', async () => {
+		const { container } = render(DrawCursorAttentionHost, {
+			props: { shape: 'nonsense' as unknown as 'arrow' }
+		});
+		await tick();
+		expect(container.querySelector('.cursor-glyph path')).not.toBeNull();
+	});
 });
 
 describe('Cursor — per-waypoint size (path mode)', () => {

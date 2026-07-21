@@ -134,7 +134,7 @@ const COMPONENTS: Array<[string, any, Record<string, unknown>]> = [
 /** The Draw primitives, which only exist inside a <Draw> surface. */
 // CarouselItem joins these: it needs a parent for context, not a surface, but either
 // way it cannot be rendered alone.
-const HOSTED = ['Draw', 'CarouselItem', 'Rect', 'Ellipse', 'Line', 'Path', 'Polyline', 'Curve', 'Arc', 'Sprite', 'Connector'];
+const HOSTED = ['Draw', 'CarouselItem', 'Rect', 'Ellipse', 'Line', 'Path', 'Polyline', 'Curve', 'Arc', 'Sprite', 'Connector', 'Cursor'];
 
 describe('style / id / class reach every author-facing component', () => {
 	for (const [name, Component, props] of COMPONENTS) {
