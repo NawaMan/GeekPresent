@@ -423,7 +423,14 @@ than misleading the next agent.
   `Block` / `ImageBlock` (absolutely-positioned
   wrappers you place at exact canvas pixels — drag/resize them in **ADJUST mode**,
   see that playbook), `Connector` (an arrow auto-routed between two *named* `Block`s —
-  see the diagram playbook), `Video` (a `<video>` with themeable chrome and *time
+  see the diagram playbook), `Cursor` (a fake mouse pointer for demoing a UI without a
+  live app — a `Sprite` wearing a pointer under the hood, riding `<Draw>`; `path` glides
+  between named/literal points, or chain `script` — `warpTo`/`moveTo`/`around`/`attention`
+  commands, each timing itself, composed on one flight. `startOn="name"` gates it on a
+  named trigger pulse — fired by a checked `<Note data-trigger="name">` line in the
+  presenter console, or `fireTrigger()` directly — instead of autoplaying. `size`/`shape`
+  configure the glyph; see `src/routes/animation/cursor-component.html` and
+  `cursor-script.html`), `Video` (a `<video>` with themeable chrome and *time
   bookmarks* — chapter buttons that seek, the current one highlighted; import the
   file as an asset rather than hard-coding a path), `VideoPage` (the same player
   filling the canvas, nav bar included — a complete slide, as `WebPage` is) and

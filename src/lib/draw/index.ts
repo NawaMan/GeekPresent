@@ -6,6 +6,7 @@
 // Raw SVG elements pass through <Draw>'s slot as an escape hatch.
 export { default as Arc } from './Arc.svelte';
 export { default as Canvas } from './Canvas.svelte';
+export { default as Cursor } from './Cursor.svelte';
 export { default as Curve } from './Curve.svelte';
 export { default as Draw } from './Draw.svelte';
 export { default as Line } from './Line.svelte';

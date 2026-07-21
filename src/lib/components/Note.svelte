@@ -24,9 +24,11 @@
 	import { page } from '$app/stores';
 	import { displayMode } from '$lib/stores/displayMode';
 	import {
-		presenterMode, consoleLive, deckKeyFromPath, loadChecks, saveChecks, publishHighlight
+		presenterMode, consoleLive, deckKeyFromPath, loadChecks, saveChecks, publishHighlight,
+		publishTrigger
 	} from '$lib/stores/presenter';
 	import { setHighlight } from '$lib/stores/highlightTarget';
+	import { fireTrigger } from '$lib/stores/triggers';
 	import { printNotes } from '$lib/stores/printNotes';
 	import { getHandout } from '$lib/presentation';
 	import { kioskActive, kioskPaces, setKioskNoteItems, clearKioskNotes } from '$lib/stores/kiosk';
@@ -122,7 +124,12 @@
 			if (e.shiftKey) {
 				for (let k = 0; k <= i; k++) setChecked(lines[k], true); // cumulative: up to here
 			} else {
-				setChecked(lines[i], !lines[i].classList.contains('gp-checked')); // toggle one
+				const turningOn = !lines[i].classList.contains('gp-checked');
+				setChecked(lines[i], turningOn);
+				// A plain check-ON fires this line's named trigger (if any) — "I just
+				// covered this live". Shift's cumulative catch-up and unchecking do NOT
+				// fire: neither one is a speaker doing the thing right now.
+				if (turningOn) fire(lines[i]);
 			}
 			persist();
 		};
@@ -136,6 +143,14 @@
 		// audience actually sees; see Spotlight / stores/highlightTarget). Reuses this
 		// same per-line pass rather than a second scan of the note.
 		const light = (name: string | null) => { setHighlight(name); publishHighlight(ctx.deckKey, name); };
+		// Note-driven trigger: a line carrying `data-trigger="save-cursor"` fires that
+		// name — locally AND relayed to the audience window (see stores/triggers /
+		// presenter's publishTrigger) — the instant its checkbox is checked. A
+		// discrete "start this now" pulse, unlike the highlight's hover-driven state.
+		const fire = (line: HTMLElement) => {
+			const name = line.getAttribute('data-trigger');
+			if (name) { fireTrigger(name); publishTrigger(ctx.deckKey, name); }
+		};
 		function setup() {
 			teardown();
 			if (!ctx.enabled) return;
@@ -169,6 +184,7 @@
 						line.removeEventListener('pointerleave', onLeave);
 					});
 				}
+				if (line.hasAttribute('data-trigger')) line.classList.add('gp-trigger-line');
 				setChecked(line, !!saved[i]); // restore persisted state
 			});
 			window.addEventListener('gp:checks-clear', onClear);
@@ -179,7 +195,7 @@
 			cleanups = [];
 			light(null); // never leave a spotlight stuck when the note re-sets or unmounts
 			lines.forEach((line) => {
-				line.classList.remove('gp-note-line', 'gp-checked');
+				line.classList.remove('gp-note-line', 'gp-checked', 'gp-trigger-line');
 				line.querySelector(':scope > .gp-check')?.remove();
 			});
 			lines = [];

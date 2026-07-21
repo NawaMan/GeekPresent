@@ -125,13 +125,14 @@
 	import { DEFAULT_PAGE_MS, DEFAULT_STEP_MS, DEFAULT_WPM } from '$lib/kiosk/kioskCore';
 	import {
 		presenterMode, publishCurrentSlide, subscribeCurrentSlide, subscribeAnimCommand,
-		subscribeContinue, subscribeHighlight, deckKeyFromPath, openPresenterWindow,
+		subscribeContinue, subscribeHighlight, subscribeTrigger, deckKeyFromPath, openPresenterWindow,
 		consoleLive, publishConsoleAlive, subscribeConsoleAlive, loadConsoleBeat
 	} from '$lib/stores/presenter';
 	import { consoleIsLive, CONSOLE_BEAT_MS, CONSOLE_TTL_MS } from '$lib/utils/consoleLiveCore';
 	import { roleOf } from '$lib/utils/relayCore';
 	import Spotlight from '$lib/components/Spotlight.svelte';
 	import { setHighlight } from '$lib/stores/highlightTarget';
+	import { fireTrigger } from '$lib/stores/triggers';
 	import { collectFinite, applyState } from '$lib/utils/slideAnim';
 	import { navigate } from '$lib/utils/deckNav';
 	import { documentTitle, getPageNavigation } from '$lib/utils/navigate';
@@ -1118,6 +1119,13 @@
 			? subscribeHighlight(deckKey, (name) => setHighlight(name))
 			: () => {};
 
+		// A relayed TRIGGER pulse from a checked <Note data-trigger> line fires the
+		// named local pulse (see stores/triggers) — a <Cursor startOn="name">, today,
+		// reacts. Top window only, same guard as the relays above.
+		const stopTrigger = (window.self === window.top)
+			? subscribeTrigger(deckKey, (name) => fireTrigger(name))
+			: () => {};
+
 		// Console presence. In the ?present window this is the CONSOLE, so heartbeat —
 		// stamp the shared key now (so an already-open audience flips at once) and keep
 		// re-stamping on an interval while we live. In an audience window (top only — an
@@ -1154,6 +1162,7 @@
 			stopAnim();
 			stopContinue();
 			stopHighlight();
+			stopTrigger();
 			stopConsole(); // stop the heartbeat / presence tracking; clears consoleLive
 			setHighlight(null); // don't leave a stale spotlight across a deck swap
 			// Ink is NOT cleared here — it is meant to survive. That is the whole point.

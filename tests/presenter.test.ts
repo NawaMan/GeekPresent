@@ -7,6 +7,8 @@ import {
 	subscribeAnimCommand,
 	publishContinue,
 	subscribeContinue,
+	publishTrigger,
+	subscribeTrigger,
 	presenterTimerStart,
 	resetPresenterTimer,
 	loadPresenterPause,
@@ -208,6 +210,41 @@ describe('continue pulse channel', () => {
 		fireStorage('geekpresent:continue:/slides/', JSON.stringify({ ts: 2 }));
 		fireStorage('geekpresent:continue:/slides/', JSON.stringify({ ts: 3 }));
 		expect(cb).toHaveBeenCalledTimes(2); // each press is a distinct pulse
+		stop();
+	});
+});
+
+describe('trigger pulse channel', () => {
+	it('publishes a named pulse under a distinct trigger key', () => {
+		publishTrigger('/slides/', 'save-cursor');
+		expect(localStorage.getItem('geekpresent:trigger:/slides/')).toBeTruthy();
+		expect(localStorage.getItem('geekpresent:continue:/slides/')).toBeNull(); // separate channel
+	});
+
+	it('ignores an empty name — nothing worth firing', () => {
+		publishTrigger('/slides/', '');
+		expect(localStorage.getItem('geekpresent:trigger:/slides/')).toBeNull();
+	});
+
+	it('fires the subscriber with the name on a pulse for its key, ignores other keys', () => {
+		const cb = vi.fn();
+		const stop = subscribeTrigger('/slides/', cb);
+		fireStorage('geekpresent:trigger:/portrait/', JSON.stringify({ name: 'x', ts: 1 }));
+		expect(cb).not.toHaveBeenCalled();
+		fireStorage('geekpresent:trigger:/slides/', JSON.stringify({ name: 'save-cursor', ts: 2 }));
+		fireStorage('geekpresent:trigger:/slides/', JSON.stringify({ name: 'save-cursor', ts: 3 }));
+		expect(cb).toHaveBeenCalledTimes(2); // re-checking the same line replays it
+		expect(cb).toHaveBeenNthCalledWith(1, 'save-cursor');
+		stop();
+	});
+
+	it('ignores malformed / empty-name payloads without throwing', () => {
+		const cb = vi.fn();
+		const stop = subscribeTrigger('/slides/', cb);
+		fireStorage('geekpresent:trigger:/slides/', '{bad');
+		fireStorage('geekpresent:trigger:/slides/', JSON.stringify({ name: '' }));
+		fireStorage('geekpresent:trigger:/slides/', JSON.stringify({ ts: 1 }));
+		expect(cb).not.toHaveBeenCalled();
 		stop();
 	});
 });

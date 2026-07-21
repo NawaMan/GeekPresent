@@ -29,4 +29,17 @@
 			{ pct: 100, x: 500, y: 500, w: 50, h: 50 }
 		]}
 	>LOCKED</Sprite>
+
+	<!-- Paused: flies with the same generated keyframes, but starts (and
+	     stays) frozen at its base pose until `paused` flips off. -->
+	<Sprite
+		name="frozen"
+		lock
+		paused
+		animate={2}
+		stops={[
+			{ pct: 0, x: 200, y: 200, w: 50, h: 50 },
+			{ pct: 100, x: 700, y: 700, w: 50, h: 50 }
+		]}
+	>FROZEN</Sprite>
 </Draw>

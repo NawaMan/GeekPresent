@@ -59,6 +59,15 @@ describe('Sprite rendering', () => {
 		expect(css).not.toContain('NaN');
 	});
 
+	it('paused freezes the flight at its base pose via animation-play-state', () => {
+		const { container } = render(DrawSpriteHost);
+		const frozen = container.querySelectorAll('.sprite-el')[2] as HTMLElement;
+		expect(frozen.textContent?.trim()).toBe('FROZEN');
+		expect(frozen.style.left).toBe('200px'); // still the base (0%) pose
+		expect(frozen.style.animation).toContain('draw-sprite-'); // keyframes still generated
+		expect(frozen.style.animationPlayState).toBe('paused');
+	});
+
 	it('shows no editing chrome outside ADJUST mode, but the element still flies', () => {
 		const { container } = render(DrawSpriteHost);
 		expect(container.querySelector('.sprite-hit')).toBeNull();
@@ -127,7 +136,7 @@ describe('Sprite editing (ADJUST mode)', () => {
 		const { container } = render(DrawSpriteHost);
 		// Both sprites render and animate…
 		const els = container.querySelectorAll('.sprite-el');
-		expect(els).toHaveLength(2);
+		expect(els).toHaveLength(3);
 		expect((els[1] as HTMLElement).style.animation).toContain('draw-sprite-');
 		// …but only the unlocked one has ghost boxes: 3 stops, not 3 + 2.
 		expect(container.querySelectorAll('.sprite-hit')).toHaveLength(3);

@@ -1273,24 +1273,125 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     named `deploy` Block, a Save button a plain top banner), registered in `pages.ts` beside
     Note-driven Highlight with `adjust: true` so "drag the box, the spotlight follows" is live.
 
-- [ ] **`Cursor` — a fake mouse pointer that demonstrates a UI without a live app** — an author-
+- [x] **`Cursor` — a fake mouse pointer that demonstrates a UI without a live app** — an author-
   placed pointer glyph that sits at a point, glides between named targets, and flashes a click
   ripple, so a slide can *show* a hover → click → drag instead of cutting to a screen recording.
-  - Why: demoing an interaction today means a `Video` (heavy, re-record on every UI change) or hand-
-    waving over a static shot. A scriptable cursor makes the gesture part of the slide's own
-    timeline — it scrubs, holds and replays with everything else, and it re-times for free when the
-    talk does.
-  - Approach: it's a `Sprite` wearing a pointer, not a new engine — reuse the unified Draw + Sprite
-    path (the `polyline` path kind already carries a sprite between points) for the motion, aim the
-    endpoints at boxes by name through `stores/blockAnchors.ts` exactly as `Connector`/`Spotlight`
-    do, and ride the `AnimationBar` keyframe clock (`Canvas`/`Terminal`/`Sprite` discipline) so
-    hold/seek/replay come free. The click ripple is an opt-in, SSR-inert reveal keyed to a path
-    checkpoint; colours/size are `--cursor-*` role tokens in `roles.css`. Done = component + a demo
-    slide that *is* the docs + a DOM test + an SSR test (glyph prerenders, no `NaN` in the path).
-  - Open questions: a standalone `<Cursor>` vs. just a pointer preset/glyph on `Sprite` (if the path
-    engine already does everything, the cursor may be one glyph + a ripple layer, not a component);
-    how a "click" is authored — a keyframe marker on the path, or a `Steps`-style beat; and whether
-    hover/drag want distinct pointer states or just the move + ripple to start.
+  - Done: `src/lib/draw/Cursor.svelte` — home is `draw/`, not `components/`, and the demo lives in
+    the `animation/` deck, not `slides/`: like every other Sprite/Rect/Line rider it must live
+    inside a `<Draw>`, so it follows that family's precedent rather than the generic component
+    skill's default. Timing/geometry in `src/lib/draw/cursorCore.ts` (pure, `drawCore`/
+    `connectorCore` discipline).
+  - **Settles the open questions.** A standalone `<Cursor>` — but a thin one: it's a `Sprite`
+    wearing a pointer, not a new engine. `path` waypoints (a Block `name`, resolved live through
+    the SAME `blockAnchors` registry `Connector`/`Spotlight` read, or a literal `[x, y]`) become
+    generated `SpriteStop[]`, forwarded to a **`lock`ed `<Sprite>`** underneath — Sprite's own
+    escape hatch for calculated geometry: *"never registers: cannot be selected, listed or
+    copied — ADJUST simply doesn't know it exists."* That resolves the standalone-vs-preset
+    question cleanly — there is exactly one source of truth for Copy (the `<Cursor>` tag itself),
+    and nothing on the Sprite side to save. An unresolved name drops the whole flight
+    (Connector's rule), never a glyph stranded at a fallback point. **Click is a keyframe
+    marker** (`{ at: "save-btn", click: true }`), not a `Steps`-style beat — the flight already
+    rides one continuous `AnimationBar` timeline, so a marker needs no second clock. **Deliberate
+    non-goal:** no distinct hover/drag pointer states — just move + a ripple, which is what every
+    use so far needs; easy to extend later without breaking the API.
+  - The ripple is ONE static `@keyframes` shared by every click marker (only `animation-delay`
+    varies, computed as `delay + animate·pct` — the exact real-time offset Sprite's own generated
+    `animation: … <animate>s <ease> <delay>s both;` places that stop at), and honours
+    `prefers-reduced-motion` — a flourish, not the taught content, unlike the flight itself (which
+    Sprite deliberately never mutes). `--cursor-fill` / `--cursor-outline` / `--cursor-ripple`
+    role tokens in `roles.css`, warm "look here" accent matching Spotlight/Toast.
+  - Tests: `cursorCore` unit-tested directly in `tests/cursorCore.test.ts` (0/1/N targets, garbage
+    size/delay/animate, click subset, no NaN); DOM coverage in `tests/DrawCursor.test.ts`
+    (base pose + generated keyframes, ripple timing, a single-waypoint static cursor, re-routing
+    when the named target moves, dropping the whole flight when it's unresolved, zero ADJUST
+    chrome even with ADJUST on); SSR in `tests/DrawCursorSsr.ssr.test.ts` (the same guarantees
+    proven through `svelte/server`, since `SlideDeck` gates real slide markup behind `onMount` and
+    a built page ships blank). Demo: `src/routes/animation/cursor-component.html/` — a pointer
+    glides from rest onto a fake "File" button, clicks it, glides to "Save", clicks that; flip
+    ADJUST and drag either button to watch the flight re-route live.
+  - **Extended: chained scripts (`warpTo`/`moveTo`/`around`) and note-triggered playback
+    (`startOn`).** `script` composes commands instead of an evenly-timed `path` — an instant cut,
+    a direct one-way move whose `times` (default 1) counts ALTERNATING legs — 2 is a
+    there-and-back "shake" ending where it started, 3 goes-back-goes ending at the target again
+    — an orbit of `times` laps around a centre (a
+    Block name works there too). None of it needed a new `PathShape`: CSS `animation-iteration-
+    count`/`direction` can't loop just one leg of a chain and continue to the next, so every
+    repeat/bounce/lap is baked directly into the generated stop list by a new pure
+    `src/lib/draw/cursorScriptCore.ts` (`compileScript`, NaN-safe, unit-tested in
+    `tests/cursorScriptCore.test.ts`) — which is also why `around` samples its ellipse into
+    literal stops rather than riding a shape; entry angle is computed from the flight's CURRENT
+    point relative to the centre, so entering an orbit is a swoop onto the ring, not a snap to a
+    fixed angle.
+  - `startOn="name"` waits for a **named trigger pulse** — fired by a checked
+    `<Note data-trigger="name">` line in the presenter console, or directly via `fireTrigger()` —
+    instead of autoplaying. New plumbing, mirroring the existing note-driven HIGHLIGHT relay
+    exactly: `stores/triggers.ts` (a local `lastTrigger` pulse store, like `highlightTarget.ts`)
+    + `publishTrigger`/`subscribeTrigger` in `stores/presenter.ts` (a pulse channel like
+    CONTINUE, not a persistent state like HIGHLIGHT — a note check is a one-off "now", so a
+    fresh `ts` on every publish means re-checking the same line always re-fires) + `SlideDeck`
+    bridging the relay into the local store, top-window only. `Note.svelte`'s checklist action
+    fires the pulse on a plain check-ON only — NOT on Shift's cumulative catch-up, and not on
+    unchecking — because neither of those is "the speaker doing this live."
+  - Sprite gained one new prop for this, `paused` (`animation-play-state`, purely additive —
+    every existing Sprite keeps autoplaying on mount). A `startOn` Cursor sits idle at its first
+    pose (paused, ripples not even MOUNTED — a ripple's own delay ticks from mount independent of
+    the Sprite's pause, so if it existed in the DOM the whole idle wait it would fire out of sync
+    with a flight that hasn't started) until a MATCHING pulse's timestamp latches locally; a
+    fresh pulse (re-checking the line) replays from the top via a keyed remount, since resuming a
+    paused animation can't restart one that already finished. The latch (not a raw comparison
+    against the single module-wide `lastTrigger` slot) matters: a LATER, unrelated trigger firing
+    must not re-pause an already-started Cursor. `$effect` never runs during SSR, so a `startOn`
+    Cursor always prerenders idle — confirmed live in a real browser (not just jsdom): the
+    animation's own generated keyframe name changes on every fire (`draw-sprite-1` →
+    `draw-sprite-2` → `draw-sprite-3`), proving each press is a genuine fresh instance, not a
+    resume.
+  - **Found and fixed a pre-existing bug while wiring this up:** the ripple's
+    `animation-fill-mode: both` made it apply its 0% keyframe (opacity 0.9) DURING
+    `animation-delay` — CSS backwards-fill — so every ripple was actually visible as a static
+    translucent ring from mount until its delay elapsed, not the "SSR-inert reveal keyed to a
+    checkpoint" the component's own doc comment promised. Invisible in jsdom (which doesn't
+    compute fill-mode-driven values) and in the original DOM/SSR tests (which check style TEXT,
+    not paint), which is exactly why it shipped unnoticed. Fixed by dropping the fill-mode
+    entirely — the plain `opacity: 0` base rule already covers both the "before" and "after"
+    resting state correctly on its own.
+  - Tests: `cursorScriptCore.test.ts` (single-command static pose, warpTo's instant cut,
+    moveTo's default one-way arrival vs. its opt-in alternating-leg shake (and which position it
+    hands to the NEXT command depending on leg parity), around's entry
+    angle and per-lap ripples, degenerate rx/ry, full NaN-safety); `presenter.test.ts`'s new
+    "trigger pulse channel" describe (distinct key, empty name is a no-op, re-checking re-fires,
+    malformed payloads ignored); `tests/NoteTrigger.test.ts` + `NoteTriggerHost.svelte` (fires on
+    check-ON, not on uncheck or Shift-cumulative, re-checking fires again); `DrawSprite.test.ts`
+    (paused freezes at base pose via `animation-play-state`); `DrawCursor.test.ts` /
+    `DrawCursorSsr.ssr.test.ts` extended with `DrawCursorScriptHost.svelte` (a named orbit centre,
+    resolved and dropped like any `path` name) and `DrawCursorTriggerHost.svelte` (idle/paused,
+    unrelated triggers ignored, matching trigger plays, replay is a new element not a resume).
+    Demo: `src/routes/animation/cursor-script.html/` — a cursor idles until a button (or, in the
+    presenter console, a checked note line) fires `startOn="fly"`, then warps to a rest point,
+    moves directly to one point, shakes at a second, and orbits a dial once with a click.
+  - **Further extended: an `attention` action, per-command `size`, and glyph `shape` presets.**
+    `attention({times, period, scale})` is the cursor calling attention to ITSELF — a size pulse
+    IN PLACE (bigger then back to normal, `times` times), never moving "current". No new Sprite
+    machinery: a stop already carries `w`/`h` per frame, so a pulse is just two extra stops at
+    the SAME x/y with a bigger box — the exact mechanism `size` overrides reuse too. Any command
+    (including `attention` itself) can carry its own `size`, which becomes AMBIENT — in force for
+    every command after it until one of them sets its own again — so a flight can grow or shrink
+    mid-route, not just sit at one fixed size. `path` waypoints gained the same per-waypoint
+    `size` for symmetry. A ripple's radius now follows whichever size was active at ITS
+    checkpoint (an `attention` ripple uses the PEAK size) rather than one shared radius for the
+    whole flight — `CursorRipple` gained an `r` field, computed once at the point of creation in
+    both `cursorCore.ts` and `cursorScriptCore.ts`, rather than re-derived at render time.
+  - `shape="arrow" | "dot" | "ring"` swaps the built-in glyph without hand-authoring SVG; a custom
+    glyph via the default slot still overrides everything (mutually exclusive, slot wins).
+  - Tests: `cursorScriptCore.test.ts` (a lone pulse's peak/settle stops and ripple, repeated
+    pulses, the degenerate first-command case, size carried forward across commands, a garbage
+    size left alone); `cursorCore.test.ts` (a waypoint's own size overriding the shared box and
+    driving its own ripple radius); `DrawCursor.test.ts`/`DrawCursorSsr.ssr.test.ts` extended with
+    `DrawCursorAttentionHost.svelte` (ambient size carried from a `warpTo` into the pulse, the
+    three `shape` presets) and `DrawCursorPathSizeHost.svelte` (per-waypoint size in `path` mode).
+    Demo: `cursor-script.html`'s flight now lands at an overridden size and finishes with two
+    attention pulses; a small static gallery at the bottom shows all three `shape` presets side
+    by side. Verified live in a real browser (glyph presets render correctly, the flight completes
+    and settles with no console errors) on top of the numeric keyframe assertions.
 
 - [x] **`Terminal`** — fake console: typed command + output, riding the `AnimationBar` keyframe clock.
   - Done: `src/lib/components/Terminal.svelte`, with the schedule in
