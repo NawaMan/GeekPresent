@@ -70,8 +70,16 @@ describe('FREEZE end-to-end — a stroke into this slide’s real source', () =>
 		expect(next).toContain('<Line from={[1120, 600]} to={[1800, 600]}');
 		// …the chosen colour came with the one that had one, and the untinted one stayed
 		// untinted so --draw-stroke keeps painting it.
-		expect(next).toContain('color="#E5484D"');
-		expect(next.match(/color="#E5484D"/g)).toHaveLength(1);
+		//
+		// Asserted over the INSERTED lines, not the whole file. The slide invites a reader to
+		// freeze their own marks onto it, so it may already carry shapes (and colours) of its
+		// own — counting `#E5484D` across the file would make this test fail for the very
+		// reason the feature is working.
+		const added = next
+			.split('\n')
+			.filter((line) => !source.includes(line.trim()) && line.trim() !== '');
+		expect(added.filter((l) => l.includes('color="#E5484D"'))).toHaveLength(1);
+		expect(added.filter((l) => l.includes('<Polyline'))).toHaveLength(1);
 		// …inside a <Draw>, without which neither shape would render at all…
 		expect(next).toMatch(/<Draw>[\s\S]*<Polyline[\s\S]*<\/Draw>/);
 		// …and the import that makes them compile.

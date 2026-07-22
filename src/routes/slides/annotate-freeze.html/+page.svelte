@@ -18,6 +18,7 @@
 	import source      from './+page.svelte?raw';
 
 	const path = 'src/routes/slides/annotate-freeze.html/+page.svelte';
+	import { Draw, Line, Polyline } from '$lib/draw';
 </script>
 
 <ContentPage title="Freeze" subtitle="The one mark you'd rather keep">
@@ -38,7 +39,7 @@
 
 <!-- Something worth circling: a term a speaker would ring while answering a question, and
      then decide belongs on the slide for good. -->
-<Block name="ring-me" x={1090} y={360} width={760} height={150}>
+<Block name="ring-me" x={1101} y={495} width={760} height={150}>
 	<div class="demo a">
 		the <code>p99</code> is the number that matters &mdash; <b>ring it</b>
 	</div>
@@ -46,7 +47,7 @@
 
 <!-- Something worth underlining, and something worth boxing: one target per shape the
      mapping produces, so the demo covers the whole table below. -->
-<Block name="underline-me" x={1090} y={545} width={760} height={140}>
+<Block name="underline-me" x={1104} y={779} width={760} height={140}>
 	<div class="demo b">
 		<span>every request pays it</span>
 		<span class="tip">underline a line &middot; box a region &middot; arrow at a word</span>
@@ -56,7 +57,7 @@
 <!-- The mapping, stated where the speaker meets it. This is the whole feature: it is not
      new geometry, it is a translation between two things that already share a coordinate
      space (the ink surface and <Draw> are both 1920x1080). -->
-<Block name="mapping" x={65} y={430} width={950} height={300}>
+<Block name="mapping" x={64} y={475} width={950} height={300}>
 	<div class="tools">
 		<p><b>What each mark becomes.</b></p>
 		<ul>
@@ -89,6 +90,15 @@
 <Hint text="Press ✎ ANNOTATE (top-centre), draw on a box, then pick ❄ FREEZE and tap your mark" />
 
 <ViewSource {source} {path} />
+
+<!-- Frozen from an ANNOTATE stroke. -->
+<Draw>
+	<Polyline points={[[1044.35, 639.45], [1031.76, 629.38], [1024.21, 628.12], [1014.14, 623.08], [1001.55, 621.83], [988.96, 621.83], [976.37, 621.83], [968.81, 621.83], [962.52, 623.08], [954.96, 625.6], [948.67, 629.38], [943.63, 633.16], [938.6, 636.93], [936.08, 640.71], [933.56, 649.52], [933.56, 654.56], [934.82, 664.63], [939.86, 670.93], [947.41, 679.74], [952.45, 687.29], [956.22, 694.85], [961.26, 702.4], [967.55, 709.96], [973.85, 717.51], [978.89, 722.55], [983.92, 726.32], [987.7, 730.1], [995.25, 733.88], [1002.81, 733.88], [1014.14, 731.36], [1017.91, 728.84], [1022.95, 725.06], [1033.02, 716.25], [1038.06, 709.96], [1041.84, 703.66], [1045.61, 696.11], [1049.39, 688.55], [1053.17, 682.26], [1054.43, 677.22], [1054.43, 667.15], [1054.43, 662.11], [1053.17, 657.08], [1050.65, 649.52], [1046.87, 645.75], [1043.1, 640.71], [1039.32, 636.93]]} smooth thickness={6} />
+	<Polyline points={[[949.93, 662.11], [957.48, 657.08], [967.55, 648.26], [971.33, 644.49], [976.37, 639.45], [983.92, 634.42], [986.44, 630.64], [991.48, 626.86], [983.92, 635.67], [976.37, 645.75], [973.85, 650.78], [965.04, 665.89], [962.52, 670.93], [958.74, 683.52], [954.96, 689.81], [953.7, 696.11], [951.19, 701.14], [963.78, 693.59], [970.07, 687.29], [982.66, 675.96], [991.48, 668.41], [997.77, 662.11], [1005.32, 657.08], [1010.36, 653.3], [1015.4, 649.52], [1019.17, 647.01], [1022.95, 644.49], [1029.25, 641.97], [1020.43, 649.52], [1011.62, 659.6], [1005.32, 667.15], [1000.29, 672.19], [997.77, 677.22], [995.25, 683.52], [991.48, 691.07], [990.22, 696.11], [987.7, 699.88], [996.51, 696.11], [1000.29, 693.59], [1026.73, 681], [1031.76, 679.74], [1049.39, 674.7], [1060.72, 672.19], [1055.69, 679.74], [1049.39, 686.03], [1039.32, 696.11], [1029.25, 704.92], [1024.21, 711.21], [1020.43, 714.99], [1016.66, 720.03], [1011.62, 725.06], [1009.1, 726.32]]} smooth color="#E5484D" thickness={6} />
+	<Line from={[753.52, 759.06]} to={[928.52, 692.33]} arrow="end" color="#3FA9F5" thickness={6} />
+	<Line from={[1295, 718]} to={[1076, 694]} arrow="end" color="#4BD07A" thickness={6} />
+	<Line from={[902.09, 499.7]} to={[943.63, 595.39]} arrow="end" color="#4BD07A" thickness={6} />
+</Draw>
 
 <style>
 	.tools p {
