@@ -169,6 +169,15 @@
 	--annot-erase:             #FF5C5C;
 	--annot-erase-glow:        rgba(255, 92, 92, 0.75);
 
+	/* FREEZE's "this one gets kept" colour — the eraser's twin, and deliberately its opposite
+	   in temperature: erase is a hot red for a mark about to be destroyed, freeze is a cold
+	   blue for one about to become permanent. A mark PICKED stays lit in it (so the whole
+	   selection is visible at once, which is the point of picking before committing), and one
+	   merely hovered gets the glow. Reads on the dark main deck; a light theme may pick its
+	   own, like every other token here. */
+	--annot-freeze:            #6FD3F5;
+	--annot-freeze-glow:       rgba(111, 211, 245, 0.75);
+
 	/* A TEXT label's fill. Defaults to the pen's colour, so untinted labels follow the ink
 	   through a re-theme; override for a deck that wants typed notes a different colour. */
 	--annot-text:              var(--annot-pen, #F0A33E);

@@ -27,17 +27,10 @@ export interface SaveResult {
 	error?: string;
 }
 
-/** Write every dirty Block AND Draw shape on the current slide back to source. */
-export async function saveAdjust(): Promise<SaveResult> {
-	// Blocks patch by geometry (robust to formatting); Draw shapes patch by a
-	// literal old→new tag swap (a Curve has no box to patch numerically).
-	const blockChanges = [...get(adjustChanges).values()]
-		.filter((e) => e.dirty)
-		.map((e) => ({ kind: e.kind, name: e.name || undefined, before: e.before, after: e.after }));
-	const drawChanges = [...get(shapeChanges).values()]
-		.filter((e) => e.dirty)
-		.map((e) => ({ kind: e.kind, name: e.name || undefined, oldTag: e.oldTag, newTag: e.newTag }));
-	const changes = [...blockChanges, ...drawChanges];
+/** POST a set of changes and normalise the answer. Shared by saveAdjust (rewrites)
+    and saveFreeze (an insert), so both inherit the same error and partial-write
+    reporting rather than growing a second, subtly different one. */
+async function post(changes: unknown[]): Promise<SaveResult> {
 	if (!changes.length) return { ok: true, patched: 0, unmatched: [] };
 
 	try {
@@ -59,4 +52,31 @@ export async function saveAdjust(): Promise<SaveResult> {
 	} catch (err) {
 		return { ok: false, patched: 0, unmatched: [], error: err instanceof Error ? err.message : String(err) };
 	}
+}
+
+/** FREEZE: write new shape markup into the current slide's source — the one save
+    that ADDS rather than rewrites (see patchSource's insert mode). Deliberately NOT
+    routed through the adjustChanges registry: a frozen stroke is not a dirty tag
+    that drifted from its source, it is markup the source has never had, so it has
+    nothing to report dirty and nothing to go clean afterwards.
+
+    Dev-only, like every other write here — the endpoint is a Vite middleware. In a
+    built deck the fetch simply fails and the caller falls back to the clipboard,
+    which is the path a published deck has anyway. */
+export async function saveFreeze(insert: string, insertImports: string[] = []): Promise<SaveResult> {
+	if (!insert.trim()) return { ok: true, patched: 0, unmatched: [] };
+	return post([{ kind: 'Draw', insert, insertImports }]);
+}
+
+/** Write every dirty Block AND Draw shape on the current slide back to source. */
+export async function saveAdjust(): Promise<SaveResult> {
+	// Blocks patch by geometry (robust to formatting); Draw shapes patch by a
+	// literal old→new tag swap (a Curve has no box to patch numerically).
+	const blockChanges = [...get(adjustChanges).values()]
+		.filter((e) => e.dirty)
+		.map((e) => ({ kind: e.kind, name: e.name || undefined, before: e.before, after: e.after }));
+	const drawChanges = [...get(shapeChanges).values()]
+		.filter((e) => e.dirty)
+		.map((e) => ({ kind: e.kind, name: e.name || undefined, oldTag: e.oldTag, newTag: e.newTag }));
+	return post([...blockChanges, ...drawChanges]);
 }

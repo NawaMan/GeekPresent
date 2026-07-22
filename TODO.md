@@ -2165,25 +2165,77 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
 
 ## Authoring / LAYOUT mode
 
-- [ ] **Convert an annotation to a shape (when SAVE is allowed)** — promote a live ANNOTATE ink
-  stroke into a persistent Draw shape written back to source, so a mark drawn on stage stops being
-  ephemeral ink and becomes an authored slide element.
+- [x] **Convert an annotation to a shape — FREEZE** — promote a live ANNOTATE ink stroke into a
+  persistent Draw shape, so a mark drawn on stage stops being ephemeral ink and becomes an
+  authored slide element.
   - Why: ANNOTATE ink is deliberately transient and per-slide (the `inkBook`, keyed by pathname);
-    Draw shapes are source. Today the only bridge is redrawing the mark by hand as a `<Polyline>`. A
-    "keep this" promotion turns a good live annotation — an underline, a circled term, a scrawled
-    arrow — into a permanent element in one step, exactly when the author already has SAVE in front
-    of them.
-  - Approach: it's a mapping, not new geometry. An ANNOTATE stroke is already `Point[]` + a tool +
-    colour (`annotate/annotateCore.ts`, the `inkBook` in `stores/annotation.ts`), and `Polyline`'s
-    source form is literally `points: Point[]` with `smooth`/`close` — so emit a `<Polyline points={…}
-    smooth …>` (a pen → a smoothed line, a highlighter → a fat low-opacity band) and hand it to the
-    SAME shape change registry SAVE already patches (the one Draw shapes report to via
-    `registerPathSource`). Carry the stroke's colour to a `stroke` / `--draw-*` role token, not a
-    frozen hex. Gate the action on the SAVE-allowed flag (`canLayout`), and on success drop the
-    promoted stroke from the `inkBook` so the mark doesn't paint twice.
-  - Open questions: does the stroke leave the ink layer immediately (default) or stay as ink until
-    SAVE actually lands; how a highlighter band maps (a fat translucent `Polyline` vs a `Rect`); and
-    whether it's a per-stroke "keep as shape" on tap/click or a bulk "promote all ink on this slide".
+    Draw shapes are source. Before this, the only bridge was redrawing the mark by hand as a
+    `<Polyline>`.
+  - Done: the mapping is a pure, total `src/lib/annotate/freezeCore.ts` — `Stroke[]` + a picked id
+    set → Draw markup, in the `drawCore`/`patchSource` tradition (junk in, a tag that still
+    parses; every coordinate through `fmtNum`, so a NaN emits `0` rather than pasting `NaN` into
+    someone's source). It is nearly free for one reason worth recording: **the two coordinate
+    spaces were already identical** — the ink surface is laid out at 1920x1080 (`annotateCore`'s
+    `toCanvasPoint`) and `<Draw>`'s viewBox is `0 0 1920 1080` — so a stroke's `points` are
+    drop-in `Polyline` points, with no transform to go subtly wrong. Pen → a smoothed
+    `<Polyline>`; **highlighter → a fat translucent `<Polyline>`, never a `<Rect>`** (settling that
+    open question — a band is just a wide stroke, and boxing it throws away the gesture);
+    line/arrow → `<Line from to>` keeping the head; rectangle → `<Rect>` with the corners
+    normalised the way `rectD` paints them. **TEXT stays ink** — the Draw family has no
+    counterpart for a typed label. A stroke's colour is carried ONLY when the speaker explicitly
+    picked one, so an untinted mark leaves `--annot-*` for `--draw-stroke` and follows a re-theme
+    instead of freezing today's hex.
+  - **FREEZE is a bar MODE, not a one-tap action** (settling the per-stroke-vs-bulk question, and
+    displacing both options with the better third): ❄ FREEZE joins the tool row and borrows the
+    eraser's whole interaction — hover lights the mark under the cursor through the same
+    `hitStroke`/`hitText` reach — with one deliberate divergence. **A tap TOGGLES a selection
+    instead of acting at once**, because freezing is additive and reversible where erasing is
+    neither, and a speaker choosing what to keep wants to see the whole set before committing.
+    Picked marks stay lit in a cold `--annot-freeze` (the eraser's hot red, inverted on purpose);
+    the bar shows `FREEZE (n)` and **that button is the commit** — nothing leaves the ink layer
+    until it is pressed. The selection is plain component state, never part of the persisted
+    `inkBook`, so it cannot ride the storage event to the audience's window.
+  - **The TODO entry that asked for this misdescribed the mechanism, and the correction was the
+    work.** It said to hand the shape to "the SAME shape change registry SAVE already patches" —
+    but that registry (`ShapeChangeEntry`) carries `oldTag`/`newTag` and `patchSource.ts` applies
+    it as a *literal replacement of an existing tag*. A frozen stroke has no `oldTag`, and on most
+    slides no `<Draw>` to be inserted into. **Writing ink back to source was a new capability, not
+    a reuse.** So `patchSource.ts` grew a third change mode, `insert`, as conservative as the
+    matcher it sits beside: into the slide's `<Draw>` when it has exactly one, into a fresh
+    top-level `<Draw>` (before any `<style>` block) when it has none, and `ambiguous` when it has
+    several — never a guess. It merges the needed `$lib/draw` import at the same time, and will
+    add a `<script>` block to a pure-markup slide to hold it, because an inserted `<Polyline>`
+    without its import is a build error rather than a shape.
+  - **Two destinations, and the order is the design.** In dev with SAVE allowed (`canSave`) the
+    markup goes straight into the slide's source through the same `/__geekpresent/adjust-save`
+    endpoint, via a new `saveFreeze()` sharing `saveAdjust`'s POST/error/partial-write reporting
+    (both were refactored onto one `post()`). Anywhere else — a built deck, a static host, SAVE
+    refused — there is no source to write, so it falls back to the **clipboard**: the snippet-emit
+    bargain every other ADJUST gesture already makes, prompt-fallback included.
+  - **Ink is dropped ONLY when a source write actually lands** (settling the third open question,
+    against the entry's own default): a clipboard copy has not landed until the author pastes it,
+    and destroying the mark on the strength of a copy would lose it to a failed paste. On a real
+    write the promoted strokes leave the `inkBook` so the mark can't paint twice. The bar says
+    which happened (`FROZEN 2` / `COPIED 2` / `PLACE IT YOURSELF`) — a write to your source must
+    never be silent, the same rule ADJUST's SAVE flash follows.
+  - Files: `src/lib/annotate/freezeCore.ts` (new), the insert mode + import merge in
+    `src/lib/adjust/patchSource.ts`, `saveFreeze()` in `src/lib/stores/adjustSave.ts`, the FREEZE
+    mode/selection/commit in `src/lib/components/Annotate.svelte`, `'freeze'` on `AnnotateMode` in
+    `src/lib/annotate/annotateCore.ts`, `--annot-freeze`/`--annot-freeze-glow` in
+    `src/lib/themes/roles.css`, the demo slide `src/routes/slides/annotate-freeze.html/` (+ its
+    `pages.ts` entry, slotted after PERSISTENCE — "the ink stays" is what makes "but it is still
+    not source" a question worth answering), and the patcher's third mode documented in
+    `.claude/skills/adjust-mode/SKILL.md`.
+  - Tests: `tests/freezeCore.test.ts` (20 — every tool's mapping, the colour-absence rule,
+    NaN/Infinity repair, empty and non-array points, draw-order-not-pick-order, the count matching
+    what the button promises), the insert + import suites in `tests/adjustPatch.test.ts` (one
+    `<Draw>` / none / several / empty, and the four import cases), `tests/Annotate.test.ts`
+    (DOM — pick, un-pick, hover-is-not-choosing, nothing happens before the commit, the clipboard
+    copy KEEPING the ink, TEXT refused, the pick dropped on leaving the mode),
+    `tests/AnnotateSsr.ssr.test.ts` (no FREEZE control and no `frozen`/`freezing` class ever
+    prerenders) and `tests/AnnotateFreezeSsr.ssr.test.ts` (the demo slide through `svelte/server`,
+    plus an END-TO-END freeze — a stroke through the real mapping and the real patcher onto the
+    demo slide's actual bytes on disk, proving the two halves compose).
 
 - [x] **Ctrl+S saves while in ADJUST mode** — trap the browser's Save shortcut and route it to
   ADJUST's SAVE instead of the "save this webpage" dialog.

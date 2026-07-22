@@ -103,3 +103,36 @@ describe('Annotate (SSR)', () => {
 		expect(body).not.toContain('NaN');
 	});
 });
+
+// --- FREEZE (SSR) --------------------------------------------------------------
+//
+// FREEZE writes to a source file, so of all the ink chrome it is the one that MUST NOT
+// reach a prerendered page: a static host has no source to write and no dev endpoint to
+// write it through, and a commit button on a published deck is a button that can only
+// disappoint. The bar as a whole is already client-only (the pen cannot be armed at
+// prerender), but this pins the FREEZE half of it by name, because the bar's contents are
+// exactly what a future change is most likely to loosen.
+describe('Annotate — FREEZE (SSR)', () => {
+	it('prerenders no FREEZE control, armed or not', () => {
+		canAnnotate.set(true);
+		annotationMode.set(true);
+		const { body } = render(Annotate, { props: {} });
+		expect(body).not.toContain('FREEZE');
+		expect(body).not.toContain('freeze-go');
+		expect(body).not.toContain('tap a mark to keep it');
+	});
+
+	it('never lights a stroke as picked in a prerendered page', () => {
+		// The selection is component state, deliberately NOT part of the persisted inkBook —
+		// so ink mirrored into a static page can carry no pick with it, however it got there.
+		inkPath.set(SLIDE);
+		inkBook.set({
+			[SLIDE]: { strokes: [{ id: 'a', tool: 'pen', points: [[0, 0], [9, 9]] }], ts: 1 }
+		});
+		const { body } = render(Annotate, { props: {} });
+
+		expect(body).toContain('annot-stroke'); // the ink itself still mirrors
+		expect(body).not.toContain('frozen');
+		expect(body).not.toContain('freezing');
+	});
+});

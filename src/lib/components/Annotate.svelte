@@ -31,7 +31,16 @@
 -->
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
+	import { canSave } from '$lib/stores/adjustMode';
+	import { saveFreeze } from '$lib/stores/adjustSave';
+	import {
+		freezeCount,
+		freezeImport,
+		freezeSnippet,
+		freezeTags,
+		isFreezable
+	} from '$lib/annotate/freezeCore';
 	import {
 		annotationMode,
 		canAnnotate,
@@ -124,16 +133,20 @@
 	// "has ink" alone would give the speaker nothing to draw on.
 	const showSurface = $derived(armed || $strokes.length > 0);
 
-	// The tool actually drawn with as a stroke. The eraser and text tools do not lay down a
-	// live path — eraser removes, text types — so while either is selected we stand in the pen
-	// (the draw path never runs: `live` stays empty). This keeps every draw-side call
-	// (shapeOf/dFor/strokeWidth) type-safe without an `as` in sight.
+	// The modes that lay down NO ink: the eraser removes, freeze promotes to source, text
+	// types its own label. None of them has a colour to set or a stroke to build.
+	const picking = $derived($annotateTool === 'eraser' || $annotateTool === 'freeze');
+
+	// The tool actually drawn with as a stroke. The picking modes and text do not lay down a
+	// live path, so while any of them is selected we stand in the pen (the draw path never
+	// runs: `live` stays empty). This keeps every draw-side call (shapeOf/dFor/strokeWidth)
+	// type-safe without an `as` in sight.
 	const drawTool = $derived<AnnotateTool>(
-		$annotateTool === 'eraser' || $annotateTool === 'text' ? 'pen' : $annotateTool
+		picking || $annotateTool === 'text' ? 'pen' : ($annotateTool as AnnotateTool)
 	);
-	// The colour the next mark uses — the selected tool's own, or null for the eraser (which
-	// paints nothing). Text is colourable, so it keeps its swatch.
-	const color = $derived($annotateTool === 'eraser' ? null : $annotateColor[$annotateTool]);
+	// The colour the next mark uses — the selected tool's own, or null while picking (neither
+	// the eraser nor freeze paints anything). Text is colourable, so it keeps its swatch.
+	const color = $derived(picking ? null : $annotateColor[$annotateTool as AnnotateTool]);
 
 	let surface: SVGSVGElement | undefined = $state();
 	let live: Point[] = $state([]);
@@ -171,6 +184,123 @@
 			}
 		}
 		return null;
+	}
+
+	// ── FREEZE: keeping a mark ────────────────────────────────────────────────────────────
+	// Ink is transient by design; a shape is source. FREEZE is the bridge — the speaker picks
+	// the marks worth keeping and they come back as <Polyline>/<Line>/<Rect> markup.
+	//
+	// It is a MODE, and it borrows the eraser's whole interaction, because that interaction
+	// already teaches "point at a mark and act on it": hover lights the stroke under the
+	// cursor, and the reach test is the same hitStroke/hitText. The one deliberate divergence
+	// is that a tap TOGGLES a selection instead of acting at once — freezing is additive and
+	// reversible where erasing is neither, and a speaker choosing what to keep wants to see
+	// the whole set before committing. Nothing leaves the ink layer and nothing reaches the
+	// clipboard or the source until the FREEZE (n) button is pressed.
+	//
+	// The selection is plain component state, NOT part of the persisted inkBook: it is a
+	// question being asked right now, not a property of the slide, and it must not ride the
+	// storage event to the audience's window.
+	let frozenPick: string[] = $state([]);
+
+	/** The mark a freeze-tap right here would toggle, or null. TEXT is excluded — it has no
+	    Draw counterpart (freezeCore's isFreezable), so lighting it up would promise a shape
+	    that never arrives. */
+	const freezeHoverId = $derived.by<string | null>(() => {
+		if (!armed || $annotateTool !== 'freeze' || !hoverPoint) return null;
+		const id = topStrokeUnder(hoverPoint);
+		return id && isFreezable($strokes.find((s) => s.id === id)) ? id : null;
+	});
+
+	/** How many of the picked marks would actually produce a tag — the number on the button,
+	    so `FREEZE (2)` means two tags and never one-plus-a-disappointment. */
+	const freezeReady = $derived(freezeCount($strokes, frozenPick));
+
+	/** The markup for the current pick, wrapped in a <Draw> for the clipboard (a <Polyline>
+	    outside one renders nothing). Recomputed rather than cached — it is cheap, and a
+	    stroke erased out from under the selection must drop out of it. */
+	const freezeOpts = $derived({ penWidth, highlighterWidth });
+	const freezeMarkup = $derived(freezeSnippet($strokes, frozenPick, freezeOpts));
+
+	function toggleFreeze(id: string): void {
+		frozenPick = frozenPick.includes(id) ? frozenPick.filter((x) => x !== id) : [...frozenPick, id];
+	}
+
+	/** Drop the pick — leaving the mode, paging, or freezing. Ids that no longer exist would
+	    be harmless (freezeTags filters by the live list), but a stale pick would still show a
+	    count for marks that are gone. */
+	function clearFreeze(): void {
+		frozenPick = [];
+	}
+
+	// Leaving FREEZE mode abandons the pick: a selection you cannot see is a selection you
+	// will be surprised by when you come back to it.
+	$effect(() => {
+		if ($annotateTool !== 'freeze') untrack(clearFreeze);
+	});
+
+	/** What the last FREEZE did, shown on the bar for a moment. The same vocabulary ADJUST's
+	    SAVE uses, and for the same reason: a keypress that silently may-or-may-not have
+	    written to your source is worse than no keypress. */
+	let freezeSaid: string | null = $state(null);
+	let freezeSayTimer: ReturnType<typeof setTimeout> | undefined;
+	function say(msg: string): void {
+		freezeSaid = msg;
+		clearTimeout(freezeSayTimer);
+		freezeSayTimer = setTimeout(() => (freezeSaid = null), 2400);
+	}
+
+	/** Commit the pick.
+
+	    TWO destinations, tried in order, and the order is the whole design. In dev with SAVE
+	    allowed the markup goes straight into the slide's source — the same write ADJUST's
+	    SAVE performs, through the same endpoint and the same partial-write reporting. Anywhere
+	    else (a built deck, a static host, SAVE refused) there is no source to write, so it
+	    falls back to the clipboard: the snippet-emit bargain every other ADJUST gesture makes.
+
+	    Ink is dropped ONLY when a source write actually lands. A clipboard copy has not landed
+	    until the author pastes it, and destroying the mark on the strength of a copy would lose
+	    it to a failed paste. */
+	async function commitFreeze(): Promise<void> {
+		const ids = frozenPick.slice();
+		const tags = freezeTags($strokes, ids, freezeOpts);
+		if (tags.length === 0) return;
+
+		if ($canSave) {
+			const res = await saveFreeze(tags.join('\n'), importsFor(tags));
+			if (res.ok && res.patched > 0) {
+				// It is in the source now; a second copy on the ink layer would paint twice.
+				eraseStrokes(ids);
+				clearFreeze();
+				say(`FROZEN ${tags.length}`);
+				return;
+			}
+			if (res.ok && res.unmatched.length > 0) {
+				// The slide has several <Draw>s and we will not guess which one. Fall through
+				// to the clipboard so the author can place it — never a silent no-op.
+				say('PLACE IT YOURSELF');
+			} else if (!res.ok) {
+				say('COPIED (NO SAVE)');
+			}
+		}
+
+		try {
+			await navigator.clipboard.writeText(freezeMarkup);
+			if (!freezeSaid) say(`COPIED ${tags.length}`);
+		} catch {
+			// Clipboard blocked (insecure context / permission) — the prompt is the fallback
+			// Draw's own Copy already uses, so the markup is never simply lost.
+			window.prompt('Copy this markup into the slide:', freezeMarkup);
+		}
+		clearFreeze();
+	}
+
+	/** The `$lib/draw` names a set of tags needs — parsed from the tags themselves rather
+	    than from the strokes, so it can never name a component the markup doesn't use. */
+	function importsFor(tags: string[]): string[] {
+		const line = freezeImport(tags);
+		const m = /\{([^}]*)\}/.exec(line);
+		return m ? m[1].split(',').map((s) => s.trim()).filter(Boolean) : [];
 	}
 
 	// ── Text: place, re-edit, drag ─────────────────────────────────────────────────────────
@@ -362,6 +492,15 @@
 			return;
 		}
 
+		if ($annotateTool === 'freeze') {
+			// A TAP toggles, and that is all — no drag, no capture. Freezing is a decision
+			// about a set, so it must be as easy to un-pick a mark as to pick it.
+			hoverPoint = pointFrom(ev);
+			const id = topStrokeUnder(hoverPoint);
+			if (id && isFreezable($strokes.find((s) => s.id === id))) toggleFreeze(id);
+			return;
+		}
+
 		if ($annotateTool === 'text') {
 			onTextPointerDown(ev); // place / re-edit / drag a label — its own gesture, no `live`
 			return;
@@ -380,6 +519,11 @@
 			// hover highlight (what WOULD go); with the button held it also erases as it goes.
 			hoverPoint = pointFrom(ev);
 			if (erasing) eraseUnder(hoverPoint);
+			return;
+		}
+
+		if ($annotateTool === 'freeze') {
+			hoverPoint = pointFrom(ev); // drives the highlight only; the tap does the picking
 			return;
 		}
 
@@ -406,6 +550,7 @@
 			return;
 		}
 
+		if ($annotateTool === 'freeze') return; // the pick happened on the press
 		if ($annotateTool === 'text') return; // the text gesture ends on its own trackPointer up
 
 		if (live.length === 0) return;
@@ -498,7 +643,7 @@
 	}
 
 	function setColor(c: string | null): void {
-		if ($annotateTool === 'eraser') return; // the eraser has no colour to set
+		if (picking) return; // neither the eraser nor freeze has a colour to set
 		annotateColor.update((m) => ({ ...m, [$annotateTool]: c }));
 	}
 
@@ -512,7 +657,11 @@
 		{ tool: 'rectangle', label: 'Rectangle', d: 'M5 6h14v12H5z' },
 		{ tool: 'highlighter', label: 'Highlight', d: 'M4 20h5M6 18L15 9l3 3-9 9H6zM14 8l3 3' },
 		{ tool: 'text', label: 'Text', d: 'M6 6h12M12 6v13M9 19h6' },
-		{ tool: 'eraser', label: 'Erase', d: 'M4 20h9M6 18l7-7 6 6-4 4H10z' }
+		{ tool: 'eraser', label: 'Erase', d: 'M4 20h9M6 18l7-7 6 6-4 4H10z' },
+		// A snowflake: this mark stops melting away. Last on the bar, after the tools that
+		// make marks and the one that removes them — freezing is what you do once the
+		// drawing is done.
+		{ tool: 'freeze', label: 'Freeze', d: 'M12 3v18M4.5 7.5l15 9M19.5 7.5l-15 9' }
 	];
 
 	/** Escape puts the pen down; Ctrl/Cmd+Z takes back a stroke.
@@ -553,6 +702,7 @@
 		class="annot-surface"
 		class:armed
 		class:erasing={armed && $annotateTool === 'eraser'}
+		class:freezing={armed && $annotateTool === 'freeze'}
 		class:texting={armed && $annotateTool === 'text'}
 		viewBox="0 0 {canvasWidth} {canvasHeight}"
 		style="width:{canvasWidth}px; height:{canvasHeight}px; pointer-events:{armed ? 'auto' : 'none'};"
@@ -583,6 +733,8 @@
 					class="annot-stroke"
 					class:highlighter={stroke.tool === 'highlighter'}
 					class:erasing={eraseHoverId === stroke.id}
+					class:freezing={freezeHoverId === stroke.id}
+					class:frozen={frozenPick.includes(stroke.id)}
 					d={dFor(stroke.points, stroke.tool)}
 					stroke-width={strokeWidth(stroke.tool, penWidth, highlighterWidth)}
 					style={paint(stroke.color)}
@@ -671,6 +823,7 @@
 				class="annot-btn icon"
 				class:on={$annotateTool === t.tool}
 				class:erase={t.tool === 'eraser'}
+				class:freeze={t.tool === 'freeze'}
 				aria-label={t.label}
 				aria-pressed={$annotateTool === t.tool}
 				title={t.label}
@@ -680,8 +833,30 @@
 			</button>
 		{/each}
 
-		<!-- Colour is meaningless while erasing, so the swatches step aside for the eraser. -->
-		{#if $annotateTool !== 'eraser'}
+		<!-- FREEZE's own controls, in the swatches' place: while picking, colour is meaningless
+		     and what the speaker needs instead is the count and the commit. The button IS the
+		     commit — nothing leaves the ink layer until it is pressed. -->
+		{#if $annotateTool === 'freeze'}
+			<span class="annot-sep" aria-hidden="true"></span>
+			<button
+				type="button"
+				class="annot-btn freeze-go"
+				disabled={freezeReady === 0}
+				title={$canSave
+					? 'Write the picked marks into this slide’s source'
+					: 'Copy the picked marks as Draw markup'}
+				onclick={commitFreeze}>FREEZE ({freezeReady})</button
+			>
+			{#if freezeSaid}
+				<span class="annot-said" role="status">{freezeSaid}</span>
+			{:else}
+				<span class="annot-said hint">tap a mark to keep it</span>
+			{/if}
+		{/if}
+
+		<!-- Colour is meaningless while picking, so the swatches step aside for the eraser
+		     and for freeze. -->
+		{#if !picking}
 			<span class="annot-sep" aria-hidden="true"></span>
 
 			<!-- Swatches for speed (you are on stage), plus a picker for anything else. The first
@@ -755,6 +930,11 @@
 	.annot-surface.armed.erasing {
 		cursor: cell;
 	}
+	/* Freezing PICKS rather than draws or deletes, so it wears the pointer every "choose this
+	   one" surface in the deck wears, not the eraser's cell. */
+	.annot-surface.armed.freezing {
+		cursor: pointer;
+	}
 	/* Text places a caret, so the I-beam — the same cue any text field gives. */
 	.annot-surface.armed.texting {
 		cursor: text;
@@ -798,6 +978,26 @@
 		opacity: 1;
 		mix-blend-mode: normal;
 		filter: drop-shadow(0 0 7px var(--annot-erase-glow, rgba(255, 92, 92, 0.75)));
+	}
+
+	/* FREEZE's two states, and they are two rather than one on purpose. `.frozen` is a mark
+	   already PICKED — it stays lit for as long as the selection stands, so the speaker sees
+	   the whole set they are about to keep, not just the one under the cursor. `.freezing` is
+	   the hover, and it adds the glow on top: "this is the one a tap would toggle".
+
+	   Both come after .highlighter for the same reason .erasing does — identical specificity,
+	   so order decides — and both restore full opacity and normal blend, or a picked
+	   highlighter band would light only faintly. They can never collide with .erasing: the two
+	   highlights are keyed to different bar modes, and leaving FREEZE drops the pick. */
+	.annot-stroke.frozen,
+	.annot-stroke.freezing {
+		stroke: var(--annot-freeze, #6FD3F5);
+		opacity: 1;
+		mix-blend-mode: normal;
+		filter: none;
+	}
+	.annot-stroke.freezing {
+		filter: drop-shadow(0 0 7px var(--annot-freeze-glow, rgba(111, 211, 245, 0.75)));
 	}
 
 	/* A TEXT label — FILLED (not stroked) with its own role token, which defaults to the pen's
@@ -945,6 +1145,32 @@
 	.annot-btn.erase.on {
 		background: var(--annot-erase, #FF5C5C);
 		color: var(--annot-bar-on-fg, #1A1206);
+	}
+	/* FREEZE armed: the same trick the eraser plays, in freeze's own cold token — the bar says
+	   which of the two "point at a mark" modes you are in without reading the icon. */
+	.annot-btn.freeze.on,
+	.annot-btn.freeze-go {
+		background: var(--annot-freeze, #6FD3F5);
+		color: var(--annot-bar-on-fg, #1A1206);
+	}
+	/* The commit. Disabled until something freezable is picked, so an empty press is not a
+	   thing that can happen — the count on the face and the disabled state come from the same
+	   freezeCount, and cannot disagree. */
+	.annot-btn.freeze-go:disabled {
+		background: transparent;
+		color: var(--annot-bar-fg, #D7DDE5);
+	}
+	/* What just happened (FROZEN 2 / COPIED 2 / PLACE IT YOURSELF), or the standing hint. A
+	   write to your source must never be silent — the same rule ADJUST's SAVE flash follows. */
+	.annot-said {
+		font-size: 0.82em;
+		letter-spacing: 0.04em;
+		color: var(--annot-bar-done, #7FD1A0);
+		white-space: nowrap;
+	}
+	.annot-said.hint {
+		color: var(--annot-bar-fg, #D7DDE5);
+		opacity: 0.6;
 	}
 	.annot-btn:disabled {
 		opacity: 0.35;
