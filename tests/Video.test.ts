@@ -4,6 +4,12 @@ import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Video from '../src/lib/components/Video.svelte';
 import { activeSteps } from '../src/lib/stores/activeSteps';
+import { kioskStatus, stopKiosk } from '../src/lib/stores/kiosk';
+import {
+	clearAllKioskMediaHold,
+	kioskMediaBusy,
+	kioskMediaProgress
+} from '../src/lib/stores/kioskMediaHold';
 
 // The interactive half of Video (the SSR half is in VideoSsr.ssr.test.ts). What
 // carries the component:
@@ -58,6 +64,13 @@ beforeEach(() => {
 	HTMLMediaElement.prototype.pause = vi.fn(function (this: HTMLVideoElement) {
 		fake(this, 'paused', true, 'pause');
 	});
+	stopKiosk();
+	clearAllKioskMediaHold();
+});
+
+afterEach(() => {
+	stopKiosk();
+	clearAllKioskMediaHold();
 });
 
 describe('Video — bookmarks', () => {
@@ -152,7 +165,95 @@ describe('Video — transport', () => {
 		// A browser refuses to autoplay with sound, so autoplay implies muted.
 		const auto = render(Video, { props: { src: 'demo.mp4', autoplay: true } });
 		expect(btn(auto.container, 'Unmute')).not.toBeNull();
+
+		// 'kiosk' can autoplay later — pre-mute so Start is not blocked.
+		const kiosk = render(Video, { props: { src: 'demo.mp4', autoplay: 'kiosk' } });
+		expect(btn(kiosk.container, 'Unmute')).not.toBeNull();
 	});
+
+	it('autoplay="kiosk" does not autoplay until kiosk is running', async () => {
+		const { container } = render(Video, {
+			props: { src: 'demo.mp4', autoplay: 'kiosk', kioskHold: false }
+		});
+		expect(player(container).hasAttribute('autoplay')).toBe(false);
+		expect(player(container).paused).toBe(true);
+
+		kioskStatus.set('running');
+		await tick();
+		expect(player(container).hasAttribute('autoplay')).toBe(true);
+		// Our play stub flips paused via the binding path.
+		expect(player(container).paused).toBe(false);
+	});
+
+	it('kioskHold plays during kiosk even without autoplay (and unregisters chapter steps)', async () => {
+		// The bug: keys=global + bookmarks + kiosk sought the first mark every stepMs
+		// on a paused tape. Hold must play the clip and drop activeSteps for the session.
+		const { container } = render(Video, {
+			props: { src: 'demo.mp4', bookmarks: BOOKMARKS, keys: 'global' }
+		});
+		expect(get(activeSteps)).not.toBeNull(); // presenter Space-stepping is on
+
+		kioskStatus.set('running');
+		await tick();
+		expect(get(activeSteps)).toBeNull(); // no chapter seeks on the step clock
+		expect(player(container).paused).toBe(false); // tape is rolling
+		expect(get(kioskMediaBusy)).toBe(true);
+	});
+
+	it('registers a kiosk media hold while the clip is in a playthrough', async () => {
+		const { container, unmount } = render(Video, {
+			props: { src: 'demo.mp4', autoplay: 'kiosk' }
+		});
+		kioskStatus.set('running');
+		await tick();
+		fake(player(container), 'duration', 20, 'durationchange');
+		playTo(player(container), 5);
+		await tick();
+
+		expect(get(kioskMediaBusy)).toBe(true);
+		expect(get(kioskMediaProgress)).toBe(0.25);
+
+		player(container).dispatchEvent(new Event('ended'));
+		await tick();
+		expect(get(kioskMediaBusy)).toBe(false);
+
+		unmount();
+		expect(get(kioskMediaBusy)).toBe(false);
+	});
+
+	it('kioskHold={false} never registers a hold and does not force play', async () => {
+		const { container } = render(Video, {
+			props: { src: 'demo.mp4', autoplay: false, kioskHold: false }
+		});
+		kioskStatus.set('running');
+		await tick();
+		expect(player(container).paused).toBe(true);
+		fake(player(container), 'duration', 20, 'durationchange');
+		playTo(player(container), 5);
+		await tick();
+		// Playing mid-clip with hold off still does not register
+		expect(get(kioskMediaBusy)).toBe(false);
+	});
+
+	it('strips loop during a kiosk hold so one cycle can end (no infinite booth)', async () => {
+		// video-component.html uses loop — HTML loop suppresses `ended`, which used
+		// to pin kiosk forever. While holding, the element must not have loop on.
+		const { container } = render(Video, {
+			props: { src: 'demo.mp4', loop: true, autoplay: 'kiosk' }
+		});
+		expect(player(container).hasAttribute('loop')).toBe(true); // normal mode
+
+		kioskStatus.set('running');
+		await tick();
+		expect(player(container).hasAttribute('loop')).toBe(false);
+		expect(get(kioskMediaBusy)).toBe(true);
+
+		// Natural end releases the hold.
+		player(container).dispatchEvent(new Event('ended'));
+		await tick();
+		expect(get(kioskMediaBusy)).toBe(false);
+	});
+
 
 	it('start seeks once the metadata arrives, not before', async () => {
 		const { container } = render(Video, { props: { src: 'demo.mp4', start: '0:10' } });

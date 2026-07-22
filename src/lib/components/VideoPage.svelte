@@ -32,8 +32,8 @@
   so nothing here competes for the deck's.
 
   Props: `src`, `poster`, `bookmarks`, `chapters`, `controls`, `native`, `keys`,
-  `continueKey`, `start`, `autoplay`, `loop`, `muted`, `playsinline`, `preload` all
-  pass straight through to Video. Plus:
+  `continueKey`, `start`, `autoplay` (`true` | `false` | `'kiosk'`), `kioskHold`,
+  `loop`, `muted`, `playsinline`, `preload` all pass straight through to Video. Plus:
     height — text mode only: the player's height there (a text artifact has no canvas).
 
   In `text` mode there is no canvas to fill, so the player drops out of the absolute
@@ -43,6 +43,7 @@
 	import { getMode } from '$lib/presentation';
 	import Video from '$lib/components/Video.svelte';
 	import type { Bookmark } from '$lib/utils/videoCore';
+	import type { VideoAutoplay } from '$lib/utils/videoKioskCore';
 
 	/** The video URL. Import the file as an asset so it survives a base path. */
 	export let src: string = '';
@@ -62,11 +63,13 @@
 	export let continueKey: boolean = true;
 	/** Seek here once metadata arrives — seconds or a clock string. */
 	export let start: number | string | null = null;
-	/** Start playing on mount (browsers require `muted`). */
-	export let autoplay: boolean = false;
+	/** `true` always; `false` never; `'kiosk'` only while kiosk is active. */
+	export let autoplay: VideoAutoplay = false;
+	/** Hold the kiosk clock until this clip ends (one cycle if `loop`). Default true. */
+	export let kioskHold: boolean = true;
 	/** Restart on end. */
 	export let loop: boolean = false;
-	/** Start muted. `undefined` → muted iff `autoplay`. */
+	/** Start muted. `undefined` → muted when autoplay is `true` or `'kiosk'`. */
 	export let muted: boolean | undefined = undefined;
 	/** Play inline on iOS. */
 	export let playsinline: boolean = true;
@@ -99,6 +102,7 @@
 		{continueKey}
 		{start}
 		{autoplay}
+		{kioskHold}
 		{loop}
 		{muted}
 		{playsinline}

@@ -64,8 +64,12 @@
     keys        — 'global' lets Space/Shift+Space step the bookmarks. Default 'off'.
     continueKey — also seek on the presenter console's CONTINUE pulse. Needs `keys`.
     start       — seek here once metadata lands (seconds or a clock string).
-    autoplay    — start playing on mount. Browsers only allow this while muted, so
-                  `muted` defaults to `autoplay` — pass `muted={false}` to insist.
+    autoplay    — `true` always starts on mount; `false` never; `'kiosk'` only while
+                  a kiosk session is active (lobby loop). Browsers only allow this
+                  while muted, so `muted` defaults on for `true` and `'kiosk'`.
+    kioskHold   — while kiosk runs, hold the auto-advance clock until this clip's
+                  natural end (one cycle even if `loop`). Default true. Decorative
+                  clips pass `kioskHold={false}` so pageMs still owns the slide.
     loop, muted, playsinline, preload — the <video> attributes, unchanged.
     width/height — CSS lengths (default '100%' — fills a Block). In normal flow a
                   `100%` height collapses; pass e.g. height="540px".
@@ -79,6 +83,8 @@
 	import { browser } from '$app/environment';
 	import { getMode } from '$lib/presentation';
 	import { activeSteps } from '$lib/stores/activeSteps';
+	import { kioskActive } from '$lib/stores/kiosk';
+	import { clearKioskMediaHold, setKioskMediaHold } from '$lib/stores/kioskMediaHold';
 	import { spaceIntent } from '$lib/utils/stepKeys';
 	import {
 		activeBookmarkIndex,
@@ -89,6 +95,18 @@
 		seekFraction,
 		type Bookmark
 	} from '$lib/utils/videoCore';
+	import {
+		defaultMutedForAutoplay,
+		effectiveMediaLoop,
+		isLoopWrap,
+		mediaHoldFraction,
+		mediaHoldRemainingMs,
+		shouldDriveChapterSteps,
+		shouldHoldForKiosk,
+		wantsAutoplay,
+		wantsPlay,
+		type VideoAutoplay
+	} from '$lib/utils/videoKioskCore';
 
 	/** The video URL. Import the file as an asset so it survives a base path. */
 	export let src: string = '';
@@ -109,12 +127,13 @@
 	export let continueKey: boolean = true;
 	/** Seek here once metadata arrives — seconds or a clock string. */
 	export let start: number | string | null = null;
-	/** Start playing on mount (browsers require `muted`; see below). */
-	export let autoplay: boolean = false;
+	/** `true` always; `false` never; `'kiosk'` only while a kiosk session is active. */
+	export let autoplay: VideoAutoplay = false;
+	/** Hold the kiosk clock until this clip's natural end (one cycle if `loop`). */
+	export let kioskHold: boolean = true;
 	/** Restart on end. */
 	export let loop: boolean = false;
-	/** Start muted. `undefined` → muted iff `autoplay`, which is the only way a
-	    browser will honour it. */
+	/** Start muted. `undefined` → muted when autoplay is `true` or `'kiosk'`. */
 	export let muted: boolean | undefined = undefined;
 	/** Play inline on iOS rather than taking over the screen. */
 	export let playsinline: boolean = true;
@@ -134,6 +153,8 @@
 	export { klass as class };
 
 	const isText = getMode() === 'text';
+	/** Identity for activeSteps + kiosk media hold. */
+	const token = {};
 
 	let video: HTMLVideoElement;
 	let track: HTMLElement;
@@ -141,12 +162,76 @@
 	// Media bindings, not hand-wired events: Svelte keeps these in step with the
 	// element's own play/pause/timeupdate/durationchange. `duration` is NaN until
 	// metadata lands, which every consumer below is written to survive.
-	let paused = !autoplay;
+	// Autoplay may be kiosk-only — seed paused assuming session off; the reactive
+	// block below starts play when kiosk becomes active.
+	let paused = !wantsAutoplay(autoplay, false);
 	let currentTime = 0;
 	let duration = NaN;
-	// Seeded once from the prop, then owned by the mute button. Autoplay is the
-	// reason for the default: a browser silently refuses to autoplay with sound.
-	let isMuted = muted ?? autoplay;
+	// Seeded once from the prop, then owned by the mute button. Autoplay modes
+	// that can fire without a gesture default muted; hold-driven kiosk Start mutes
+	// in the play-kick block below so ordinary Video chrome stays unmuted.
+	let isMuted = muted ?? defaultMutedForAutoplay(autoplay);
+	/** First natural end of this hold cycle — loop must not re-trap kiosk. */
+	let cycleDone = false;
+	/** Previous playhead — detects a loop wrap if `ended` never fires. */
+	let prevHoldTime = 0;
+
+	// Authored autoplay, or kiosk running a content hold — play the tape, don't
+	// leave a paused playhead for chapter-step seeks.
+	$: wantPlay =
+		!isText &&
+		wantsPlay({
+			autoplay,
+			kioskActive: $kioskActive,
+			kioskHold,
+			cycleDone
+		});
+	// HTML autoplay attr only when we actually want play now (not a latent 'kiosk').
+	$: mediaAutoplay = wantPlay;
+	// Strip `loop` for one kiosk playthrough so the `ended` event fires (HTML loop
+	// suppresses it and would pin the booth forever). Author's loop returns after.
+	$: mediaLoop = effectiveMediaLoop({
+		loop,
+		kioskActive: $kioskActive,
+		kioskHold,
+		cycleDone
+	});
+	// When kiosk/autoplay wants play, flip paused so Svelte's binding calls play().
+	// Force mute first if the author did not insist on sound — unmuted autoplay is
+	// rejected by the browser and the clip would sit paused on the first frame.
+	// Stopping kiosk does not force-pause — the speaker may keep watching.
+	$: if (browser && video && wantPlay && paused && !cycleDone) {
+		if (muted !== false) isMuted = true;
+		paused = false;
+	}
+
+	$: holding = shouldHoldForKiosk({
+		kioskHold,
+		kioskActive: $kioskActive,
+		cycleDone,
+		wantPlay,
+		paused,
+		currentTime,
+		duration
+	});
+	// Belt-and-braces: if loop still wrapped the playhead (ended suppressed),
+	// treat that as cycle complete so kiosk can page.
+	$: if (browser && holding && !cycleDone && isLoopWrap(prevHoldTime, currentTime, duration)) {
+		finishHoldCycle();
+	}
+	$: if (holding) prevHoldTime = currentTime;
+	$: if (!holding) prevHoldTime = 0;
+
+	$: if (browser && !isText) {
+		if (holding) {
+			setKioskMediaHold(token, {
+				fraction: mediaHoldFraction(currentTime, duration),
+				remainingMs: mediaHoldRemainingMs(currentTime, duration)
+			});
+		} else {
+			clearKioskMediaHold(token);
+		}
+	}
 
 	$: marks = normalizeBookmarks(bookmarks);
 	$: active = activeBookmarkIndex(marks, currentTime);
@@ -169,8 +254,22 @@
 	}
 
 	function restart() {
+		cycleDone = false;
+		prevHoldTime = 0;
 		seekTo(0);
 		paused = false;
+	}
+
+	/** One playthrough finished — release the kiosk hold (loop must not re-trap). */
+	function finishHoldCycle() {
+		if (cycleDone) return;
+		cycleDone = true;
+		clearKioskMediaHold(token);
+	}
+
+	/** Natural end — only fires when `loop` is off (we strip it during a hold). */
+	function onEnded() {
+		finishHoldCycle();
 	}
 
 	function seekFromClick(event: MouseEvent) {
@@ -210,13 +309,26 @@
 	// Publish to the slide chrome exactly as a Steps build does — same store, same
 	// contract — so CONTINUE steps the chapters and greys out on the last one. Only
 	// the keyboard-owning instance registers, matching who Space would drive.
-	const token = {};
-	$: drivesChrome = browser && !isText && keys === 'global' && marks.length > 0;
-	$: if (drivesChrome) activeSteps.set({ owner: token, ...build, next: stepNext });
+	// While kiosk is active we *un*register: otherwise the runner's `reveal` branch
+	// seeks bookmark-to-bookmark every stepMs on a still-paused (or mid-play) tape.
+	$: drivesChrome =
+		browser &&
+		!isText &&
+		shouldDriveChapterSteps({
+			keysGlobal: keys === 'global',
+			hasMarks: marks.length > 0,
+			kioskActive: $kioskActive
+		});
+	$: if (drivesChrome) {
+		activeSteps.set({ owner: token, ...build, next: stepNext });
+	} else {
+		activeSteps.update((v) => (v && v.owner === token ? null : v));
+	}
 
 	onDestroy(() => {
 		// Only clear it if we are still the registered build (a later one may own it).
 		activeSteps.update((v) => (v && v.owner === token ? null : v));
+		clearKioskMediaHold(token);
 	});
 
 	// Space seeks forward, Shift+Space back. We claim the key only while a chapter
@@ -265,11 +377,12 @@
 			bind:duration
 			bind:muted={isMuted}
 			on:loadedmetadata={onMetadata}
+			on:ended={onEnded}
 			{src}
 			poster={poster || undefined}
 			controls={native}
-			{autoplay}
-			{loop}
+			autoplay={mediaAutoplay}
+			loop={mediaLoop}
 			{playsinline}
 			{preload}
 		></video>

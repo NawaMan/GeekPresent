@@ -81,7 +81,10 @@ export const pages = [
     { path: "webpage-component.html", title: "WebPage — Full-Canvas Site" },
     { path: "video-component.html",   title: "Video — Player & Bookmarks" },
     { path: "videopage-component.html", title: "VideoPage — Full-Canvas Video" },
+    { path: "videopage-bare.html",    title: "VideoPage — Bare (no chrome)" },
+    { path: "videopage-autoplay.html", title: "VideoPage — Autoplay" },
     { path: "hint-component.html",    title: "Hint" },
+
     { path: "callout-component.html", title: "Callout", adjust: true },
     { path: "stat-component.html",    title: "Stat & StatGroup", adjust: true },
     { path: "quote-component.html",   title: "Quote", adjust: true },
