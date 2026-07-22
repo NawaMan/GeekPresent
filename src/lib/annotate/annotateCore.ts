@@ -25,10 +25,11 @@ import { finite, finitePoint, round, smoothPath } from '$lib/draw/drawCore';
     carries its own string. */
 export type AnnotateTool = 'pen' | 'line' | 'arrow' | 'rectangle' | 'highlighter' | 'text';
 
-/** What the bar can be set to: any DRAW tool, or the ERASER. The eraser is a MODE, not a
-    tool a stroke can be — it removes whole strokes rather than adding one — so it lives
-    here and never in `Stroke.tool` or the per-tool colour map. */
-export type AnnotateMode = AnnotateTool | 'eraser';
+/** What the bar can be set to: any DRAW tool, the ERASER, or FREEZE. Neither of the last
+    two is a tool a stroke can be — the eraser removes whole strokes and freeze promotes
+    them to source — so they live here and never in `Stroke.tool` or the per-tool colour
+    map. */
+export type AnnotateMode = AnnotateTool | 'eraser' | 'freeze';
 
 /** One freehand mark. `id` exists so a mirrored list can be keyed without
     re-drawing every stroke on each update.

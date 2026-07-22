@@ -290,3 +290,108 @@ describe('patchSlideSource', () => {
 		expect(source).toContain('x={111} y={222} width={333} height={444}');
 	});
 });
+
+// --- INSERT: FREEZE adding markup the slide has never had ---------------------
+//
+// Every other mode here finds a tag and rewrites it. An inserted shape has no tag to
+// find, so the question is "where does a NEW shape go?" — and the answers have to be
+// conservative in the same way the matcher is: one <Draw> is obvious, several is a
+// genuine ambiguity and is never guessed at.
+describe('patchSlideSource — insert (FREEZE)', () => {
+	const POLY = '<Polyline points={[[10, 20], [30, 40]]} smooth />';
+	const insert = (over: Partial<LayoutChange> = {}): LayoutChange => ({
+		kind: 'Draw',
+		insert: POLY,
+		insertImports: ['Draw', 'Polyline'],
+		...over
+	});
+
+	it('places the shape inside the slide’s existing <Draw>, indented to match', () => {
+		const src = [
+			'<script>',
+			"\timport { Draw, Line } from '$lib/draw';",
+			'</script>',
+			'',
+			'<Draw>',
+			'\t<Line from={[0, 0]} to={[9, 9]} />',
+			'</Draw>'
+		].join('\n');
+		const { source, patched, unmatched } = patchSlideSource(src, [insert()]);
+
+		expect(unmatched).toHaveLength(0);
+		expect(patched).toHaveLength(1);
+		expect(source).toContain('\t<Line from={[0, 0]} to={[9, 9]} />\n\t' + POLY + '\n</Draw>');
+		// The existing shape is untouched and the close tag keeps its own indentation.
+		expect(source).toContain('<Line from={[0, 0]} to={[9, 9]} />');
+	});
+
+	it('appends a whole <Draw> when the slide has none', () => {
+		const src = '<script>\n</script>\n\n<ContentPage title="x" />\n';
+		const { source, unmatched } = patchSlideSource(src, [insert()]);
+
+		expect(unmatched).toHaveLength(0);
+		expect(source).toContain('<Draw>\n\t' + POLY + '\n</Draw>');
+		// After the markup it belongs after, not before it.
+		expect(source.indexOf('<ContentPage')).toBeLessThan(source.indexOf('<Draw>'));
+	});
+
+	it('puts a fresh <Draw> BEFORE the slide’s <style> block, not after it', () => {
+		const src = '<script>\n</script>\n\n<ContentPage title="x" />\n\n<style>\n\t.a { color: red; }\n</style>\n';
+		const { source } = patchSlideSource(src, [insert()]);
+
+		expect(source.indexOf('<Draw>')).toBeLessThan(source.indexOf('<style>'));
+		expect(source).toContain('.a { color: red; }');
+	});
+
+	it('refuses to guess when the slide has SEVERAL <Draw>s', () => {
+		const src = '<Draw name="a">\n</Draw>\n<Draw name="b">\n</Draw>\n';
+		const { source, patched, unmatched } = patchSlideSource(src, [insert()]);
+
+		expect(patched).toHaveLength(0);
+		expect(unmatched).toHaveLength(1);
+		expect(unmatched[0].reason).toBe('ambiguous');
+		expect(source).toBe(src); // and nothing was written
+	});
+
+	it('reports an empty insert rather than writing nothing and claiming success', () => {
+		const { unmatched } = patchSlideSource('<Draw>\n</Draw>', [insert({ insert: '   ' })]);
+		expect(unmatched[0].reason).toBe('not-found');
+	});
+});
+
+// Without the import, an inserted <Polyline> is a build error rather than a shape — so the
+// import half is as load-bearing as the markup half.
+describe('patchSlideSource — insert brings its imports', () => {
+	const insert = (imports: string[]): LayoutChange => ({
+		kind: 'Draw',
+		insert: '<Rect x={0} y={0} width={9} height={9} />',
+		insertImports: imports
+	});
+
+	it('merges missing names into an existing $lib/draw import', () => {
+		const src = "<script>\n\timport { Draw, Line } from '$lib/draw';\n</script>\n<Draw>\n</Draw>";
+		const { source } = patchSlideSource(src, [insert(['Draw', 'Rect'])]);
+		expect(source).toContain("import { Draw, Line, Rect } from '$lib/draw';");
+	});
+
+	it('leaves the import alone when everything is already imported', () => {
+		const src = "<script>\n\timport { Draw, Rect } from '$lib/draw';\n</script>\n<Draw>\n</Draw>";
+		const { source } = patchSlideSource(src, [insert(['Draw', 'Rect'])]);
+		expect(source).toContain("import { Draw, Rect } from '$lib/draw';");
+		// Not duplicated, and not re-sorted into a second line.
+		expect(source.match(/\$lib\/draw/g)).toHaveLength(1);
+	});
+
+	it('adds the import to a script block that has no draw import at all', () => {
+		const src = "<script>\n\timport Block from '$lib/components/Block.svelte';\n</script>\n<Draw>\n</Draw>";
+		const { source } = patchSlideSource(src, [insert(['Draw', 'Rect'])]);
+		expect(source).toContain("import { Draw, Rect } from '$lib/draw';");
+		expect(source).toContain("import Block from '$lib/components/Block.svelte';");
+	});
+
+	it('gives a pure-markup slide a <script> block to hold the import', () => {
+		const { source } = patchSlideSource('<ContentPage title="x" />\n', [insert(['Draw', 'Rect'])]);
+		expect(source.startsWith('<script lang="ts">')).toBe(true);
+		expect(source).toContain("import { Draw, Rect } from '$lib/draw';");
+	});
+});

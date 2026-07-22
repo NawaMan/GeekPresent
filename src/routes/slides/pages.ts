@@ -58,11 +58,14 @@ export const pages = [
     // AUTHOR named, ANNOTATE draws on what the SPEAKER decides to point at. No `annotate`
     // flag here — that one is deck-wide (see +layout.svelte), because a speaker tool takes
     // no instruction from the slide it happens to be standing on.
-    // Four slides, and they READ as four: draw on it, straighten the pen with Shift, watch the
-    // ink survive the hop, then learn the switch. Each payoff leans on the slide before it.
+    // Five slides, and they READ as five: draw on it, straighten the pen with Shift, watch the
+    // ink survive the hop, keep the one mark worth keeping, then learn the switch. Each payoff
+    // leans on the slide before it — FREEZE comes after PERSISTENCE because "the ink stays" is
+    // what makes "but it is still not source" a question worth answering.
     { path: "annotate-component.html", title: "Annotate — The Speaker's Pen" },
     { path: "annotate-snap.html",     title: "Annotate — A Straight Edge" },
     { path: "annotate-persistence.html", title: "Annotate — The Ink Stays" },
+    { path: "annotate-freeze.html",   title: "Annotate — Freezing a Mark" },
     { path: "annotate-setup.html",    title: "Annotate — Turning It On" },
     { path: "chart-bar.html",         title: "Chart — Grouped & Stacked Bars" },
     { path: "chart-line.html",        title: "Chart — Dual-Axis Line + Time" },

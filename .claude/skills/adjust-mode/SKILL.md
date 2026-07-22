@@ -82,6 +82,15 @@ tag carries a `reason` from the patcher — `'not-found'` vs `'ambiguous'`):
 > `name` and `x/y/width/height` is indistinguishable from the real tag, and **neither** can be placed.
 > **Elide the geometry in code samples** (`<Block name="api" …>`), as every sample in this deck does.
 
+**The patcher has a third mode, and only ANNOTATE's FREEZE uses it.** Everything above *rewrites* a tag
+that is already in the file. A change carrying `insert` instead **adds** markup the slide has never had —
+a frozen ink stroke becoming a `<Polyline>`/`<Line>`/`<Rect>` (`src/lib/annotate/freezeCore.ts` does the
+mapping, `patchSource.ts`'s insert mode places it). It has no `oldTag` to find, so the question is *where
+a new shape goes*, and the answers stay as conservative as the matcher: into the slide's `<Draw>` when it
+has exactly one, into a fresh top-level `<Draw>` when it has none, and **`ambiguous`** when it has several
+— never a guess. The needed `$lib/draw` import is merged in at the same time, because an inserted
+`<Polyline>` without it is a build error rather than a shape.
+
 ## Dragging (what to tell the user)
 
 Ask the user to open the slide in *their* dev server — you never run it. The top-centre tool bar

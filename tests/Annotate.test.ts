@@ -4,6 +4,7 @@
 import { render, cleanup, fireEvent, screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { get } from 'svelte/store';
+import { tick } from 'svelte';
 import AnnotateHost from './AnnotateHost.svelte';
 import {
 	annotationMode,
@@ -765,5 +766,140 @@ describe('Annotate — disarmed', () => {
 		expect(svg.style.pointerEvents).toBe('none');
 		stroke(svg, [[10, 10], [60, 60]]);
 		expect(get(strokes)).toHaveLength(1); // the existing one, and nothing new
+	});
+});
+
+// --- FREEZE: keeping a mark ---------------------------------------------------
+//
+// Ink is transient by design and a Draw shape is source; FREEZE is the bridge. It borrows
+// the eraser's interaction (hover lights a mark, the same hitStroke reach) with one
+// deliberate divergence: a tap TOGGLES a selection instead of acting at once, because
+// freezing is additive and reversible where erasing is neither. The load-bearing claims
+// here are that nothing happens before the commit, and that a clipboard copy — which has
+// not landed until the author pastes — never destroys the ink.
+describe('Annotate — FREEZE', () => {
+	let copied: string[] = [];
+
+	beforeEach(() => {
+		annotationMode.set(true);
+		copied = [];
+		Object.defineProperty(navigator, 'clipboard', {
+			configurable: true,
+			value: { writeText: (t: string) => { copied.push(t); return Promise.resolve(); } }
+		});
+	});
+
+	/** Draw a mark with the pen, then switch to FREEZE. Svelte 5 flushes on a microtask,
+	    so a store set needs a tick before the bar reflects it. */
+	async function drawThenFreeze(svg: Element): Promise<void> {
+		stroke(svg, [[100, 100], [200, 150], [300, 100]]);
+		annotateTool.set('freeze');
+		await tick();
+	}
+
+	const freezeBtn = () => screen.getByText(/^FREEZE \(/) as HTMLButtonElement;
+
+	it('picks a mark on tap and un-picks it on a second tap', async () => {
+		render(AnnotateHost);
+		const svg = surfaceAt();
+		await drawThenFreeze(svg);
+
+		// Nothing picked yet: the commit is disabled and says so.
+		expect(freezeBtn().textContent).toContain('(0)');
+		expect(freezeBtn().disabled).toBe(true);
+
+		eraseAt(svg, [200, 150]); // a tap on the stroke — picks it
+		await tick();
+		expect(freezeBtn().textContent).toContain('(1)');
+		expect(freezeBtn().disabled).toBe(false);
+		expect(document.querySelector('.annot-stroke.frozen')).not.toBeNull();
+
+		eraseAt(svg, [200, 150]); // tap again — changes your mind
+		await tick();
+		expect(freezeBtn().textContent).toContain('(0)');
+		expect(document.querySelector('.annot-stroke.frozen')).toBeNull();
+	});
+
+	it('lights the mark under the pointer without picking it', async () => {
+		render(AnnotateHost);
+		const svg = surfaceAt();
+		await drawThenFreeze(svg);
+
+		hover(svg, [200, 150]);
+		await tick();
+		expect(document.querySelector('.annot-stroke.freezing')).not.toBeNull();
+		// Hovering is not choosing.
+		expect(freezeBtn().textContent).toContain('(0)');
+	});
+
+	it('does NOTHING to the ink until the commit is pressed', async () => {
+		render(AnnotateHost);
+		const svg = surfaceAt();
+		await drawThenFreeze(svg);
+		eraseAt(svg, [200, 150]);
+		await tick();
+
+		expect(get(strokes)).toHaveLength(1); // still ink
+		expect(copied).toHaveLength(0); // and nothing copied
+	});
+
+	it('copies the picked marks as <Draw>-wrapped markup, and KEEPS the ink', async () => {
+		// The clipboard is not a landing: a copy has not taken effect until the author
+		// pastes it, so destroying the mark here would lose it to a failed paste.
+		render(AnnotateHost);
+		const svg = surfaceAt();
+		await drawThenFreeze(svg);
+		eraseAt(svg, [200, 150]);
+		await tick();
+		await fireEvent.click(freezeBtn());
+		await tick();
+
+		expect(copied).toHaveLength(1);
+		expect(copied[0]).toContain('<Draw>');
+		expect(copied[0]).toContain('<Polyline');
+		expect(get(strokes)).toHaveLength(1);
+	});
+
+	it('refuses to freeze a TEXT label — it has no Draw counterpart', async () => {
+		render(AnnotateHost);
+		const svg = surfaceAt();
+		annotateTool.set('text');
+		await tick();
+		fireEvent(svg, new MouseEvent('pointerdown', { clientX: 100, clientY: 100, bubbles: true, button: 0 }));
+		await tick();
+		const input = document.querySelector('.annot-text-input') as HTMLInputElement;
+		await fireEvent.input(input, { target: { value: 'note' } });
+		await fireEvent.keyDown(input, { key: 'Enter' });
+		expect(get(strokes)).toHaveLength(1);
+
+		annotateTool.set('freeze');
+		await tick();
+		eraseAt(surfaceAt(), [100, 100]);
+		await tick();
+		// Neither picked nor even lit — lighting it would promise a shape that never arrives.
+		expect(freezeBtn().textContent).toContain('(0)');
+		expect(document.querySelector('.annot-stroke.frozen')).toBeNull();
+	});
+
+	it('drops the pick when the speaker leaves FREEZE mode', async () => {
+		// A selection you cannot see is one you will be surprised by on your way back.
+		render(AnnotateHost);
+		const svg = surfaceAt();
+		await drawThenFreeze(svg);
+		eraseAt(svg, [200, 150]);
+		await tick();
+		expect(freezeBtn().textContent).toContain('(1)');
+
+		annotateTool.set('pen');
+		await tick();
+		annotateTool.set('freeze');
+		await tick();
+		expect(freezeBtn().textContent).toContain('(0)');
+	});
+
+	it('hides the colour swatches while picking — there is no colour to set', async () => {
+		render(AnnotateHost);
+		await drawThenFreeze(surfaceAt());
+		expect(document.querySelector('.annot-swatch')).toBeNull();
 	});
 });

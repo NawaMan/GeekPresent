@@ -48,7 +48,14 @@ export interface LayoutChange {
 	//      so the old tag matches the source line byte-for-byte. Curves/Lines/Arcs
 	//      have no box geometry, so this is the only way to save them.
 	//
-	// A literal change (oldTag present) takes precedence; otherwise geometry is used.
+	//   3. INSERT (FREEZE): give `insert` — markup that is not in the file at all yet
+	//      and has to be ADDED. This is the one mode with no target tag to find, and
+	//      it exists for exactly one caller: freezing an ANNOTATE stroke into a Draw
+	//      shape (see annotate/freezeCore.ts). Everything else here rewrites what is
+	//      already written; this writes something new.
+	//
+	// A literal change (oldTag present) takes precedence, then an insert; otherwise
+	// geometry is used.
 	/** Geometry as the tag was mounted (matches the current source). */
 	before?: Geometry;
 	/** Geometry to write. */
@@ -57,6 +64,14 @@ export interface LayoutChange {
 	oldTag?: string;
 	/** Whole opening tag to write in its place. */
 	newTag?: string;
+	/** NEW markup to add to the slide — one shape tag per line, unindented. Placed
+	    inside the slide's existing <Draw> when it has exactly one, or in a fresh
+	    top-level <Draw> appended to the markup when it has none. */
+	insert?: string;
+	/** Component names from `$lib/draw` the inserted markup needs. Merged into the
+	    slide's existing draw import, or added as a new one — without this, an
+	    inserted <Polyline> is a build error rather than a shape. */
+	insertImports?: string[];
 }
 
 /** WHY a change couldn't be placed — so the UI can tell the author the true
@@ -209,6 +224,113 @@ function applyGeometry(tagText: string, after: Geometry): string {
 	return out;
 }
 
+// --- INSERT: adding markup that isn't there yet (FREEZE) ---------------------
+//
+// Every other mode in this file finds a tag and rewrites it. Freezing a stroke has
+// no tag to find: the shape is new. So the question changes from "which tag is
+// this?" to "where does a new shape go?", and there are exactly two answers — into
+// the <Draw> the slide already has, or into one we append. Both are conservative:
+// several <Draw>s is a genuine ambiguity and is never guessed at, exactly as a twin
+// tag tie isn't.
+
+/** The whitespace at the start of the line `at` falls on. */
+function indentAt(source: string, at: number): string {
+	const lineStart = source.lastIndexOf('\n', at - 1) + 1;
+	const m = /^[ \t]*/.exec(source.slice(lineStart, at));
+	return m ? m[0] : '';
+}
+
+/** Every `</Draw>` in the source, as indices. */
+function drawCloseTags(source: string): number[] {
+	const out: number[] = [];
+	for (let at = source.indexOf('</Draw>'); at !== -1; at = source.indexOf('</Draw>', at + 1)) {
+		out.push(at);
+	}
+	return out;
+}
+
+/** Where a fresh top-level <Draw> block belongs: after the markup, but BEFORE the
+    `<style>` block if the slide has one — a `<Draw>` written after `</style>` still
+    compiles, but it reads as an accident and it is not where an author would put it.
+    Only a `<style` at column 0 counts, so a `<style>` mentioned inside a code sample
+    can't drag the insert into the middle of a paragraph. */
+function markupEnd(source: string): number {
+	const m = /^<style\b/m.exec(source);
+	return m ? m.index : source.length;
+}
+
+/** Merge the names an inserted shape needs into the slide's `$lib/draw` import,
+    adding the import (and, if need be, the whole `<script>` block) when it has none.
+    Names already imported are left alone, and the merged list is sorted so repeated
+    freezes converge on one stable line rather than churning the import on every save. */
+function ensureDrawImports(source: string, names: string[]): string {
+	const want = names.filter((n) => n);
+	if (want.length === 0) return source;
+
+	const existing = /import\s*\{([^}]*)\}\s*from\s*(['"])\$lib\/draw\2\s*;?/.exec(source);
+	if (existing) {
+		const have = existing[1]
+			.split(',')
+			.map((s) => s.trim())
+			.filter(Boolean);
+		const missing = want.filter((n) => !have.includes(n));
+		if (missing.length === 0) return source;
+		const merged = [...have, ...missing].sort().join(', ');
+		const line = `import { ${merged} } from '$lib/draw';`;
+		return source.slice(0, existing.index) + line + source.slice(existing.index + existing[0].length);
+	}
+
+	const line = `import { ${[...want].sort().join(', ')} } from '$lib/draw';`;
+	const scriptClose = source.indexOf('</script>');
+	if (scriptClose !== -1) {
+		// Last line inside the script block, indented like whatever is already there.
+		const indent = indentAt(source, scriptClose) || '\t';
+		return source.slice(0, scriptClose) + `${indent}${line}\n` + source.slice(scriptClose);
+	}
+	// No script block at all (a pure-markup slide) — give it one.
+	return `<script lang="ts">\n\t${line}\n</script>\n\n` + source;
+}
+
+/** Place new shape markup. Returns the rewritten source, or WHY it couldn't be
+    placed — 'ambiguous' when the slide has more than one <Draw> and picking is a
+    coin flip. Nothing else here can fail: a slide with no <Draw> gets one.
+
+    Tagged rather than returning `string | UnmatchReason`: both arms would be strings,
+    and a source file that happened to equal "not-found" would read as a failure. */
+type InsertResult = { ok: true; source: string } | { ok: false; reason: UnmatchReason };
+
+function applyInsert(source: string, change: LayoutChange): InsertResult {
+	const tags = (change.insert ?? '')
+		.split('\n')
+		.map((t) => t.trim())
+		.filter(Boolean);
+	if (tags.length === 0) return { ok: false, reason: 'not-found' }; // nothing to add
+
+	const withImports = ensureDrawImports(source, change.insertImports ?? []);
+	const closes = drawCloseTags(withImports);
+	if (closes.length > 1) return { ok: false, reason: 'ambiguous' };
+
+	if (closes.length === 1) {
+		const at = closes[0];
+		const outer = indentAt(withImports, at);
+		const inner = outer + '\t';
+		const block = tags.map((t) => `${inner}${t}\n`).join('') + outer;
+		// Splice from the start of the `</Draw>` line, so the close tag keeps its own
+		// indentation instead of being pushed along by ours.
+		const lineStart = withImports.lastIndexOf('\n', at - 1) + 1;
+		return { ok: true, source: withImports.slice(0, lineStart) + block + withImports.slice(at) };
+	}
+
+	const end = markupEnd(withImports);
+	const before = withImports.slice(0, end).replace(/\s*$/, '');
+	const after = withImports.slice(end);
+	const block =
+		'\n\n<!-- Frozen from an ANNOTATE stroke. -->\n<Draw>\n' +
+		tags.map((t) => `\t${t}\n`).join('') +
+		'</Draw>\n';
+	return { ok: true, source: before + block + (after ? '\n' + after : '') };
+}
+
 /**
  * Apply ADJUST geometry changes to a slide's Svelte source. Each change is
  * matched to one opening tag and its x/y/width/height rewritten in place; the
@@ -237,6 +359,18 @@ export function patchSlideSource(source: string, changes: LayoutChange[]): Patch
 				continue;
 			}
 			current = current.slice(0, at) + change.newTag + current.slice(at + change.oldTag.length);
+			patched.push(change);
+			continue;
+		}
+
+		// New markup (FREEZE): nothing to find, something to add.
+		if (change.insert != null) {
+			const result = applyInsert(current, change);
+			if (!result.ok) {
+				unmatched.push({ ...change, reason: result.reason });
+				continue;
+			}
+			current = result.source;
 			patched.push(change);
 			continue;
 		}
