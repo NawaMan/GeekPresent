@@ -107,17 +107,24 @@ export type KioskAction = 'wait' | 'reveal' | 'note' | 'page';
  * Decide the next kiosk action.
  *
  * 1. Finite slide animations still running → wait.
- * 2. A build still has a step (`activeSteps.hasNext`) → reveal (Space).
- * 3. Speaker notes still have an item to show → note (one line at a time).
- * 4. Otherwise → page (or loop to first — the runner picks the href).
+ * 2. Media (e.g. Video) still in a playthrough → wait (same gate; runner labels it).
+ * 3. A build still has a step (`activeSteps.hasNext`) → reveal (Space).
+ * 4. Speaker notes still have an item to show → note (one line at a time).
+ * 5. Otherwise → page (or loop to first — the runner picks the href).
+ *
+ * Media sits *above* reveal so a full-bleed video is watched to its end rather
+ * than seeked chapter-to-chapter on the step clock.
  */
 export function kioskAction(state: {
 	animBusy: boolean;
+	/** True while a Video (or similar) is holding for its natural runtime. */
+	mediaBusy?: boolean;
 	hasNextStep: boolean;
 	/** True while useNotes and the current note index is still within items. */
 	hasNoteItem?: boolean;
 }): KioskAction {
 	if (state.animBusy === true) return 'wait';
+	if (state.mediaBusy === true) return 'wait';
 	if (state.hasNextStep === true) return 'reveal';
 	if (state.hasNoteItem === true) return 'note';
 	return 'page';

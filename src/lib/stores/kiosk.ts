@@ -25,6 +25,7 @@ import {
 	resolveCanKiosk,
 	type Choice
 } from '$lib/kiosk/kioskCore';
+import { clearAllKioskMediaHold } from '$lib/stores/kioskMediaHold';
 
 export type KioskStatus = 'off' | 'running' | 'paused';
 
@@ -244,6 +245,7 @@ export function stopKiosk(): void {
 	kioskPhaseLabel.set('');
 	kioskDialogOpen.set(false);
 	clearKioskNotes();
+	clearAllKioskMediaHold();
 }
 
 /** After a full page load: resume if the session still wants to run. */

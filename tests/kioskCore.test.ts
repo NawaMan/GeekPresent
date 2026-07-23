@@ -93,10 +93,19 @@ describe('wordsIn / note dwell', () => {
 	});
 });
 
-describe('kioskAction — Space semantics + note steps + anim gate', () => {
+describe('kioskAction — Space semantics + note steps + anim/media gate', () => {
 	it('waits while animations are busy', () => {
 		expect(kioskAction({ animBusy: true, hasNextStep: true })).toBe('wait');
 		expect(kioskAction({ animBusy: true, hasNextStep: false, hasNoteItem: true })).toBe('wait');
+	});
+
+	it('waits for media hold above reveal (watch the tape, do not seek chapters)', () => {
+		expect(
+			kioskAction({ animBusy: false, mediaBusy: true, hasNextStep: true, hasNoteItem: true })
+		).toBe('wait');
+		expect(
+			kioskAction({ animBusy: false, mediaBusy: true, hasNextStep: false, hasNoteItem: false })
+		).toBe('wait');
 	});
 
 	it('reveals build before notes, notes before page', () => {

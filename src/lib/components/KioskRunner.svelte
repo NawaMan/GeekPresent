@@ -4,10 +4,13 @@
   While status is `running`, ticks every ~100ms and:
 
     1. Waits for finite CSS animations on the slide content to finish.
-    2. Reveals the next build step (activeSteps.next — Space semantics).
-    3. When "Show speaker notes" is on: dwells on each note line in order
+    2. Waits for media holds (Video playthroughs) — progress tracks the tape.
+    3. Reveals the next build step (activeSteps.next — Space semantics).
+    4. When "Show speaker notes" is on: dwells on each note line in order
        (step pace, stretched by ~wpm for long lines), advancing the caption.
-    4. Pages (and loops to the first visible slide at the end of the deck).
+    5. Pages (and loops to the first visible slide at the end of the deck).
+       Leaving a media hold pages *immediately* — no second full pageMs after
+       the clip already spent its runtime.
 
   Pause freezes the dwell timer. Stop ends the session.
 -->
@@ -20,6 +23,7 @@
 	import { navigate } from '$lib/utils/deckNav';
 	import { getViewTransitions } from '$lib/presentation';
 	import { activeSteps } from '$lib/stores/activeSteps';
+	import { kioskMediaBusy, kioskMediaProgress } from '$lib/stores/kioskMediaHold';
 	import { collectFinite, isPlaying, sampleFraction } from '$lib/utils/slideAnim';
 	import {
 		kioskStatus,
@@ -114,14 +118,30 @@
 		const items = get(kioskNoteItems);
 		const noteIdx = get(kioskNoteIndex);
 		const hasNoteItem = paces.useNotes && items.length > 0 && noteIdx < items.length;
+		const mediaBusy = get(kioskMediaBusy);
+		const animIsBusy = animBusy();
 
 		const action = kioskAction({
-			animBusy: animBusy(),
+			animBusy: animIsBusy,
+			mediaBusy,
 			hasNextStep: !!steps?.hasNext,
 			hasNoteItem
 		});
 
 		if (action === 'wait') {
+			// Media hold: progress tracks the video, not a fake dwell clock.
+			// CSS anim wait: no ring (unchanged).
+			if (mediaBusy && !animIsBusy) {
+				if (lastAction !== 'media') {
+					dwellStartedAt = performance.now();
+					dwellTotal = 0;
+					pausedElapsed = 0;
+					lastAction = 'media';
+					kioskPhaseLabel.set('video');
+				}
+				kioskDwellFraction.set(get(kioskMediaProgress));
+				return;
+			}
 			if (lastAction !== 'wait') resetDwell(0, 'wait');
 			kioskDwellFraction.set(0);
 			return;
@@ -166,6 +186,13 @@
 		}
 
 		// page (no notes, or notes off)
+		// After a video hold the runtime already *was* the dwell — page now, no
+		// second full pageMs of dead air on the last frame.
+		if (lastAction === 'media') {
+			resetDwell(0, 'page');
+			goNextPage();
+			return;
+		}
 		const needMs = paces.pageMs;
 		if (lastAction !== 'page' || dwellTotal !== needMs) resetDwell(needMs, 'page');
 		const elapsed = performance.now() - dwellStartedAt;
