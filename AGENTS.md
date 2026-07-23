@@ -933,7 +933,8 @@ stay out of the audience's way. A speaker who is actively using one often wants 
   of PIN. Hidden either way under `?clean` / `?present`.
 - **Alt+. (⌥. on macOS) raises both bars for keyboard.** Temporary arm (~5s, amber halo) — not
   a pin. While armed: **a** ANNOTATE, **j** ADJUST, **z** open DISPLAY zoom menu, **p** PRESENT,
-  **m** ☰, **t** TOC. When the letter lives in the word it is underlined (`PRESENT`, `ANNOTATE`,
+  **m** ☰, **t** TOC, **u** pause/resume a *live* kiosk (inert otherwise — no kiosk running,
+  no-op). When the letter lives in the word it is underlined (`PRESENT`, `ANNOTATE`,
   `ADJUST`, Table of Contents); when it does not, a trailing chip remains (`FITTED (Z)`,
   `☰ (M)`). **z** opens (toggles) the zoom menu — ↑/↓ / Home/End walk the presets, **c** jumps
   to the CUSTOM % field, Enter applies, Esc closes — it does **not** flip FITTED/SCALED by itself.
@@ -951,6 +952,9 @@ stay out of the audience's way. A speaker who is actively using one often wants 
   destination) closes ☰; focus inside the menu is blurred so CSS `:focus-within` cannot stick it
   open. PRINT opens on hover or **r**, then the flyout's own keys take over (Esc closes only the
   flyout). **Kiosk** dialog: **Enter** starts/OK, **Esc** cancels (window-level, works from fields).
+  While a kiosk is *live* (running/paused), the bare Alt+.→**K** fast-path stops opening this
+  dialog and instead toggles the panel's forced-visible pin (`KioskIndicator`'s `--kiosk-idle`
+  ghost) — mouse-click on ☰→KIOSK (or the panel's own ⚙) still reaches the dialog to reconfigure.
 - **Not the same as `fadeChrome`.** `fadeChrome` ghosts `.gp-chrome` opacity until pointed at;
   PIN is the tuck/untuck of the two window-edge bars. They compose: a pinned bar is fully seated
   even when fade would otherwise dim other chrome.
@@ -1031,6 +1035,23 @@ sticky `?kiosk` / always in `pnpm dev`); **running** is a separate session.
 - **One floating panel** (`KioskIndicator`): title bar is the transport (grip, pause ring,
   phase, note **n/N**, ⚙ settings, × stop); body is the current note when notes are on.
   Drag by the title bar; the body scrolls. Without notes the panel collapses to a compact pill.
+  Hovering it also **freezes the dwell countdown** (so it can't page out from under you
+  while reading it or reaching for a button) — WITHOUT flipping the play/pause mode
+  itself (`kioskHoverFrozen`, distinct from `kioskStatus`): the icon and aria-label keep
+  reporting the real, explicit state throughout, and there is no jump when the pointer
+  leaves — the elapsed dwell excludes however long the freeze lasted.
+- **Keyboard, no mouse required.** While a kiosk is live (running/paused), Alt+. then **K**
+  reveals/hides the panel (a bare-armed **K** otherwise opens the setup dialog — see the PIN
+  section above); Alt+. then **U** pauses/resumes and is inert when nothing is running.
+- **Idle opacity — `--kiosk-idle` (`themes/roles.css`, default `0.6`)** is how findable the
+  panel is before you reach for it; it can go to `0` (fully invisible until Alt+.→K or a
+  hover) now that the keyboard path above exists — going lower without it would be
+  undiscoverable, the same "opacity, never visibility" bargain `fadeChrome` and the Annotate
+  bar make. Three scopes, narrowest first: **one slide** — `:global(.kiosk-panel) {
+  --kiosk-idle: 0; }` in that slide's own `<style>` (deck nav is a full page load, so the
+  rule only exists while that route is mounted — see the worked example,
+  `slides/kiosk-demo.html`); **one deck** — the same rule in that deck's `+layout.svelte`;
+  **every deck** — change the default in `themes/roles.css` itself.
 - **Exit is explicit only** — Pause / Stop / settings. Keys and pointer on the slide do not
   break out (a booth must not stop because someone brushed the glass).
 - **Pure core:** `src/lib/kiosk/kioskCore.ts`. Session: `stores/kiosk.ts`. Runner:

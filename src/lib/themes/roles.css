@@ -209,7 +209,13 @@
 	--annot-stale-edge: var(--ACCENT-WARM, #F0A33E);
 
 	/* Kiosk / auto-advance — booth chrome, bottom-left. Accent marks the dwell ring;
-	   danger is Stop. Idle opacity stays high so Pause/Stop stay findable mid-talk. */
+	   danger is Stop. Idle opacity stays high so Pause/Stop stay findable mid-talk —
+	   changing it here lowers it for every deck. Override `:global(.kiosk-panel)
+	   { --kiosk-idle: … }` in one slide's own <style> (deck nav is a full page load,
+	   so it scopes to that slide only — see slides/kiosk-demo.html) or in a deck's
+	   +layout.svelte (that deck only) for narrower reach. Going below the default is
+	   only safe because Alt+. then K/U reach the panel without a mouse — see
+	   chrome/chromeArmCore.ts and AGENTS.md's KIOSK playbook. */
 	--kiosk-panel-bg:  rgba(20, 22, 26, 0.96);
 	--kiosk-edge:      rgba(255, 255, 255, 0.28);
 	--kiosk-fg:        var(--INK, #D7DDE5);
