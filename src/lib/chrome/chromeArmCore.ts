@@ -3,9 +3,10 @@
 //
 // Global letters fight typing and deck paging; so the model is:
 //   1. Alt+. raises both bars (arm)
-//   2. While armed, a/j/z/p/m/t pick a bar control
+//   2. While armed, a/j/z/p/m/t/u pick a bar control (u = pause/resume a live kiosk)
 //   3. ☰ rows (o/k/c/r/s/e) fire while armed OR while the more menu is open —
-//      so Alt+. → m → c runs CAPTURE, and a bare Alt+. → c does too
+//      so Alt+. → m → c runs CAPTURE, and a bare Alt+. → c does too. K is dual-purpose:
+//      opens the Kiosk dialog while off, toggles the panel's forced-visible pin while live.
 //   4. Esc (or timeout) disarms
 //
 // Total: garbage input → ignore, never throw.
@@ -49,6 +50,7 @@ export type ChromeKeyIntent =
 	| 'present'
 	| 'more'
 	| 'toc'
+	| 'kiosk-pause'
 	| 'ignore';
 
 /** ☰ dropdown row letters (underlined on the rows). Collision-free with the bar alphabet. */
@@ -158,6 +160,10 @@ export function chromeKeyIntent(e: KeyboardEvent, armed: boolean): ChromeKeyInte
 			return 'more';
 		case 't':
 			return 'toc';
+		case 'u':
+			// Pause/resume a live kiosk run — the one free letter shared by "paUse"
+			// and "resUme". Caller no-ops it when no kiosk is running.
+			return 'kiosk-pause';
 		default:
 			return 'ignore';
 	}

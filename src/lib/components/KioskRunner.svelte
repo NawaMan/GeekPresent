@@ -27,6 +27,7 @@
 	import { collectFinite, isPlaying, sampleFraction } from '$lib/utils/slideAnim';
 	import {
 		kioskStatus,
+		kioskHoverFrozen,
 		kioskPaces,
 		kioskDwellFraction,
 		kioskPhaseLabel,
@@ -101,7 +102,9 @@
 	}
 
 	function tick() {
-		if (get(kioskStatus) !== 'running') return;
+		// Hover-freeze stops the clock the same way Pause does, WITHOUT touching
+		// kioskStatus — see kioskHoverFrozen's doc comment in stores/kiosk.ts.
+		if (get(kioskStatus) !== 'running' || get(kioskHoverFrozen)) return;
 
 		if (currentSlide !== lastSlide) {
 			lastSlide = currentSlide;
@@ -238,7 +241,13 @@
 		}
 	}
 
-	$: if (browser) syncTimer($kioskStatus);
+	// Hover-freeze is treated exactly like an explicit pause for the CLOCK (same
+	// elapsed-preserving syncTimer branch, so unfreezing never skips the frozen
+	// interval forward) while leaving kioskStatus — and so the play/pause icon —
+	// untouched. `status === 'off'` still wins outright.
+	$: effectiveStatus =
+		$kioskStatus === 'off' ? 'off' : $kioskStatus === 'paused' || $kioskHoverFrozen ? 'paused' : 'running';
+	$: if (browser) syncTimer(effectiveStatus);
 	$: if (browser && $kioskStatus === 'running' && currentSlide) {
 		void currentSlide;
 	}

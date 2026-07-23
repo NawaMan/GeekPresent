@@ -14,6 +14,7 @@ import {
 	closeMoreMenu,
 	disarmChrome
 } from '../src/lib/stores/chromeArm';
+import { kioskStatus, kioskPanelPinned, startKiosk, stopKiosk } from '../src/lib/stores/kiosk';
 
 const pages = [{ path: 'stub.html', title: 'Stub' }];
 
@@ -125,5 +126,60 @@ describe('SlideDeck chrome bars — opt-out', () => {
 		expect(root.querySelector('.ctrl-bar')).toBeNull();
 		// Overlay itself is gated when neither bar is wanted.
 		expect(root.querySelector('.overlay')).toBeNull();
+	});
+});
+
+describe('SlideDeck chrome bars — kiosk keyboard (Alt+. K / U)', () => {
+	beforeEach(() => {
+		stopKiosk();
+		kioskPanelPinned.set(false);
+		// KioskRunner's tick() calls collectFinite() → getAnimations() once a kiosk is
+		// running; jsdom ships no Web Animations API. Same stub as SlideDeckRelay.test.ts.
+		const none = () => [] as Animation[];
+		(Element.prototype as unknown as { getAnimations: () => Animation[] }).getAnimations = none;
+		(Document.prototype as unknown as { getAnimations: () => Animation[] }).getAnimations = none;
+	});
+
+	afterEach(() => {
+		stopKiosk();
+		kioskPanelPinned.set(false);
+		delete (Element.prototype as unknown as { getAnimations?: unknown }).getAnimations;
+		delete (Document.prototype as unknown as { getAnimations?: unknown }).getAnimations;
+	});
+
+	async function arm() {
+		await fireEvent.keyDown(window, { key: '.', code: 'Period', altKey: true });
+		await tick();
+		await tick();
+		expect(get(chromeArmed)).toBe(true);
+	}
+
+	it('K toggles the panel pin instead of the dialog while a kiosk is live', async () => {
+		await mount({ kiosk: true });
+		startKiosk();
+		await arm();
+
+		await fireEvent.keyDown(window, { key: 'k', code: 'KeyK' });
+		expect(get(kioskPanelPinned)).toBe(true);
+
+		await arm();
+		await fireEvent.keyDown(window, { key: 'k', code: 'KeyK' });
+		expect(get(kioskPanelPinned)).toBe(false);
+	});
+
+	it('U pauses/resumes a live kiosk and is inert when none is running', async () => {
+		await mount({ kiosk: true });
+		await arm();
+		await fireEvent.keyDown(window, { key: 'u', code: 'KeyU' });
+		expect(get(kioskStatus)).toBe('off'); // no kiosk running — no-op, no throw
+
+		startKiosk();
+		await arm();
+		await fireEvent.keyDown(window, { key: 'u', code: 'KeyU' });
+		expect(get(kioskStatus)).toBe('paused');
+
+		await arm();
+		await fireEvent.keyDown(window, { key: 'u', code: 'KeyU' });
+		expect(get(kioskStatus)).toBe('running');
 	});
 });
