@@ -115,12 +115,15 @@
 	import KioskRunner from '$lib/components/KioskRunner.svelte';
 	import {
 		canKiosk,
+		kioskActive,
+		kioskPanelPinned,
 		kioskDeckDefaults,
 		setCanKiosk,
 		applyKioskParam,
 		bootKioskFromUrl,
 		resolveOffered as resolveKioskOffered,
-		openKioskDialog
+		openKioskDialog,
+		toggleKioskPause
 	} from '$lib/stores/kiosk';
 	import { DEFAULT_PAGE_MS, DEFAULT_STEP_MS, DEFAULT_WPM } from '$lib/kiosk/kioskCore';
 	import {
@@ -763,7 +766,11 @@
 					closeMoreMenu();
 					break;
 				case 'kiosk':
-					if ($canKiosk) openKioskDialog();
+					// Live kiosk: K reveals/hides the panel instead of reopening setup
+					// (still reachable by mouse via the panel's own ⚙ button). Off: K
+					// opens the dialog, same as before — the only keyboard way to start.
+					if ($kioskActive) kioskPanelPinned.update((v) => !v);
+					else if ($canKiosk) openKioskDialog();
 					closeMoreMenu();
 					break;
 				case 'capture':
@@ -846,6 +853,12 @@
 			}
 			case 'toc':
 				requestTocOpen();
+				return;
+			case 'kiosk-pause':
+				// Inert unless a kiosk is actually running/paused — U does nothing on a
+				// deck that never offered or started one.
+				if ($kioskActive) toggleKioskPause();
+				keepChromeArmed();
 				return;
 		}
 	}

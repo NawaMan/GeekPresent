@@ -60,6 +60,8 @@ describe('chromeKeyIntent', () => {
 		expect(chromeKeyIntent(key({ key: 'm' }), true)).toBe('more');
 		expect(chromeKeyIntent(key({ key: 'M' }), true)).toBe('more');
 		expect(chromeKeyIntent(key({ key: 't' }), true)).toBe('toc');
+		expect(chromeKeyIntent(key({ key: 'u' }), true)).toBe('kiosk-pause');
+		expect(chromeKeyIntent(key({ key: 'U' }), true)).toBe('kiosk-pause');
 	});
 
 	it('falls back to the physical key on a non-Latin layout', () => {

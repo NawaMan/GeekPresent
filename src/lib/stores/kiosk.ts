@@ -41,6 +41,15 @@ export const kioskActive: Readable<boolean> = derived(
 	($s) => $s === 'running' || $s === 'paused'
 );
 
+/** True while the pointer sits over the panel. Freezes KioskRunner's clock (the
+    dwell countdown stops advancing) WITHOUT touching `kioskStatus` — the play/pause
+    icon, aria-label and `.paused` styling must keep reporting the real, explicit
+    mode. Transient (not persisted): driven live by mouseenter/mouseleave in
+    KioskIndicator, reset by `stopKiosk()` so a stale `true` can't survive into the
+    next session if the panel unmounts mid-hover (Stop while hovering fires no
+    mouseleave — the element is simply removed). */
+export const kioskHoverFrozen: Writable<boolean> = writable(false);
+
 /** Survives full-page nav in this tab so a non-ViewTransition deck keeps
     auto-advancing — sessionStorage, not localStorage (see file header). */
 export const kioskWantsRun = persisted('geekpresent:kiosk:wantsRun', false, {
@@ -118,6 +127,15 @@ export interface KioskNotesPos {
 	top: number;
 }
 export const kioskNotesPos: Writable<KioskNotesPos | null> = writable(null);
+
+/** Forced-visible pin — overrides the panel's idle opacity so a speaker can reveal
+    it without a mouse (Alt+. K while a kiosk is live; see chromeArmCore). Persisted
+    like chromePin's bar pins, `sync: false` for the same reason: a console window
+    and the audience window each keep their own reveal state. */
+export const kioskPanelPinned = persisted<boolean>('geekpresent:kiosk:pinned', false, {
+	codec: booleanCodec(),
+	sync: false
+});
 
 /** Replace the note list for this slide. Resets the index only when the list changes
     (MutationObserver re-publishes often; we must not rewind mid-step). */
@@ -244,6 +262,7 @@ export function stopKiosk(): void {
 	kioskDwellFraction.set(0);
 	kioskPhaseLabel.set('');
 	kioskDialogOpen.set(false);
+	kioskHoverFrozen.set(false);
 	clearKioskNotes();
 	clearAllKioskMediaHold();
 }

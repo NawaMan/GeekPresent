@@ -3,7 +3,13 @@
   the current line; body shows that line large and scrollable.
 
   Replaces a separate corner chip + notes window. Draggable by the grip / empty
-  title area (not by the buttons or the note body). Explicit Pause / Stop only.
+  title area (not by the buttons or the note body). Explicit Pause / Stop, PLUS a
+  temporary hover-freeze: mousing over the panel freezes the dwell countdown so it
+  doesn't page out from under you while you're reading it or reaching for a button —
+  WITHOUT flipping the play/pause mode itself (kioskHoverFrozen, not kioskStatus; see
+  onHoverEnter/onHoverLeave and KioskRunner's effectiveStatus). Moving off resumes the
+  countdown exactly where it was; the mode was never touched, so there's nothing to
+  restore — a kiosk already explicitly paused just stays paused, hover or not.
 -->
 <script lang="ts">
 	import { browser } from '$app/environment';
@@ -15,6 +21,8 @@
 		kioskNoteItems,
 		kioskNoteIndex,
 		kioskNotesPos,
+		kioskPanelPinned,
+		kioskHoverFrozen,
 		toggleKioskPause,
 		stopKiosk,
 		openKioskDialog
@@ -90,6 +98,17 @@
 			/* ignore */
 		}
 	}
+
+	// Temporary hover-freeze (see the file header). Purely a clock signal for
+	// KioskRunner — never touches kioskStatus, so the button/icon/aria-label above
+	// keep reporting the real, explicit mode regardless of hover.
+	function onHoverEnter() {
+		kioskHoverFrozen.set(true);
+	}
+
+	function onHoverLeave() {
+		kioskHoverFrozen.set(false);
+	}
 </script>
 
 {#if live}
@@ -97,6 +116,7 @@
 		class="kiosk-panel no-print gp-chrome"
 		class:paused
 		class:dragging
+		class:pinned={$kioskPanelPinned}
 		class:has-note={!!current}
 		role="status"
 		aria-live="polite"
@@ -111,6 +131,8 @@
 		on:pointermove={onPointerMove}
 		on:pointerup={onPointerUp}
 		on:pointercancel={onPointerUp}
+		on:mouseenter={onHoverEnter}
+		on:mouseleave={onHoverLeave}
 	>
 		<!-- Title bar = former kiosk chip -->
 		<div class="kiosk-bar">
@@ -119,7 +141,7 @@
 			<button
 				type="button"
 				class="ring-btn"
-				title={paused ? 'Resume kiosk' : 'Pause kiosk'}
+				title={paused ? 'Resume kiosk (Alt+. U)' : 'Pause kiosk (Alt+. U)'}
 				aria-label={paused ? 'Resume' : 'Pause'}
 				on:click|stopPropagation={toggleKioskPause}
 			>
@@ -199,7 +221,8 @@
 	.kiosk-panel:hover,
 	.kiosk-panel:focus-within,
 	.kiosk-panel.paused,
-	.kiosk-panel.dragging {
+	.kiosk-panel.dragging,
+	.kiosk-panel.pinned {
 		opacity: 1;
 	}
 

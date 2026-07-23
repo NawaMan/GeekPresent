@@ -4,10 +4,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import KioskIndicator from '$lib/components/KioskIndicator.svelte';
 import {
 	kioskStatus,
+	kioskHoverFrozen,
 	startKiosk,
 	stopKiosk,
 	kioskDialogOpen,
 	kioskPaceOverride,
+	kioskPanelPinned,
 	setKioskNoteItems,
 	kioskNoteIndex,
 	advanceKioskNote,
@@ -19,6 +21,7 @@ describe('KioskIndicator — combined transport + notes panel', () => {
 		stopKiosk();
 		kioskDialogOpen.set(false);
 		kioskPaceOverride.set({});
+		kioskPanelPinned.set(false);
 		clearKioskNotes();
 	});
 
@@ -27,6 +30,7 @@ describe('KioskIndicator — combined transport + notes panel', () => {
 		stopKiosk();
 		clearKioskNotes();
 		kioskPaceOverride.set({});
+		kioskPanelPinned.set(false);
 	});
 
 	it('is hidden when kiosk is off', () => {
@@ -50,6 +54,69 @@ describe('KioskIndicator — combined transport + notes panel', () => {
 
 		await fireEvent.click(getByLabelText('Stop kiosk'));
 		expect(get(kioskStatus)).toBe('off');
+	});
+
+	it('kioskPanelPinned forces the panel fully visible', async () => {
+		startKiosk();
+		const { container } = render(KioskIndicator);
+		const panel = container.querySelector('.kiosk-panel');
+		expect(panel?.classList.contains('pinned')).toBe(false);
+
+		kioskPanelPinned.set(true);
+		await Promise.resolve();
+		expect(panel?.classList.contains('pinned')).toBe(true);
+
+		kioskPanelPinned.set(false);
+		await Promise.resolve();
+		expect(panel?.classList.contains('pinned')).toBe(false);
+	});
+
+	it('hover freezes the clock without changing the play/pause mode', async () => {
+		startKiosk();
+		const { container, getByLabelText } = render(KioskIndicator);
+		const panel = container.querySelector('.kiosk-panel') as HTMLElement;
+		expect(get(kioskStatus)).toBe('running');
+
+		await fireEvent.mouseEnter(panel);
+		expect(get(kioskHoverFrozen)).toBe(true);
+		expect(get(kioskStatus)).toBe('running'); // mode untouched — still "play"
+		expect(getByLabelText('Pause')).toBeTruthy(); // icon/label agree: still running
+
+		await fireEvent.mouseLeave(panel);
+		expect(get(kioskHoverFrozen)).toBe(false);
+		expect(get(kioskStatus)).toBe('running');
+	});
+
+	it('hovering an already-paused kiosk leaves the mode paused, hover or not', async () => {
+		startKiosk();
+		const { container, getByLabelText } = render(KioskIndicator);
+		const panel = container.querySelector('.kiosk-panel') as HTMLElement;
+
+		await fireEvent.click(getByLabelText('Pause'));
+		expect(get(kioskStatus)).toBe('paused');
+
+		await fireEvent.mouseEnter(panel);
+		expect(get(kioskStatus)).toBe('paused'); // still explicitly paused
+		expect(getByLabelText('Resume')).toBeTruthy();
+
+		await fireEvent.mouseLeave(panel);
+		expect(get(kioskStatus)).toBe('paused'); // hover never resumes an explicit pause
+	});
+
+	it('an explicit Pause/Resume click mid-hover still works, independent of the freeze', async () => {
+		startKiosk();
+		const { container, getByLabelText } = render(KioskIndicator);
+		const panel = container.querySelector('.kiosk-panel') as HTMLElement;
+
+		await fireEvent.mouseEnter(panel); // freezes the clock, mode still "running"
+		expect(get(kioskHoverFrozen)).toBe(true);
+
+		await fireEvent.click(getByLabelText('Pause')); // speaker explicitly pauses mid-hover
+		expect(get(kioskStatus)).toBe('paused');
+
+		await fireEvent.mouseLeave(panel);
+		expect(get(kioskHoverFrozen)).toBe(false);
+		expect(get(kioskStatus)).toBe('paused'); // the explicit pause persists past the hover
 	});
 
 	it('settings opens the dialog', async () => {
