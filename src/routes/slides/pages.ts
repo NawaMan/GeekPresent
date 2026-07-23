@@ -111,6 +111,7 @@ export const pages = [
     { path: "handout-page.html",      title: "The Handout — The Deck as a PDF" },
     { path: "state-demo.html",        title: "State — URL, localStorage, Stores" },
     { path: "progress-demo.html",     title: "Progress — Which Page of How Many" },
+    { path: "kiosk-demo.html",        title: "Kiosk — Invisible Until You Ask For It" },
     // The listed appendix (see the note beside the hidden pair above): no `hidden`, so
     // it IS in the running order and IS in the TOC — back matter, at the back.
     { path: "appendix-listed.html",   title: "Appendix — Listed, not hidden" },
