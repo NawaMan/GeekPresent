@@ -14,7 +14,7 @@
 	const path = 'src/routes/slides/webpage-component.html/+page.svelte';
 </script>
 
-<WebPage src="https://example.com" title="example.com — the whole canvas" />
+<WebPage src="https://codingbooth.io/" title="codingbooth.io — the whole canvas" />
 
 <!-- Rendered after WebPage, so the deck's own chrome paints above the site. The deck
      opts into `fadeChrome`, so that chrome ghosts out until you reach for it — which

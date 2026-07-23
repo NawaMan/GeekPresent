@@ -23,7 +23,7 @@
 		</p>
 
 		<QuickCode style="margin-top: 0.6em;" lang="svelte" code={`<Block x={120} y={260} width={760} height={520}>
-  <WebSite src="https://example.com" />
+  <WebSite src="https://codingbooth.io/" />
 </Block>`} />
 
 		<p style="margin-top: 0.7em;">
@@ -37,20 +37,22 @@
 		<Callout kind="warn" title="Not every site can be framed" style="margin-top: 0.8em;">
 			<code>X-Frame-Options</code> / <code>frame-ancestors</code> let a site refuse.
 			That is its call, not ours — the frame renders empty and the bar's
-			<b>Open&nbsp;↗</b> is the way out. Check the target before the talk.
+			<b>Open&nbsp;↗</b> is the way out. Check the target before the talk — GitHub,
+			Hacker News and MDN all say no; the two frames here say yes.
 		</Callout>
 	</div>
 </ContentPage>
 
 <!-- Default: chrome bar + shield, mounted lazily. -->
 <Block name="plain" x={1000} y={250} width={840} height={330} grid={10}>
-	<WebSite src="https://example.com" />
+	<WebSite src="https://codingbooth.io/" />
 </Block>
 
-<!-- Same site at 60%: the DESKTOP layout shrinks into the box. A custom `zoomLevels`
-     ladder gives the − / + buttons three stops that suit this embed. -->
+<!-- A denser site at 60%: the DESKTOP layout shrinks into the box instead of tripping
+     the phone breakpoint. A custom `zoomLevels` ladder gives the − / + buttons three
+     stops that suit this embed. -->
 <Block name="zoomed" x={1000} y={610} width={840} height={330} grid={10}>
-	<WebSite src="https://example.com" zoom={0.6} zoomLevels={[0.4, 0.6, 1]} />
+	<WebSite src="https://en.wikipedia.org/wiki/Presentation" zoom={0.6} zoomLevels={[0.4, 0.6, 1]} />
 </Block>
 
 <Hint text="Zoom (− % +) and reload (⟳) work without arming. Click a frame to interact; click the slide to release." />
