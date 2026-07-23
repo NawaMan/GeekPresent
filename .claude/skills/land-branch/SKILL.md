@@ -1,6 +1,6 @@
 ---
 name: land-branch
-description: Land a worktree's feature branch into main — preflight, rebase, booth test, --no-ff merge. Use when the user says "land this", "merge the branch", "merge into main", or asks to finish a worktree session. Merges only; cleanup and pushing are separate asks.
+description: Land a worktree's feature branch into main — preflight, rebase, booth test, --no-ff merge, then delete the worktree/branch. Use when the user says "land this", "merge the branch", "merge into main", or asks to finish a worktree session. Never pushes.
 ---
 
 # Land a worktree's branch into main
@@ -9,8 +9,10 @@ The prose version is `AGENTS.md` → *Landing a worktree's branch into main*. Th
 form. `$ARGUMENTS` is the branch (default: the branch checked out in the worktree you are in).
 
 **Merging is a deliberate act — Rule 8.** Only run this when the user asks to land/merge, never on
-your own initiative, and never because "the change is done". Do **not** push afterwards, and do
-**not** clean up the worktree, unless separately asked. Both are their own decisions.
+your own initiative, and never because "the change is done". **Never push** — `git merge --no-ff`
+only ever touches the local `main`; pushing is its own explicit ask. Cleanup (worktree + branch) is
+different: it now runs automatically as the final step, once the merge itself has made the work
+safe — see step 7.
 
 **This skill's own Proposal before code gate** (replaces the generic `AGENTS.md` form — do not
 stack both): after the read-only preflight below, report as **Problem · Diagnostic · Approach**
@@ -110,7 +112,7 @@ git -C <main-clone> stash drop <sha>
 `apply`-then-`drop` keeps the stash recoverable if restoring onto the just-merged main conflicts.
 `pop` would already have discarded it.
 
-## 6. Report, and stop
+## 6. Report the merge
 
 Show the graph and where main now sits:
 
@@ -119,7 +121,31 @@ git -C <main-clone> log --oneline --graph -5
 git -C <main-clone> status --short --branch | head -1    # "ahead N" — nothing is pushed
 ```
 
-Then **stop**. Say explicitly that nothing was pushed and the worktree still exists. Cleanup
-(`git worktree remove` + `git branch -d`, both without `--force`, from the main clone) is the
-separate ask described in `AGENTS.md` → *Cleaning up after a session*. If git refuses either one,
-that refusal is the feature: report what is unmerged or uncommitted and let the user decide.
+Confirm the "ahead N" line out loud — that is the proof nothing was pushed.
+
+## 7. Clean up the worktree and branch
+
+The merge already made the work safe in `main`, so this is no longer a separate ask — it's the
+last step. Stop any booth you started for this worktree first (skip if you never started one; per
+Rule 6 never stop one you did not start):
+
+```bash
+./booth list                          # confirm it's yours before stopping it
+./booth stop --name <name>            # skip if you never started this worktree's booth
+```
+
+Then, **from the main clone** (never from inside the worktree being removed):
+
+```bash
+git worktree remove worktree/<name>   # NO --force — refuses on any uncommitted change
+git branch -d <name>                  # NO --force/-D — refuses to drop unmerged work
+git worktree list                     # confirm it is gone
+```
+
+**A refusal here is the feature, not a bug to route around.** `-d` (lowercase) only ever drops a
+branch git can already see is fully merged; `worktree remove` only ever refuses when there is
+something uncommitted it would otherwise discard. If either refuses, **stop** — report exactly
+what is unmerged or uncommitted and let the user decide. Never reach for `--force` / `-D` to push
+past that refusal.
+
+Then **stop**. Say explicitly that nothing was pushed, and that the worktree/branch are gone.

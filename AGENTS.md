@@ -252,15 +252,27 @@ land/merge a worktree's work, never on your own initiative. The procedure:
 4. If step 1 stashed anything, `git stash apply` (not `pop`) to restore it, confirm the working
    tree looks right, then `git stash drop`. Apply-then-drop leaves the stash recoverable if
    restoring it onto the just-merged main conflicts — `pop` would have already discarded it.
+5. **Clean up the worktree and branch.** A clean `--no-ff` merge already means the work is safe in
+   `main`, so this now runs as part of landing rather than waiting on a second ask: stop any booth
+   you started for this worktree (`./booth stop --name <name>`; skip if you never started one),
+   then from the main clone `git worktree remove worktree/<name>` and `git branch -d <name>` —
+   both **without** `--force`. See *Cleaning up after a session* below for why a refusal here is
+   the feature, not a bug to route around: `-d` (not `-D`) only drops a branch git can already see
+   is fully merged, and `worktree remove` refuses on any uncommitted change it would otherwise
+   discard.
 
-Landing and cleanup are separate asks: only move on to *Cleaning up after a session* below once the
-user confirms the merge is done and they want the worktree removed too — don't chain them unasked.
+**Never push** as part of landing. `git merge --no-ff` only ever touches the local `main` —
+pushing is its own explicit ask, same as any other push (Rule 8).
 
 ### Cleaning up after a session
 
 **Clean up only what you created, and only when the user says the work is done.** A worktree holds
 real work — an unmerged branch and possibly uncommitted edits — so removing one is destructive and
-is the user's call, never a tidy-up you do on your own initiative.
+is the user's call, never a tidy-up you do on your own initiative. **Exception:** *Landing a
+worktree's branch into main* above now runs its own worktree/branch removal automatically as the
+last step of a successful merge — the merge itself is what makes that removal safe, not a separate
+ask. Everything below is for every other case: cleaning up mid-session, a worktree abandoned
+without landing, stray booths, and so on.
 
 Most booths need no teardown: without `--keep-alive` the container is `--rm` and disappears when its
 command ends. Only `--keep-alive` / `--daemon` booths persist, and those are the ones that pile up:
