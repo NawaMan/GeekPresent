@@ -73,6 +73,7 @@ export const pages = [
     { path: "chart-scatter.html",     title: "Chart — Bubble Scatter" },
     { path: "chart-area.html",        title: "Chart — Stacked Area + Draw-In" },
     { path: "chart-waterfall.html",   title: "Chart — Waterfall (Running Totals)" },
+    { path: "chart-gantt.html",       title: "Chart — Gantt (Spans & Dependencies)" },
     { path: "function-graph.html",    title: "Chart — Plotting y = f(x)" },
     { path: "histogram-component.html", title: "Chart — Histogram (Distribution)" },
     { path: "heatmap-component.html", title: "Chart — Heatmap (2-D Distribution)" },

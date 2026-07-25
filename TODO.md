@@ -2138,6 +2138,67 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     the module binary `data` and plain `grep` silently skipped all 1073 lines of it, which is
     exactly how this session came to believe stacking wasn't implemented. Behaviour identical, one
     character; the module now greps.
+- [x] **`Gantt`** — tasks as SPANS on a time axis: the family's one chart whose mark has a
+      LENGTH. Every other chart plots a point value (one number per category or per x), so a phase
+      that "runs from week 2 to week 6, overlapping the next one" had nowhere to live and authors
+      hand-drew it with `Block` + `Connector`. Done: `src/lib/chart/Gantt.svelte` over pure
+      `ganttBars` / `ganttLinks` / `ganttExtent` in `chartCore.ts`.
+  - **`Timeline` is deliberately not this**, and its own header says so — a narrative event spine,
+    pure CSS, evenly spaced markers with free-text labels and *no date arithmetic*. An event there
+    cannot express a length, and two events three years apart sit as far apart as two three days
+    apart. This is the counterpart: real dates on a real axis, which is what makes overlap and
+    duration visible at all.
+  - **The time axis is reused, not reinvented** — `linearScale` over epoch ms with `nice: false`
+    plus calendar-aware `timeTicks`, exactly the pattern `LineChart`/`AreaChart`/`ScatterChart`
+    already use; lanes are a `bandScale` down the side. `toTime` means Dates, ISO strings and raw
+    timestamps all work.
+  - **Never a backwards or infinite bar.** A REVERSED pair (end before start) is normalised by
+    swapping rather than drawn inside-out — a typo becomes a readable bar. A MISSING END is a
+    milestone (a diamond, `duration: 0`), never an open-ended span running off the axis. A missing
+    START keeps its LANE, flagged `blank`, drawing nothing — the `waterfallBars` rule again, since
+    dropping the row would silently shorten the plan. `progress` is clamped to [0,1] and a 0–100
+    value is rescaled, so a percentage and a fraction both do the sane thing.
+  - **Dependencies are declared by TASK NAME** (`dependsOn`, one key or an array), resolved by
+    `keyString` value the way `highlighted` is — so reordering rows cannot silently repoint an
+    arrow. An edge naming a task that doesn't exist is DROPPED rather than pointed at bar 0; self
+    edges and duplicates collapse; an edge touching an unplaceable bar is dropped (no geometry to
+    draw between).
+  - **One link type, and it says so when the data disagrees.** An arrow is FINISH-TO-START
+    ("cannot begin until that ends"). A dependent that starts strictly before its predecessor
+    finishes therefore contradicts the only relationship the chart can express — in planning terms
+    it wants start-to-start or a negative lag (fast-tracking), neither of which is modelled. Such
+    edges are kept but flagged `violated` and drawn DASHED in `--chart-link-warn` with a matching
+    warn arrowhead and a `<title>` saying why, instead of an arrow silently running backwards
+    through time. The core **reports rather than corrects**: only the author knows whether the
+    dates or the dependency is the mistake. Touching ends are the normal case, not a violation.
+    - **This was found by the user reading the demo, not by a test.** The first draft's data gave
+      overlapping phases finish-to-start arrows, so the slide taught a contradiction while the
+      elbow-routing code was described as a feature. The fix was both: make every linked pair
+      genuinely finish-to-start, move overlap onto an UNLINKED row (`Write runbook` — parallel
+      work is how you honestly show two things at once), and add the flag so a real plan's
+      contradiction becomes visible rather than silent.
+  - **SSR-safe** exactly as the rest of the family: the full `<svg>` — bars, progress overlays,
+    milestone diamonds, dependency elbows and both arrowhead `<marker>`s — renders from props
+    alone; the hover tooltip (a VERTICAL lane snap via `nearestIndex`, since here the categories
+    run down the side) and the `animate` clip-wipe are client-only. `role="img"` + required
+    `title`, one aria-label per bar carrying its span and duration
+    (`"Migrate schema: Mar 3 – Mar 17 (14 days), 70% complete"`), so the accessible reading is the
+    plan. New `--chart-task`/`-task-done`/`--chart-milestone`/`--chart-link`/`--chart-link-warn`/
+    `--chart-today` tokens, fallbacks baked in the `seriesColor` way.
+  - Demo `chart-gantt.html` (one migration plan: a finish-to-start chain, a parallel unlinked
+    phase, shaded progress, a cutover milestone, a `today` rule, ONE deliberately impossible link
+    drawn dashed because a feature that never fires teaches nothing, and an unscheduled row that
+    keeps its lane). Unit tests in `tests/chartCore.test.ts` (`ganttBars`: spans/milestones/
+    reversed/blank-lane/Dates+timestamps/progress-clamp/totality; `ganttLinks`: by-name
+    resolution, ghost/self/duplicate/blank drops, `violated` true-false-touching-milestone;
+    `ganttExtent`), DOM tests in `tests/Gantt.test.ts` (span vs milestone vs lane-only counts,
+    aria-labels, progress overlay, arrow count + the dashed violated one with its title and warn
+    marker, `today` only when usable, the default calendar formatter, empty data with no `NaN`),
+    SSR assertion + host in `tests/ChartSsr(.ssr).test.ts`.
+  - Scope settled up front: arrows in v1; `start`/`end` is the ONLY input shape (no `duration`
+    accessor). Deliberate non-goals — start-to-start / finish-to-finish / lag link types (the
+    honest home for a *stated* overlap, a separate item), horizontal-only orientation, and
+    resource/critical-path anything.
 - [x] **Multi-segment path** — one `Draw` shape whose geometry chains several segments
       (line + curve + arc) instead of composing separate `Line` / `Curve` / `Arc` elements.
   - Gives a single continuous stroke: one `draw`/`drawDelay` reveal, one arrowhead at the

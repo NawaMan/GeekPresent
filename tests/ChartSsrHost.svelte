@@ -6,6 +6,7 @@
 	import AreaChart from '../src/lib/chart/AreaChart.svelte';
 	import BarChart from '../src/lib/chart/BarChart.svelte';
 	import ComboChart from '../src/lib/chart/ComboChart.svelte';
+	import Gantt from '../src/lib/chart/Gantt.svelte';
 	import Heatmap from '../src/lib/chart/Heatmap.svelte';
 	import Histogram from '../src/lib/chart/Histogram.svelte';
 	import LineChart from '../src/lib/chart/LineChart.svelte';
@@ -51,6 +52,16 @@
 		{ day: 'Mon', slot: 'PM', load: 8 },
 		{ day: 'Tue', slot: 'AM', load: 5 }
 	];
+	// A plan with every kind of row: two spans (one with progress, one overlapping
+	// its predecessor), a dependency chain, a milestone, and an undated row that
+	// keeps its lane. ISO dates via an explicit dateFormat keep the labels stable.
+	const plan = [
+		{ phase: 'audit', from: '2026-03-02', to: '2026-03-16', done: 100 },
+		{ phase: 'dual-write', from: '2026-03-09', to: '2026-03-27', done: 70, after: 'audit' },
+		{ phase: 'cutover', from: '2026-04-20', after: 'dual-write' }, // milestone
+		{ phase: 'unscheduled', from: '', to: '' } // lane only, no bar
+	];
+	const isoDate = (d: Date) => d.toISOString().slice(0, 10);
 	// A walk with every kind of bar: rises, a fall, a blank (contributes 0 but
 	// keeps its slot), a mid-walk checkpoint, and an appended closing total.
 	const walk = [
@@ -125,6 +136,20 @@
 	value="load"
 	title="Weekly load"
 	description="a 2×2 matrix; Tue × PM has no measurement and is drawn empty"
+/>
+<Gantt
+	data={plan}
+	task="phase"
+	start="from"
+	end="to"
+	progress="done"
+	dependsOn="after"
+	today="2026-03-20"
+	dateFormat={isoDate}
+	xLabel="2026"
+	title="Migration plan"
+	description="spans, a milestone, dependency arrows and a today rule; animate and the tooltip are client-only"
+	animate
 />
 <Waterfall
 	data={walk}

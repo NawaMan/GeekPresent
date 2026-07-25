@@ -1024,6 +1024,192 @@ export function timeTicks(min: number, max: number, count = 6): TimeTicks {
 }
 
 /**
+ * One task bar of a Gantt: a SPAN on the time axis, not a point value.
+ *
+ * This is the gap the rest of the family leaves. Every other chart plots one
+ * number per category or per x; a Gantt plots a start AND an end, so the mark's
+ * LENGTH is the datum. `Timeline` (the CSS event spine) is deliberately not
+ * this: its events are evenly spaced markers with free-text labels and no date
+ * arithmetic, so two events three years apart sit as far apart as two three days
+ * apart, and an event cannot express a length at all.
+ *
+ * `row` is the lane index (its band on the categorical y axis), assigned in
+ * first-seen order so the caller controls order by sorting rows — the same
+ * philosophy as bandScale's domain.
+ */
+export interface GanttBar {
+	key: string; // keyString(task) — stable identity for links, bands and {#each}
+	task: unknown; // the raw task value (band domain member)
+	row: number; // lane index, first-seen order
+	t0: number; // start timestamp (ms); NaN when unplaceable
+	t1: number; // end timestamp (ms); equals t0 for a milestone
+	duration: number; // t1 - t0 in ms (0 for a milestone); never negative
+	milestone: boolean; // a moment, not a span (no end, or a zero-length one)
+	progress: number; // fraction complete, clamped to [0, 1]; 0 when absent
+	blank: boolean; // no usable start — the lane is kept, but nothing is drawable
+}
+
+/** Options for `ganttBars`. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface GanttOptions<T = any> {
+	task: Accessor<T>; // the lane label
+	start: Accessor<T>; // span start (Date / ISO string / ms — via toTime)
+	end: Accessor<T>; // span end; blank → a milestone at `start`
+	/** Fraction complete per row (0–1, or 0–100 which is rescaled). Optional. */
+	progress?: Accessor<T>;
+}
+
+/**
+ * Walk rows into Gantt bars (pure — the caller maps t0/t1 through a linearScale
+ * over epoch ms and `row` through a bandScale).
+ *
+ * Total, and never emits a backwards or infinite bar:
+ *   - `start`/`end` coerce through `toTime`, so Dates, ISO strings and raw
+ *     timestamps all work and an unparseable one is a blank (NaN), not a 0
+ *     that would silently place the task at the epoch.
+ *   - A **reversed** pair (end before start) is normalised by swapping, not
+ *     drawn inside-out — a typo becomes a readable bar, not a negative width.
+ *   - A **missing end** is a MILESTONE (t1 === t0, duration 0), the natural
+ *     reading of "this is a date, not a period" — never an open-ended span
+ *     running off the axis.
+ *   - A **missing start** keeps its lane (flagged `blank`) so the task still
+ *     appears on the y axis, following the same rule waterfallBars uses for a
+ *     blank contribution: dropping the row would silently shorten the plan.
+ *   - `progress` is clamped to [0, 1], and a 0–100 style value is rescaled, so
+ *     a percentage and a fraction both do the sane thing; junk becomes 0.
+ */
+export function ganttBars<T>(rows: readonly T[], options: GanttOptions<T>): GanttBar[] {
+	const { task, start, end, progress } = options;
+
+	return rows.map((row, i) => {
+		const taskValue = valueOf(row, task);
+		const rawStart = toTime(valueOf(row, start));
+		const rawEnd = toTime(valueOf(row, end));
+
+		const hasStart = Number.isFinite(rawStart);
+		const hasEnd = Number.isFinite(rawEnd);
+
+		// A milestone when there is no end; a swap when the pair is reversed.
+		let t0 = hasStart ? rawStart : NaN;
+		let t1 = hasEnd ? rawEnd : t0;
+		if (hasStart && hasEnd && t1 < t0) [t0, t1] = [t1, t0];
+
+		const duration = Number.isFinite(t0) && Number.isFinite(t1) ? t1 - t0 : 0;
+
+		let pct = 0;
+		if (progress !== undefined) {
+			const raw = toNumber(valueOf(row, progress));
+			if (Number.isFinite(raw)) pct = Math.min(1, Math.max(0, raw > 1 ? raw / 100 : raw));
+		}
+
+		return {
+			key: keyString(taskValue),
+			task: taskValue,
+			row: i,
+			t0,
+			t1,
+			duration,
+			milestone: !hasEnd || duration === 0,
+			progress: pct,
+			blank: !hasStart
+		};
+	});
+}
+
+/** One dependency edge between two Gantt bars, resolved to their lane indices. */
+export interface GanttLink {
+	fromKey: string;
+	toKey: string;
+	from: number; // index into the bars array (the predecessor)
+	to: number; // index into the bars array (the dependent)
+	/**
+	 * The dependent STARTS BEFORE its predecessor finishes — the plan contradicts
+	 * itself. A dependency here means finish-to-start ("cannot begin until that
+	 * ends"), so this combination cannot be true as stated: it is either a data
+	 * error, or a deliberate overlap (a negative lag / "fast-tracking") that this
+	 * chart has no way to express, since it models one link type. Flagged rather
+	 * than silently drawn as an arrow running backwards in time, so the component
+	 * can mark it and the reader can see the plan disagrees with itself.
+	 *
+	 * Touching ends (the dependent starting exactly when the predecessor finishes)
+	 * is the normal case, NOT a violation.
+	 */
+	violated: boolean;
+}
+
+/**
+ * Resolve each row's `dependsOn` into edges between bars (pure — the caller
+ * turns the pair into an elbow path in pixels).
+ *
+ * `dependsOn` reads a task key, or an array of them, matched by `keyString`
+ * against the bars' own keys — the same by-value keying `highlighted` uses, so a
+ * dependency is declared with the task's label, not an index that shifts when
+ * rows are reordered.
+ *
+ * Total: an edge naming a task that doesn't exist is DROPPED rather than
+ * throwing or pointing at bar 0, self-dependencies are dropped, duplicates
+ * collapse, and an edge touching an unplaceable (`blank`) bar is dropped since
+ * there is no geometry to draw between.
+ *
+ * A surviving edge whose dependent starts before its predecessor finishes is
+ * kept but flagged `violated` — see GanttLink. The plan is drawn as given; the
+ * contradiction is reported, not corrected, because only the author knows
+ * whether the dates or the dependency is the mistake.
+ */
+export function ganttLinks<T>(
+	rows: readonly T[],
+	bars: readonly GanttBar[],
+	dependsOn: Accessor<T>
+): GanttLink[] {
+	const indexOfKey = new Map<string, number>();
+	bars.forEach((bar, i) => {
+		if (!indexOfKey.has(bar.key)) indexOfKey.set(bar.key, i);
+	});
+
+	const out: GanttLink[] = [];
+	const seen = new Set<string>();
+
+	rows.forEach((row, i) => {
+		const to = i;
+		if (to >= bars.length || bars[to].blank) return;
+		const raw = valueOf(row, dependsOn);
+		if (isBlank(raw)) return;
+		const keys = (Array.isArray(raw) ? raw : [raw]).map(keyString);
+
+		for (const fromKey of keys) {
+			const from = indexOfKey.get(fromKey);
+			if (from === undefined || from === to) continue; // unknown or self
+			if (bars[from].blank) continue; // nothing to draw from
+			const edge = `${from}->${to}`;
+			if (seen.has(edge)) continue;
+			seen.add(edge);
+			// Finish-to-start is the modelled relationship, so a dependent starting
+			// strictly before its predecessor's end contradicts the link it declares.
+			const violated = bars[to].t0 < bars[from].t1;
+			out.push({ fromKey, toKey: bars[to].key, from, to, violated });
+		}
+	});
+
+	return out;
+}
+
+/**
+ * The time extent of a set of Gantt bars — [min t0, max t1] across every
+ * placeable bar, ignoring blanks. Returns [NaN, NaN] when nothing is placeable,
+ * which linearScale turns into its [0, 1] fallback (the numericExtent contract).
+ */
+export function ganttExtent(bars: readonly GanttBar[]): [number, number] {
+	let min = Infinity;
+	let max = -Infinity;
+	for (const bar of bars) {
+		if (!Number.isFinite(bar.t0) || !Number.isFinite(bar.t1)) continue;
+		if (bar.t0 < min) min = bar.t0;
+		if (bar.t1 > max) max = bar.t1;
+	}
+	return min === Infinity ? [NaN, NaN] : [min, max];
+}
+
+/**
  * Sample a continuous function `y = f(x)` into evenly-spaced `{x, y}` points
  * over `[x0, x1]` — the one missing seam between a math formula and the existing
  * data-driven charts. Feed the result to LineChart as its `data` with
