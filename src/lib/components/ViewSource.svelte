@@ -66,7 +66,10 @@
 
 	let expanded = false;
 
-	/** Open the unscaled editor popup (☰ → EDIT or CodeBox EDIT). */
+	/** Open the unscaled editor popup (☰ → EDIT or CodeBox EDIT). Closes the in-slide
+	    panel on success — EDIT is a handoff to the popup, not a second view of the
+	    same source open at once. Left open on a blocked popup: there is nothing to
+	    hand off to, so the panel is still the only place to read the source. */
 	function openEdit() {
 		if (typeof location === 'undefined') return;
 		const win = openSourceEditor({
@@ -76,7 +79,9 @@
 			language,
 			canSave: get(canSave)
 		});
-		if (!win) {
+		if (win) {
+			expanded = false;
+		} else {
 			console.warn(
 				'[ViewSource] popup blocked — allow popups for this origin to edit source in a separate window'
 			);
