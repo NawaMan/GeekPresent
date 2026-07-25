@@ -721,7 +721,7 @@ export function heatmapMatrix<T>(rows: readonly T[], options: HeatmapOptions<T>)
 	const yIndex = new Map<string, number>();
 	// Per-cell running sum + count of finite values (keyed by x\0y), for the mean.
 	const acc = new Map<string, { sum: number; n: number }>();
-	const cellKey = (xk: string, yk: string): string => xk + ' ' + yk;
+	const cellKey = (xk: string, yk: string): string => xk + '\u0000' + yk;
 
 	for (const row of rows) {
 		const x = valueOf(row, options.x);
