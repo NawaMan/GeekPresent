@@ -246,13 +246,16 @@ land/merge a worktree's work, never on your own initiative. The procedure:
    conflicts as they come up. If the rebase touched code the tests cover, rerun the suite before
    continuing — that worktree's own booth (`./booth list` for its name, then `./booth exec --run
    --name <name> -- pnpm test`), never the host.
-3. **From the main clone**, `git merge --no-ff <branch>`. Always a real merge commit — **never
-   squash** (`git merge --squash`) and never fast-forward-only — so the worktree's commit history
-   is kept, not flattened.
+3. **From the main clone**, merge the branch. A branch with **more than one commit** gets
+   `git merge --no-ff <branch>` — always a real merge commit, **never squash**
+   (`git merge --squash`) — so the worktree's commit history is kept, not flattened. A branch
+   with **exactly one commit** fast-forwards instead (`git merge --ff-only <branch>`): a
+   fast-forwarded single commit and a merge commit wrapping a single commit read identically in
+   the graph, so `--no-ff` there would only add a redundant merge node.
 4. If step 1 stashed anything, `git stash apply` (not `pop`) to restore it, confirm the working
    tree looks right, then `git stash drop`. Apply-then-drop leaves the stash recoverable if
    restoring it onto the just-merged main conflicts — `pop` would have already discarded it.
-5. **Clean up the worktree and branch.** A clean `--no-ff` merge already means the work is safe in
+5. **Clean up the worktree and branch.** A clean merge (either form) already means the work is safe in
    `main`, so this now runs as part of landing rather than waiting on a second ask: stop any booth
    you started for this worktree (`./booth stop --name <name>`; skip if you never started one),
    then from the main clone `git worktree remove worktree/<name>` and `git branch -d <name>` —
@@ -261,7 +264,7 @@ land/merge a worktree's work, never on your own initiative. The procedure:
    is fully merged, and `worktree remove` refuses on any uncommitted change it would otherwise
    discard.
 
-**Never push** as part of landing. `git merge --no-ff` only ever touches the local `main` —
+**Never push** as part of landing. Neither merge form touches anything but the local `main` —
 pushing is its own explicit ask, same as any other push (Rule 8).
 
 ### Cleaning up after a session

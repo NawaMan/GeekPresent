@@ -92,14 +92,28 @@ extends `./.svelte-kit/tsconfig.json`, and non-TTY `exec` aborts pnpm's deps che
 
 ## 4. Merge, from the main clone
 
+**`--no-ff` is for a branch with more than one commit** — the merge commit is what marks "this
+came from an isolated worktree session" in the graph, so squashing that away with a fast-forward
+would erase the one signal worktree isolation exists to leave behind.
+
+**A branch with exactly one commit fast-forwards instead.** One commit landing as a fast-forward
+is indistinguishable from a merge commit wrapping one commit — the graph reads the same either
+way, so `--no-ff`'s only effect there would be a redundant merge node for a "session" that never
+branched into more than a single change:
+
 ```bash
 cd <main-clone>
-git merge --no-ff <branch>
+git log --oneline main..<branch>   # from preflight step 0 — count the commits
 ```
 
-Always a real merge commit. **Never** `--squash`, never `--ff-only` — the branch's history is the
-point. Write the message to a file and pass `-F <file>`; `-F -` (heredoc on stdin) fails with
-`could not read file '-'`.
+```bash
+git merge --no-ff <branch>    # 2+ commits: always a real merge commit
+git merge --ff-only <branch>  # exactly 1 commit: fast-forward, no merge node needed
+```
+
+Never `--squash` either way — the branch's own commit boundaries are the point when there is more
+than one. Write the `--no-ff` message to a file and pass `-F <file>`; `-F -` (heredoc on stdin)
+fails with `could not read file '-'`.
 
 ## 5. Restore the stash, if step 1 took one
 
