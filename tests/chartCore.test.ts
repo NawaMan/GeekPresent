@@ -7,6 +7,9 @@ import {
 	bandScale,
 	bubbleRadius,
 	countOf,
+	ganttBars,
+	ganttExtent,
+	ganttLinks,
 	groupRows,
 	heatmapMatrix,
 	histogramBins,
@@ -319,6 +322,198 @@ describe('stackExtent', () => {
 
 	it('returns [0, 0] for empty input (still a valid baseline)', () => {
 		expect(stackExtent([])).toEqual([0, 0]);
+	});
+});
+
+describe('ganttBars', () => {
+	type Row = { task: string; from: string | null; to?: string | null; done?: unknown };
+	const opts = { task: 'task' as const, start: 'from' as const, end: 'to' as const };
+	const DAY = 86400000;
+
+	it('turns a start/end pair into a span with a duration and a lane index', () => {
+		const bars = ganttBars<Row>(
+			[
+				{ task: 'a', from: '2026-03-02', to: '2026-03-16' },
+				{ task: 'b', from: '2026-03-09', to: '2026-03-12' }
+			],
+			opts
+		);
+		expect(bars[0]).toMatchObject({ row: 0, duration: 14 * DAY, milestone: false, blank: false });
+		expect(bars[1]).toMatchObject({ row: 1, duration: 3 * DAY });
+		expect(bars[0].t1 - bars[0].t0).toBe(14 * DAY);
+	});
+
+	it('treats a row with no end as a MILESTONE at its start', () => {
+		const [bar] = ganttBars<Row>([{ task: 'cutover', from: '2026-04-20' }], opts);
+		expect(bar).toMatchObject({ milestone: true, duration: 0 });
+		expect(bar.t1).toBe(bar.t0); // a moment, not an open-ended span
+		expect(Number.isFinite(bar.t0)).toBe(true);
+	});
+
+	it('normalises a REVERSED pair instead of drawing it inside-out', () => {
+		const [bar] = ganttBars<Row>([{ task: 'oops', from: '2026-03-20', to: '2026-03-10' }], opts);
+		expect(bar.t0).toBeLessThan(bar.t1);
+		expect(bar.duration).toBe(10 * DAY); // positive, never negative
+	});
+
+	it('keeps the LANE for a row with no usable start, drawing nothing', () => {
+		const bars = ganttBars<Row>(
+			[
+				{ task: 'a', from: '2026-03-02', to: '2026-03-04' },
+				{ task: 'unscheduled', from: '', to: '' },
+				{ task: 'c', from: 'not a date', to: '2026-03-09' }
+			],
+			opts
+		);
+		expect(bars).toHaveLength(3); // the plan is not silently shortened
+		expect(bars[1]).toMatchObject({ blank: true, row: 1 });
+		expect(bars[2].blank).toBe(true);
+		expect(Number.isNaN(bars[1].t0)).toBe(true);
+	});
+
+	it('accepts Dates and raw timestamps, not just ISO strings', () => {
+		const d0 = new Date('2026-03-02T00:00:00Z');
+		const d1 = new Date('2026-03-05T00:00:00Z');
+		const [fromDate] = ganttBars(
+			[{ task: 'a', from: d0, to: d1 }],
+			{ task: 'task', start: 'from', end: 'to' }
+		);
+		expect(fromDate.duration).toBe(3 * DAY);
+		const [fromMs] = ganttBars(
+			[{ task: 'a', from: d0.getTime(), to: d1.getTime() }],
+			{ task: 'task', start: 'from', end: 'to' }
+		);
+		expect(fromMs.duration).toBe(3 * DAY);
+	});
+
+	it('clamps progress, rescaling a 0–100 value and zeroing junk', () => {
+		const rows: Row[] = [
+			{ task: 'a', from: '2026-03-02', to: '2026-03-04', done: 70 }, // percent
+			{ task: 'b', from: '2026-03-02', to: '2026-03-04', done: 0.4 }, // fraction
+			{ task: 'c', from: '2026-03-02', to: '2026-03-04', done: 250 }, // over
+			{ task: 'd', from: '2026-03-02', to: '2026-03-04', done: -5 }, // under
+			{ task: 'e', from: '2026-03-02', to: '2026-03-04', done: 'soon' } // junk
+		];
+		const bars = ganttBars<Row>(rows, { ...opts, progress: 'done' });
+		expect(bars.map((b) => b.progress)).toEqual([0.7, 0.4, 1, 0, 0]);
+	});
+
+	it('is total: empty rows and a missing field stay NaN-free where it matters', () => {
+		expect(ganttBars<Row>([], opts)).toEqual([]);
+		const bars = ganttBars([{ task: 'x' }] as never, opts as never);
+		expect(bars[0]).toMatchObject({ blank: true, duration: 0, progress: 0 });
+	});
+});
+
+describe('ganttLinks', () => {
+	type Row = { task: string; from: string; to: string; after?: string | string[] };
+	const rows: Row[] = [
+		{ task: 'a', from: '2026-03-02', to: '2026-03-06' },
+		{ task: 'b', from: '2026-03-07', to: '2026-03-11', after: 'a' },
+		{ task: 'c', from: '2026-03-12', to: '2026-03-16', after: ['a', 'b'] }
+	];
+	const bars = ganttBars<Row>(rows, { task: 'task', start: 'from', end: 'to' });
+
+	it('resolves dependencies by task NAME into bar indices', () => {
+		const links = ganttLinks<Row>(rows, bars, 'after');
+		expect(links).toHaveLength(3);
+		expect(links[0]).toMatchObject({ fromKey: 't:a', toKey: 't:b', from: 0, to: 1 });
+		expect(links.filter((l) => l.to === 2).map((l) => l.from)).toEqual([0, 1]);
+	});
+
+	it('drops an edge naming a task that does not exist, rather than mispointing', () => {
+		const withGhost: Row[] = [...rows, { task: 'd', from: '2026-03-17', to: '2026-03-18', after: 'ghost' }];
+		const ghostBars = ganttBars<Row>(withGhost, { task: 'task', start: 'from', end: 'to' });
+		const links = ganttLinks<Row>(withGhost, ghostBars, 'after');
+		expect(links.some((l) => l.to === 3)).toBe(false);
+		expect(links).toHaveLength(3); // the real three survive
+	});
+
+	it('drops self-dependencies and collapses duplicates', () => {
+		const odd: Row[] = [
+			{ task: 'a', from: '2026-03-02', to: '2026-03-06' },
+			{ task: 'b', from: '2026-03-07', to: '2026-03-11', after: ['a', 'a', 'b'] }
+		];
+		const oddBars = ganttBars<Row>(odd, { task: 'task', start: 'from', end: 'to' });
+		const links = ganttLinks<Row>(odd, oddBars, 'after');
+		expect(links).toHaveLength(1);
+		expect(links[0]).toMatchObject({ from: 0, to: 1 });
+	});
+
+	it('drops an edge touching an unplaceable bar (no geometry to draw)', () => {
+		const withBlank = [
+			{ task: 'a', from: '', to: '' },
+			{ task: 'b', from: '2026-03-07', to: '2026-03-11', after: 'a' }
+		] as Row[];
+		const blankBars = ganttBars<Row>(withBlank, { task: 'task', start: 'from', end: 'to' });
+		expect(ganttLinks<Row>(withBlank, blankBars, 'after')).toEqual([]);
+	});
+
+	it('yields nothing when no row declares a dependency', () => {
+		expect(ganttLinks<Row>(rows, bars, 'nothing' as never)).toEqual([]);
+	});
+
+	// Finish-to-start is the only relationship modelled, so "B waits for A" and
+	// "B starts while A is still running" cannot both be true. The contradiction
+	// is reported, never silently corrected.
+	it('flags a dependent that starts BEFORE its predecessor finishes', () => {
+		const clashing: Row[] = [
+			{ task: 'cutover', from: '2026-04-20', to: '2026-04-20' },
+			{ task: 'drop tables', from: '2026-04-15', to: '2026-04-22', after: 'cutover' }
+		];
+		const clashBars = ganttBars<Row>(clashing, { task: 'task', start: 'from', end: 'to' });
+		const [link] = ganttLinks<Row>(clashing, clashBars, 'after');
+		expect(link).toMatchObject({ from: 0, to: 1, violated: true });
+	});
+
+	it('does NOT flag touching ends — that is the normal finish-to-start case', () => {
+		const touching: Row[] = [
+			{ task: 'a', from: '2026-03-02', to: '2026-03-13' },
+			{ task: 'b', from: '2026-03-13', to: '2026-03-27', after: 'a' }
+		];
+		const touchBars = ganttBars<Row>(touching, { task: 'task', start: 'from', end: 'to' });
+		expect(ganttLinks<Row>(touching, touchBars, 'after')[0].violated).toBe(false);
+	});
+
+	it('leaves a clean chain unflagged, and keeps the violated one in the plan', () => {
+		const links = ganttLinks<Row>(rows, bars, 'after');
+		expect(links.every((l) => l.violated === false)).toBe(true);
+	});
+
+	it('treats a milestone predecessor by its single instant', () => {
+		const afterMilestone: Row[] = [
+			{ task: 'cutover', from: '2026-04-20' } as Row, // no end → milestone
+			{ task: 'after', from: '2026-04-21', to: '2026-04-25', after: 'cutover' }
+		];
+		const msBars = ganttBars<Row>(afterMilestone, { task: 'task', start: 'from', end: 'to' });
+		expect(ganttLinks<Row>(afterMilestone, msBars, 'after')[0].violated).toBe(false);
+	});
+});
+
+describe('ganttExtent', () => {
+	type Row = { task: string; from: string; to?: string | null };
+	const build = (rows: Row[]) =>
+		ganttBars<Row>(rows, { task: 'task', start: 'from', end: 'to' });
+
+	it('spans the earliest start to the latest end', () => {
+		const bars = build([
+			{ task: 'a', from: '2026-03-10', to: '2026-03-20' },
+			{ task: 'b', from: '2026-03-02', to: '2026-03-08' }
+		]);
+		expect(ganttExtent(bars)).toEqual([Date.parse('2026-03-02'), Date.parse('2026-03-20')]);
+	});
+
+	it('ignores unplaceable rows', () => {
+		const bars = build([
+			{ task: 'a', from: '2026-03-10', to: '2026-03-20' },
+			{ task: 'b', from: '', to: '' }
+		]);
+		expect(ganttExtent(bars)).toEqual([Date.parse('2026-03-10'), Date.parse('2026-03-20')]);
+	});
+
+	it('returns [NaN, NaN] when nothing is placeable (linearScale then falls back)', () => {
+		expect(ganttExtent([]).every(Number.isNaN)).toBe(true);
+		expect(ganttExtent(build([{ task: 'a', from: '', to: '' }])).every(Number.isNaN)).toBe(true);
 	});
 });
 

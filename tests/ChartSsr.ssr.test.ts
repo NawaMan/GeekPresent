@@ -97,6 +97,47 @@ describe('Chart (SSR)', () => {
 		expect(body).toContain('legend-end');
 	});
 
+	it('renders the Gantt plan server-side: spans, a milestone, arrows, today', () => {
+		expect(body).toContain('<title>Migration plan</title>');
+
+		// two dated spans, each labelled with its dates and duration
+		expect(body).toContain(
+			'aria-label="audit: 2026-03-02 – 2026-03-16 (14 days), 100% complete"'
+		);
+		expect(body).toContain(
+			'aria-label="dual-write: 2026-03-09 – 2026-03-27 (18 days), 70% complete"'
+		);
+		// the row with no end is a moment, not an open-ended bar
+		expect(body).toContain('aria-label="cutover: 2026-04-20 (milestone)"');
+
+		// the undated row keeps its LANE (the axis labels it) but draws no bar
+		expect(body).toContain('unscheduled');
+		expect(body).not.toContain('unscheduled: ');
+
+		// span rects (the <g class="spans"> wrapper excluded by the non-'s' guard)
+		const spans = body.match(/class="span[^s]/g) ?? [];
+		expect(spans).toHaveLength(2);
+		// progress overlays, one per span carrying progress
+		const done = body.match(/class="done/g) ?? [];
+		expect(done).toHaveLength(2);
+
+		// dependency arrows: audit→dual-write, dual-write→cutover, with a marker
+		const links = body.match(/class="link[^s]/g) ?? [];
+		expect(links).toHaveLength(2);
+		expect(body).toMatch(/<marker[^>]*id="chart-gantt-arrow-/);
+		expect(body).toMatch(/marker-end="url\(#chart-gantt-arrow-/);
+
+		// dual-write starts 03-09 but waits on audit, which ends 03-16 — a plan that
+		// contradicts itself. It prerenders DASHED with its reason, not passed off as
+		// an ordinary finish-to-start.
+		expect(body).toContain('violated');
+		expect(body).toContain('audit → dual-write: starts before its dependency ends');
+		expect(body).toMatch(/marker-end="url\(#chart-gantt-arrow-warn-/);
+
+		expect(body).toContain('class="today'); // the "you are here" rule
+		expect(body).toContain('2026'); // the x axis label
+	});
+
 	it('renders the Waterfall walk server-side: rises, a fall, checkpoints, steps', () => {
 		expect(body).toContain('<title>Where the time goes</title>');
 		// 180 → 270 → 235 (the cache gives time back) → checkpoint → blank → 295
