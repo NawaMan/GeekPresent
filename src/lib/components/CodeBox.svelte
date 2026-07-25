@@ -43,8 +43,16 @@
 	$: editorHeight = title || hasActions ? '915px' : '975px';
 	$: showTitle = !!(title || hasActions);
 
-	// Bound so getValue / isDirty forward to Monaco (or the code prop before mount).
-	let codeRef: { getValue: () => string; isDirty: () => boolean; markClean: () => void } | undefined;
+	// Bound so getValue / isDirty forward to Monaco (or the code prop before mount),
+	// and so Box's outside-click check can recognize a click on the portaled panel.
+	let codeRef:
+		| {
+				getValue: () => string;
+				isDirty: () => boolean;
+				markClean: () => void;
+				containsPortaled: (target: EventTarget | null) => boolean;
+		  }
+		| undefined;
 
 	/** Current buffer from the editor. */
 	export function getValue(): string {
@@ -68,7 +76,15 @@
 	}
 </script>
 
-<Box {style} {id} class={klass} bind:expanded={expanded} width={1500} height={975}>
+<Box
+	{style}
+	{id}
+	class={klass}
+	bind:expanded={expanded}
+	width={1500}
+	height={975}
+	containsExternal={(t) => codeRef?.containsPortaled(t) ?? false}
+>
 	{#if showTitle}
 		<div class="code-title">
 			<span class="code-title-text">{title}</span>
@@ -115,6 +131,7 @@
 		height={editorHeight}
 		{fontSize}
 		{readOnly}
+		{expanded}
 	/>
 </Box>
 
