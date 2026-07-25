@@ -171,7 +171,9 @@ export async function openPageSourceEdit(): Promise<void> {
 		language: 'html',
 		canSave: true
 	});
-	if (!win) {
+	if (win) {
+		closePageSource();
+	} else {
 		console.warn(
 			'[EDIT] popup blocked — allow popups for this origin to edit source in a separate window'
 		);

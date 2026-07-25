@@ -17,6 +17,13 @@
 
 	export let shadowOpacity: number              = 0.8;
 	export let onClick      : (() => void) | null = null;
+	/** Extra "is this click inside me" test, OR'd with the normal DOM-containment
+	    check — for content a consumer has reparented OUTSIDE this box's own subtree
+	    (e.g. Code.svelte moves Monaco into an unscaled `position: fixed` layer so its
+	    own hit-testing isn't broken by the deck's canvas scale; that content is no
+	    longer a DOM descendant of `boxEl`, so a click on it would otherwise read as
+	    "outside" and immediately collapse the box it visually belongs to). */
+	export let containsExternal: ((target: EventTarget | null) => boolean) | null = null;
 
 	/** Inline style for the root element, applied last so it wins. */
 	export let style: string = '';
@@ -43,9 +50,10 @@
 	}
 
 	function handleOutsideClick(event: MouseEvent) {
-		if (expanded && boxEl && !boxEl.contains(event.target as Node)) {
-			collapse();
-		}
+		if (!expanded || !boxEl) return;
+		if (boxEl.contains(event.target as Node)) return;
+		if (containsExternal && containsExternal(event.target)) return;
+		collapse();
 	}
 
 	let outsideListening = false;
