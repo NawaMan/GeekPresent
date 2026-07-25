@@ -86,6 +86,29 @@
 	});
 
 	/**
+	 * DISMISSED — the force-closed counterpart the three "ways in" below used to lack.
+	 *
+	 * Blurring handled `:focus-within`, but `:hover` had no answer, and after clicking a
+	 * row your pointer is BY DEFINITION still on it. That is invisible for CAPTURE (it
+	 * downloads a file) and for OVERVIEW (the grid covers everything), but SOURCE opens a
+	 * panel DIRECTLY UNDER the drop: moving the pointer toward the thing you just opened
+	 * keeps it inside the menu, so `:hover` never let go and the drop sat over the source
+	 * you asked to read. Latch closed, focus blurred, still painted.
+	 *
+	 * So a picked row now also dismisses, and the pointer/focus paths honour it. It clears
+	 * when the pointer genuinely leaves the menu (hover-to-open must keep working) or when
+	 * the drop is opened again. PRINT never dismisses: it stops propagation, so the latch
+	 * stays set and its flyout stays put.
+	 */
+	let dismissed = $state(false);
+
+	// Reopening (M, or a click on the hamburger) always wins over a past dismissal —
+	// otherwise a dismiss with the pointer still parked on ☰ would swallow the next open.
+	$effect(() => {
+		if ($moreMenuOpen) dismissed = false;
+	});
+
+	/**
 	 * A click anywhere outside the ☰ closes it, the way every other menu on the page behaves.
 	 * `pointerdown` (capture) rather than `click`, so the drop is gone before the press lands
 	 * on whatever is underneath. Only armed while the latch is actually open — an always-on
@@ -183,7 +206,16 @@
 		<!-- The hamburger menu. Groups: navigate (OVERVIEW, KIOSK) · export (CAPTURE, PRINT) ·
 		     source (SOURCE, EDIT). Separators sit between groups; empty capture/kiosk leave a
 		     zero-height row so the sep still reads as group boundaries. -->
-		<div class="annot-menu" class:menu-open={$moreMenuOpen} role="presentation" bind:this={menuEl}>
+		<!-- pointerleave clears a dismissal: the pointer having genuinely left is the honest
+		     "you are done with this menu", and hover-to-open has to keep working afterwards. -->
+		<div
+			class="annot-menu"
+			class:menu-open={$moreMenuOpen}
+			class:dismissed
+			role="presentation"
+			bind:this={menuEl}
+			onpointerleave={() => (dismissed = false)}
+		>
 			<button
 				type="button"
 				class="annot-hamburger"
@@ -197,13 +229,18 @@
 			<!-- Picking a row puts the menu away — the rows ACT (open OVERVIEW, print, …), they
 			     are not settings to leave sitting open. Caught by bubbling rather than wired per
 			     row, since the rows are SlideDeck's snippets. PRINT is the one exception and it
-			     already stops propagation, because its job is to open a submenu in here. -->
+			     already stops propagation, because its job is to open a submenu in here.
+			     Dropping the latch is not enough on its own — the pointer is still on the row it
+			     just clicked, so `dismissed` is what actually puts the panel away. -->
 			<div
 				class="annot-drop"
 				role="menu"
 				aria-label="More tools"
 				tabindex="-1"
-				onclick={() => closeMoreMenu()}
+				onclick={() => {
+					closeMoreMenu();
+					dismissed = true;
+				}}
 			>
 				{@render overviewBtn?.()}
 				{@render kioskItem?.()}
@@ -375,10 +412,14 @@
 		transition: opacity 150ms ease, transform 150ms ease;
 	}
 	/* Three independent ways in, OR'd: pointer, focus, and the `moreMenuOpen` latch that M
-	   and a click on ☰ set. No force-closed counterpart — closing is now the latch going
-	   false plus the pointer/focus leaving, so nothing has to out-shout a CSS state. */
-	.annot-menu:hover .annot-drop,
-	.annot-menu:focus-within .annot-drop,
+	   and a click on ☰ set. The pointer and focus paths are GUARDED by `:not(.dismissed)`,
+	   which is the force-close a picked row needs: without it the latch could go false, focus
+	   could be blurred, and the drop would still sit painted under a pointer that has nowhere
+	   to go — see `dismissed` in the script. Guarding the selectors rather than adding a
+	   competing rule keeps this a single source of truth, with no `!important` and no reliance
+	   on source order. `.menu-open` needs no guard: reopening clears the dismissal. */
+	.annot-menu:not(.dismissed):hover .annot-drop,
+	.annot-menu:not(.dismissed):focus-within .annot-drop,
 	.annot-menu.menu-open .annot-drop {
 		opacity: 1;
 		pointer-events: auto;
