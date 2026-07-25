@@ -2227,6 +2227,32 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     accessor). Deliberate non-goals — start-to-start / finish-to-finish / lag link types (the
     honest home for a *stated* overlap, a separate item), horizontal-only orientation, and
     resource/critical-path anything.
+- [ ] **`Gantt` link types — a STATED overlap instead of a flagged one** — start-to-start,
+      finish-to-finish, start-to-finish, and lag/lead, so "B begins when A begins" can be
+      declared rather than inferred from dates that contradict a finish-to-start arrow.
+  - **Why:** the Gantt above models ONE relationship and is honest about it — a dependent
+    starting before its predecessor finishes is flagged `violated` and drawn dashed, because
+    the chart has no vocabulary for it. But a deliberately fast-tracked plan is a real, common
+    thing, and today the only way to draw it is to accept a red warning on correct data. The
+    flag is the right answer to a *mistake* and the wrong answer to an *intention*; nothing
+    currently distinguishes them. Found by a user reading the demo — see the Gantt entry.
+  - **Approach:** the relationship belongs on the edge, so extend `dependsOn` from a task name
+    to accept `{ task, type?: 'FS' | 'SS' | 'FF' | 'SF', lag?: number }` alongside the current
+    bare string (which stays `FS`, so every existing deck is untouched). `ganttLinks` in
+    `chartCore.ts` already resolves edges by `keyString` and computes `violated`; it grows to
+    carry the type plus the two ANCHOR EDGES the elbow should join (predecessor start-or-end →
+    dependent start-or-end), which is the geometry `Gantt.svelte` currently hardcodes as
+    end→start. `violated` then becomes type-aware: only an FS link is contradicted by an
+    overlap, an SS link by the dependent starting *earlier* than its predecessor, and a link
+    with a negative lag not at all. Pure, total, NaN-safe as the rest of `chartCore`, unit
+    tested directly. No new tokens needed unless the types want distinguishing strokes.
+  - **Open questions**, and they should be settled before line one:
+    - Does `lag` carry a UNIT (days? ms? a duration string), or is it plain milliseconds to
+      match `toTime`'s output? Milliseconds are consistent and unreadable in authoring.
+    - Should the four types be visually distinguishable at all (anchor position alone may
+      read ambiguously on tight lanes), or does the `<title>` carry it?
+    - Is `SF` worth building? It is vanishingly rare in real plans and costs the same as the
+      other three — dropping it keeps the union honest rather than complete-for-its-own-sake.
 - [x] **Multi-segment path** — one `Draw` shape whose geometry chains several segments
       (line + curve + arc) instead of composing separate `Line` / `Curve` / `Arc` elements.
   - Gives a single continuous stroke: one `draw`/`drawDelay` reveal, one arrowhead at the
