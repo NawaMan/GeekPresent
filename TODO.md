@@ -942,6 +942,34 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
     flyout is open, cCwWtT still own the keys first. Row letters work while the drop is open
     (even if arm timed out) and while chrome is armed with the drop still closed.
 
+- [x] **The ☰ drop sat open on top of what a row just opened** — click `SOURCE` and the source
+      panel appeared *underneath* the still-painted menu. Reported from use, not caught by a test.
+  - **Three OR'd ways in, and only two had a way out.** The drop is shown by
+    `.annot-menu:hover`, `:focus-within`, OR `.menu-open` (the `moreMenuOpen` latch).
+    `closeMoreMenu()` cleared the latch and an existing `$effect` blurred to answer
+    `:focus-within` — but nothing answered `:hover`, and after clicking a row **the pointer is
+    by definition still on it**. The old comment accepted this by design ("closing is now the
+    latch going false plus the pointer/focus leaving, so nothing has to out-shout a CSS state").
+  - **SOURCE is where that assumption breaks**, which is why it went unnoticed: CAPTURE
+    downloads a file, OVERVIEW covers the screen with the grid (and blurs), PRINT deliberately
+    stays open — SOURCE is the only row that opens a surface *directly under the drop*, so
+    moving the pointer toward the thing you asked to read never leaves the menu. The keyboard
+    path was always fine: it calls `closeMoreMenu()` per row explicitly.
+  - Done: a `dismissed` state in `SlideToolbar.svelte`, set when a row's click bubbles to the
+    panel, with the pointer/focus selectors GUARDED as `.annot-menu:not(.dismissed):hover` /
+    `:not(.dismissed):focus-within` — a guard rather than a competing rule, so there is one
+    source of truth, no `!important`, and no reliance on source order. Cleared on
+    `pointerleave` of the menu root (hover-to-open has to keep working) and whenever the drop
+    reopens (so M straight after a dismissal is not swallowed). **PRINT is untouched** — it
+    stops propagation, so it never reaches the panel handler. Fixes CAPTURE and KIOSK's
+    identical latent behaviour too; nobody could see it, as neither opens a surface underneath.
+  - Tests: `tests/MenuDismiss.test.ts` + `MenuDismissHost.svelte`, whose rows mirror production's
+    three shapes (ordinary, stop-propagation PRINT, SOURCE). **jsdom does not apply Svelte's
+    scoped CSS** — `getComputedStyle().opacity` is empty there, which is exactly why DOM probes
+    could not reproduce the bug — so the tests assert the `dismissed` STATE the guards key off,
+    never that the drop is visually gone, and say so at the top of the file. The CSS is reviewed,
+    not tested; the fix was confirmed in a real browser.
+
 - [x] **`SlideDeck fadeChrome`** — fade the deck's own controls until pointed at.
   - Opt-in prop. NAV, TOC, DISPLAY, the minimap and the LAYOUT toggle drop to 12% opacity
     and lift to full on `:hover` / `:focus-within`. Wanted most where chrome sits over
