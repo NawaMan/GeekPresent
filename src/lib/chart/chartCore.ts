@@ -401,6 +401,141 @@ export function stackExtent(stacks: readonly StackSegment[][]): [number, number]
 }
 
 /**
+ * One column of a waterfall: a floating bar spanning [y0, y1] in value space.
+ *
+ * This is the OTHER cumulative form, next to stackSeries above. A stack sums
+ * MANY series inside one category, every segment measured from a shared zero.
+ * A waterfall walks ONE series ACROSS categories: each bar starts where the
+ * previous one ended, so the chart shows the arithmetic that gets you from a
+ * start value to an end value — "the 400ms request: 180 in TLS, 90 in the
+ * query, …". Sign is the point, not an accident: `kind` says which way a bar
+ * moves, and the running `total` after it is carried on every bar.
+ *
+ * A TOTAL column asserts the running total instead of contributing to it: it is
+ * drawn from the zero baseline (`y0: 0`) up to the running total, and leaves
+ * that total unchanged. Declare them per row via `isTotal`, and/or append a
+ * closing one with `endTotal`.
+ */
+export interface WaterfallBar {
+	key: string; // keyString(category) — stable identity for the band + {#each}
+	category: unknown; // the raw category value (band domain member)
+	y0: number; // value the bar starts at (the running total before it; 0 for a total)
+	y1: number; // value the bar ends at (the running total after it)
+	value: number; // the signed contribution (0 for a blank; the total for a total column)
+	total: number; // the running total AFTER this bar
+	kind: 'rise' | 'fall' | 'total';
+	blank: boolean; // the source value was blank, so it contributed 0
+}
+
+/** Options for `waterfallBars`. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface WaterfallOptions<T = any> {
+	x: Accessor<T>; // the category
+	value: Accessor<T>; // the signed contribution
+	/** Rows whose value here reads truthy are TOTAL columns: they assert the
+	 *  running total (drawn from the baseline) rather than moving it. */
+	isTotal?: Accessor<T>;
+	/** The value the first bar starts from. Non-finite → 0. */
+	start?: number;
+	/** Append a closing total column after the last row. */
+	endTotal?: boolean;
+	/** The appended column's category label. Default 'Total'. */
+	endTotalLabel?: string;
+}
+
+/**
+ * Walk the rows into floating waterfall bars (pure — the caller maps y0/y1
+ * through a linearScale and the categories through a bandScale).
+ *
+ * Blanks contribute **0** and leave the running total intact, following the
+ * stacked-bar convention rather than the line one: a waterfall IS a running
+ * total, so a missing part is "nothing moved here", not "the total is unknown".
+ * The bar is still emitted (flagged `blank`) so the category keeps its slot on
+ * the axis — dropping it would silently shorten the walk.
+ *
+ * Total, and NaN-free by construction: every y0/y1/total is finite for any
+ * input, since each contribution is coerced through toNumber and a non-finite
+ * one becomes 0.
+ */
+export function waterfallBars<T>(
+	rows: readonly T[],
+	options: WaterfallOptions<T>
+): WaterfallBar[] {
+	const { x, value, isTotal, start = 0, endTotal = false, endTotalLabel = 'Total' } = options;
+
+	let running = Number.isFinite(start) ? start : 0;
+	const out: WaterfallBar[] = [];
+
+	for (const row of rows) {
+		const category = valueOf(row, x);
+		const key = keyString(category);
+
+		if (isTotal !== undefined && valueOf(row, isTotal)) {
+			// A checkpoint: from the baseline up to wherever the walk has reached.
+			out.push({
+				key,
+				category,
+				y0: 0,
+				y1: running,
+				value: running,
+				total: running,
+				kind: 'total',
+				blank: false
+			});
+			continue;
+		}
+
+		const raw = toNumber(valueOf(row, value));
+		const blank = !Number.isFinite(raw);
+		const contribution = blank ? 0 : raw;
+		const y0 = running;
+		running += contribution;
+		out.push({
+			key,
+			category,
+			y0,
+			y1: running,
+			value: contribution,
+			total: running,
+			kind: contribution < 0 ? 'fall' : 'rise',
+			blank
+		});
+	}
+
+	if (endTotal) {
+		out.push({
+			key: keyString(endTotalLabel),
+			category: endTotalLabel,
+			y0: 0,
+			y1: running,
+			value: running,
+			total: running,
+			kind: 'total',
+			blank: false
+		});
+	}
+
+	return out;
+}
+
+/**
+ * The vertical extent of a waterfall — [min, max] across every bar's y0/y1,
+ * always including 0 (the walk is measured from a zero baseline, and total
+ * columns are drawn from it). Feeds the y linearScale.
+ */
+export function waterfallExtent(bars: readonly WaterfallBar[]): [number, number] {
+	let min = 0;
+	let max = 0;
+	for (const bar of bars) {
+		if (bar.y0 < min) min = bar.y0;
+		if (bar.y1 < min) min = bar.y1;
+		if (bar.y0 > max) max = bar.y0;
+		if (bar.y1 > max) max = bar.y1;
+	}
+	return [min, max];
+}
+
+/**
  * One bar of a histogram: the half-open value interval `[x0, x1)` and how many
  * of the sample's finite values fell in it. The LAST bin is closed on the right
  * (`[x0, x1]`) so the maximum value isn't dropped off the end.
@@ -586,7 +721,7 @@ export function heatmapMatrix<T>(rows: readonly T[], options: HeatmapOptions<T>)
 	const yIndex = new Map<string, number>();
 	// Per-cell running sum + count of finite values (keyed by x\0y), for the mean.
 	const acc = new Map<string, { sum: number; n: number }>();
-	const cellKey = (xk: string, yk: string): string => xk + ' ' + yk;
+	const cellKey = (xk: string, yk: string): string => xk + '\u0000' + yk;
 
 	for (const row of rows) {
 		const x = valueOf(row, options.x);

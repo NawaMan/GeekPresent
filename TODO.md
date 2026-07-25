@@ -2092,6 +2092,52 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
       per-cell aria-labels, the blank drawn empty, `color-mix` fills, the legend), DOM tests in
       `tests/Charts.test.ts` (cell count, labels, empty-cell class, `showValues`, no reveal clip
       by default). New `--chart-heat-*` role tokens.
+- [x] **`Waterfall`** — the RUNNING-TOTAL chart, the remaining cumulative gap: the family could
+      show a total, or many series sharing one baseline, but nothing showed the *arithmetic* that
+      gets you from a start value to an end value. Done: `src/lib/chart/Waterfall.svelte` over pure
+      `waterfallBars` / `waterfallExtent` in `chartCore.ts` (the family's discipline — junk in
+      yields a drawable bar, never a throw or a `NaN` edge).
+  - **Not a stacked bar, and deliberately not a prop on one** — the counterpart call to
+    `StackedBarChart`'s above, reached the other way. `stackSeries` sums MANY series inside one
+    category, every segment measured from a shared zero. A waterfall walks ONE series ACROSS
+    categories, each bar floating between the running total before it and after it. Same
+    neighbourhood, different function: it needed a new core primitive, not a flag, so it earns a
+    component name where `StackedBarChart` did not.
+  - **Sign is the subject, not an accident.** `kind` is `'rise' | 'fall' | 'total'` and colours the
+    bar by direction, and every bar carries the running `total` after it — which is what the
+    aria-labels expose (`"Query: +90 (total 270)"`), so the accessible reading is the walk itself,
+    not a column of disconnected magnitudes. Dashed **step lines** (`connectors`, on by default)
+    carry each bar's end level across to the next, since the next bar's `y0` IS this bar's `y1`.
+  - **A TOTAL column asserts the total instead of moving it** — drawn from the zero baseline up to
+    wherever the walk has reached, leaving it unchanged. Two authoring paths, settled during the
+    proposal: `isTotal` (an accessor, for mid-walk checkpoints) and `endTotal` + `endTotalLabel` (an
+    appended closing column). `start` seeds the walk, so a subtractive story ("2.1 s down to
+    620 ms") is the same component with a seed and negative contributions.
+  - **A blank contributes 0 and KEEPS its slot** — the stacked-bar convention, the deliberate
+    contrast with lines, where a blank gaps: a waterfall IS a running total, so a missing part is
+    "nothing moved here", not "the total is unknown". Dropping the bar would silently shorten the
+    walk, so it is emitted flagged `blank` and drawn as a flat marker rather than an invisible
+    zero-height rect.
+  - **SSR-safe** exactly as the rest of the family: the full `<svg>` renders from props alone; the
+    hover tooltip (band snap via `nearestIndex`, showing the change *and* the running total) and the
+    `animate` clip-wipe are client-only and never reach the prerender. `role="img"` + required
+    `title`. **Reuses `--chart-*` wholesale** with new `--chart-rise`/`-fall`/`-total`/`-step`,
+    fallbacks baked in the `seriesColor` way — note the chart family sets **no** `--chart-*` in
+    `roles.css` (it has none), each demo slide tints its own panel, so that is where these live too.
+  - Demo `chart-waterfall.html` (one latency budget drives two walks: additive with `endTotal`, a
+    falling cache saving and an unprofiled blank stage, vs. subtractive with `start={2100}`, an
+    `isTotal` checkpoint, `animate`, and a shipped regression that rises where all else falls).
+    Unit tests in `tests/chartCore.test.ts` (`waterfallBars`/`waterfallExtent`: running totals,
+    falls, blanks-as-0-keeping-their-slot, seeded/non-finite `start`, `isTotal`, `endTotal`, stable
+    keys, totality on garbage), DOM tests in `tests/Waterfall.test.ts` (bar/step counts, the
+    rise/fall/total fills, aria-labels carrying the total, `connectors={false}`, the flat marker,
+    `format`, empty data with no `NaN`), SSR assertion + host in `tests/ChartSsr(.ssr).test.ts`
+    (the whole walk prerenders; the existing blanket assertions prove the tooltip and wipe do not).
+  - **Fixed while here: `chartCore.ts` was invisible to `grep`.** The heatmap's cell key held a
+    **raw NUL byte** inside its string literal instead of the escape `'\u0000'` — so `file` called
+    the module binary `data` and plain `grep` silently skipped all 1073 lines of it, which is
+    exactly how this session came to believe stacking wasn't implemented. Behaviour identical, one
+    character; the module now greps.
 - [x] **Multi-segment path** — one `Draw` shape whose geometry chains several segments
       (line + curve + arc) instead of composing separate `Line` / `Curve` / `Arc` elements.
   - Gives a single continuous stroke: one `draw`/`drawDelay` reveal, one arrowhead at the
