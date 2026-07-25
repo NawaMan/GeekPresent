@@ -646,6 +646,15 @@ are load-bearing when you touch anything nearby:
    feature branch early (Rule 0b / *Session = linked worktree + branch*) so the user can
    push and open a PR; still do not commit or push that branch unless asked. Creating the
    worktree itself is Rule 0b and does **not** require a separate commit request.
+9. **Unpushed commits and other worktrees are not your problem — don't raise them.** Several
+   things are developed here in parallel, and the user pushes when *their* conditions are met.
+   So `## main...origin/main [ahead N]` is the **normal steady state**, not a risk: don't warn
+   about it, don't offer to push, don't count it up in a status report. Likewise, other
+   `worktree/<name>/` folders sitting on uncommitted changes with no commits are **other
+   sessions mid-flight** — never commit them, tidy them, remove them, stop their booths, or
+   describe them as work at risk. The one time to say "ahead N" out loud is immediately after a
+   merge you just made, where it is the *proof* that nothing was pushed (see the `land-branch`
+   skill); every other mention is noise.
 
 ---
 
