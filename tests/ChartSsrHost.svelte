@@ -11,6 +11,7 @@
 	import LineChart from '../src/lib/chart/LineChart.svelte';
 	import PieChart from '../src/lib/chart/PieChart.svelte';
 	import ScatterChart from '../src/lib/chart/ScatterChart.svelte';
+	import Waterfall from '../src/lib/chart/Waterfall.svelte';
 
 	const regions = [
 		{ region: 'us-east', net: 320 },
@@ -49,6 +50,16 @@
 		{ day: 'Mon', slot: 'AM', load: 2 },
 		{ day: 'Mon', slot: 'PM', load: 8 },
 		{ day: 'Tue', slot: 'AM', load: 5 }
+	];
+	// A walk with every kind of bar: rises, a fall, a blank (contributes 0 but
+	// keeps its slot), a mid-walk checkpoint, and an appended closing total.
+	const walk = [
+		{ stage: 'tls', cost: 180 },
+		{ stage: 'query', cost: 90 },
+		{ stage: 'cache', cost: -35 }, // falls
+		{ stage: 'mid', cost: null, check: true }, // checkpoint drawn from the baseline
+		{ stage: 'middleware', cost: null }, // blank → contributes 0, keeps its slot
+		{ stage: 'render', cost: 60 }
 	];
 </script>
 
@@ -114,4 +125,15 @@
 	value="load"
 	title="Weekly load"
 	description="a 2×2 matrix; Tue × PM has no measurement and is drawn empty"
+/>
+<Waterfall
+	data={walk}
+	x={{ value: 'stage', type: 'band', label: 'Stage' }}
+	value="cost"
+	isTotal="check"
+	endTotal
+	label="Cost"
+	title="Where the time goes"
+	description="a running total per stage; animate and the tooltip are client-only"
+	animate
 />

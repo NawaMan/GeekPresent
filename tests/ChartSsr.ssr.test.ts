@@ -97,6 +97,31 @@ describe('Chart (SSR)', () => {
 		expect(body).toContain('legend-end');
 	});
 
+	it('renders the Waterfall walk server-side: rises, a fall, checkpoints, steps', () => {
+		expect(body).toContain('<title>Where the time goes</title>');
+		// 180 → 270 → 235 (the cache gives time back) → checkpoint → blank → 295
+		expect(body).toContain('aria-label="tls: +180 (total 180)"');
+		expect(body).toContain('aria-label="query: +90 (total 270)"');
+		expect(body).toContain('aria-label="cache: -35 (total 235)"'); // falls
+		expect(body).toContain('aria-label="mid: 235 total"'); // isTotal checkpoint
+		expect(body).toContain('aria-label="middleware: no change (total 235)"'); // blank kept its slot
+		expect(body).toContain('aria-label="render: +60 (total 295)"');
+		expect(body).toContain('aria-label="Total: 295 total"'); // the appended endTotal
+
+		// contributions vs checkpoints: 5 moving bars + 2 total columns
+		const moves = body.match(/aria-label="[^"]*\(total [^"]*\)"/g) ?? [];
+		expect(moves).toHaveLength(5);
+		const totals = body.match(/aria-label="[^"]*: [\d,]+ total"/g) ?? [];
+		expect(totals).toHaveLength(2);
+
+		// one step line per adjacent pair (7 bars → 6 gaps); the <g class="steps">
+		// wrapper is excluded by requiring a non-'s' character after "step"
+		const steps = body.match(/class="step[^s]/g) ?? [];
+		expect(steps).toHaveLength(6);
+
+		expect(body).toContain('zero-line'); // total columns are measured from it
+	});
+
 	it('never emits NaN in any coordinate', () => {
 		expect(body).not.toContain('NaN');
 	});

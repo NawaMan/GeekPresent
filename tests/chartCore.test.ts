@@ -25,7 +25,9 @@ import {
 	timeTicks,
 	toNumber,
 	toTime,
-	valueOf
+	valueOf,
+	waterfallBars,
+	waterfallExtent
 } from '../src/lib/chart/chartCore';
 
 describe('isBlank / toNumber', () => {
@@ -317,6 +319,146 @@ describe('stackExtent', () => {
 
 	it('returns [0, 0] for empty input (still a valid baseline)', () => {
 		expect(stackExtent([])).toEqual([0, 0]);
+	});
+});
+
+describe('waterfallBars', () => {
+	type Row = { stage: string; cost: number | null; check?: boolean };
+	const opts = { x: 'stage' as const, value: 'cost' as const };
+
+	it('walks each bar from the running total before it to the one after', () => {
+		const bars = waterfallBars<Row>(
+			[
+				{ stage: 'a', cost: 10 },
+				{ stage: 'b', cost: 20 },
+				{ stage: 'c', cost: 5 }
+			],
+			opts
+		);
+		expect(bars.map((b) => [b.y0, b.y1, b.total])).toEqual([
+			[0, 10, 10],
+			[10, 30, 30],
+			[30, 35, 35]
+		]);
+		expect(bars.map((b) => b.kind)).toEqual(['rise', 'rise', 'rise']);
+	});
+
+	it('falls for a negative contribution without breaking the walk', () => {
+		const bars = waterfallBars<Row>(
+			[
+				{ stage: 'a', cost: 100 },
+				{ stage: 'b', cost: -40 },
+				{ stage: 'c', cost: 10 }
+			],
+			opts
+		);
+		expect(bars[1]).toMatchObject({ y0: 100, y1: 60, value: -40, kind: 'fall' });
+		expect(bars[2]).toMatchObject({ y0: 60, y1: 70, total: 70 });
+	});
+
+	it('treats a blank as 0 and KEEPS the bar (the category holds its slot)', () => {
+		const bars = waterfallBars<Row>(
+			[
+				{ stage: 'a', cost: 10 },
+				{ stage: 'b', cost: null },
+				{ stage: 'c', cost: 5 }
+			],
+			opts
+		);
+		expect(bars).toHaveLength(3);
+		expect(bars[1]).toMatchObject({ y0: 10, y1: 10, value: 0, blank: true, total: 10 });
+		expect(bars[2]).toMatchObject({ y0: 10, y1: 15 }); // walk undisturbed
+	});
+
+	it('seeds the walk from `start`, ignoring a non-finite one', () => {
+		const [bar] = waterfallBars<Row>([{ stage: 'a', cost: -100 }], { ...opts, start: 2100 });
+		expect(bar).toMatchObject({ y0: 2100, y1: 2000, total: 2000 });
+		const [fallback] = waterfallBars<Row>([{ stage: 'a', cost: 5 }], {
+			...opts,
+			start: Number.NaN
+		});
+		expect(fallback).toMatchObject({ y0: 0, y1: 5 });
+	});
+
+	it('draws an `isTotal` row from the baseline and leaves the total unmoved', () => {
+		const bars = waterfallBars<Row>(
+			[
+				{ stage: 'a', cost: 30 },
+				{ stage: 'b', cost: 12 },
+				{ stage: 'mid', cost: null, check: true },
+				{ stage: 'c', cost: 8 }
+			],
+			{ ...opts, isTotal: 'check' }
+		);
+		expect(bars[2]).toMatchObject({ y0: 0, y1: 42, value: 42, total: 42, kind: 'total' });
+		expect(bars[3]).toMatchObject({ y0: 42, y1: 50 }); // resumes from the same total
+	});
+
+	it('appends an endTotal column from the baseline, labelled', () => {
+		const bars = waterfallBars<Row>(
+			[
+				{ stage: 'a', cost: 10 },
+				{ stage: 'b', cost: 5 }
+			],
+			{ ...opts, endTotal: true, endTotalLabel: 'Sum' }
+		);
+		expect(bars).toHaveLength(3);
+		expect(bars[2]).toMatchObject({ category: 'Sum', y0: 0, y1: 15, kind: 'total' });
+	});
+
+	it('is total: empty rows, garbage values and a missing field stay NaN-free', () => {
+		expect(waterfallBars<Row>([], opts)).toEqual([]);
+		const bars = waterfallBars(
+			[{ stage: 'a', cost: 'nonsense' }, { stage: 'b' }, { stage: 'c', cost: '12' }],
+			opts as never
+		);
+		for (const bar of bars) {
+			expect(Number.isFinite(bar.y0)).toBe(true);
+			expect(Number.isFinite(bar.y1)).toBe(true);
+			expect(Number.isFinite(bar.total)).toBe(true);
+		}
+		// only the coercible '12' moved the walk
+		expect(bars[2]).toMatchObject({ y0: 0, y1: 12 });
+	});
+
+	it('gives each bar a stable key and carries the raw category through', () => {
+		const bars = waterfallBars<Row>([{ stage: 'a', cost: 1 }], { ...opts, endTotal: true });
+		expect(bars[0].key).toBe('t:a');
+		expect(bars[0].category).toBe('a');
+		expect(bars[1].key).toBe('t:Total'); // the default endTotalLabel
+	});
+});
+
+describe('waterfallExtent', () => {
+	it('spans the walk and always includes 0', () => {
+		const bars = waterfallBars(
+			[
+				{ s: 'a', v: 10 },
+				{ s: 'b', v: 25 }
+			],
+			{ x: 's', value: 'v' }
+		);
+		expect(waterfallExtent(bars)).toEqual([0, 35]);
+	});
+
+	it('reaches below zero when the walk crosses the baseline', () => {
+		const bars = waterfallBars(
+			[
+				{ s: 'a', v: 10 },
+				{ s: 'b', v: -30 }
+			],
+			{ x: 's', value: 'v' }
+		);
+		expect(waterfallExtent(bars)).toEqual([-20, 10]);
+	});
+
+	it('covers a walk seeded above zero from the baseline up', () => {
+		const bars = waterfallBars([{ s: 'a', v: -100 }], { x: 's', value: 'v', start: 500 });
+		expect(waterfallExtent(bars)).toEqual([0, 500]);
+	});
+
+	it('returns [0, 0] for empty input (still a valid baseline)', () => {
+		expect(waterfallExtent([])).toEqual([0, 0]);
 	});
 });
 

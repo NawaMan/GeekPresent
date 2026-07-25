@@ -16,5 +16,6 @@ export { default as Histogram } from './Histogram.svelte';
 export { default as LineChart } from './LineChart.svelte';
 export { default as PieChart } from './PieChart.svelte';
 export { default as ScatterChart } from './ScatterChart.svelte';
+export { default as Waterfall } from './Waterfall.svelte';
 export * from './chartCore';
 export type * from './types';
