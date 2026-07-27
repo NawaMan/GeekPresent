@@ -92,6 +92,56 @@ describe('DrawHandle', () => {
 		expect(moves).toEqual([[50, 0]]);
 	});
 
+	it('shiftSnap replaces the 90° default outright', async () => {
+		const moves: Point[] = [];
+		const { container } = render(DrawHandle, {
+			point: [0, 0] as Point,
+			// Pin to the horizontal through the grab point. The default would have
+			// snapped (50,30) to the same axis, so tilt the expectation with a
+			// rule the default CANNOT produce: y is forced to a constant.
+			shiftSnap: ([x]: Point) => [x, 7] as Point,
+			onmove: (p: Point) => moves.push(p)
+		});
+		await grab(container.querySelector('circle')!);
+		moveTo(50, 30, { shiftKey: true });
+		release();
+		expect(moves).toEqual([[50, 7]]);
+	});
+
+	it('shiftSnap receives the grid-snapped candidate and the GRAB point', async () => {
+		const seen: Point[][] = [];
+		const { container } = render(DrawHandle, {
+			point: [100, 100] as Point,
+			grid: 20,
+			shiftSnap: (p: Point, from: Point) => {
+				seen.push([p, from]);
+				return p;
+			},
+			onmove: () => {}
+		});
+		await grab(container.querySelector('circle')!);
+		moveTo(28, 7, { shiftKey: true });
+		release();
+		// Candidate already quantized to the 20px grid (100+28 → 120, 100+7 → 100),
+		// and `from` is where the drag STARTED, not the pointer's current spot.
+		expect(seen).toEqual([[[120, 100], [100, 100]]]);
+	});
+
+	it('shiftSnap is left alone when Shift is not held', async () => {
+		const shiftSnap = vi.fn((p: Point) => p);
+		const moves: Point[] = [];
+		const { container } = render(DrawHandle, {
+			point: [0, 0] as Point,
+			shiftSnap,
+			onmove: (p: Point) => moves.push(p)
+		});
+		await grab(container.querySelector('circle')!);
+		moveTo(50, 30);
+		release();
+		expect(shiftSnap).not.toHaveBeenCalled();
+		expect(moves).toEqual([[50, 30]]);
+	});
+
 	it('Esc cancels: restores the start point and never commits', async () => {
 		const moves: Point[] = [];
 		const oncommit = vi.fn();
