@@ -169,6 +169,52 @@ describe('patchSlideSource', () => {
 		expect(unmatched[0].reason).toBe('not-found');
 	});
 
+	it('a BOX shape written geometry-first still saves, via the geometry fallback', () => {
+		// The animation-check/shape-edit slide, and 4 of the 5 <Rect> tags in this
+		// repo: the author leads with x/y/width/height the way a Block does, while
+		// boxTag() serializes the cosmetic attrs FIRST. The literal swap therefore
+		// misses, and before the fallback existed SAVE refused a drag it could have
+		// placed perfectly well.
+		const src = `<Rect name="frame" x={710} y={460} width={500} height={210} rounded={16} color="#4aa3f0" thickness={4} />`;
+		const { source, patched, unmatched } = patchSlideSource(src, [
+			{
+				kind: 'Rect',
+				name: 'frame',
+				oldTag: `<Rect name="frame" rounded={16} color="#4aa3f0" thickness={4} x={710} y={460} width={500} height={210} />`,
+				newTag: `<Rect name="frame" rounded={16} color="#4aa3f0" thickness={4} x={800} y={500} width={500} height={210} />`,
+				before: { x: 710, y: 460, width: 500, height: 210 },
+				after: { x: 800, y: 500, width: 500, height: 210 }
+			}
+		]);
+		expect(unmatched).toHaveLength(0);
+		expect(patched).toHaveLength(1);
+		// Geometry moved…
+		expect(source).toContain('x={800} y={500}');
+		// …and the author's own ordering survived — the fallback rewrites the four
+		// numbers in place, it does not impose the canonical tag.
+		expect(source).toBe(
+			`<Rect name="frame" x={800} y={500} width={500} height={210} rounded={16} color="#4aa3f0" thickness={4} />`
+		);
+	});
+
+	it('a POINT shape sends no geometry, so a literal miss still refuses', () => {
+		// The fallback must not quietly widen to Line/Curve/Arc/Path/Polyline:
+		// they have no x/y/width/height box, so there is nothing to rewrite in
+		// place and 'not-found' remains the honest answer.
+		const src = `<Line name="rule" from={[720, 760]} to={[1219, 728]} thickness={6} color="#f39c12" />`;
+		const { patched, unmatched } = patchSlideSource(src, [
+			{
+				kind: 'Line',
+				name: 'rule',
+				oldTag: `<Line name="rule" from={[720, 760]} to={[1219, 728]} color="#f39c12" thickness={6} />`,
+				newTag: `<Line name="rule" from={[720, 700]} to={[1219, 728]} color="#f39c12" thickness={6} />`
+			}
+		]);
+		expect(patched).toHaveLength(0);
+		expect(unmatched).toHaveLength(1);
+		expect(unmatched[0].reason).toBe('not-found');
+	});
+
 	it('reports a literal change whose old tag is not in source', () => {
 		const src = `<Curve name="hop" from={[1, 1]} to={[2, 2]} c1={[3, 3]} />`;
 		const { patched, unmatched } = patchSlideSource(src, [
