@@ -94,7 +94,7 @@ describe('presenterKeyIntent — paging keys', () => {
 	});
 
 	it('never pages while the caret is in a field (the timer input)', () => {
-		const inField = { target: { tagName: 'INPUT' } as EventTarget };
+		const inField = { target: { tagName: 'INPUT' } as unknown as EventTarget };
 		expect(presenterKeyIntent(key({ key: 'ArrowRight', ...inField }))).toBe('ignore');
 		expect(presenterKeyIntent(key({ key: ' ', ...inField }))).toBe('ignore');
 	});
@@ -118,7 +118,7 @@ describe('presenterKeyIntent — Escape closes menus', () => {
 
 	it('closes even from a typing target — so it dismisses the timer popover', () => {
 		expect(
-			presenterKeyIntent(key({ key: 'Escape', target: { tagName: 'INPUT' } as EventTarget }))
+			presenterKeyIntent(key({ key: 'Escape', target: { tagName: 'INPUT' } as unknown as EventTarget }))
 		).toBe('close');
 	});
 
@@ -131,7 +131,7 @@ describe('presenterKeyIntent — Escape closes menus', () => {
 describe('presenterKeyIntent — never fires over typing or a chord', () => {
 	it('bails while the caret is in a field (the timer input)', () => {
 		expect(
-			presenterKeyIntent(key({ key: 't', target: { tagName: 'INPUT' } as EventTarget }), true)
+			presenterKeyIntent(key({ key: 't', target: { tagName: 'INPUT' } as unknown as EventTarget }), true)
 		).toBe('ignore');
 		expect(
 			presenterKeyIntent(

@@ -27,6 +27,7 @@
 
 	const path = 'src/routes/animation/scroll-anim.html/+page.svelte';
 
+	/** @type {InstanceType<typeof AnimationBar>} */
 	let bar;   // the AnimationBar instance — scroll seeks it by fraction
 </script>
 

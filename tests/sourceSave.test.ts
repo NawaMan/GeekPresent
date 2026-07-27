@@ -8,8 +8,7 @@ const originalFetch = globalThis.fetch;
 const originalPathname = window.location.pathname;
 
 beforeEach(() => {
-	// @ts-expect-error — jsdom allows redefining pathname via history in some setups;
-	// assign a stub location shape when needed.
+	// jsdom's location is not writable, so swap in a stub location shape wholesale.
 	Object.defineProperty(window, 'location', {
 		configurable: true,
 		value: { ...window.location, pathname: '/slides/title.html' }

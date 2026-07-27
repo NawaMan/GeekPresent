@@ -2,7 +2,7 @@ import { render, fireEvent } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import TableOfContent from '$lib/components/TableOfContent.svelte';
-import { pages as slidesPages } from '../src/routes/slides/pages.ts';
+import { pages as slidesPages } from '../src/routes/slides/pages';
 import { setPageUrl, resetPageUrl } from './stubs/app-stores';
 
 // The live half of full-deck search: the filter box grown inside the TOC overlay.

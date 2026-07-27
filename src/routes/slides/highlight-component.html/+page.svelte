@@ -17,6 +17,7 @@
 
 	// Ring layout: each cell's grid position matches the direction the arrow
 	// comes from, so the demo reads at a glance.
+	/** @type {(import('$lib/components/Highlight.svelte').HighlightFrom | null)[]} */
 	const ring = [
 		'top-left',    'top',    'top-right',
 		'left',        null,     'right',
@@ -24,7 +25,9 @@
 	];
 
 	// Interactive bits: imperative toggle() via bind:this, and a clickable arrow.
+	/** @type {InstanceType<typeof Highlight>} */
 	let wordHl;                    // the inline-word Highlight, driven by the button
+	/** @type {import('$lib/components/Highlight.svelte').HighlightFrom} */
 	let remoteFrom = 'bottom';     // clicking the remote arrow flips its side
 	let remoteClicks = 0;
 	function flipRemote() {

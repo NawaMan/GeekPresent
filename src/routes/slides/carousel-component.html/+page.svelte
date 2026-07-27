@@ -23,6 +23,7 @@
 		{ n: 4, tint: '#38271c', text: 'bind:this for next()/prev()' },
 	];
 
+	/** @type {InstanceType<typeof Carousel>} */
 	let car;   // imperative handle on the second carousel
 </script>
 

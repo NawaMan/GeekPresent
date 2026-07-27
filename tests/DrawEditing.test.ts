@@ -80,11 +80,10 @@ describe('DrawHandle', () => {
 		expect(moves).toEqual([[120, 100]]);
 	});
 
-	it('Shift routes through the shiftSnap hook', async () => {
+	it('Shift snaps the drag to the nearest 90° axis', async () => {
 		const moves: Point[] = [];
 		const { container } = render(DrawHandle, {
 			point: [0, 0] as Point,
-			shiftSnap: ([x]: Point) => [x, 0] as Point, // pin to horizontal
 			onmove: (p: Point) => moves.push(p)
 		});
 		await grab(container.querySelector('circle')!);
