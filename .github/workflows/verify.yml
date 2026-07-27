@@ -24,21 +24,26 @@ jobs:
 
     steps:
       - name: Check out the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Must come BEFORE setup-node: `cache: pnpm` below needs the pnpm binary to
       # already exist so it can resolve the store path. Version 9 matches
       # deploy-pages.yml and the lockfile (lockfileVersion 9.0).
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 9
 
       # Pinned to 22 to match the CodingBooth image, which is where these commands
       # are actually run day to day. Without this the runner's default Node drifts
       # independently of what anyone verifies locally.
+      #
+      # `cache: pnpm` is passed explicitly and stays authoritative: setup-node v5
+      # grew automatic caching off package.json's `packageManager` field, and v6
+      # narrowed that to npm only. This repo declares no `packageManager`, so
+      # neither path fires — the cache here is the one asked for.
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
