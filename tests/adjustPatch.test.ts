@@ -153,20 +153,23 @@ describe('patchSlideSource', () => {
 		expect(source).toContain('color="#7f8c8d" thickness={3} dash'); // decoration survives
 	});
 
-	it("a Polyline tag whose attributes are in a NON-canonical order is 'not-found'", () => {
-		// The exact trap: the shape serializes `smooth color thickness dash`, but
-		// the author wrote `smooth dash thickness color`. Literal swap is byte-for-
-		// byte, so the canonical old tag isn't in the file — SAVE must refuse and
-		// say so (Copy/paste by hand), never silently miss.
+	it('a Polyline tag whose attributes are in a NON-canonical order still saves', () => {
+		// The shape serializes `smooth color thickness dash`, but the author wrote
+		// `smooth dash thickness color`, so the literal swap misses. It used to stop
+		// there and refuse; the attribute rewrite places it, because name="route"
+		// plus points still matching the pre-edit value identifies the tag exactly.
 		const src = `<Polyline name="route" points={[[100, 900], [500, 500]]} smooth dash thickness={3} color="#7f8c8d" />`;
 		const oldTag = `<Polyline name="route" points={[[100, 900], [500, 500]]} smooth color="#7f8c8d" thickness={3} dash />`;
 		const newTag = `<Polyline name="route" points={[[100, 900], [550, 450]]} smooth color="#7f8c8d" thickness={3} dash />`;
-		const { patched, unmatched } = patchSlideSource(src, [
+		const { source, patched, unmatched } = patchSlideSource(src, [
 			{ kind: 'Polyline', name: 'route', oldTag, newTag }
 		]);
-		expect(patched).toHaveLength(0);
-		expect(unmatched).toHaveLength(1);
-		expect(unmatched[0].reason).toBe('not-found');
+		expect(unmatched).toHaveLength(0);
+		expect(patched).toHaveLength(1);
+		// Only `points` was rewritten — the author's own attribute order survives.
+		expect(source).toBe(
+			`<Polyline name="route" points={[[100, 900], [550, 450]]} smooth dash thickness={3} color="#7f8c8d" />`
+		);
 	});
 
 	it('a BOX shape written geometry-first still saves, via the geometry fallback', () => {
@@ -197,12 +200,9 @@ describe('patchSlideSource', () => {
 		);
 	});
 
-	it('a POINT shape sends no geometry, so a literal miss still refuses', () => {
-		// The fallback must not quietly widen to Line/Curve/Arc/Path/Polyline:
-		// they have no x/y/width/height box, so there is nothing to rewrite in
-		// place and 'not-found' remains the honest answer.
+	it('a POINT shape has no geometry, so a literal miss goes to the attribute rewrite', () => {
 		const src = `<Line name="rule" from={[720, 760]} to={[1219, 728]} thickness={6} color="#f39c12" />`;
-		const { patched, unmatched } = patchSlideSource(src, [
+		const { source, patched, unmatched } = patchSlideSource(src, [
 			{
 				kind: 'Line',
 				name: 'rule',
@@ -210,8 +210,30 @@ describe('patchSlideSource', () => {
 				newTag: `<Line name="rule" from={[720, 700]} to={[1219, 728]} color="#f39c12" thickness={6} />`
 			}
 		]);
+		expect(unmatched).toHaveLength(0);
+		expect(patched).toHaveLength(1);
+		expect(source).toBe(
+			`<Line name="rule" from={[720, 700]} to={[1219, 728]} thickness={6} color="#f39c12" />`
+		);
+	});
+
+	it('…but refuses when the source no longer holds the value the browser mounted', () => {
+		// The guard that matters. Someone edited the file (or another save landed)
+		// while ADJUST was open, so `from` on disk is not what this change was
+		// computed against. Rewriting would silently discard that edit, so the tag
+		// is treated as unidentifiable — the same rule geometry mode applies to
+		// `before`.
+		const src = `<Line name="rule" from={[10, 20]} to={[1219, 728]} thickness={6} color="#f39c12" />`;
+		const { source, patched, unmatched } = patchSlideSource(src, [
+			{
+				kind: 'Line',
+				name: 'rule',
+				oldTag: `<Line name="rule" from={[720, 760]} to={[1219, 728]} color="#f39c12" thickness={6} />`,
+				newTag: `<Line name="rule" from={[720, 700]} to={[1219, 728]} color="#f39c12" thickness={6} />`
+			}
+		]);
+		expect(source).toBe(src);
 		expect(patched).toHaveLength(0);
-		expect(unmatched).toHaveLength(1);
 		expect(unmatched[0].reason).toBe('not-found');
 	});
 
@@ -439,5 +461,193 @@ describe('patchSlideSource — insert brings its imports', () => {
 		const { source } = patchSlideSource('<ContentPage title="x" />\n', [insert(['Draw', 'Rect'])]);
 		expect(source.startsWith('<script lang="ts">')).toBe(true);
 		expect(source).toContain("import { Draw, Rect } from '$lib/draw';");
+	});
+});
+
+// A <Sprite>'s editable state is a stops ARRAY: too big to be a box (so geometry
+// mode can't place it) and never written the way the serializer emits it (so the
+// literal swap can't either). These cover the attribute rewrite that does.
+describe('patchSlideSource — attribute rewrite (Sprite stops)', () => {
+	const STOPS_OLD = '{ pct: 0, x: 0, y: 100, w: 56, h: 55 }, { pct: 100, x: 900, y: 400, w: 120, h: 118 }';
+	const STOPS_NEW = '{ pct: 0, x: 0, y: 100, w: 56, h: 55 }, { pct: 100, x: 900, y: 500, w: 120, h: 118 }';
+	const sprite = (over: Partial<LayoutChange> = {}): LayoutChange => ({
+		kind: 'Sprite',
+		name: 'rocket',
+		oldTag: `<Sprite name="rocket" animate={2.5} stops={[${STOPS_OLD}]}>`,
+		newTag: `<Sprite name="rocket" animate={2.5} stops={[${STOPS_NEW}]}>`,
+		...over
+	});
+
+	it('rewrites stops written inline across several lines, and keeps them that way', () => {
+		const src = `<Sprite name="rocket" animate={2.5} stops={[
+	{ pct: 0,   x: 0,   y: 100, w: 56,  h: 55 },
+	{ pct: 100, x: 900, y: 400, w: 120, h: 118 }
+]}>🚀</Sprite>`;
+		const { source, patched, unmatched } = patchSlideSource(src, [sprite()]);
+		expect(unmatched).toHaveLength(0);
+		expect(patched).toHaveLength(1);
+		// One stop per line at the original indent — not collapsed onto one line —
+		// and stop 0, which didn't move, keeps its hand-aligned columns.
+		expect(source).toBe(`<Sprite name="rocket" animate={2.5} stops={[
+	{ pct: 0,   x: 0,   y: 100, w: 56,  h: 55 },
+	{ pct: 100, x: 900, y: 500, w: 120, h: 118 }
+]}>🚀</Sprite>`);
+	});
+
+	it('follows stops={theConst} into the <script> and rewrites the array there', () => {
+		const src = `<script lang="ts">
+	const rocketStops = [
+		{ pct: 0,   x: 0,   y: 100, w: 56,  h: 55 },
+		{ pct: 100, x: 900, y: 400, w: 120, h: 118 }
+	];
+</script>
+
+<Sprite name="rocket" animate={2.5} stops={rocketStops}>🚀</Sprite>`;
+		const { source, unmatched } = patchSlideSource(src, [sprite()]);
+		expect(unmatched).toHaveLength(0);
+		// The const moved…
+		expect(source).toContain('{ pct: 100, x: 900, y: 500, w: 120, h: 118 }');
+		expect(source).not.toContain('y: 400');
+		// …and the tag still passes it by name rather than being inlined.
+		expect(source).toContain('<Sprite name="rocket" animate={2.5} stops={rocketStops}>');
+	});
+
+	it("keeps the slide's own quote style and column padding on stops it didn't move", () => {
+		// sprite-multi.html, verbatim: single-quoted ease, columns padded by hand.
+		// Moving stop 60 must not reformat stop 0 — these slides show their source.
+		const src = `<script lang="ts">
+	const rocketStops = [
+		{ pct: 0,   x: 80,   y: 930, w: 56,  h: 55,  rot: 20,  ease: 'ease-in' },
+		{ pct: 60,  x: 980,  y: 300, w: 120, h: 118, rot: 18 },
+		{ pct: 100, x: 1600, y: 150, w: 160, h: 157, rot: -30 }
+	];
+</script>
+
+<Sprite name="rocket" animate={2.5} fontScale={0.84} stops={rocketStops}>🚀</Sprite>`;
+		const stop = (y: number) =>
+			`{ pct: 0, x: 80, y: 930, w: 56, h: 55, rot: 20, ease: "ease-in" }, ` +
+			`{ pct: 60, x: 980, y: ${y}, w: 120, h: 118, rot: 18 }, ` +
+			`{ pct: 100, x: 1600, y: 150, w: 160, h: 157, rot: -30 }`;
+		const { source, unmatched } = patchSlideSource(src, [
+			{
+				kind: 'Sprite',
+				name: 'rocket',
+				oldTag: `<Sprite name="rocket" animate={2.5} fontScale={0.84} stops={[${stop(300)}]}>`,
+				newTag: `<Sprite name="rocket" animate={2.5} fontScale={0.84} stops={[${stop(777)}]}>`
+			}
+		]);
+		expect(unmatched).toHaveLength(0);
+		// The two untouched stops are byte-identical — padding, single quotes and all.
+		expect(source).toContain(`{ pct: 0,   x: 80,   y: 930, w: 56,  h: 55,  rot: 20,  ease: 'ease-in' },`);
+		expect(source).toContain(`{ pct: 100, x: 1600, y: 150, w: 160, h: 157, rot: -30 }`);
+		// Only the dragged one is re-emitted.
+		expect(source).toContain(`{ pct: 60, x: 980, y: 777, w: 120, h: 118, rot: 18 },`);
+	});
+
+	it('writes a changed stop in the file’s quote style, not the serializer’s', () => {
+		const src = `<Sprite name="rocket" stops={[
+	{ pct: 0,   x: 0,   y: 100, w: 56, h: 55, ease: 'ease-in' },
+	{ pct: 100, x: 900, y: 400, w: 56, h: 55, ease: 'ease-out' }
+]}>🚀</Sprite>`;
+		const tag = (ease: string) =>
+			`<Sprite name="rocket" stops={[{ pct: 0, x: 0, y: 100, w: 56, h: 55, ease: "ease-in" }, ` +
+			`{ pct: 100, x: 900, y: 400, w: 56, h: 55, ease: "${ease}" }]}>`;
+		const { source, unmatched } = patchSlideSource(src, [
+			{ kind: 'Sprite', name: 'rocket', oldTag: tag('ease-out'), newTag: tag('linear') }
+		]);
+		expect(unmatched).toHaveLength(0);
+		expect(source).toContain(`ease: 'linear'`);
+		expect(source).not.toContain('"linear"');
+	});
+
+	it('matches a stop the author wrote with an explicit default the serializer drops', () => {
+		// sprite-multi.html's star, verbatim. The file writes `rot: 0`; the
+		// serializer omits any property at its default, so the mounted tag has no
+		// `rot` on that stop at all. Comparing the two texts refuses the save — this
+		// is the case that made a third of the repo's sprites unsavable.
+		const src = `<script lang="ts">
+	const starStops = [
+		{ pct: 0,   x: 180, y: 600, w: 70,  h: 70,  rot: 0,   ease: 'ease-in-out' },
+		{ pct: 50,  x: 520, y: 470, w: 140, h: 140, rot: 180 },
+		{ pct: 100, x: 900, y: 820, w: 210, h: 210, rot: 360 }
+	];
+</script>
+
+<Sprite name="star" animate={3} stops={starStops}>★</Sprite>`;
+		const tag = (y: number) =>
+			`<Sprite name="star" animate={3} stops={[{ pct: 0, x: 180, y: 600, w: 70, h: 70, ease: "ease-in-out" }, ` +
+			`{ pct: 50, x: 520, y: ${y}, w: 140, h: 140, rot: 180 }, ` +
+			`{ pct: 100, x: 900, y: 820, w: 210, h: 210, rot: 360 }]}>`;
+		const { source, unmatched } = patchSlideSource(src, [
+			{ kind: 'Sprite', name: 'star', oldTag: tag(470), newTag: tag(333) }
+		]);
+		expect(unmatched).toHaveLength(0);
+		expect(source).toContain('{ pct: 50, x: 520, y: 333, w: 140, h: 140, rot: 180 },');
+		// The untouched stop keeps the explicit `rot: 0` the author wrote — it is
+		// not silently dropped just because the serializer would not emit it.
+		expect(source).toContain(`{ pct: 0,   x: 180, y: 600, w: 70,  h: 70,  rot: 0,   ease: 'ease-in-out' },`);
+	});
+
+	it('is not fooled by a code SAMPLE of the same tag elsewhere in the slide', () => {
+		// draw-sprite.html does exactly this: a QuickCode showing an abridged
+		// <Sprite> tag sits a few lines above the real one, with the same name.
+		const src = `<QuickCode lang="svelte" code={\`<Sprite name="rocket" animate={2.5} stops={[{ pct: 0, x: 0, … }]}>\`} />
+
+<Sprite name="rocket" animate={2.5} stops={[${STOPS_OLD}]}>🚀</Sprite>`;
+		const { source, unmatched } = patchSlideSource(src, [sprite()]);
+		expect(unmatched).toHaveLength(0);
+		// The sample is untouched…
+		expect(source).toContain('stops={[{ pct: 0, x: 0, … }]}');
+		// …and the real tag moved.
+		expect(source).toContain(`stops={[${STOPS_NEW}]}`);
+	});
+
+	it('refuses a computed value rather than flattening it into a literal', () => {
+		const src = `<Sprite name="rocket" animate={2.5} stops={makeStops(3)}>🚀</Sprite>`;
+		const { source, unmatched } = patchSlideSource(src, [sprite()]);
+		expect(source).toBe(src);
+		expect(unmatched).toEqual([expect.objectContaining({ reason: 'not-found' })]);
+	});
+
+	it('refuses a const two sprites share — rewriting it would move both', () => {
+		const src = `<script lang="ts">
+	const shared = [${STOPS_OLD}];
+</script>
+
+<Sprite name="rocket" animate={2.5} stops={shared}>🚀</Sprite>
+<Sprite name="star" animate={2.5} stops={shared}>★</Sprite>`;
+		const { source, unmatched } = patchSlideSource(src, [sprite()]);
+		expect(source).toBe(src);
+		expect(unmatched).toEqual([expect.objectContaining({ reason: 'ambiguous' })]);
+	});
+
+	it('reports not-found when the slide renders a Sprite only through a wrapper', () => {
+		// keyframe-studio.html: <SpriteStudio initialStops={stops}> owns the Sprite,
+		// which has no tag of its own in this file. Deliberately not savable.
+		const src = `<SpriteStudio name="fly" initialStops={stops} duration={2.5}>🚀</SpriteStudio>`;
+		const { source, unmatched } = patchSlideSource(src, [sprite()]);
+		expect(source).toBe(src);
+		expect(unmatched).toEqual([expect.objectContaining({ reason: 'not-found' })]);
+	});
+
+	it('also rescues a POINT shape whose tag is written multi-line', () => {
+		// Previously a literal miss with no geometry to fall back on was the end of
+		// the road for Line/Curve/Arc; now it falls through to the same rewrite.
+		const src = `<Line
+	name="rule"
+	from={[100, 100]}
+	to={[500, 100]}
+/>`;
+		const { source, unmatched } = patchSlideSource(src, [
+			{
+				kind: 'Line',
+				name: 'rule',
+				oldTag: '<Line name="rule" from={[100, 100]} to={[500, 100]} />',
+				newTag: '<Line name="rule" from={[100, 100]} to={[500, 300]} />'
+			}
+		]);
+		expect(unmatched).toHaveLength(0);
+		expect(source).toContain('to={[500, 300]}');
+		expect(source).toContain('\tname="rule"'); // layout preserved
 	});
 });

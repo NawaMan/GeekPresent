@@ -51,12 +51,19 @@ export interface LayoutChange {
 	//      <Rect>/<Ellipse> almost always leads with the geometry the way a Block
 	//      does. So Rect/Ellipse send `before`/`after` as WELL as the tags, and a
 	//      literal miss falls through to mode 1 rather than reporting not-found.
+	//      A shape with NO geometry to fall back on (a point shape, or a <Sprite>
+	//      whose editable state is a stops array) falls through to mode 4 instead.
 	//
 	//   3. INSERT (FREEZE): give `insert` — markup that is not in the file at all yet
 	//      and has to be ADDED. This is the one mode with no target tag to find, and
 	//      it exists for exactly one caller: freezing an ANNOTATE stroke into a Draw
 	//      shape (see annotate/freezeCore.ts). Everything else here rewrites what is
 	//      already written; this writes something new.
+	//
+	//   4. ATTRIBUTE (Sprites, and any shape a literal miss leaves nowhere to go):
+	//      rewrite just the attributes whose values changed — in the tag, or in the
+	//      `const` the tag references by name — leaving the author's line breaks and
+	//      every other prop alone. Derived from `oldTag`/`newTag`; no extra payload.
 	//
 	// A literal change (oldTag present) takes precedence, then an insert; otherwise
 	// geometry is used.
@@ -228,6 +235,365 @@ function applyGeometry(tagText: string, after: Geometry): string {
 	return out;
 }
 
+// --- ATTRIBUTE: rewriting ONE prop's value (Sprite `stops`, `path`, …) --------
+//
+// The literal swap above needs the whole opening tag to match byte-for-byte, and
+// a <Sprite> essentially never does: its editable state is a `stops` ARRAY, which
+// authors write across several lines, or hoist into a `const` and pass by name.
+// Geometry mode can't help either — five stops with pct/ease are not one box.
+//
+// So: find the tag, then rewrite only the attributes that actually changed,
+// leaving the author's layout and every other prop alone. Two shapes of target:
+//
+//   DIRECT    <Sprite name="x" stops={[ … ]}>   → rewrite the value in the tag
+//   INDIRECT  <Sprite name="x" stops={theStops}> → rewrite `const theStops = […]`
+//
+// Identification is the same principle geometry mode uses with `before`: the tag
+// only matches if it CURRENTLY carries the pre-edit value, whitespace ignored.
+// That is what lets a slide keep a <Sprite> code SAMPLE next to the real thing —
+// the sample's stops are abridged, so it can't impersonate the tag being saved.
+
+interface ParsedAttr {
+	name: string;
+	/** Raw value text WITH its delimiters (`{…}` / `"…"`), or null for a bare
+	    boolean attribute like `lock`. */
+	raw: string | null;
+	/** Offsets of `raw` within the tag text. */
+	start: number;
+	end: number;
+}
+
+/** Attributes of one opening tag, in source order. Hand-rolled rather than
+    regexed because a value can hold braces, quotes and `>` (`stops={[{…}]}`). */
+function parseAttrs(tagText: string): ParsedAttr[] {
+	const out: ParsedAttr[] = [];
+	// Skip `<Kind`; the name runs to the first boundary char.
+	let i = 1;
+	while (i < tagText.length && !isTagBoundary(tagText[i])) i++;
+	for (; i < tagText.length; ) {
+		const ch = tagText[i];
+		if (/\s/.test(ch)) {
+			i++;
+			continue;
+		}
+		if (ch === '>' || ch === '/') break;
+		const nameStart = i;
+		while (i < tagText.length && /[\w:$-]/.test(tagText[i])) i++;
+		if (i === nameStart) {
+			i++; // not an identifier (a spread, say) — step over it
+			continue;
+		}
+		const name = tagText.slice(nameStart, i);
+		while (i < tagText.length && /\s/.test(tagText[i])) i++;
+		if (tagText[i] !== '=') {
+			out.push({ name, raw: null, start: nameStart, end: i });
+			continue;
+		}
+		i++; // past '='
+		while (i < tagText.length && /\s/.test(tagText[i])) i++;
+		const valStart = i;
+		const open = tagText[i];
+		if (open === '"' || open === "'") {
+			i++;
+			while (i < tagText.length && tagText[i] !== open) i++;
+			i++; // past the closer
+		} else if (open === '{') {
+			let depth = 0;
+			let quote: string | null = null;
+			for (; i < tagText.length; i++) {
+				const c = tagText[i];
+				if (quote) {
+					if (c === quote) quote = null;
+					continue;
+				}
+				if (c === '"' || c === "'" || c === '`') quote = c;
+				else if (c === '{' || c === '[') depth++;
+				else if (c === '}' || c === ']') {
+					depth--;
+					if (depth === 0) {
+						i++;
+						break;
+					}
+				}
+			}
+		} else {
+			while (i < tagText.length && !/[\s>]/.test(tagText[i])) i++;
+		}
+		out.push({ name, raw: tagText.slice(valStart, i), start: valStart, end: i });
+	}
+	return out;
+}
+
+const attrMap = (tagText: string) => new Map(parseAttrs(tagText).map((a) => [a.name, a]));
+
+/** Compare attribute values ignoring ALL whitespace AND quote style — the
+    difference between a stops array written on one line and the same array
+    written across six is not a difference, and neither is `ease: 'ease-in'`
+    versus the `ease: "ease-in"` the serializer emits. (Whitespace folding also
+    equates `"50% 50%"` with `"50%50%"`; that only ever makes two already-
+    near-identical tags look identical, never the reverse.) */
+const norm = (s: string) => s.replace(/\s+/g, '').replace(/'/g, '"');
+
+/** Top-level `key: value` pairs of an object literal (`{ pct: 0, x: 80 }`), or
+    null when the text isn't one. */
+function objectPairs(text: string): Map<string, string> | null {
+	const t = text.trim();
+	if (t[0] !== '{' || t[t.length - 1] !== '}') return null;
+	const out = new Map<string, string>();
+	for (const part of splitTopLevel(t.slice(1, -1))) {
+		const at = part.indexOf(':');
+		if (at === -1) return null;
+		out.set(part.slice(0, at).trim(), part.slice(at + 1).trim());
+	}
+	return out;
+}
+
+/** Does one element of the source array still hold what the browser mounted?
+
+    Identical text (modulo whitespace and quote style) is the happy path. Failing
+    that, compare STRUCTURALLY — every key the serializer wrote must be present
+    and equal in the source. This exists because the serializer omits a property
+    sitting at its default (`rot: 0`, an empty ease) while an author routinely
+    writes it out: sprite-multi.html's star stop is `{ …, rot: 0, ease: 'ease-in-out' }`
+    in the file and `{ …, ease: "ease-in-out" }` on the wire. Demanding identical
+    text refuses that save for no real reason.
+
+    Extra keys in the SOURCE are therefore tolerated. The one drift that hides
+    behind that is someone ADDING a key to the file while ADJUST sat open with
+    unsaved edits — the same race the feature already runs; a key that merely
+    CHANGED is still caught. */
+function elementMatches(sourceEl: string, mountedEl: string): boolean {
+	if (norm(sourceEl) === norm(mountedEl)) return true;
+	const src = objectPairs(sourceEl);
+	const mounted = objectPairs(mountedEl);
+	if (!src || !mounted) return false;
+	for (const [k, v] of mounted) {
+		const got = src.get(k);
+		if (got == null || norm(got) !== norm(v)) return false;
+	}
+	return true;
+}
+
+/** The same question for a whole attribute value — element by element, so a list
+    only matches when it is the same length and every entry still agrees. */
+function valueMatches(sourceRaw: string, mountedRaw: string): boolean {
+	if (norm(sourceRaw) === norm(mountedRaw)) return true;
+	const strip = (s: string) => {
+		const t = s.trim();
+		return (t[0] === '[' || t[0] === '{') && t.length > 1 ? t.slice(1, -1) : t;
+	};
+	const src = splitTopLevel(strip(sourceRaw));
+	const mounted = splitTopLevel(strip(mountedRaw));
+	if (src.length === 0 || src.length !== mounted.length) return false;
+	return src.every((el, i) => elementMatches(el, mounted[i]));
+}
+
+/** Write the replacement in the quote style the replaced text used. Without this
+    every save flips a slide's `'ease-in'` to `"ease-in"`, so a drag that moved one
+    stop shows up in the diff as a change to all of them. Skipped unless the swap
+    is unambiguous — the new text must have no apostrophe of its own to mangle. */
+function matchQuoteStyle(next: string, previous: string): string {
+	if (!next.includes('"') || next.includes("'")) return next;
+	if (!previous.includes("'") || previous.includes('"')) return next;
+	return next.replace(/"/g, "'");
+}
+
+/** Attribute names whose value differs between the mounted tag and the new one. */
+function changedAttrNames(oldTag: string, newTag: string): string[] {
+	const before = attrMap(oldTag);
+	const after = attrMap(newTag);
+	const names = new Set([...before.keys(), ...after.keys()]);
+	return [...names].filter((n) => {
+		const a = before.get(n)?.raw ?? null;
+		const b = after.get(n)?.raw ?? null;
+		if (a === null || b === null) return a !== b;
+		return norm(a) !== norm(b);
+	});
+}
+
+/** `{someName}` → `someName`, for a value that is a bare identifier reference and
+    nothing else. Anything with an operator, call or literal in it returns null —
+    `stops={makeStops(3)}` must NOT be flattened into an array behind the author's
+    back, so it refuses rather than guessing. */
+function identifierOf(raw: string | null): string | null {
+	if (!raw) return null;
+	const m = /^\{\s*([A-Za-z_$][\w$]*)\s*\}$/.exec(raw);
+	return m ? m[1] : null;
+}
+
+/** The initializer of a `const <id> = …` in the source, as offsets. Only a `const`
+    declared in THIS file counts: an import or a `let` that something else may
+    reassign is not ours to rewrite. Returns 'ambiguous' when the name is declared
+    or referenced more than once — rewriting a shared array would silently move a
+    second sprite too. */
+function findConstInit(source: string, id: string): { start: number; end: number } | UnmatchReason {
+	const decl = new RegExp(`\\bconst\\s+${escapeRegExp(id)}\\s*=\\s*`, 'g');
+	const hits = [...source.matchAll(decl)];
+	if (hits.length === 0) return 'not-found';
+	if (hits.length > 1) return 'ambiguous';
+	// Every other mention must be the single tag we are patching; more than that
+	// and the binding is shared.
+	const uses = [...source.matchAll(new RegExp(`\\b${escapeRegExp(id)}\\b`, 'g'))];
+	if (uses.length > 2) return 'ambiguous';
+
+	const start = hits[0].index! + hits[0][0].length;
+	const open = source[start];
+	if (open !== '[' && open !== '{') return 'not-found'; // not an array/object literal
+	let depth = 0;
+	let quote: string | null = null;
+	for (let i = start; i < source.length; i++) {
+		const c = source[i];
+		if (quote) {
+			if (c === quote) quote = null;
+			continue;
+		}
+		if (c === '"' || c === "'" || c === '`') quote = c;
+		else if (c === '[' || c === '{') depth++;
+		else if (c === ']' || c === '}') {
+			depth--;
+			if (depth === 0) return { start, end: i + 1 };
+		}
+	}
+	return 'not-found'; // unterminated
+}
+
+/** Split `[a, b, c]` (or `{…}`) into its top-level elements, ignoring commas
+    nested inside elements or strings. */
+function splitTopLevel(inner: string): string[] {
+	const out: string[] = [];
+	let depth = 0;
+	let quote: string | null = null;
+	let from = 0;
+	for (let i = 0; i < inner.length; i++) {
+		const c = inner[i];
+		if (quote) {
+			if (c === quote) quote = null;
+			continue;
+		}
+		if (c === '"' || c === "'" || c === '`') quote = c;
+		else if (c === '[' || c === '{' || c === '(') depth++;
+		else if (c === ']' || c === '}' || c === ')') depth--;
+		else if (c === ',' && depth === 0) {
+			out.push(inner.slice(from, i).trim());
+			from = i + 1;
+		}
+	}
+	const last = inner.slice(from).trim();
+	if (last) out.push(last);
+	return out;
+}
+
+/** Re-emit a new array/object value in the shape the old one was written in. A
+    five-stop array is authored one stop per line; collapsing it onto one
+    400-column line is a diff nobody wants to read, so when the value being
+    replaced spanned lines the replacement does too, at the same indent.
+
+    Elements that did not actually change are copied from the OLD text verbatim,
+    so dragging one stop produces a one-line diff instead of rewriting all five
+    with the serializer's spacing. That matters here more than most places: these
+    slides display their own source. */
+function reflow(next: string, previous: string, indent: string): string {
+	if (!previous.includes('\n')) return next;
+	const open = next[0];
+	const close = next[next.length - 1];
+	if ((open !== '[' && open !== '{') || next.length < 2) return next;
+	const parts = splitTopLevel(next.slice(1, -1));
+	if (parts.length < 2) return next;
+	const was = splitTopLevel(previous.slice(1, -1));
+	// Only a same-length list can be paired up element-for-element; adding or
+	// removing a keyframe re-emits the whole array, which is honest.
+	// elementMatches, not raw equality: a stop the author wrote with an explicit
+	// `rot: 0` is unchanged even though the serializer drops that key, and must
+	// keep its own text rather than being rewritten without it.
+	const merged =
+		was.length === parts.length ? parts.map((p, i) => (elementMatches(was[i], p) ? was[i] : p)) : parts;
+	const inner = indent + '\t';
+	return `${open}\n${merged.map((p) => inner + p).join(',\n')}\n${indent}${close}`;
+}
+
+type AttrResult = { ok: true; source: string } | { ok: false; reason: UnmatchReason };
+
+/** Rewrite the changed attributes of `change` in `source`. See the block comment
+    at the top of this section for how the target tag is identified. */
+function applyAttrChange(source: string, change: LayoutChange): AttrResult {
+	const oldTag = change.oldTag;
+	const newTag = change.newTag;
+	if (oldTag == null || newTag == null) return { ok: false, reason: 'not-found' };
+	const changed = changedAttrNames(oldTag, newTag);
+	if (changed.length === 0) return { ok: false, reason: 'not-found' };
+
+	const oldAttrs = attrMap(oldTag);
+	const newAttrs = attrMap(newTag);
+	// Every changed attr must have a value on both sides; a boolean flag flipping
+	// (`lock`) is a structural edit, not a value rewrite, and isn't ours.
+	if (changed.some((n) => !oldAttrs.get(n)?.raw || !newAttrs.get(n)?.raw)) {
+		return { ok: false, reason: 'not-found' };
+	}
+
+	let pool = findOpeningTags(source, change.kind);
+	if (change.name) pool = pool.filter((s) => hasName(s.text, change.name!));
+	if (pool.length === 0) return { ok: false, reason: 'not-found' };
+
+	const carries = (tagText: string, resolve: (raw: string | null) => string | null) =>
+		changed.every((n) => {
+			const got = resolve(attrMap(tagText).get(n)?.raw ?? null);
+			return got != null && valueMatches(got, oldAttrs.get(n)!.raw!);
+		});
+
+	// DIRECT — the tag itself carries the pre-edit value.
+	const direct = pool.filter((s) => carries(s.text, (raw) => raw));
+	if (direct.length > 1) return { ok: false, reason: 'ambiguous' };
+	if (direct.length === 1) {
+		const span = direct[0];
+		let text = span.text;
+		// Right to left, so an earlier rewrite can't shift a later offset.
+		for (const attr of parseAttrs(span.text)
+			.filter((a) => changed.includes(a.name))
+			.sort((a, b) => b.start - a.start)) {
+			const next = newAttrs.get(attr.name)!.raw!;
+			// Only a `{…}` expression is reflowed; a quoted value is written as-is.
+			const written =
+				next[0] === '{'
+					? `{${reflow(matchQuoteStyle(next.slice(1, -1), attr.raw!.slice(1, -1)), attr.raw!.slice(1, -1), indentAt(source, span.start))}}`
+					: next;
+			text = text.slice(0, attr.start) + written + text.slice(attr.end);
+		}
+		return { ok: true, source: source.slice(0, span.start) + text + source.slice(span.end) };
+	}
+
+	// INDIRECT — the value is a `const` the tag references by name. Only one
+	// changed attr is supported here: two hoisted arrays edited in one gesture is
+	// not a case the editors produce, and guessing at it is how you corrupt a file.
+	if (changed.length !== 1) return { ok: false, reason: 'not-found' };
+	const attrName = changed[0];
+	const consts = new Map<TagSpan, { id: string; at: { start: number; end: number } }>();
+	for (const span of pool) {
+		const id = identifierOf(attrMap(span.text).get(attrName)?.raw ?? null);
+		if (!id) continue;
+		const at = findConstInit(source, id);
+		if (typeof at === 'string') continue;
+		if (!valueMatches(source.slice(at.start, at.end), oldAttrs.get(attrName)!.raw!.slice(1, -1))) {
+			continue;
+		}
+		consts.set(span, { id, at });
+	}
+	if (consts.size > 1) return { ok: false, reason: 'ambiguous' };
+	if (consts.size === 0) {
+		// Distinguish "the binding is shared / not a const" from "no such tag", so
+		// the author is told which one it is.
+		for (const span of pool) {
+			const id = identifierOf(attrMap(span.text).get(attrName)?.raw ?? null);
+			if (id && findConstInit(source, id) === 'ambiguous') return { ok: false, reason: 'ambiguous' };
+		}
+		return { ok: false, reason: 'not-found' };
+	}
+	const [{ at }] = [...consts.values()];
+	const previous = source.slice(at.start, at.end);
+	const next = matchQuoteStyle(newAttrs.get(attrName)!.raw!.slice(1, -1), previous);
+	const inner = reflow(next, previous, indentAt(source, at.start));
+	return { ok: true, source: source.slice(0, at.start) + inner + source.slice(at.end) };
+}
+
 // --- INSERT: adding markup that isn't there yet (FREEZE) ---------------------
 //
 // Every other mode in this file finds a tag and rewrites it. Freezing a stroke has
@@ -369,10 +735,18 @@ export function patchSlideSource(source: string, changes: LayoutChange[]): Patch
 			// that. Those changes also carry structured geometry, so fall through
 			// to the same order-independent attribute rewrite Blocks use, which
 			// preserves the author's ordering, spacing, and multi-line layout.
-			// Point shapes (Line/Curve/Arc/Path/Polyline) have no box, send no
-			// geometry, and correctly stop here.
+			// Point shapes (Line/Curve/Arc/Path/Polyline) have no box and send no
+			// geometry; they fall through to the attribute rewrite instead, which
+			// is the only thing that can place a <Sprite> at all (its editable
+			// state is a stops ARRAY — see that section).
 			if (!change.after) {
-				unmatched.push({ ...change, reason: 'not-found' });
+				const attrs = applyAttrChange(current, change);
+				if (attrs.ok) {
+					current = attrs.source;
+					patched.push(change);
+					continue;
+				}
+				unmatched.push({ ...change, reason: attrs.reason });
 				continue;
 			}
 		}

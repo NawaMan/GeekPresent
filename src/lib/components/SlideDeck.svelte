@@ -951,6 +951,21 @@
 			console.warn('[adjust save] not written — Copy these by hand:', r.unmatched);
 		} else {
 			flashSave('SAVED', 1600);
+			// Re-read the slide from what was just written. Everything ADJUST sends
+			// describes itself relative to the source the page MOUNTED with (a Block's
+			// `before` box, a shape's `oldTag`), and the patcher refuses anything whose
+			// baseline no longer matches the file — the guard that stops a save from
+			// clobbering an edit made behind its back. Without a re-read that guard
+			// turns on the author: after the first write the file has moved on, the
+			// mounted baseline has not, and every later save is rejected as drift.
+			//
+			// The dev server also pushes a full-reload, which is what refreshes any
+			// OTHER tab on this slide. This reload is here because that push rides the
+			// HMR websocket, and a dev server reached through a port-forwarded
+			// container may have no live socket to the browser at all — while this
+			// response, on plain HTTP, is proof the write happened. Delayed just long
+			// enough for the SAVED flash to register as feedback.
+			setTimeout(() => location.reload(), 550);
 		}
 	}
 	// Open (or focus) the presenter console at the current slide — the PRESENT anchor's

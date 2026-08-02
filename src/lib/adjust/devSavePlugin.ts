@@ -124,6 +124,34 @@ async function handleAdjustSave(server: ViteDevServer, body: string) {
 	const { source: next, patched, unmatched } = patchSlideSource(source, changes);
 	if (patched.length && next !== source) {
 		await fs.writeFile(file, next, 'utf8');
+
+		// Tell Vite the file changed. This is NOT belt-and-braces — without it the
+		// write is invisible to the dev server: the watcher does not see writes made
+		// through a bind mount (and would not be trusted to be prompt even when it
+		// does), so the module graph keeps serving the transform it cached at first
+		// request. The browser then reloads straight back into the OLD source, mounts
+		// the OLD baseline, and every save after the first is refused as drift — with
+		// the file on disk and the module being served disagreeing the whole time.
+		// Emitting the change drives Vite's ordinary invalidate + HMR path.
+		server.watcher.emit('change', file);
+
+		// Force the page to re-mount from what we just wrote.
+		//
+		// Every change describes itself relative to the source the browser MOUNTED
+		// with — a Block's `before` box, a shape's `oldTag`. The patcher refuses
+		// anything whose baseline no longer matches the file, which is what stops a
+		// save from clobbering an edit made behind its back. That guard turns on
+		// the saver itself the moment a page saves twice: after the first write the
+		// file has moved on, the mounted baseline has not, and every later save is
+		// rejected as drift. SAVE worked exactly once per page load.
+		//
+		// The client already assumed a reload closed this loop (see adjustSave.ts),
+		// but Svelte's HMR update keeps the live component state that ADJUST is
+		// editing, so the props — and with them the baseline — never refresh. Only a
+		// full reload re-reads the source. It costs the current selection and scroll
+		// position, which is the right trade for a dev-only authoring mode: a stale
+		// baseline silently refuses every subsequent save.
+		server.ws.send({ type: 'full-reload', path: '*' });
 	}
 
 	return {
