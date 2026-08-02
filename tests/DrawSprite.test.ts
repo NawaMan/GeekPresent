@@ -8,9 +8,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { redo, undo } from '../src/lib/stores/adjustHistory';
 import { canAdjust, adjustMode } from '../src/lib/stores/adjustMode';
 import DrawSpriteHost from './DrawSpriteHost.svelte';
+import DrawSpriteShiftHost from './DrawSpriteShiftHost.svelte';
 
-const moveTo = (clientX: number, clientY: number) =>
-	window.dispatchEvent(new MouseEvent('pointermove', { clientX, clientY }));
+const moveTo = (clientX: number, clientY: number, init: MouseEventInit = {}) =>
+	window.dispatchEvent(new MouseEvent('pointermove', { clientX, clientY, ...init }));
 const release = () => window.dispatchEvent(new MouseEvent('pointerup'));
 
 async function grab(el: Element, clientX = 0, clientY = 0) {
@@ -160,5 +161,83 @@ describe('Sprite editing (ADJUST mode)', () => {
 		expect(container.querySelectorAll('.tb-keyframes .tb-kfrow')).toHaveLength(2);
 		// The remaining delete buttons are disabled at the floor.
 		expect(dels().every((b) => b.disabled)).toBe(true);
+	});
+});
+
+// What Shift does on a stop's handles, i.e. Sprite's `shiftSnap` overrides.
+// DrawHandle's default locks to H/V from the GRAB point; a keyframe stop wants
+// its LEG aligned against the stop before it, and its rotate grip wants round
+// angles. Each case below asserts a value the default cannot produce.
+describe('Sprite editing — Shift on a stop handle (ADJUST mode)', () => {
+	beforeEach(() => {
+		canAdjust.set(true);
+		adjustMode.set(true);
+	});
+	afterEach(() => {
+		canAdjust.set(false);
+		adjustMode.set(false);
+	});
+
+	// Handles come out in markup order, three per stop: move, resize, rotate.
+	// Stops are 100×100 at (100,100) / (600,500) / (1200,900), so the centers
+	// are (150,150) / (650,550) / (1250,950) and equal `top` == aligned leg.
+	const handles = (c: HTMLElement) => c.querySelectorAll('.draw-handle');
+	async function select(c: HTMLElement) {
+		await grab(c.querySelector('.sprite-hit')!);
+	}
+
+	it('Shift on a move handle aligns the leg with the PREVIOUS stop', async () => {
+		const { container } = render(DrawSpriteShiftHost);
+		await select(container);
+		await grab(handles(container)[3], 0, 0); // 50% stop, move handle at (650,550)
+		moveTo(60, -20, { shiftKey: true }); // candidate (710,530)
+		release();
+		await tick();
+		// Snapped against the 0% center (150,150): |Δx| 560 > |Δy| 380, so the leg
+		// goes horizontal and y follows the 0% stop — top 500 → 100, matching it.
+		// The default (H/V from the grab point) would have held y at 550 → top 500.
+		expect(keyframeStyle(container)).toContain('50% { left:660px; top:100px;');
+		undo();
+	});
+
+	it('the FIRST stop has no predecessor, so it aligns against its successor', async () => {
+		const { container } = render(DrawSpriteShiftHost);
+		await select(container);
+		await grab(handles(container)[0], 0, 0); // 0% stop, move handle at (150,150)
+		moveTo(40, 300, { shiftKey: true }); // candidate (190,450)
+		release();
+		await tick();
+		// Against the 50% center (650,550): |Δx| 460 > |Δy| 100 → horizontal leg,
+		// so top lands on 500. The default would have gone vertical → top 400.
+		expect(keyframeStyle(container)).toContain('0% { left:140px; top:500px;');
+		undo();
+	});
+
+	it('Shift on a rotate grip snaps the angle to 15° detents', async () => {
+		const { container } = render(DrawSpriteShiftHost);
+		await select(container);
+		await grab(handles(container)[5], 0, 0); // 50% stop, grip at (650,460)
+		moveTo(100, 100, { shiftKey: true }); // candidate (750,560)
+		release();
+		await tick();
+		// Around the center (650,550) that candidate sits at 5.71°, which rounds to
+		// the 0° detent → rot 90. Unsnapped it would be 96; the default rule (90°
+		// off the grab point) would give 180. Every other stop is at rot 0, so a
+		// 90deg frame can only have come from the detent.
+		expect(keyframeStyle(container)).toContain('rotate(90deg)');
+		undo();
+	});
+
+	it('the resize handle keeps the default Shift: one axis, not aspect ratio', async () => {
+		const { container } = render(DrawSpriteShiftHost);
+		await select(container);
+		await grab(handles(container)[4], 0, 0); // 50% stop, corner at (700,600)
+		moveTo(200, 40, { shiftKey: true }); // candidate (900,640) → H lock → (900,600)
+		release();
+		await tick();
+		// Width grows, height is untouched. Deliberate: locking one dimension is a
+		// coherent thing for Shift to mean on a corner, so it keeps the default.
+		expect(keyframeStyle(container)).toContain('width:300px; height:100px;');
+		undo();
 	});
 });
