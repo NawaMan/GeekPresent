@@ -13,6 +13,7 @@ export const pages = [
 	{ path: "note.html", title: "Note" },
 	{ path: "label.html", title: "Label" },
 	{ path: "kbd.html", title: "Kbd" },
+	{ path: "link.html", title: "Link" },
 	{ path: "toast.html", title: "Toast" },
 	{ path: "qrcode.html", title: "QRCode" },
 	{ path: "progressbar.html", title: "ProgressBar" },

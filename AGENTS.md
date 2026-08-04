@@ -467,6 +467,16 @@ than misleading the next agent.
   a `-QR.png`, and note `YouTube`'s `qr` prop is now optional for exactly that reason),
   `AppendixLink` (the call *into* an appendix — `<AppendixLink to="appendix-gc.html">how the GC
   marks</AppendixLink>`; it stamps the current slide as the return address, so you never type one),
+  `Link` (the anchor every slide and Text should write instead of a bare `<a>`. Every link wears
+  ONE colour (`--link-fg`) and ONE thin dashed underline; a trailing **glyph** says which kind it
+  is — **unmarked** an ordinary move inside the site, **↩** a detour you come back from (that is
+  `AppendixLink`), **↗** this leaves the site. So the glyph is the entire distinction, not
+  decoration on top of a colour that already said it. An absolute URL / `mailto:` / `tel:`
+  classifies itself and gets `target` + `rel="noopener noreferrer"` unasked; `newTab` forces the
+  window, and forcing it ON also earns the ↗, since the reader does leave. `glyph={false}` /
+  `icon` adjust the mark. Never hand-set a link colour on a slide — one role token moves them
+  all, and `--appendix-link-fg` / `--link-external-fg` are escape hatches that DEFAULT to
+  `--link-fg`. Logic in `utils/linkCore.ts`),
   `ProgressBar` (a thin "how far through the deck" bar that fills as you page — it reads `getProgress()`,
   so it needs no props; drop it in a deck's `+layout.svelte` after `setPages`, tagged `gp-chrome no-print`
   so it bows out of captures and printouts. geeklight wears one deck-wide),

@@ -2,6 +2,7 @@
 	import ContentPage from '$lib/templates/ContentPage.svelte';
 	import QuickCode from '$lib/components/QuickCode.svelte';
 	import Callout from '$lib/components/Callout.svelte';
+	import Link from '$lib/components/Link.svelte';
 </script>
 
 <ContentPage title="WebPage" subtitle="Full-canvas embedded site">
@@ -12,7 +13,7 @@
 		</p>
 		<p style="margin-top: 0.6em;">
 			Docs (with AppendixLink to a live canvas):
-			<a href="../slide-pages/webpage.html">Slide Pages → WebPage</a>
+			<Link href="../slide-pages/webpage.html">Slide Pages → WebPage</Link>
 		</p>
 		<QuickCode style="margin-top: 0.7em;" lang="svelte" code={`<WebPage src="https://svelte.dev" title="svelte.dev" />
 <WebPage src="https://svelte.dev" chrome={false} />`} />

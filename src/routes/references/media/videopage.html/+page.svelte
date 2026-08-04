@@ -1,6 +1,7 @@
 <script>
 	import ContentPage from '$lib/templates/ContentPage.svelte';
 	import QuickCode from '$lib/components/QuickCode.svelte';
+	import Link from '$lib/components/Link.svelte';
 </script>
 
 <ContentPage title="VideoPage" subtitle="Full-canvas video slide">
@@ -11,7 +12,7 @@
 		</p>
 		<p style="margin-top: 0.6em;">
 			Docs (with AppendixLink to a live canvas):
-			<a href="../slide-pages/videopage.html">Slide Pages → VideoPage</a>
+			<Link href="../slide-pages/videopage.html">Slide Pages → VideoPage</Link>
 		</p>
 		<QuickCode style="margin-top: 0.7em;" lang="svelte" code={`<VideoPage src={clip} keys="global" bookmarks={[
   { at: '0:00', label: 'Start' }

@@ -9,6 +9,7 @@
 <script lang="ts">
 	import Label from '$lib/components/Label.svelte';
 	import AnimationScene from '$lib/components/AnimationScene.svelte';
+	import Link from '$lib/components/Link.svelte';
 	import diagram from './presentation-vs-text.svg';
 </script>
 
@@ -129,8 +130,8 @@
 </p>
 
 <p>
-	Prefer slides? Head to the <a href="../slides/title.html">presentation</a>, or
-	back to the <a href="../">home page</a>.
+	Prefer slides? Head to the <Link href="../slides/title.html">presentation</Link>, or
+	back to the <Link href="../">home page</Link>.
 </p>
 
 <style>

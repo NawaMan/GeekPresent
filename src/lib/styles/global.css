@@ -30,10 +30,12 @@ a {
     margin-bottom: 0.6em;
 }
 
-/* Unvisited links only — a darker blue. visited / other states keep the
-   inherited color above (left unchanged on purpose). */
+/* Unvisited links only; visited / other states keep the inherited color above
+   (left unchanged on purpose). This is the floor for a HAND-WRITTEN <a>; authored
+   links should use <Link>, which adds the stroke and the external tone on top.
+   Fallback must match --link-fg in roles.css — see the link family note there. */
 a:link {
-    color: var(--link-fg, #1E6FB0);
+    color: var(--link-fg, #58A6FF);
 }
 
 /* TRY: default orange for every heading. Experimental — we may revert. */

@@ -15,6 +15,7 @@
 	import Kbd         from '$lib/components/Kbd.svelte';
 	import Note        from '$lib/components/Note.svelte';
 	import ViewSource  from '$lib/components/ViewSource.svelte';
+	import Link from '$lib/components/Link.svelte';
 	import source      from './+page.svelte?raw';
 
 	const path = 'src/routes/slides/handout-page.html/+page.svelte';
@@ -37,8 +38,8 @@
 this-slide.html?notes         just this slide, and its note, on one page`}
 		/>
 		<p style="margin-top: 0.7em;">
-			Open <a href="{base}/_handout/slides.html"><b>this deck's handout</b></a> (or
-			<a href="{base}/_handout/slides.html?notes">with notes</a>), then press
+			Open <Link href="{base}/_handout/slides.html"><b>this deck's handout</b></Link> (or
+			<Link href="{base}/_handout/slides.html?notes">with notes</Link>), then press
 			<Kbd>Ctrl</Kbd>+<Kbd>P</Kbd>. The browser is the PDF engine, so there is no export step
 			and no dependency — <code>Save as PDF</code> is the feature.
 		</p>

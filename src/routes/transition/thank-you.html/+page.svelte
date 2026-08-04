@@ -4,13 +4,14 @@
 -->
 <script>
 	import TitlePage from '$lib/templates/TitlePage.svelte';
+	import Link from '$lib/components/Link.svelte';
 </script>
 
 <TitlePage>
 	<span slot="title">Now go animate your deck</span>
 	<span slot="subtitle">It's one <code>goto</code> wrapped in <code>startViewTransition</code> &mdash; the CSS does the rest</span>
 	<span slot="subsubtitle">Open <b>&lt;/&gt; Source</b> on any slide to steal the keyframes &mdash; built on <b>CodingBooth</b><br/>
-		<a href="https://codingbooth.io/" target="_blank" rel="noopener" style="opacity: 0.85;">→ codingbooth.io</a>
+		<Link href="https://codingbooth.io/" style="opacity: 0.85;">codingbooth.io</Link>
 		&nbsp;&middot;&nbsp;
-		<a href="../" style="opacity: 0.85;">↑ back to the home page</a></span>
+		<Link href="../" style="opacity: 0.85;">↑ back to the home page</Link></span>
 </TitlePage>

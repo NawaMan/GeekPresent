@@ -4,6 +4,7 @@
 -->
 <script>
 	import ContentPage from '$lib/templates/ContentPage.svelte';
+	import Link from '$lib/components/Link.svelte';
 </script>
 
 <ContentPage title="One framework, two kinds of artifact" subtitle="The same components build both — you author each kind for itself">
@@ -25,8 +26,8 @@
 	</p>
 	<p style="margin-top: 0.6em;">
 		See both kinds:
-		<a href="../text.html" style="color: #7fd9ff;">the sample Text &rarr;</a>
+		<Link href="../text.html">the sample Text &rarr;</Link>
 		&nbsp;&middot;&nbsp;
-		<a href="../" style="color: #7fd9ff;">the home page (also a Text) &rarr;</a>
+		<Link href="../">the home page (also a Text) &rarr;</Link>
 	</p>
 </ContentPage>

@@ -3,15 +3,20 @@
 	import Columns from '$lib/components/Columns.svelte';
 	import Column from '$lib/components/Column.svelte';
 	import Callout from '$lib/components/Callout.svelte';
+	import Link from '$lib/components/Link.svelte';
 	import { page } from '$app/stores';
+	import { browser } from '$app/environment';
 	import { appendixHref, readReturnStack, slidePathOf } from '$lib/utils/appendixCore';
 
 	// Stamp this hub card as ?return= so Slide Pages CATALOG / ↑ / Backspace
-	// come back here (not only to the catalog root). Carry any outer stack too.
+	// come back here (not only to the catalog root). Carry any outer stack too —
+	// but only in the browser: reading url.searchParams at prerender is a hard
+	// error, and a prerendered page has no query string to carry anyway. Same
+	// guard as AppendixLink and slide-pages/closing.html.
 	$: href = appendixHref(
 		'slide-pages/title.html',
 		slidePathOf($page.url.pathname),
-		readReturnStack($page.url.searchParams)
+		browser ? readReturnStack($page.url.searchParams) : []
 	);
 </script>
 
@@ -60,7 +65,7 @@
 		</Callout>
 
 		<p style="margin-top: 0.9em; font-size: 1.1em;">
-			<a {href}>Open the Slide Pages reference →</a>
+			<Link {href}>Open the Slide Pages reference →</Link>
 		</p>
 	</div>
 </ContentPage>
