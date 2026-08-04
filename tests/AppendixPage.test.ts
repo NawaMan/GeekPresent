@@ -202,13 +202,22 @@ describe('AppendixPage — when there is nobody to return to', () => {
 		expect(screen.getByRole('button', { name: /DECK/i })).toBeTruthy();
 	});
 
-	// Passes the syntax check but names no slide in THIS deck — following it would land
-	// on a 404, so it is treated as no address at all.
-	it('refuses a return address that names no slide in the deck', () => {
+	// A name that is NOT in this deck is read as a caller one level UP — that is what
+	// makes hub → deck → appendix unwind, since the hub stamps its own slide name and
+	// the appendix has no way to see the hub's page list. So it returns rather than
+	// falling back to DECK, and the way out is the parent folder.
+	//
+	// The cost of that feature, stated plainly: a genuinely bogus `?return=` is
+	// indistinguishable from a hub caller, so it resolves to `../ghost.html` instead
+	// of being refused. Only a marker in the URL encoding (rather than a bare slide
+	// name) could tell the two apart; see isHubReturn in appendixCore.
+	it('treats a name outside this deck as a caller one level up, not as no address', () => {
 		at('detail.html', '?return=ghost.html');
 		render(AppendixHost);
 
-		expect(screen.getByRole('button', { name: /DECK/i })).toBeTruthy();
+		expect(screen.queryByRole('button', { name: /DECK/i })).toBeNull();
+		click(/RETURN/i);
+		wentTo('../ghost.html');
 	});
 
 	it('the DECK fallback skips a hidden first slide', () => {

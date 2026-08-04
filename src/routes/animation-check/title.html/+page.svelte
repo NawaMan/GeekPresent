@@ -4,6 +4,7 @@
 -->
 <script>
 	import TitlePage from '$lib/templates/TitlePage.svelte';
+	import Link from '$lib/components/Link.svelte';
 </script>
 
 <TitlePage>
@@ -11,6 +12,6 @@
 	<span slot="subtitle">Step by step: place it &mdash; then move it</span>
 	<span slot="subsubtitle">
 		Editable: Block &middot; Shape &middot; both &nbsp;→&nbsp; Animated: Block &middot; Shape &middot; both<br />
-		<a href="../" style="opacity: 0.85;">↑ back to the home page</a>
+		<Link href="../" style="opacity: 0.85;">↑ back to the home page</Link>
 	</span>
 </TitlePage>

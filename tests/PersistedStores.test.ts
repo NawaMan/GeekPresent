@@ -137,41 +137,55 @@ describe('displayMode — the zoom factor', () => {
 });
 
 describe('adjustMode', () => {
+	beforeEach(() => {
+		sessionStorage.clear();
+	});
+
 	it('starts OFF on a first visit', async () => {
 		const { adjustMode } = await freshLayout();
 		expect(get(adjustMode)).toBe(false);
 	});
 
-	it('remembers being on across a reload', async () => {
-		localStorage.setItem('adjustMode', 'true');
+	it('remembers being on across a reload in the same tab (sessionStorage)', async () => {
+		sessionStorage.setItem('adjustMode', 'true');
 		const { adjustMode } = await freshLayout();
 		expect(get(adjustMode)).toBe(true);
 	});
 
+	it('does NOT re-arm from a leftover localStorage key — fail closed across visits', async () => {
+		// Regression: mode used to live in localStorage, so one authoring flip stuck
+		// every later visit (and every deck) in ADJUST until someone noticed.
+		localStorage.setItem('adjustMode', 'true');
+		const { adjustMode } = await freshLayout();
+		expect(get(adjustMode)).toBe(false);
+		expect(localStorage.getItem('adjustMode')).toBeNull();
+	});
+
 	it('reads a stored false as off', async () => {
-		localStorage.setItem('adjustMode', 'false');
+		sessionStorage.setItem('adjustMode', 'false');
 		const { adjustMode } = await freshLayout();
 		expect(get(adjustMode)).toBe(false);
 	});
 
 	it('treats a garbage key as off — the authoring chrome fails CLOSED', async () => {
-		localStorage.setItem('adjustMode', '{"not":"a boolean"}');
+		sessionStorage.setItem('adjustMode', '{"not":"a boolean"}');
 		const { adjustMode } = await freshLayout();
 		expect(get(adjustMode)).toBe(false);
 	});
 
-	it('mirrors a change out to storage as a plain boolean string', async () => {
+	it('mirrors a change out to sessionStorage as a plain boolean string', async () => {
 		const { adjustMode } = await freshLayout();
 		adjustMode.set(true);
-		expect(localStorage.getItem('adjustMode')).toBe('true');
+		expect(sessionStorage.getItem('adjustMode')).toBe('true');
+		expect(localStorage.getItem('adjustMode')).toBeNull();
 		adjustMode.set(false);
-		expect(localStorage.getItem('adjustMode')).toBe('false');
+		expect(sessionStorage.getItem('adjustMode')).toBe('false');
 	});
 
 	it('leaves canAdjust and canSave — which are NOT persisted stores — alone', async () => {
 		// canAdjust is resolved from DEV + the sticky ?adjust flag + the slide's own
-		// declaration; canSave from the dev server's existence. Neither is a localStorage
-		// mirror, and neither moves onto persisted().
+		// declaration; canSave from the dev server's existence. Neither is a storage
+		// mirror of the mode.
 		const { canAdjust, canSave } = await freshLayout();
 		expect(typeof get(canAdjust)).toBe('boolean');
 		expect(typeof get(canSave)).toBe('boolean');

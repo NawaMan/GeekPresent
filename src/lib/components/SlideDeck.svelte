@@ -140,6 +140,11 @@
 	import { navigate } from '$lib/utils/deckNav';
 	import { documentTitle, getPageNavigation } from '$lib/utils/navigate';
 	import type { Page }  from '$lib/utils/navigate';
+	import {
+		carryReturnThrough,
+		rememberReturnStack,
+		resolveReturnStack
+	} from '$lib/utils/appendixCore';
 
 	/** This deck's slide list — for the Table of Contents rendered in the shell. */
 	export let pages: Array<Page> = [];
@@ -327,11 +332,23 @@
 	// site default (app.html) and any presentation favicon set in the deck's layout.
 	$: currentSlide   = $page.url.pathname.replace(/\/+$/, '').split('/').pop();
 	$: currentIndex   = pages.findIndex((p) => p.path === currentSlide);
+	// Nested return stack (hub → deck → appendix…), carried in `?return=` and mirrored
+	// into sessionStorage so full-page NEXT/PREV that drop the query can restore it.
+	// Re-stamped on every deck-level link so closing RETURN and nested appendices unwind.
+	$: if (browser) {
+		rememberReturnStack($page.url.searchParams, deckName, sessionStorage, pages);
+	}
+	$: returnStack = browser
+		? resolveReturnStack($page.url.searchParams, deckName, sessionStorage, pages)
+		: [];
 	// The current slide's neighbours in the linear order, for the ControlBar's ONE
 	// deck-level pager — the same helper each template used to call for its own bar,
 	// now computed once here. Hidden/appendix slides resolve to all-undefined links
 	// (and their own template keeps its RETURN pager, so this one goes dormant anyway).
-	$: deckNavigation = getPageNavigation(pages, currentSlide ?? '', './');
+	$: deckNavigation = carryReturnThrough(
+		getPageNavigation(pages, currentSlide ?? '', './'),
+		returnStack
+	);
 	$: currentFavicon = pages.find((p) => p.path === currentSlide)?.favicon;
 	// `?clean` hides all shell chrome (ToC, display-mode control, copyright, nav bar,
 	// minimap) for an unobstructed screen capture — e.g. the /tests calibration
@@ -501,10 +518,18 @@
 		if (browser) window.print();
 	}
 
-	// The current deck's name, from the URL: `/slides/title.html` -> `slides`. The handout for it
-	// lives OUTSIDE the deck at `/_handout/<deck>.html`, so whole-deck / grid options navigate
-	// there rather than printing in place — the handout is a different document.
-	$: deckName = ($page.url.pathname.replace(base, '').split('/').filter(Boolean)[0]) || '';
+	// Deck id for search / handout: every path segment before the slide (`*.html`),
+	// with `/` → `-`. Top-level `/slides/title.html` → `slides`; nested
+	// `/references/shell/block.html` → `references-shell` (matches handout + search index).
+	// The handout lives outside the deck at `/_handout/<id>.html`.
+	$: deckName = (() => {
+		const parts = $page.url.pathname.replace(base, '').split('/').filter(Boolean);
+		if (parts.length === 0) return '';
+		const deckParts = parts[parts.length - 1]?.endsWith('.html')
+			? parts.slice(0, -1)
+			: parts;
+		return deckParts.join('-');
+	})();
 	function openHandout(query: string) {
 		printMenuOpen = false;
 		// A FULL navigation, not a client-side goto. The handout is a separate top-level document
@@ -1576,7 +1601,15 @@
 	{#if controlBar}
 	<ControlBar>
 		{#snippet tocItem()}
-			<TableOfContent bar {pages} deck={deckName} {article} {articleText} {articleHref} />
+			<TableOfContent
+				bar
+				{pages}
+				deck={deckName}
+				{article}
+				{articleText}
+				{articleHref}
+				returnTo={returnStack}
+			/>
 		{/snippet}
 		{#snippet navGroup()}
 			<NavigationBar

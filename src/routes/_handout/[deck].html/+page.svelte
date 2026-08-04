@@ -48,7 +48,7 @@
 		thumb
 	} from '$lib/handout/handoutCore';
 	import { applyPageRule } from '$lib/handout/pageRuleDom';
-	import { deckCanvas, deckPages, slideComponent } from '$lib/handout/handoutDecks';
+	import { deckCanvas, deckPages, deckUrlPath, slideComponent } from '$lib/handout/handoutDecks';
 	import HandoutFrame from '$lib/handout/HandoutFrame.svelte';
 
 	// The themed decks (geeklight, transition) carry a `deckClass` and their role tokens come
@@ -67,6 +67,10 @@
 	const surface = deckCanvas(data.deck);
 	const pages = deckPages(data.deck);
 	const sheets = handoutSheets(pages);
+	// Nested decks use a single-segment handout id (`references-shell`) but live at a
+	// multi-segment URL (`references/shell`). Base must point at the public path so
+	// relative links inside slides resolve into the real deck.
+	const urlPath = deckUrlPath(data.deck);
 
 	// The deck's own slide list, published to the slides exactly as its +layout.svelte would.
 	// The templates read it (ContentPage's nav and ToC), so without it every slide here would
@@ -164,7 +168,7 @@
 	     the deck" — so the document declares that it stands where the deck stands, and the
 	     browser, and SvelteKit's prerender crawler, both resolve them into the real slides. See
 	     +page.js. Everything else here is root-absolute, so this moves nothing but the links. -->
-	<base href="{base}/{data.deck}/" />
+	<base href="{base}/{urlPath}/" />
 </svelte:head>
 
 <div class="handout" class:with-notes={showNotes}>

@@ -8,6 +8,7 @@
 	import { onMount } from 'svelte';
 	import Label from '$lib/components/Label.svelte';
 	import { SITE_URL } from '$lib/seo/config';
+	import Link from '$lib/components/Link.svelte';
 
 	// Read this page's own SEO/social tags straight from the document head on mount,
 	// so the box below shows the REAL emitted metadata (including the absolute
@@ -35,7 +36,7 @@
 	carry real search-engine and social-share metadata baked right into the file —
 	no JavaScript required for a crawler to read it. This page is a
 	<Label style="color: #7fd9ff;">Text artifact</Label> like any other, and it is
-	itself the demo: scroll to <a href="#emitted">what this page emits</a> to see
+	itself the demo: scroll to <Link href="#emitted">what this page emits</Link> to see
 	its own <code>&lt;head&gt;</code> tags, pulled live from the document.
 </p>
 
@@ -60,8 +61,8 @@
 	</li>
 	<li>a <code>&lt;link rel="canonical"&gt;</code>;</li>
 	<li>
-		a site-wide <a href="../sitemap.xml">sitemap.xml</a> and
-		<a href="../robots.txt">robots.txt</a> in the build output.
+		a site-wide <Link href="../sitemap.xml">sitemap.xml</Link> and
+		<Link href="../robots.txt">robots.txt</Link> in the build output.
 	</li>
 </ul>
 
@@ -140,7 +141,7 @@ GEEKPRESENT_SITE_URL= pnpm build</code></pre>
 <p>
 	The cascade is: <b>slide</b> value &rarr; <b>deck</b> default &rarr;
 	<b>site</b> default. Images fall back to the bundled
-	<a href="../og-default.png">1200&times;630 default card</a>.
+	<Link href="../og-default.png">1200&times;630 default card</Link>.
 </p>
 
 <h2 id="emitted">What this page emits</h2>
@@ -167,8 +168,8 @@ are in the prerendered HTML regardless — view source to confirm).</code></pre>
 <h2>Sitemap &amp; robots</h2>
 
 <p>
-	A full build also writes <a href="../sitemap.xml">sitemap.xml</a> (every
-	prerendered route, as absolute URLs) and <a href="../robots.txt">robots.txt</a>
+	A full build also writes <Link href="../sitemap.xml">sitemap.xml</Link> (every
+	prerendered route, as absolute URLs) and <Link href="../robots.txt">robots.txt</Link>
 	into the output. The sitemap is generated from each presentation&rsquo;s
 	<code>pages.ts</code> plus the standalone texts, so new slides are picked up
 	automatically. (A single-route build &mdash; <code>build-static.sh ./out
@@ -177,8 +178,8 @@ are in the prerendered HTML regardless — view source to confirm).</code></pre>
 
 <p>
 	That&rsquo;s the whole feature. Back to the
-	<a href="../">home page</a>, or read the
-	<a href="../text.html">sample Text</a> next door.
+	<Link href="../">home page</Link>, or read the
+	<Link href="../text.html">sample Text</Link> next door.
 </p>
 
 <style>

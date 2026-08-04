@@ -524,23 +524,34 @@ function applyAttrChange(source: string, change: LayoutChange): AttrResult {
 
 	const oldAttrs = attrMap(oldTag);
 	const newAttrs = attrMap(newTag);
-	// Every changed attr must have a value on both sides; a boolean flag flipping
-	// (`lock`) is a structural edit, not a value rewrite, and isn't ours.
-	if (changed.some((n) => !oldAttrs.get(n)?.raw || !newAttrs.get(n)?.raw)) {
+	// Removals (old only) and bare boolean flips are structural — refuse.
+	if (changed.some((n) => !newAttrs.get(n)?.raw)) {
 		return { ok: false, reason: 'not-found' };
 	}
+	// Rewrites need a value on both sides; pure insertions (e.g. adding `widths=`
+	// to a bare <Columns>) are allowed and handled below.
+	const rewrites = changed.filter((n) => oldAttrs.get(n)?.raw != null);
+	const inserts = changed.filter((n) => oldAttrs.get(n)?.raw == null);
 
 	let pool = findOpeningTags(source, change.kind);
 	if (change.name) pool = pool.filter((s) => hasName(s.text, change.name!));
 	if (pool.length === 0) return { ok: false, reason: 'not-found' };
 
-	const carries = (tagText: string, resolve: (raw: string | null) => string | null) =>
-		changed.every((n) => {
-			const got = resolve(attrMap(tagText).get(n)?.raw ?? null);
-			return got != null && valueMatches(got, oldAttrs.get(n)!.raw!);
-		});
+	const carries = (tagText: string, resolve: (raw: string | null) => string | null) => {
+		const attrs = attrMap(tagText);
+		for (const n of rewrites) {
+			const got = resolve(attrs.get(n)?.raw ?? null);
+			if (got == null || !valueMatches(got, oldAttrs.get(n)!.raw!)) return false;
+		}
+		// An insert matches only when the source tag does NOT already carry the attr
+		// (otherwise we would be inventing a second widths=).
+		for (const n of inserts) {
+			if (attrs.get(n)?.raw != null) return false;
+		}
+		return true;
+	};
 
-	// DIRECT — the tag itself carries the pre-edit value.
+	// DIRECT — the tag itself carries the pre-edit value (or lacks the insert attrs).
 	const direct = pool.filter((s) => carries(s.text, (raw) => raw));
 	if (direct.length > 1) return { ok: false, reason: 'ambiguous' };
 	if (direct.length === 1) {
@@ -548,7 +559,7 @@ function applyAttrChange(source: string, change: LayoutChange): AttrResult {
 		let text = span.text;
 		// Right to left, so an earlier rewrite can't shift a later offset.
 		for (const attr of parseAttrs(span.text)
-			.filter((a) => changed.includes(a.name))
+			.filter((a) => rewrites.includes(a.name))
 			.sort((a, b) => b.start - a.start)) {
 			const next = newAttrs.get(attr.name)!.raw!;
 			// Only a `{…}` expression is reflowed; a quoted value is written as-is.
@@ -557,6 +568,15 @@ function applyAttrChange(source: string, change: LayoutChange): AttrResult {
 					? `{${reflow(matchQuoteStyle(next.slice(1, -1), attr.raw!.slice(1, -1)), attr.raw!.slice(1, -1), indentAt(source, span.start))}}`
 					: next;
 			text = text.slice(0, attr.start) + written + text.slice(attr.end);
+		}
+		// Pure inserts (Columns ADJUST SAVE adding widths=): park them just before
+		// the closing `>` / `/>`, after a single space.
+		if (inserts.length) {
+			const selfClose = /\/>\s*$/.test(text);
+			const cut = selfClose ? text.lastIndexOf('/>') : text.lastIndexOf('>');
+			if (cut === -1) return { ok: false, reason: 'not-found' };
+			const added = inserts.map((n) => ` ${n}=${newAttrs.get(n)!.raw!}`).join('');
+			text = text.slice(0, cut) + added + text.slice(cut);
 		}
 		return { ok: true, source: source.slice(0, span.start) + text + source.slice(span.end) };
 	}

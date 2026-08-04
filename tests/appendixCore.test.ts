@@ -9,8 +9,20 @@ import {
 	appendixRun,
 	carryReturn,
 	carryReturnThrough,
+	catalogReturnStorageKey,
+	encodeReturnStack,
+	exitHrefFromStack,
+	isHubReturn,
 	isSlidePath,
+	mergeReturnStacks,
+	parentReturnHref,
+	parseReturnStack,
+	pushReturn,
+	popReturn,
 	readReturnParam,
+	readReturnStack,
+	rememberReturnStack,
+	resolveReturnStack,
 	returnHref,
 	slidePathOf,
 	type RunPage
@@ -115,6 +127,117 @@ describe('appendixHref — the jump in, carrying the way back', () => {
 		expect(appendixHref('appendix-gc.html', null)).toBe('./appendix-gc.html');
 		expect(appendixHref('appendix-gc.html', '../elsewhere')).toBe('./appendix-gc.html');
 	});
+
+	it('pushes onto an existing stack (hub → deck → appendix)', () => {
+		const href = appendixHref('appendix-gc.html', 'webpage.html', [
+			'slide-pages.html',
+			'webpage.html'
+		]);
+		// Consecutive duplicate of `from` is not double-pushed.
+		expect(href).toBe(
+			'./appendix-gc.html?return=' +
+				encodeURIComponent('slide-pages.html,webpage.html')
+		);
+		const deeper = appendixHref('appendix-gc.html', 'webpage.html', ['slide-pages.html']);
+		expect(deeper).toBe(
+			'./appendix-gc.html?return=' +
+				encodeURIComponent('slide-pages.html,webpage.html')
+		);
+	});
+});
+
+describe('return stack — parse, push, pop, exit', () => {
+	const pages = [
+		{ path: 'title.html' },
+		{ path: 'webpage.html' },
+		{ path: 'closing.html' }
+	];
+
+	it('parses a comma-separated stack and drops hostile segments', () => {
+		expect(parseReturnStack('slide-pages.html,webpage.html')).toEqual([
+			'slide-pages.html',
+			'webpage.html'
+		]);
+		expect(parseReturnStack('slide-pages.html,../evil,webpage.html')).toEqual([
+			'slide-pages.html',
+			'webpage.html'
+		]);
+		expect(encodeReturnStack(['a.html', 'b.html'])).toBe('a.html,b.html');
+	});
+
+	it('readReturnStack reads the full stack; readReturnParam is the top', () => {
+		const stack = readReturnStack(
+			q('?return=' + encodeURIComponent('slide-pages.html,webpage.html'))
+		);
+		expect(stack).toEqual(['slide-pages.html', 'webpage.html']);
+		expect(readReturnParam(q('?return=' + encodeURIComponent('slide-pages.html,webpage.html'))))
+			.toBe('webpage.html');
+	});
+
+	it('pushReturn / popReturn maintain the stack', () => {
+		expect(pushReturn(['hub.html'], 'page.html')).toEqual(['hub.html', 'page.html']);
+		expect(pushReturn(['hub.html', 'page.html'], 'page.html')).toEqual([
+			'hub.html',
+			'page.html'
+		]);
+		expect(popReturn(['hub.html', 'page.html'])).toEqual({
+			to: 'page.html',
+			rest: ['hub.html']
+		});
+		expect(popReturn([])).toEqual({ to: null, rest: [] });
+	});
+
+	it('exitHrefFromStack pops, resolves hub vs in-deck, re-attaches rest', () => {
+		// Nested: leave appendix → caller in this deck, hub still under.
+		expect(
+			exitHrefFromStack(['slide-pages.html', 'webpage.html'], pages, 'title.html')
+		).toBe('./webpage.html?return=' + encodeURIComponent('slide-pages.html'));
+
+		// Hub only: leave child deck → parent folder.
+		expect(exitHrefFromStack(['slide-pages.html'], pages, 'title.html')).toBe(
+			'../slide-pages.html'
+		);
+
+		// Empty → deck home.
+		expect(exitHrefFromStack([], pages, 'title.html')).toBe('./title.html');
+	});
+
+	it('mergeReturnStacks keeps hub when URL only has the top', () => {
+		expect(mergeReturnStacks(['slide-pages.html'], ['webpage.html'], pages)).toEqual([
+			'slide-pages.html',
+			'webpage.html'
+		]);
+		expect(
+			mergeReturnStacks(['slide-pages.html'], ['slide-pages.html', 'webpage.html'], pages)
+		).toEqual(['slide-pages.html', 'webpage.html']);
+		expect(
+			mergeReturnStacks(['slide-pages.html', 'webpage.html'], ['webpage.html'], pages)
+		).toEqual(['slide-pages.html', 'webpage.html']);
+	});
+
+	it('remember + resolve round-trip the full stack via sessionStorage', () => {
+		const store = new Map<string, string>();
+		const storage = {
+			getItem: (k: string) => store.get(k) ?? null,
+			setItem: (k: string, v: string) => {
+				store.set(k, v);
+			}
+		};
+		const deckId = 'references-slide-pages';
+		const nested = new URLSearchParams(
+			'return=' + encodeURIComponent('slide-pages.html,webpage.html')
+		);
+		rememberReturnStack(nested, deckId, storage, pages);
+		// Paging dropped the query — restore from storage.
+		expect(resolveReturnStack(new URLSearchParams(), deckId, storage, pages)).toEqual([
+			'slide-pages.html',
+			'webpage.html'
+		]);
+		// Partial URL still merges hub from storage.
+		expect(
+			resolveReturnStack(new URLSearchParams('return=webpage.html'), deckId, storage, pages)
+		).toEqual(['slide-pages.html', 'webpage.html']);
+	});
 });
 
 describe('returnHref — the jump back', () => {
@@ -126,6 +249,68 @@ describe('returnHref — the jump back', () => {
 		expect(returnHref(null)).toBe(null);
 		expect(returnHref(undefined)).toBe(null);
 		expect(returnHref('https://evil.example')).toBe(null);
+	});
+});
+
+describe('parentReturnHref — hub card → child deck → back', () => {
+	it('goes one folder up to the hub card that stamped ?return=', () => {
+		// /references/slide-pages/closing.html → /references/slide-pages.html
+		expect(parentReturnHref('slide-pages.html')).toBe('../slide-pages.html');
+	});
+
+	it('refuses junk the same way returnHref does', () => {
+		expect(parentReturnHref(null)).toBe(null);
+		expect(parentReturnHref('../evil')).toBe(null);
+	});
+});
+
+describe('catalogReturnStorageKey', () => {
+	it('namespaces by deck id', () => {
+		expect(catalogReturnStorageKey('references/slide-pages')).toBe(
+			'gp-catalog-return:references/slide-pages'
+		);
+	});
+});
+
+describe('appendixHref into a child deck folder', () => {
+	it('stamps return onto a nested title path', () => {
+		expect(appendixHref('slide-pages/title.html', 'slide-pages.html')).toBe(
+			'./slide-pages/title.html?return=slide-pages.html'
+		);
+	});
+});
+
+describe('hub return vs in-deck appendix return', () => {
+	const pages = [{ path: 'title.html' }, { path: 'webpage.html' }, { path: 'closing.html' }];
+
+	it('treats a parent card name as a hub return', () => {
+		expect(isHubReturn('slide-pages.html', pages)).toBe(true);
+	});
+
+	it('treats a path in this deck as an appendix return (not hub)', () => {
+		expect(isHubReturn('webpage.html', pages)).toBe(false);
+	});
+
+	it('merges a lone in-deck return under a stored hub (does not clobber hub)', () => {
+		const store = new Map<string, string>();
+		const storage = {
+			getItem: (k: string) => store.get(k) ?? null,
+			setItem: (k: string, v: string) => {
+				store.set(k, v);
+			}
+		};
+		const deckId = 'references-slide-pages';
+		const hubQ = new URLSearchParams('return=slide-pages.html');
+		rememberReturnStack(hubQ, deckId, storage, pages);
+		expect(resolveReturnStack(hubQ, deckId, storage, pages)).toEqual(['slide-pages.html']);
+
+		// Later: open an appendix with only the top stamped — hub stays under it.
+		const appQ = new URLSearchParams('return=webpage.html');
+		rememberReturnStack(appQ, deckId, storage, pages);
+		expect(resolveReturnStack(appQ, deckId, storage, pages)).toEqual([
+			'slide-pages.html',
+			'webpage.html'
+		]);
 	});
 });
 
@@ -238,6 +423,12 @@ describe('carryReturn — the address travels with every link', () => {
 		expect(carryReturn('./gc-2.html', 'heap.html')).toBe('./gc-2.html?return=heap.html');
 	});
 
+	it('stamps a full stack (comma-separated, encoded)', () => {
+		expect(carryReturn('./gc-2.html', ['slide-pages.html', 'heap.html'])).toBe(
+			'./gc-2.html?return=' + encodeURIComponent('slide-pages.html,heap.html')
+		);
+	});
+
 	it('leaves a link alone when there is no address, or it already carries one', () => {
 		expect(carryReturn('./gc-2.html', null)).toBe('./gc-2.html');
 		expect(carryReturn('./gc-2.html', '../evil')).toBe('./gc-2.html');
@@ -258,5 +449,17 @@ describe('carryReturn — the address travels with every link', () => {
 			prev:  './b.html?return=heap.html',
 			next:  undefined
 		});
+	});
+
+	it('threads a stack through a navigation set', () => {
+		const nav = { first: './a.html', last: undefined, prev: undefined, next: './b.html' };
+		const stack = ['hub.html', 'page.html'];
+		const stamped = carryReturnThrough(nav, stack);
+		expect(stamped.next).toBe(
+			'./b.html?return=' + encodeURIComponent('hub.html,page.html')
+		);
+		expect(stamped.first).toBe(
+			'./a.html?return=' + encodeURIComponent('hub.html,page.html')
+		);
 	});
 });

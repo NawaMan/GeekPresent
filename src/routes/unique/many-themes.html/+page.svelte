@@ -4,6 +4,7 @@
 -->
 <script>
 	import ContentPage from '$lib/templates/ContentPage.svelte';
+	import Link from '$lib/components/Link.svelte';
 </script>
 
 <ContentPage title="Many decks, each walled off" subtitle="Scoped styles and separate themes — so nothing leaks or rots">
@@ -32,8 +33,8 @@
 	</ul>
 	<p style="margin-top: 0.6em;">
 		Same components, separate worlds:
-		<a href="../../portrait/title.html" style="color: #7fd9ff;">GeekPortrait (1080&times;1920) &rarr;</a>
+		<Link href="../../portrait/title.html">GeekPortrait (1080&times;1920) &rarr;</Link>
 		&nbsp;&middot;&nbsp;
-		<a href="../../geeklight/title.html" style="color: #7fd9ff;">GeekLight (light theme) &rarr;</a>
+		<Link href="../../geeklight/title.html">GeekLight (light theme) &rarr;</Link>
 	</p>
 </ContentPage>

@@ -8,6 +8,7 @@
 -->
 <script lang="ts">
 	import Label from '$lib/components/Label.svelte';
+	import Link from '$lib/components/Link.svelte';
 </script>
 
 <h1>GeekPresent</h1>
@@ -98,7 +99,9 @@
 	<li>
 		<b>A component toolbox.</b> Box (pop-up overlays), Code / CodeBox (Monaco
 		viewers, any language), YouTube (thumbnail + QR), plus Notes, Hints, and
-		Labels.
+		Labels. See the
+		<Link href="./references/title.html">component references</Link>
+		catalog for one slide per component, grouped by role.
 	</li>
 	<li>
 		<b>Per-deck themes.</b> Each presentation can carry its own fonts, colours,
@@ -207,34 +210,34 @@
 <h3>Example Presentation</h3>
 <ul>
 	<li>
-		<a href="slides/title.html">GeekPresent</a> &mdash; the main presentation: a
+		<Link href="slides/title.html">GeekPresent</Link> &mdash; the main presentation: a
 		guide to building decks with this framework.
 	</li>
 	<li>
-		<a href="animation/title.html">Animation</a> &mdash; a deck of in-slide motion
+		<Link href="animation/title.html">Animation</Link> &mdash; a deck of in-slide motion
 		demos: the AnimationBar/Scene playback primitives, the SpriteStudio authoring
 		wrapper, the animated Draw family, and scroll-driven animation.
 	</li>
 	<li>
-		<a href="transition/title.html">Page Transitions</a> &mdash; a green-themed deck
+		<Link href="transition/title.html">Page Transitions</Link> &mdash; a green-themed deck
 		on animating slide-to-slide with the View Transitions API; each effect is
 		performed live by paging through its own &ldquo;from &rarr; to&rdquo; pair.
 	</li>
 	<li>
-		<a href="unique/title.html">What Makes It Unique</a> &mdash; a short deck on what
+		<Link href="unique/title.html">What Makes It Unique</Link> &mdash; a short deck on what
 		sets GeekPresent apart from mainstream slide tools (and it demonstrates each
 		point as it makes it).
 	</li>
 	<li>
-		<a href="portrait/title.html">GeekPortrait</a> &mdash; a portrait
+		<Link href="portrait/title.html">GeekPortrait</Link> &mdash; a portrait
 		1080&times;1920 deck for YouTube Shorts: same components, taller frame.
 	</li>
 	<li>
-		<a href="geeklight/title.html">GeekLight</a> &mdash; a light-theme
+		<Link href="geeklight/title.html">GeekLight</Link> &mdash; a light-theme
 		presentation: same components on a light watercolor background.
 	</li>
 	<li>
-		<a href="seo.html">SEO &amp; social cards</a> &mdash; how every page gets real
+		<Link href="seo.html">SEO &amp; social cards</Link> &mdash; how every page gets real
 		search and social-share metadata; the page shows off its own emitted
 		<code>&lt;head&gt;</code> tags, live.
 	</li>
@@ -243,7 +246,7 @@
 <h3>Text</h3>
 <ul>
 	<li>
-		<a href="text.html">Text view</a> &mdash; a sample Text artifact: one long
+		<Link href="text.html">Text view</Link> &mdash; a sample Text artifact: one long
 		page, authored by hand, that scrolls.
 	</li>
 </ul>
@@ -251,7 +254,7 @@
 <h3>Design notes</h3>
 <ul>
 	<li>
-		<a href="animation-check/title.html">Draw &amp; Block, step by step</a> &mdash; a
+		<Link href="animation-check/title.html">Draw &amp; Block, step by step</Link> &mdash; a
 		short deck that builds one idea up a slide at a time: first make an object
 		<i>editable</i> (a Block, a Shape, then both under one ADJUST gate), then reach
 		for motion &mdash; where a plain Block hits a wall, a Shape animates, and both

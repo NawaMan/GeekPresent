@@ -4,11 +4,12 @@
 -->
 <script>
 	import TitlePage from '$lib/templates/TitlePage.svelte';
+	import Link from '$lib/components/Link.svelte';
 </script>
 
 <TitlePage>
 	<span slot="title">Scaling Calibration</span>
 	<span slot="subtitle">A measurable target to confirm the canvas scales 1:1 &mdash; and without distortion</span>
 	<span slot="subsubtitle">capture the target slide, then measure it in an image editor (GIMP)<br/>
-		<a href="../" style="opacity: 0.85;">↑ back to the home page</a></span>
+		<Link href="../" style="opacity: 0.85;">↑ back to the home page</Link></span>
 </TitlePage>

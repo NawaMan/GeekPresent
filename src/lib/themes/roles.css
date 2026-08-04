@@ -32,7 +32,7 @@
 	--page-bg:           var(--BACKDROP, #000000);
 	--page-title-fg:     var(--ACCENT-WARM, #F0A33E);  /* TitlePage / ContentPage titles */
 	--page-subtitle-fg:  var(--INK, #C0F1FF);          /* ContentPage subtitle */
-	--link-fg:           var(--LINK, #1E6FB0);         /* unvisited <a> */
+	--link-fg:           var(--LINK, #58A6FF);         /* <Link> and unvisited <a> */
 
 	/* Controls — nav buttons, TOC toggle, mode toggle (CtrlBtn) */
 	--ctrl-bg:           var(--PAPER-RAISED, #181818);
@@ -297,12 +297,24 @@
 	--columns-divider: var(--INK, #C0F1FF);
 	--columns-handle:  var(--ACCENT, #2980B9);
 
-	/* AppendixLink — the call into a hidden side slide. It reads as the deck's own
-	   accent (it is a move within the talk, not a link off it), but underlined
-	   DASHED: a detour you will be brought back from, unlike ordinary prose links.
-	   The hover brightening is mixed from this in-component, so a theme moves one
-	   token and both states follow. */
-	--appendix-link-fg: var(--ACCENT-WARM, #F0A33E);
+	/* Links — every link in a deck wears ONE colour and ONE thin dashed underline, and
+	   a trailing GLYPH says which kind it is:
+
+	     (none) an ordinary move inside the site   <Link>
+	     ↩      a detour you come back from        <AppendixLink>
+	     ↗      this leaves the site               <Link>, external
+
+	   So --link-fg is the colour, and the two per-kind tokens below exist only as
+	   escape hatches: each DEFAULTS to --link-fg, so out of the box all three match
+	   and only the glyph differs. A theme that wants to pull them apart by hue can,
+	   but it has to say so — nothing here does it by accident.
+
+	   Each hover is mixed from its own token in-component, so moving one value carries
+	   both states. A theme that is not dark MUST set --LINK (see themes.css): this
+	   fallback is the dark look, and a pale sky blue on light paper is exactly as
+	   unreadable as the reverse. */
+	--link-external-fg: var(--LINK-EXTERNAL, var(--link-fg));
+	--appendix-link-fg: var(--APPENDIX-LINK, var(--link-fg));
 
 	/* Hint — the faint bottom cue. It floats over whatever the slide put behind it
 	   (an image, a chart, someone else's website), so it can't rely on contrast with

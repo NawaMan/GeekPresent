@@ -36,6 +36,27 @@ describe('AppendixLink — the way in', () => {
 	});
 });
 
+// AppendixLink shares Link's one colour and one dashed underline, so the ↩ is the
+// ONLY thing telling a reader this jump comes back — without it the link is
+// indistinguishable from an ordinary move deeper into the site.
+describe('AppendixLink — the ↩ that says "you will be brought back"', () => {
+	it('trails a ↩ the screen reader does not announce', () => {
+		const { container } = render(AppendixLink, { props: { to: 'appendix-gc.html' } });
+		const marker = container.querySelector('.marker');
+		expect(marker?.textContent).toBe('↩');
+		expect(marker?.getAttribute('aria-hidden')).toBe('true');
+	});
+
+	// As a button the CtrlBtn owns the whole look, label included — a glyph stuck on
+	// the outside of it would sit adrift of the control.
+	it('leaves the glyph off the button form', () => {
+		const { container } = render(AppendixLink, {
+			props: { to: 'appendix-gc.html', button: true }
+		});
+		expect(container.querySelector('.marker')).toBeNull();
+	});
+});
+
 describe('AppendixLink — the motion of a detour (transition)', () => {
 	it('drops the appendix in from above', async () => {
 		render(AppendixLink, { props: { to: 'appendix-gc.html', transition: true } });
