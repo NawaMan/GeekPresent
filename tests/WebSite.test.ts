@@ -276,9 +276,9 @@ describe('WebSite — shield', () => {
 		shield(container)!.click();
 		await tick();
 
-		const release = [...container.querySelectorAll('button.pill')].find(
-			(b) => b.textContent?.trim() === 'Release'
-		) as HTMLButtonElement;
+		const release = container.querySelector('button.pill.release') as HTMLButtonElement;
+		expect(release).not.toBeNull();
+		expect(release.textContent?.trim()).toBe('Release');
 		release.click();
 		await tick();
 		expect(shield(container)).not.toBeNull();

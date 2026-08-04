@@ -32,6 +32,13 @@ export default {
 			fallback: "404.html",
 			precompress
 		}),
+		// Root-absolute asset URLs (`/_app/…`). Required so a handout's `<base href>` for a
+		// nested deck (`/references/shell/`) does not re-root relative `../_app/…` links into
+		// `/references/_app/…`. Domain-root deploys (the stock GeekPresent shape) are fine;
+		// a future subpath deploy still goes through kit.paths.base.
+		paths: {
+			relative: false
+		},
 		prerender: {
 			// There is no site-wide favicon in static/ (presentations set their own
 			// via <svelte:head>). Don't fail the build over that one 404; still fail

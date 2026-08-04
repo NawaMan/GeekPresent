@@ -650,4 +650,32 @@ describe('patchSlideSource — attribute rewrite (Sprite stops)', () => {
 		expect(source).toContain('to={[500, 300]}');
 		expect(source).toContain('\tname="rule"'); // layout preserved
 	});
+
+	it('rewrites Columns widths={…} after an ADJUST gutter drag', () => {
+		const src = `<Columns widths={[5, 4]} gap="1.4em" align="start">\n\t…\n</Columns>`;
+		const { source, unmatched } = patchSlideSource(src, [
+			{
+				kind: 'Columns',
+				oldTag: '<Columns widths={[5, 4]}>',
+				newTag: '<Columns widths={[1.2, 0.8]}>'
+			}
+		]);
+		expect(unmatched).toHaveLength(0);
+		expect(source).toContain('widths={[1.2, 0.8]}');
+		expect(source).toContain('gap="1.4em"');
+		expect(source).toContain('align="start"');
+	});
+
+	it('inserts widths= on a bare <Columns> when the drag created a ratio', () => {
+		const src = `<Columns gap="1em">\n\t…\n</Columns>`;
+		const { source, unmatched } = patchSlideSource(src, [
+			{
+				kind: 'Columns',
+				oldTag: '<Columns>',
+				newTag: '<Columns widths={[1.1, 0.9]}>'
+			}
+		]);
+		expect(unmatched).toHaveLength(0);
+		expect(source).toContain('<Columns gap="1em" widths={[1.1, 0.9]}>');
+	});
 });

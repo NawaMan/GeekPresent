@@ -98,7 +98,9 @@
 	<li>
 		<b>A component toolbox.</b> Box (pop-up overlays), Code / CodeBox (Monaco
 		viewers, any language), YouTube (thumbnail + QR), plus Notes, Hints, and
-		Labels.
+		Labels. See the
+		<a href="./references/title.html">component references</a>
+		catalog for one slide per component, grouped by role.
 	</li>
 	<li>
 		<b>Per-deck themes.</b> Each presentation can carry its own fonts, colours,

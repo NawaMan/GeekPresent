@@ -32,7 +32,7 @@
 	import { page }               from '$app/stores';
 	import { onMount, onDestroy } from 'svelte';
 	import { navigate }           from '$lib/utils/deckNav';
-	import { appendixHref, slidePathOf, KIND_IN } from '$lib/utils/appendixCore';
+	import { appendixHref, readReturnStack, slidePathOf, KIND_IN } from '$lib/utils/appendixCore';
 
 	const path = 'src/routes/slides/appendix-page.html/+page.svelte';
 
@@ -40,8 +40,8 @@
 	const APPENDIX = 'appendix-detail.html';
 
 	// The same href the AppendixLink builds, by the same helper: our own slide name is
-	// the return address, so ↓ arrives with the way home already in the URL.
-	$: href = appendixHref(APPENDIX, slidePathOf($page.url.pathname));
+	// pushed onto any existing return stack, so ↓ arrives with the way home already in the URL.
+	$: href = appendixHref(APPENDIX, slidePathOf($page.url.pathname), readReturnStack($page.url.searchParams));
 
 	// ↓ jumps in, with the same view transition the link uses — the key and the click
 	// are the same navigation, so they must not look like two different ones.

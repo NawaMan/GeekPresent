@@ -51,7 +51,12 @@
 	import CtrlBtn from '$lib/components/CtrlBtn.svelte';
 
 	import { page } from '$app/stores';
-	import { appendixHref, slidePathOf, KIND_IN } from '$lib/utils/appendixCore';
+	import {
+		appendixHref,
+		readReturnStack,
+		slidePathOf,
+		KIND_IN
+	} from '$lib/utils/appendixCore';
 	import { navigate as pageNavigate } from '$lib/utils/deckNav';
 
 	// The keyframes the jump animates with. A plain global stylesheet rather than a
@@ -71,10 +76,12 @@
 	/** Animate the jump in (and let the appendix animate back out). */
 	export let transition = false;
 
-	// The return address is the slide we are ON. `$page` is populated during SSR too,
-	// so the href is in the prerendered markup rather than appearing on hydration.
+	// The return address is the slide we are ON, pushed onto any stack already in
+	// the URL (hub → deck → appendix). `$page` is populated during SSR too, so the
+	// href is in the prerendered markup rather than appearing on hydration.
 	$: from = slidePathOf($page.url.pathname);
-	$: href = appendixHref(to, from);
+	$: existing = readReturnStack($page.url.searchParams);
+	$: href = appendixHref(to, from, existing);
 
 	// Without `transition` this handler does nothing and the browser just follows the
 	// href — a full page load, like the rest of a normal deck. With it, we take the

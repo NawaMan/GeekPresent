@@ -1,0 +1,20 @@
+// Component reference deck — ordering is the reading order.
+export const pages = [
+	{ path: "title.html", title: "Content" },
+	{ path: "callout.html", title: "Callout" },
+	{ path: "quote.html", title: "Quote" },
+	{ path: "stat.html", title: "Stat & StatGroup" },
+	{ path: "timeline.html", title: "Timeline & TimelineItem" },
+	{ path: "tabs.html", title: "Tabs & Tab" },
+	{ path: "carousel.html", title: "Carousel & CarouselItem" },
+	{ path: "steps.html", title: "Steps & Fragment" },
+	{ path: "box.html", title: "Box" },
+	{ path: "hint.html", title: "Hint" },
+	{ path: "note.html", title: "Note" },
+	{ path: "label.html", title: "Label" },
+	{ path: "kbd.html", title: "Kbd" },
+	{ path: "toast.html", title: "Toast" },
+	{ path: "qrcode.html", title: "QRCode" },
+	{ path: "progressbar.html", title: "ProgressBar" },
+	{ path: "highlight.html", title: "Highlight" },
+];

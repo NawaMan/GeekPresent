@@ -49,7 +49,9 @@ describe('buildDeckIndex', () => {
 	const modules = {
 		'/src/routes/slides/title.html/+page.svelte': '<h1>The Title</h1>',
 		'/src/routes/slides/intro.html/+page.svelte': '<p>about backpressure</p>',
-		'/src/routes/other/title.html/+page.svelte': '<p>a different deck</p>'
+		'/src/routes/other/title.html/+page.svelte': '<p>a different deck</p>',
+		'/src/routes/references/shell/block.html/+page.svelte': '<p>nested block</p>',
+		'/src/routes/references/(hub)/title.html/+page.svelte': '<p>hub title</p>'
 	};
 
 	it('keys stripped text by deck then path', () => {
@@ -62,6 +64,12 @@ describe('buildDeckIndex', () => {
 	it('keeps same-named slides in different decks apart', () => {
 		const idx = buildDeckIndex(modules);
 		expect(idx.slides['title.html']).not.toBe(idx.other['title.html']);
+	});
+
+	it('maps nested decks and route groups to hyphenated ids', () => {
+		const idx = buildDeckIndex(modules);
+		expect(idx['references-shell']['block.html']).toBe('nested block');
+		expect(idx.references['title.html']).toBe('hub title');
 	});
 
 	it('is total on empty / missing input', () => {
