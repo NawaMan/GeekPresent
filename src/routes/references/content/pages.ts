@@ -8,6 +8,7 @@ export const pages = [
 	{ path: "tabs.html", title: "Tabs & Tab" },
 	{ path: "carousel.html", title: "Carousel & CarouselItem" },
 	{ path: "steps.html", title: "Steps & Fragment" },
+	{ path: "typewriter.html", title: "Typewriter" },
 	{ path: "box.html", title: "Box" },
 	{ path: "hint.html", title: "Hint" },
 	{ path: "note.html", title: "Note" },

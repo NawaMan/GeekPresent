@@ -106,6 +106,9 @@ export const pages = [
     { path: "viewsource-edit.html",   title: "ViewSource — Edit in Dev" },
     { path: "codediff-component.html", title: "CodeDiff", adjust: true },
     { path: "terminal-component.html", title: "Terminal" },
+    // Beside Terminal, because it is the same typewriter lifted out of the console:
+    // per-character CSS on the slide's own text, in the slide's own font.
+    { path: "typewriter-component.html", title: "Typewriter", adjust: true },
     { path: "speaker-notes.html",     title: "Speaker Notes" },
     // Beside Speaker Notes, because the notes are half of what it prints: the HANDOUT is
     // this deck as one document (/slides/handout). The slide IS its own demo — its link is

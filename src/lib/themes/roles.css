@@ -363,6 +363,12 @@
 	--terminal-accent:    var(--ACCENT, #2980B9);   /* transport fill, knob, play disc */
 	--terminal-track:     #E6EDF3;                  /* empty track + ticks, at low alpha */
 
+	/* Typewriter — text typing itself out. It has NO colour of its own: the text is the
+	   slide's own text, in the slide's own font, and only the caret is the component's to
+	   draw. One token, therefore — the same green a console blinks, so a typed headline
+	   and a Terminal session on the next slide read as the same hand. */
+	--typewriter-caret: var(--ACCENT-2, #00B356);
+
 	/* Kbd — keycaps. A key is a raised surface with ink on it, so it borrows the
 	   raised-panel background and the deck's ink. The border (and the cap's bottom
 	   lip, drawn from it) is softened via color-mix in-component, so the cap reads

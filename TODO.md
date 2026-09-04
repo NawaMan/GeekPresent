@@ -1572,6 +1572,52 @@ low. **All of that is now fixed** (the four boxes below); only the `Hint` check 
     `tests/TerminalSsr.ssr.test.ts` (transcript prerenders; the transport does *not* —
     a server-rendered play button would be a control that controls nothing). New
     `--terminal-*` role tokens.
+- [x] **`Typewriter`** — ordinary slide text typing itself out, one character at a time.
+  - **Terminal's typewriter, lifted out of the console.** Terminal reveals by clipping a
+    span's WIDTH to whole `ch` and walking it with `steps()` — which only means anything in
+    a monospace font, on one unwrapped line. That mechanism cannot be pointed at a headline,
+    so this is a component rather than a prop: one finite CSS animation **per character**,
+    which is what buys a proportional font, real wrapping, and a caret that can stand
+    *between* two letters.
+  - Done: `src/lib/components/Typewriter.svelte` over `src/lib/utils/typewriterCore.ts`
+    (pure, total — `terminalCore`/`drawCore` discipline: `charMs="fast"`, a negative
+    `startMs`, a NaN beat and a non-string `text` each fall back or yield an empty run,
+    never a throw and never `NaNms`).
+  - **The core's real job is segmentation, not arithmetic.** `text.split('')` is the
+    obvious implementation and it is visibly wrong: it types an emoji as two lone
+    surrogates (the first half of a flag landing a beat before the second) and detaches a
+    combining accent from its letter. `Intl.Segmenter` at grapheme granularity is the
+    authority, `Array.from` (code points, at least) the fallback.
+  - **The line holds its space.** A character waiting its turn is `visibility: hidden`,
+    not absent, so the paragraph is laid out at full size from the first frame: nothing
+    reflows, a centred line does not creep sideways as it fills, and the wrap points never
+    move. Fragment made the same call. It is also *why* the reveal animates visibility and
+    not opacity — a hidden parent can be overridden by a visible child, an `opacity: 0`
+    parent cannot, and the caret is a child.
+  - The caret is a `::before` on the character being typed, at its LEFT edge: that
+    character is hidden through its own window, so the bar stands exactly where the letter
+    is about to land. It is a window (fill `forwards` over a `from`-only keyframe), so it
+    travels with the typing and vanishes with it; the resting caret at the end blinks on an
+    INFINITE animation, which is what keeps it out of the slide's clock — it goes on
+    blinking while the AnimationBar is paused, as a real cursor does.
+  - **No transport of its own** — the difference from Terminal, and the point. Terminal
+    owns a playhead, so an `<AnimationBar />` on its slide would fight it; this owns
+    nothing, so several typewriters and one bar share a slide, staggered with `startMs`
+    alone. `startOn="name"` holds one at frame 0 (`animation-play-state: paused`) until a
+    named `<Note data-trigger>` pulse, as `<Cursor startOn>` does; the run is keyed on a
+    pulse COUNT, not the pulse's timestamp, so two pulses in the same millisecond are still
+    two replays (and re-keying is the only way to restart a finished CSS animation).
+  - Reveal keyframes declare only a `from`, so the implicit `to` is the cascaded
+    `visibility: visible` — one keyframe serves every character, and the *un-animated*
+    state is the finished text. That is what makes `typing={false}`, `text` mode,
+    `prefers-reduced-motion`, the handout and the server all agree.
+  - Demo `slides/typewriter-component.html` (pace, punctuation beats, two staggered runs,
+    a `startOn` line with a button firing the same pulse the note does, all under one
+    `<AnimationBar />`), reference card `references/content/typewriter.html`, unit test
+    `tests/typewriterCore.test.ts`, DOM test `tests/Typewriter.test.ts`, SSR test
+    `tests/TypewriterSsr.ssr.test.ts` (the load-bearing one: the whole sentence must come
+    from props alone). One `--typewriter-caret` role token — the text is the slide's own,
+    so the caret is the only thing this component gets to colour.
 - [x] **`Kbd`** — render keyboard keys (`<Kbd>⌘</Kbd><Kbd>K</Kbd>`). Trivial, no-dep.
   - Done: `src/lib/components/Kbd.svelte`, with the parsing in
     `src/lib/utils/kbdCore.ts` (pure, total — `drawCore`/`videoCore`/`columnsCore`

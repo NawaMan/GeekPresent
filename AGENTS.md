@@ -429,6 +429,18 @@ than misleading the next agent.
   `keys="global"` lets Space run it one command at a time and then page the deck. Don't put an
   `<AnimationBar />` on a Terminal slide — both would drive the same clock; pass
   `controls={false}` if you want the bar to own it),
+  `Typewriter` (the same typewriter OUT of the console — ordinary slide text revealing itself
+  one character at a time, in the deck's own font, wrapping like the prose it is. Terminal's
+  reveal is a monospace span's width clipped to whole `ch`; this is one finite CSS animation
+  *per character*, so an `<AnimationBar />` scrubs it (backwards too) and several may share one
+  slide — stagger them with `startMs`. It brings no transport of its own, which is exactly why
+  it may sit on a bar's slide where a Terminal may not. The line holds its full space from the
+  first frame (`visibility`, not `display`), so nothing reflows as it fills, and the *finished*
+  sentence is what prerenders, prints, and shows under `prefers-reduced-motion` — the animation
+  only ever hides what is already there. `startOn="name"` holds it at frame 0 until a named
+  `<Note data-trigger>` pulse, as `Cursor` does. Props `text`/`tag`/`charMs`/`startMs`/
+  `punctuationMs`/`caret`/`typing`; maths in `utils/typewriterCore.ts`, which cuts the string
+  into GRAPHEMES so an emoji is one keystroke, not two broken halves),
   `ViewSource` (optional per-slide `?raw` registration for ☰ → **SOURCE** / **EDIT**. In
   **`pnpm dev`**, SOURCE and EDIT are **deck-wide** even without ViewSource: the shell loads
   `+page.svelte` via `/__geekpresent/source-load` and hosts a canvas-space CodeBox or the
@@ -767,6 +779,9 @@ build steps, emphasis):
   ```
 - CSS `@keyframes` / `transition:` in a slide's `<style>` work too.
 - The `Box` component is already a worked example of CSS-transition choreography.
+- For **text arriving one character at a time**, use `Typewriter` (above) rather than a
+  timer that appends to a string: its per-character CSS rides the same scrubbable clock as
+  everything else here, and it prerenders as the finished sentence.
 
 For **scrubbed, timeline animation** — shapes drawing themselves in, elements flying —
 use the Draw family (`$lib/draw`) with one `<AnimationBar />`: every shape's animation

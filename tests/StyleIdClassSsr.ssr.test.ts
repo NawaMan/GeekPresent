@@ -41,6 +41,7 @@ import Steps from '$lib/components/Steps.svelte';
 import Tabs from '$lib/components/Tabs.svelte';
 import Terminal from '$lib/components/Terminal.svelte';
 import Timeline from '$lib/components/Timeline.svelte';
+import Typewriter from '$lib/components/Typewriter.svelte';
 import Video from '$lib/components/Video.svelte';
 import WebSite from '$lib/components/WebSite.svelte';
 import YouTube from '$lib/components/YouTube.svelte';
@@ -95,6 +96,7 @@ const COMPONENTS: Array<[string, any, Record<string, unknown>]> = [
 	['Tabs', Tabs, {}],
 	['Terminal', Terminal, { lines: [] }],
 	['Timeline', Timeline, {}],
+	['Typewriter', Typewriter, { text: 'x' }],
 	['Video', Video, { src: 'x.mp4' }],
 	['WebSite', WebSite, { url: 'https://example.test' }],
 	// `youtubeId`, note — the video's id, which is NOT the DOM `id`. They coexist.
