@@ -48,6 +48,7 @@ export const pages = [
     { path: "draw-component.html",    title: "Draw — Shapes & Arrows", adjust: true },
     { path: "path-component.html",    title: "Path — Multi-Segment Stroke", adjust: true },
     { path: "draw-sequence.html",     title: "Draw — Building a Diagram", adjust: true },
+    { path: "draw-rough.html",        title: "Draw — Hand-Drawn (Rough)", adjust: true },
     { path: "connector-component.html", title: "Connector — Arrows by Name", adjust: true },
     { path: "note-highlight-component.html", title: "Note-driven Highlight", adjust: true },
     // Beside the Spotlight it is built from: Toast reuses the same blockAnchors punch-out

@@ -4,6 +4,7 @@ export const pages = [
 	{ path: "title.html", title: "Draw" },
 	{ path: "draw.html", title: "Draw" },
 	{ path: "shapes.html", title: "Shapes" },
+	{ path: "rough.html", title: "Rough" },
 	{ path: "path.html", title: "Path" },
 	{ path: "sprite.html", title: "Sprite" },
 	{ path: "cursor.html", title: "Cursor" },
