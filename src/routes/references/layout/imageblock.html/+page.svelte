@@ -13,7 +13,7 @@
 	<QuickCode style="margin-top: 0.7em;" lang="svelte" code={`<script>
   import ImageBlock from '\$lib/components/ImageBlock.svelte';
   import photo from './photo.png';
-</script>
+<\/script>
 <ImageBlock src={photo} alt="Demo" x={760} y={400} width={400} height={300} />`} />
 
 	<p style="margin-top: 0.7em; opacity: 0.85;"><b>Props that matter</b></p>

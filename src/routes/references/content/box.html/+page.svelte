@@ -11,7 +11,7 @@
 
 	<QuickCode style="margin-top: 0.7em;" lang="svelte" code={`<script>
   let open = false;
-</script>
+<\/script>
 <button on:click={() => (open = true)}>Detail</button>
 <Box bind:expanded={open} width={900} height={500}>
   <!-- overlay body -->

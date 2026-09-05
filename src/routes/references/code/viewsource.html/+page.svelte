@@ -13,7 +13,7 @@
 	<QuickCode style="margin-top: 0.7em;" lang="svelte" code={`<script>
   import ViewSource from '\$lib/components/ViewSource.svelte';
   import source from './+page.svelte?raw';
-</script>
+<\/script>
 <ViewSource {source} path="src/routes/…/+page.svelte" />`} />
 
 	<p style="margin-top: 0.7em; opacity: 0.85;"><b>Props that matter</b></p>

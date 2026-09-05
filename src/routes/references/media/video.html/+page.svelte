@@ -11,7 +11,7 @@
 
 	<QuickCode style="margin-top: 0.7em;" lang="svelte" code={`<script>
   import clip from './demo.mp4';
-</script>
+<\/script>
 <Video src={clip} bookmarks={[
   { t: 0, label: 'Intro' },
   { t: 12, label: 'Demo' }

@@ -27,7 +27,7 @@
 		<QuickCode style="margin-top: 0.8em;" lang="svelte" code={`<!-- text route: +layout.svelte -->
 <script>
   import TextPage from '$lib/components/TextPage.svelte';
-</script>
+<\/script>
 <TextPage title="My guide">
   <slot />
 </TextPage>
