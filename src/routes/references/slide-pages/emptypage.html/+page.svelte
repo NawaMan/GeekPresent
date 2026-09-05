@@ -40,13 +40,6 @@
 </Draw>
 
 <style>
-	.stage {
-		box-sizing: border-box;
-		width: 100%;
-		height: 100%;
-		padding: 2.5em 3em 4em;
-		line-height: 1.5;
-	}
 	.heading {
 		margin: 0;
 		font-size: 2.5em;
@@ -57,10 +50,6 @@
 		margin: 0.9em 0 0;
 		font-size: 1.25em;
 		max-width: none;
-	}
-	.lead.muted {
-		opacity: 0.85;
-		font-size: 1.15em;
 	}
 	.code {
 		margin-top: 1.4em;
