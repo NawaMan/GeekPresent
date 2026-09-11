@@ -80,6 +80,41 @@ live in `dev-run.sh` and `.booth/config.toml` — this section is the agent summ
 | Run the test suite                                | `./booth exec --run -- pnpm test`                                                      |
 | Static build (into `docs/` via vite, or a folder) | `./booth exec --run -- pnpm build` or `./booth exec --run -- ./build-static.sh ./dist` |
 
+**The short form: `just`.** Those commands also live as recipes in the root `justfile`, which is
+the better thing to reach for — a recipe carries the env and the sync step the long form leaves to
+you (see *First run in a fresh worktree* below), and `just` alone lists them all:
+
+| Goal                        | Recipe                                          |
+| --------------------------- | ----------------------------------------------- |
+| Dev server                  | `just dev` — prints the slides URL for this booth |
+| Test suite (dom + ssr)      | `just test` · `just test-dom` · `just test-ssr`  |
+| Type-check (`svelte-check`) | `just check`                                     |
+| Build into `docs/`          | `just build`                                     |
+| Self-contained static site  | `just build-static ./dist`                       |
+| Lint (prettier + eslint)    | `just lint` — `just format-changed` fixes the formatting half |
+| The booth itself            | `just shell` · `just status` · `just stop` — host-only |
+| List every recipe           | `just`                                           |
+
+**Every recipe re-enters the booth on its own.** Run from the host, a recipe `exec`s itself through
+`./booth exec --run --quiet -- just <recipe>` and its body only ever runs in the container; run
+inside a booth, it runs straight away. Same command either way, no booth flags to get right, exit
+code and arguments passed through (`just test Connector` filters by file name).
+
+**The three that drive the booth refuse to run inside one.** `shell`, `status` and `stop` open, list
+and stop containers, which is not a thing to do from within a container — so they say so and exit 2
+rather than failing on a `./booth` that isn't there.
+
+**`just lint` is red, and that is the honest reading.** Prettier has never been run over most of this
+tree (~800 files) and eslint reports ~400 real problems. Don't "fix" it with `just format-all` as
+part of unrelated work — that is a tree-wide diff and wants a commit of its own. `just format-changed`
+is the one for day-to-day use: it reformats only what the current branch touched, so a branch leaves
+the tree a little cleaner than it found it without burying its own diff.
+
+**Agents: use `./booth exec --run -- just <recipe>`.** `just` ships in the booth image (CodingBooth
+≥ 0.77.0 — which is why `.booth/tools/codingbooth.lock` pins it), but a host is not guaranteed to
+have it, and Rule 6 still means never running the toolchain on the host. A human who installs `just`
+locally can drop the prefix; an agent should not assume it is there.
+
 **A second booth (a worktree, a parallel session) needs no flags at all.** The same command works
 from any worktree; `port = "NEXT:31000"` takes the next free slot and the slides follow at +173:
 
@@ -170,6 +205,10 @@ abort its deps check. Both are one-time; this line handles them:
 Neither is a worktree or booth problem — any fresh checkout needs the same. After that, plain
 `./booth exec --run -- pnpm test` works. (Verified in a worktree booth: 142 files, 2439 tests, all
 passing.)
+
+**Or just `./booth exec --run -- just test`** — the recipe exports both variables and syncs first,
+so a fresh worktree and a warm one take the same command. That is the whole reason the `justfile`
+exists; the long form above is what it runs.
 
 Check that GitKraken will see it (open the **main** repo, not only the worktree path):
 
