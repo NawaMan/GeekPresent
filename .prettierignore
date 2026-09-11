@@ -2,3 +2,13 @@
 package-lock.json
 pnpm-lock.yaml
 yarn.lock
+
+# CodingBooth's own files — booth's to own, not ours to restyle. Some of them are
+# bind-mounted READ-ONLY into the container, so a `prettier --write .` run from
+# inside the booth fails outright (EROFS) rather than merely reformatting something
+# it shouldn't.
+.booth/
+
+# Obsidian workspace state: editor-generated JSON, rewritten whenever the vault is
+# opened. Formatting it only creates diffs that come back.
+.obsidian/
