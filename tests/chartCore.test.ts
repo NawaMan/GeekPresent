@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	axisGutter,
 	aggregate,
 	arcPath,
 	areaPath,
@@ -374,15 +375,17 @@ describe('ganttBars', () => {
 	it('accepts Dates and raw timestamps, not just ISO strings', () => {
 		const d0 = new Date('2026-03-02T00:00:00Z');
 		const d1 = new Date('2026-03-05T00:00:00Z');
-		const [fromDate] = ganttBars(
-			[{ task: 'a', from: d0, to: d1 }],
-			{ task: 'task', start: 'from', end: 'to' }
-		);
+		const [fromDate] = ganttBars([{ task: 'a', from: d0, to: d1 }], {
+			task: 'task',
+			start: 'from',
+			end: 'to'
+		});
 		expect(fromDate.duration).toBe(3 * DAY);
-		const [fromMs] = ganttBars(
-			[{ task: 'a', from: d0.getTime(), to: d1.getTime() }],
-			{ task: 'task', start: 'from', end: 'to' }
-		);
+		const [fromMs] = ganttBars([{ task: 'a', from: d0.getTime(), to: d1.getTime() }], {
+			task: 'task',
+			start: 'from',
+			end: 'to'
+		});
 		expect(fromMs.duration).toBe(3 * DAY);
 	});
 
@@ -422,7 +425,10 @@ describe('ganttLinks', () => {
 	});
 
 	it('drops an edge naming a task that does not exist, rather than mispointing', () => {
-		const withGhost: Row[] = [...rows, { task: 'd', from: '2026-03-17', to: '2026-03-18', after: 'ghost' }];
+		const withGhost: Row[] = [
+			...rows,
+			{ task: 'd', from: '2026-03-17', to: '2026-03-18', after: 'ghost' }
+		];
 		const ghostBars = ganttBars<Row>(withGhost, { task: 'task', start: 'from', end: 'to' });
 		const links = ganttLinks<Row>(withGhost, ghostBars, 'after');
 		expect(links.some((l) => l.to === 3)).toBe(false);
@@ -492,8 +498,7 @@ describe('ganttLinks', () => {
 
 describe('ganttExtent', () => {
 	type Row = { task: string; from: string; to?: string | null };
-	const build = (rows: Row[]) =>
-		ganttBars<Row>(rows, { task: 'task', start: 'from', end: 'to' });
+	const build = (rows: Row[]) => ganttBars<Row>(rows, { task: 'task', start: 'from', end: 'to' });
 
 	it('spans the earliest start to the latest end', () => {
 		const bars = build([
@@ -1283,5 +1288,52 @@ describe('heatmapMatrix', () => {
 		});
 		expect(allBlank.min).toBeNaN(); // no finite value → no colour scale
 		expect(at(allBlank, 'Mon', 'AM')?.value).toBeNull();
+	});
+});
+
+describe('axisGutter', () => {
+	// The bug it exists for: a fixed 52px inset that eight-digit ticks ran
+	// straight through, colliding with the rotated axis label beside them.
+	it('widens past the old fixed inset once the ticks are wide', () => {
+		const wide = ['0', '5,000,000', '10,000,000', '25,000,000'];
+		expect(axisGutter(wide, { label: true })).toBeGreaterThan(52 + 20);
+	});
+
+	it('never NARROWS a gutter — the floor is the 52 every chart hardcoded', () => {
+		// Short ticks used to get 52 (or 72 with a label); they still do, so an
+		// existing deck renders identically.
+		expect(axisGutter(['0', '5', '10'])).toBe(52);
+		expect(axisGutter(['0', '5', '10'], { label: true })).toBe(72);
+	});
+
+	it('caps a pathological format so it cannot eat the plot area', () => {
+		const absurd = ['x'.repeat(400)];
+		expect(axisGutter(absurd)).toBe(120);
+		expect(axisGutter(absurd, { label: true })).toBe(140);
+	});
+
+	it('sizes from the WIDEST label, not the first or last', () => {
+		const short = axisGutter(['1', '2', '3']);
+		const mixed = axisGutter(['1', '1,234,567,890', '3']);
+		expect(mixed).toBeGreaterThan(short);
+	});
+
+	it('is the floor for junk input — never NaN, never a throw', () => {
+		expect(axisGutter([])).toBe(52);
+		expect(axisGutter(null)).toBe(52);
+		expect(axisGutter(undefined)).toBe(52);
+		expect(axisGutter(['', '', ''])).toBe(52);
+		// a format that returned numbers/nullish instead of strings
+		expect(axisGutter([1, null, undefined] as unknown as string[])).toBe(52);
+		expect(Number.isFinite(axisGutter(['12'], { min: NaN, max: NaN }))).toBe(true);
+	});
+
+	it('always returns a whole number of pixels', () => {
+		expect(Number.isInteger(axisGutter(['1,234,567'], { label: true }))).toBe(true);
+	});
+
+	it('honours an explicit min/max', () => {
+		expect(axisGutter([], { min: 30 })).toBe(30);
+		expect(axisGutter(['x'.repeat(100)], { max: 80 })).toBe(80);
 	});
 });

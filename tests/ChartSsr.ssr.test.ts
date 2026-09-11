@@ -10,6 +10,7 @@
 import { render } from 'svelte/server';
 import { describe, expect, it } from 'vitest';
 import ChartSsrHost from './ChartSsrHost.svelte';
+import BarChart from '../src/lib/chart/BarChart.svelte';
 
 describe('Chart (SSR)', () => {
 	const { body } = render(ChartSsrHost, { props: {} });
@@ -101,9 +102,7 @@ describe('Chart (SSR)', () => {
 		expect(body).toContain('<title>Migration plan</title>');
 
 		// two dated spans, each labelled with its dates and duration
-		expect(body).toContain(
-			'aria-label="audit: 2026-03-02 – 2026-03-16 (14 days), 100% complete"'
-		);
+		expect(body).toContain('aria-label="audit: 2026-03-02 – 2026-03-16 (14 days), 100% complete"');
 		expect(body).toContain(
 			'aria-label="dual-write: 2026-03-09 – 2026-03-27 (18 days), 70% complete"'
 		);
@@ -175,5 +174,51 @@ describe('Chart (SSR)', () => {
 		expect(body).not.toContain('class="guide"');
 		expect(body).not.toContain('<clipPath');
 		expect(body).not.toContain('class="wipe"');
+	});
+});
+
+describe('y-axis gutter (SSR)', () => {
+	// The y axis used to reserve a fixed 52px (+20 for its rotated label) no
+	// matter how wide the tick text was, so an eight-digit tick ran straight
+	// through its own label. The gutter is now sized from the tick text — still
+	// at prerender, from props alone, because it is a character estimate rather
+	// than a DOM measurement (there is no DOM here to measure).
+	const rows = (scale: number) => [
+		{ region: 'us-east', n: 2 * scale },
+		{ region: 'us-west', n: 5 * scale }
+	];
+	const chart = (scale: number) =>
+		render(BarChart, {
+			props: {
+				data: rows(scale),
+				x: { value: 'region' },
+				series: { key: 'n', label: 'Requests', value: 'n' },
+				title: 'Requests by region'
+			}
+		}).body;
+
+	/** The x of the first y-axis tick label — the right edge of the gutter. */
+	const tickX = (body: string): number => {
+		const m = body.match(/<text class="tick-label[^>]*x="([0-9.]+)"/);
+		return m ? Number(m[1]) : NaN;
+	};
+
+	it('leaves the gutter alone when the ticks already fit', () => {
+		// Single digits: the historical 52 + 20 label gutter, unchanged — which is
+		// what keeps every existing deck rendering exactly as it did.
+		expect(tickX(chart(1))).toBe(63);
+	});
+
+	it('widens the gutter for eight-digit ticks instead of overlapping the label', () => {
+		const wide = tickX(chart(5_000_000));
+		expect(wide).toBeGreaterThan(63);
+		// and the bars start after it, so the plot moved with the axis
+		expect(wide).toBeLessThan(140); // capped, never eats the plot
+	});
+
+	it('keeps the widened axis inside the viewBox', () => {
+		const body = chart(5_000_000);
+		expect(body).toContain('viewBox="0 0 640 400"');
+		expect(body).toContain('25,000,000');
 	});
 });
