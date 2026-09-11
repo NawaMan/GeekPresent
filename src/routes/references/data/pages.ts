@@ -2,6 +2,7 @@
 export const pages = [
 	{ path: "title.html", title: "Data" },
 	{ path: "datatable.html", title: "DataTable" },
+	{ path: "remote.html", title: "RemoteData" },
 	{ path: "barchart.html", title: "BarChart" },
 	{ path: "linechart.html", title: "LineChart" },
 	{ path: "areachart.html", title: "AreaChart" },

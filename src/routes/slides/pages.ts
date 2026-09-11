@@ -79,6 +79,9 @@ export const pages = [
     { path: "histogram-component.html", title: "Chart — Histogram (Distribution)" },
     { path: "heatmap-component.html", title: "Chart — Heatmap (2-D Distribution)" },
     { path: "datatable-chart.html",   title: "DataTable + Charts — One Dataset" },
+    // The one slide in the family with no rows in its source: <RemoteData> fetches
+    // them over HTTP at view time and the same table + charts render what lands.
+    { path: "remote-data.html",       title: "Remote Data — Table + Charts over HTTP" },
     { path: "youtube-showcase.html",  title: "YouTube" },
     { path: "website-component.html", title: "WebSite — Embedded Site" },
     { path: "webpage-component.html", title: "WebPage — Full-Canvas Site" },
