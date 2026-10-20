@@ -15,7 +15,8 @@
   it) — pass `fill={false}` for pure positioning, where the content keeps its
   natural size. When ADJUST mode is ON, the wrapper grows a drag body + a bottom-right
   resize handle + an id/location bar carrying the send-to-back / bring-to-front
-  buttons. Dragging updates x/y/width/height live, and the box publishes its updated
+  / delete buttons (Delete or Backspace deletes the selected Block too — pending
+  until SAVE, undoable with Ctrl+Z). Dragging updates x/y/width/height live, and the box publishes its updated
   OPENING tag — just
   `<Block … x={…} y={…} …>`, or `<Tag … />` for a self-closing wrapper (ImageBlock) —
   to the ADJUST change registry, so SAVE writes that one line back over the element's
@@ -53,17 +54,27 @@
 	const blockId = nextBlockId();
 	$: selected = editing && $selectedBlock === blockId;
 
-	// Escape clears the selection (only the selected Block listens, so exactly one
-	// handler is live). A drag's own Escape is handled by trackPointer's onCancel.
-	function handleDeselect(event: KeyboardEvent) {
-		if (event.key === 'Escape') selectedBlock.set(null);
+	// Keys for the selection (only the selected Block listens, so exactly one handler
+	// is live): Escape clears it, Delete / Backspace deletes the Block. A drag's own
+	// Escape is handled by trackPointer's onCancel. Capture phase, so a delete is
+	// swallowed before a page-level Backspace (AppendixPage's RETURN) can also act.
+	function handleSelectionKey(event: KeyboardEvent) {
+		if (event.key === 'Escape') {
+			selectedBlock.set(null);
+			return;
+		}
+		if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+		if (!deletable || isTyping(event.target)) return;
+		event.preventDefault();
+		event.stopImmediatePropagation();
+		deleteBlock();
 	}
 	$: if (browser) {
-		if (selected) window.addEventListener('keydown', handleDeselect);
-		else window.removeEventListener('keydown', handleDeselect);
+		if (selected) window.addEventListener('keydown', handleSelectionKey, true);
+		else window.removeEventListener('keydown', handleSelectionKey, true);
 	}
 	onDestroy(() => {
-		if (browser) window.removeEventListener('keydown', handleDeselect);
+		if (browser) window.removeEventListener('keydown', handleSelectionKey, true);
 		// Don't leave a destroyed Block as the selection target.
 		if (selected) selectedBlock.set(null);
 	});
@@ -265,11 +276,35 @@
 	// hand-authored `z={-1}` away — the button just won't produce that by surprise.
 	const sendToBack = () => setZ(Math.max(0, backZ(z, otherZValues(blockId))));
 
+	// Delete: a PENDING removal, like every other ADJUST edit. The Block hides (and
+	// drops its anchor, so arrows to it vanish), goes into the undo history, and
+	// reports itself `removed` so SAVE cuts the whole element out of the source —
+	// see patchSource's REMOVE mode. Only a tracked Block: a hosted Draw Rect/Ellipse
+	// or a KeyframeStudio ghost is not an element of the slide's own source.
+	let removed = false;
+	$: deletable = track;
+	function deleteBlock() {
+		if (!deletable || removed) return;
+		removed = true;
+		selectedBlock.set(null);
+		record({
+			undo: () => { removed = false; },
+			redo: () => { removed = true; },
+		});
+	}
+	function isTyping(target: EventTarget | null): boolean {
+		const node = target as HTMLElement | null;
+		return !!node && (node.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(node.tagName));
+	}
+
 	// Publish this Block's live z so its siblings' Front/Back can order against it.
 	// Browser-only: purely a ADJUST-mode aid, and SSR must not touch module state
 	// that outlives one render (unlike blockAnchors, which a Connector needs on the
 	// server).
-	$: if (browser) reportBlockZ(blockId, z);
+	$: if (browser) {
+		if (removed) withdrawBlockZ(blockId);
+		else reportBlockZ(blockId, z);
+	}
 	onDestroy(() => { if (browser) withdrawBlockZ(blockId); });
 
 	// When NOT editing, a bounds="none" element that bleeds past the canvas should
@@ -378,9 +413,10 @@
 			id: changeId,
 			kind: tag,
 			name,
-			dirty: snippet !== initialSnippet,
+			dirty: removed || snippet !== initialSnippet,
+			removed,
 			oldTag: initialSnippet,
-			newTag: snippet,
+			newTag: removed ? '(deleted: remove this element, its children and closing tag)' : snippet,
 			// Structured geometry for the dev "Save" endpoint: `before` matches the
 			// source, `after` is what gets written.
 			before: {
@@ -410,11 +446,16 @@
 	// Plain object, not a `let`: mutating a field must not itself invalidate the
 	// reactive statement that writes it (that would be a self-triggering cycle).
 	const anchor = { name: '' };
-	$: if (track && name) {
+	$: if (track && name && !removed) {
 		// A renamed Block must not leave its old name behind in the registry.
 		if (anchor.name && anchor.name !== name) withdrawAnchor(anchor.name);
 		anchor.name = name;
 		reportAnchor(name, { x, y, width, height });
+	}
+	// A deleted Block takes its anchor with it; undo re-reports through the block above.
+	$: if (removed && anchor.name) {
+		withdrawAnchor(anchor.name);
+		anchor.name = '';
 	}
 	onDestroy(() => withdrawAnchor(anchor.name));
 </script>
@@ -425,6 +466,7 @@
 	class:editing={editing}
 	class:selected={selected}
 	class:active={dragging}
+	class:removed={removed}
 	id={id || undefined}
 	bind:this={el}
 	style="left:{x}px; top:{y}px; width:{width}px; height:{height}px; clip-path:{clipPath}; {zStyle} {guard.safe}"
@@ -445,6 +487,13 @@
 				class="zbtn" type="button" title="Bring to front" aria-label="Bring to front"
 				on:pointerdown|stopPropagation on:click|stopPropagation={bringToFront}
 			>⤒</button>
+			{#if deletable}
+				<button
+					class="zbtn delete" type="button" title="Delete (Del) — undo with Ctrl+Z; SAVE writes it"
+					aria-label="Delete block"
+					on:pointerdown|stopPropagation on:click|stopPropagation={deleteBlock}
+				>✕</button>
+			{/if}
 		</div>
 		{#if ignoredGeometry.length || displacedBy.length}
 			<!-- The style/geometry collision, said out loud — ADJUST-mode only, so it
@@ -491,6 +540,11 @@
 	.movable {
 		position: absolute;
 		box-sizing: border-box;
+	}
+	/* Deleted in ADJUST, pending SAVE. Hidden rather than unmounted, so undo brings
+	   the content back exactly as it was (a Monaco editor, a video's position…). */
+	.movable.removed {
+		display: none;
 	}
 
 	/* The wrapped content fills the box by default: a Block is a sizing frame, and
@@ -649,6 +703,10 @@
 	}
 	.movable .readout .zbtn:hover {
 		background: rgba(255, 255, 255, 0.3);
+	}
+	.movable .readout .zbtn.delete:hover {
+		background: var(--adjust-warn-bg, #f0a33e);
+		color: var(--adjust-warn-fg, #1a1a1a);
 	}
 
 	/* Bottom-right resize grip. */

@@ -74,7 +74,11 @@ export async function saveAdjust(): Promise<SaveResult> {
 	// literal old→new tag swap (a Curve has no box to patch numerically).
 	const blockChanges = [...get(adjustChanges).values()]
 		.filter((e) => e.dirty)
-		.map((e) => ({ kind: e.kind, name: e.name || undefined, before: e.before, after: e.after }));
+		.map((e) =>
+			e.removed
+				? { kind: e.kind, name: e.name || undefined, before: e.before, remove: true }
+				: { kind: e.kind, name: e.name || undefined, before: e.before, after: e.after }
+		);
 	const drawChanges = [...get(shapeChanges).values()]
 		.filter((e) => e.dirty)
 		.map((e) => ({

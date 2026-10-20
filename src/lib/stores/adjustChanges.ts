@@ -33,6 +33,9 @@ export interface ChangedTagEntry {
 	    "Save" endpoint patches with, alongside the human-readable old/new tags. */
 	before: Geometry;
 	after: Geometry;
+	/** Deleted in ADJUST (pending until SAVE): the whole element goes, so `after`
+	    is moot. Always dirty. */
+	removed?: boolean;
 }
 
 const entries = writable<Map<number, ChangedTagEntry>>(new Map());
