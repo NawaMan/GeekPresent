@@ -36,6 +36,10 @@ export interface ChangedTagEntry {
 	/** Deleted in ADJUST (pending until SAVE): the whole element goes, so `after`
 	    is moot. Always dirty. */
 	removed?: boolean;
+	/** A PASTED copy (pending until SAVE): not in the source yet. SAVE duplicates
+	    the original — found by this name / geometry — with this entry's own `name`
+	    and `after`. */
+	pasteOf?: { name: string; before: Geometry };
 }
 
 const entries = writable<Map<number, ChangedTagEntry>>(new Map());

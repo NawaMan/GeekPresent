@@ -70,8 +70,13 @@ export interface LayoutChange {
 	//      along with the lines it leaves empty. The target is chosen exactly as a
 	//      geometry change chooses it, so a delete is refused wherever a drag would be.
 	//
-	// A remove takes precedence over everything; then a literal change (oldTag
-	// present), then an insert; otherwise geometry is used.
+	//   6. PASTE (Ctrl+V on a copied Block): give `paste` plus `before` and the whole
+	//      matched element is DUPLICATED right after itself — its opening tag carrying
+	//      the paste's geometry and name, its children copied byte for byte. Found
+	//      exactly as REMOVE finds it.
+	//
+	// A paste goes first, then a remove; then a literal change (oldTag present),
+	// then an insert; otherwise geometry is used.
 	/** Geometry as the tag was mounted (matches the current source). */
 	before?: Geometry;
 	/** Geometry to write. */
@@ -91,6 +96,10 @@ export interface LayoutChange {
 	/** Delete the matched element outright (mode 5). Needs `before` (and `name`
 	    when it has one) to find it; `after` is ignored. */
 	remove?: boolean;
+	/** Duplicate the matched element (mode 6). `name` is the copy's own name
+	    (omitted for an unnamed Block); `after` its box. Needs `before` (and
+	    `name` when the original has one) to find the original. */
+	paste?: { name?: string; after: Geometry };
 }
 
 /** WHY a change couldn't be placed — so the UI can tell the author the true
@@ -782,6 +791,47 @@ function applyRemove(source: string, change: LayoutChange): AttrResult {
 	return { ok: true, source: cutElement(source, target.start, end) };
 }
 
+// --- PASTE: duplicating a whole element (Copy / Paste) -----------------------
+//
+// The original is found and bounded exactly as REMOVE does it; the copy is its
+// text with the opening tag rewritten — new geometry, new name, and NO `id`, since
+// a DOM id must stay unique and the live copy never rendered one either. It lands
+// right after the original: on a line of its own when the original had its own
+// lines, otherwise straight after it on the same line.
+
+function applyPaste(source: string, change: LayoutChange): AttrResult {
+	const paste = change.paste!;
+	// A copy's name must be new to the file — a Connector or a later SAVE would
+	// otherwise find two Blocks answering to it.
+	if (paste.name && new RegExp(`\\bname=(["'])${escapeRegExp(paste.name)}\\1`).test(source)) {
+		return { ok: false, reason: 'ambiguous' };
+	}
+	const target = chooseTarget(findOpeningTags(source, change.kind), change);
+	if (typeof target === 'string') return { ok: false, reason: target };
+	const end = elementEnd(source, change.kind, target);
+	if (end === -1) return { ok: false, reason: 'not-found' };
+
+	let open = applyGeometry(target.text, paste.after);
+	open = open.replace(/\s+id=("[^"]*"|'[^']*'|\{[^}]*\})/, '');
+	if (paste.name) {
+		const named = /(\bname=)(["'])[^"']*\2/;
+		open = named.test(open)
+			? open.replace(named, `$1$2${paste.name}$2`)
+			: open.replace(new RegExp(`^<${escapeRegExp(change.kind)}`), (m) => `${m} name="${paste.name}"`);
+	}
+	const copy = open + source.slice(target.end, end);
+
+	const lineStart = source.lastIndexOf('\n', target.start - 1) + 1;
+	const indent = source.slice(lineStart, target.start);
+	const nl = source.indexOf('\n', end);
+	const lineEnd = nl === -1 ? source.length : nl;
+	const ownLines = /^[ \t]*$/.test(indent) && /^[ \t]*$/.test(source.slice(end, lineEnd));
+	if (ownLines) {
+		return { ok: true, source: source.slice(0, lineEnd) + '\n' + indent + copy + source.slice(lineEnd) };
+	}
+	return { ok: true, source: source.slice(0, end) + copy + source.slice(end) };
+}
+
 /**
  * Apply ADJUST geometry changes to a slide's Svelte source. Each change is
  * matched to one opening tag and its x/y/width/height rewritten in place; the
@@ -794,6 +844,18 @@ export function patchSlideSource(source: string, changes: LayoutChange[]): Patch
 	const unmatched: PatchResult['unmatched'] = [];
 
 	for (const change of changes) {
+		// Paste: duplicate the whole element.
+		if (change.paste) {
+			const result = applyPaste(current, change);
+			if (!result.ok) {
+				unmatched.push({ ...change, reason: result.reason });
+				continue;
+			}
+			current = result.source;
+			patched.push(change);
+			continue;
+		}
+
 		// Delete: cut the whole element out.
 		if (change.remove) {
 			const result = applyRemove(current, change);

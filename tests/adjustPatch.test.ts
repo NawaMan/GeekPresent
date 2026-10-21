@@ -752,3 +752,73 @@ describe('patchSlideSource — REMOVE (Delete a Block)', () => {
 		expect(r.unmatched[0].reason).toBe('not-found');
 	});
 });
+
+describe('patchSlideSource — PASTE (duplicate a Block)', () => {
+	const paste = (over: Partial<LayoutChange> = {}, name?: string): LayoutChange => ({
+		kind: 'Block',
+		before: { x: 100, y: 200, width: 300, height: 400 },
+		paste: { name, after: { x: 120, y: 220, width: 300, height: 400 } },
+		...over
+	});
+
+	it('duplicates a named element after itself, renamed and moved, children intact', () => {
+		const src = [
+			'<p>before</p>',
+			'\t<Block name="hero" x={100} y={200} width={300} height={400} grid={10}>',
+			'\t\t<h2>hi</h2>',
+			'\t</Block>',
+			'<p>after</p>'
+		].join('\n');
+		const { source, patched } = patchSlideSource(src, [paste({ name: 'hero' }, 'hero-2')]);
+		expect(patched).toHaveLength(1);
+		expect(source).toBe(
+			[
+				'<p>before</p>',
+				'\t<Block name="hero" x={100} y={200} width={300} height={400} grid={10}>',
+				'\t\t<h2>hi</h2>',
+				'\t</Block>',
+				'\t<Block name="hero-2" x={120} y={220} width={300} height={400} grid={10}>',
+				'\t\t<h2>hi</h2>',
+				'\t</Block>',
+				'<p>after</p>'
+			].join('\n')
+		);
+	});
+
+	it('duplicates an unnamed element found by geometry, still unnamed', () => {
+		const src = `<Block x={100} y={200} width={300} height={400}>a</Block>`;
+		const { source } = patchSlideSource(src, [paste()]);
+		expect(source).toBe(
+			`<Block x={100} y={200} width={300} height={400}>a</Block>\n<Block x={120} y={220} width={300} height={400}>a</Block>`
+		);
+	});
+
+	it('copies nested Blocks along with their parent', () => {
+		const src = '<Block name="o" x={1} y={1} width={1} height={1}><Block name="i" x={2} y={2} width={2} height={2}>in</Block>body</Block>';
+		const { source } = patchSlideSource(src, [paste({ name: 'o' }, 'o-2')]);
+		expect(source.match(/name="i"/g)).toHaveLength(2);
+		expect(source.endsWith('<Block name="o-2" x={120} y={220} width={300} height={400}><Block name="i" x={2} y={2} width={2} height={2}>in</Block>body</Block>')).toBe(true);
+	});
+
+	it('duplicates a self-closing ImageBlock and drops its id', () => {
+		const src = '<ImageBlock name="pic" id="logo" src={photo} x={100} y={200} width={300} height={400} />';
+		const { source } = patchSlideSource(src, [paste({ kind: 'ImageBlock', name: 'pic' }, 'pic-2')]);
+		expect(source).toBe(src + '\n<ImageBlock name="pic-2" src={photo} x={120} y={220} width={300} height={400} />');
+	});
+
+	it('refuses a copy name already in the file', () => {
+		const src = '<Block name="a" x={100} y={200} width={300} height={400}></Block>\n<Block name="a-2" x={0} y={0} width={9} height={9}></Block>';
+		const r = patchSlideSource(src, [paste({ name: 'a' }, 'a-2')]);
+		expect(r.source).toBe(src);
+		expect(r.unmatched[0].reason).toBe('ambiguous');
+	});
+
+	it('pastes before a move of the same original still finds it', () => {
+		const src = '<Block x={100} y={200} width={300} height={400}>a</Block>';
+		const move: LayoutChange = { kind: 'Block', before: { x: 100, y: 200, width: 300, height: 400 }, after: { x: 0, y: 0, width: 300, height: 400 } };
+		const { source, unmatched } = patchSlideSource(src, [paste(), move]);
+		expect(unmatched).toHaveLength(0);
+		expect(source).toContain('<Block x={0} y={0} width={300} height={400}>a</Block>');
+		expect(source).toContain('<Block x={120} y={220} width={300} height={400}>a</Block>');
+	});
+});

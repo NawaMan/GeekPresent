@@ -15,8 +15,9 @@
   it) — pass `fill={false}` for pure positioning, where the content keeps its
   natural size. When ADJUST mode is ON, the wrapper grows a drag body + a bottom-right
   resize handle + an id/location bar carrying the send-to-back / bring-to-front
-  / delete buttons (Delete or Backspace deletes the selected Block too — pending
-  until SAVE, undoable with Ctrl+Z). Dragging updates x/y/width/height live, and the box publishes its updated
+  / copy / delete buttons (Delete or Backspace deletes the selected Block too;
+  Ctrl+C / Ctrl+V copies and pastes it, the copy a live second instance — both
+  pending until SAVE, undoable with Ctrl+Z). Dragging updates x/y/width/height live, and the box publishes its updated
   OPENING tag — just
   `<Block … x={…} y={…} …>`, or `<Tag … />` for a self-closing wrapper (ImageBlock) —
   to the ADJUST change registry, so SAVE writes that one line back over the element's
@@ -31,15 +32,18 @@
 <script lang="ts">
 	import { adjustMode, canAdjust } from '$lib/stores/adjustMode';
 	import { record } from '$lib/stores/adjustHistory';
-	import { nextChangeId, reportChange, withdrawChange } from '$lib/stores/adjustChanges';
+	import { nextChangeId, reportChange, withdrawChange, type Geometry } from '$lib/stores/adjustChanges';
+	import { copyBlock, pasteRequests, type PasteRequest } from '$lib/stores/blockClipboard';
+	import { pasteBox, nextCopyName } from '$lib/adjust/pasteCore';
 	import { selectedBlock, nextBlockId } from '$lib/stores/selectedBlock';
-	import { reportAnchor, withdrawAnchor } from '$lib/stores/blockAnchors';
+	import { reportAnchor, withdrawAnchor, blockAnchors } from '$lib/stores/blockAnchors';
 	import { reportBlockZ, withdrawBlockZ, otherZValues } from '$lib/stores/blockOrder';
 	import { frontZ, backZ } from '$lib/utils/stackingCore';
 	import { trackPointer } from '$lib/utils/drag';
 	import { guardStyle } from '$lib/adjust/styleGuardCore';
 	import { browser } from '$app/environment';
-	import { onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
+	import { get } from 'svelte/store';
 
 	// Editing affordances only when the ADJUST control is BOTH available (dev or an
 	// opted-in `?adjust` session) and switched on. canAdjust keeps the published
@@ -61,6 +65,14 @@
 	function handleSelectionKey(event: KeyboardEvent) {
 		if (event.key === 'Escape') {
 			selectedBlock.set(null);
+			return;
+		}
+		// Ctrl/Cmd+C copies the Block — unless the author has text selected, which
+		// is an ordinary text copy and must stay one.
+		if ((event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'c') {
+			if (!deletable || isTyping(event.target) || window.getSelection()?.toString()) return;
+			event.preventDefault();
+			copyThis();
 			return;
 		}
 		if (event.key !== 'Delete' && event.key !== 'Backspace') return;
@@ -136,6 +148,13 @@
 	    <Draw>): when set, the toolbar grows time/delay fields for the wrapped
 	    shape's self-draw. Plain Blocks leave it null. */
 	export let drawEdit: import('$lib/draw/types').DrawOnEditor | null = null;
+	/** Set only on a PASTED copy (rendered by its source Block, never authored):
+	    the source Block's name and mount-time geometry, which SAVE uses to find
+	    the element to duplicate. */
+	export let pasteOf: { name: string; before: Geometry } | null = null;
+	/** On a pasted copy: the blockId of the source Block that renders it, so a
+	    copy of the copy is rendered by — and saved from — that same source. */
+	export let pasteHost: number | null = null;
 
 	/** Inline style for the root element, applied last so it wins — EXCEPT for the
 	    properties this Block writes itself (left/top/width/height/inset/position),
@@ -292,6 +311,40 @@
 			redo: () => { removed = true; },
 		});
 	}
+	// Copy / paste. Copy hands the clipboard this Block's box and the id of the
+	// SOURCE Block (itself, or the one that rendered this copy). Paste asks that
+	// source Block to render one more live instance of itself — see `copies` and
+	// the {#each} at the end of the markup. Pending until SAVE, like a delete.
+	let copied = false;
+	let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+	function copyThis() {
+		if (!deletable || removed) return;
+		copyBlock({ host: pasteHost ?? blockId, x, y, width, height, z, baseName: pasteOf ? pasteOf.name : name });
+		copied = true;
+		clearTimeout(copiedTimer);
+		copiedTimer = setTimeout(() => (copied = false), 900);
+	}
+	onDestroy(() => clearTimeout(copiedTimer));
+
+	interface PastedCopy { key: number; name: string; x: number; y: number; width: number; height: number; z: number }
+	let copies: PastedCopy[] = [];
+	let lastPaste = 0;
+	function takePaste(req: PasteRequest | null) {
+		if (!req || req.host !== blockId || req.id <= lastPaste) return;
+		lastPaste = req.id;
+		const box = pasteBox(req, req.n, bounds === 'canvas' ? { width: canvasWidth, height: canvasHeight } : null);
+		const copy = { key: req.id, name: nextCopyName(req.baseName, get(blockAnchors).keys()), ...box, z: req.z };
+		copies = [...copies, copy];
+		record({
+			undo: () => { copies = copies.filter((c) => c !== copy); },
+			redo: () => { copies = [...copies, copy]; },
+		});
+	}
+	// Only a source-backed Block hosts copies; a copy forwards to its host instead.
+	$: if (browser && deletable && !pasteOf) takePaste($pasteRequests);
+	// A fresh copy arrives selected, ready to drag.
+	onMount(() => { if (pasteOf) selectedBlock.set(blockId); });
+
 	function isTyping(target: EventTarget | null): boolean {
 		const node = target as HTMLElement | null;
 		return !!node && (node.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(node.tagName));
@@ -403,6 +456,17 @@
 	// module-level registry.
 	const changeId = nextChangeId();
 	const initial = { x, y, width, height, z };
+	// What a copy of THIS Block needs to find it in source at SAVE.
+	const sourceOf = {
+		name,
+		before: {
+			x: Math.round(initial.x),
+			y: Math.round(initial.y),
+			width: Math.round(initial.width),
+			height: Math.round(initial.height),
+			z: Math.round(initial.z),
+		},
+	};
 	$: initialZAttr = initial.z ? ` z={${Math.round(initial.z)}}` : '';
 	$: initialOpenTag =
 		`<${tag}${name ? ` name="${name}"` : ''}${attrs}${passAttrs} x={${Math.round(initial.x)}} y={${Math.round(initial.y)}}` +
@@ -413,9 +477,14 @@
 			id: changeId,
 			kind: tag,
 			name,
-			dirty: removed || snippet !== initialSnippet,
-			removed,
-			oldTag: initialSnippet,
+			// A pasted copy is dirty for as long as it exists — it is not in source
+			// yet. Deleting it (or undoing the paste) leaves nothing to save.
+			dirty: pasteOf ? !removed : removed || snippet !== initialSnippet,
+			removed: pasteOf ? false : removed,
+			pasteOf: pasteOf ?? undefined,
+			oldTag: pasteOf
+				? `(new: a copy of ${pasteOf.name ? `"${pasteOf.name}"` : `the ${tag} at ${pasteOf.before.x},${pasteOf.before.y}`} — insert it after that element)`
+				: initialSnippet,
 			newTag: removed ? '(deleted: remove this element, its children and closing tag)' : snippet,
 			// Structured geometry for the dev "Save" endpoint: `before` matches the
 			// source, `after` is what gets written.
@@ -467,6 +536,7 @@
 	class:selected={selected}
 	class:active={dragging}
 	class:removed={removed}
+	class:pasted={!!pasteOf}
 	id={id || undefined}
 	bind:this={el}
 	style="left:{x}px; top:{y}px; width:{width}px; height:{height}px; clip-path:{clipPath}; {zStyle} {guard.safe}"
@@ -488,6 +558,11 @@
 				on:pointerdown|stopPropagation on:click|stopPropagation={bringToFront}
 			>⤒</button>
 			{#if deletable}
+				<button
+					class="zbtn" type="button" title="Copy (Ctrl+C) — paste with Ctrl+V; SAVE writes the copy"
+					aria-label="Copy block"
+					on:pointerdown|stopPropagation on:click|stopPropagation={copyThis}
+				>{copied ? '✓' : '⧉'}</button>
 				<button
 					class="zbtn delete" type="button" title="Delete (Del) — undo with Ctrl+Z; SAVE writes it"
 					aria-label="Delete block"
@@ -536,6 +611,18 @@
 	{/if}
 </div>
 
+<!-- Pasted copies: further live instances of this same Block, slot and all, as
+     siblings (so they position against the same canvas). Never authored — they
+     exist until SAVE writes them into source, or undo takes them away. -->
+{#each copies as c (c.key)}
+	<svelte:self
+		name={c.name} x={c.x} y={c.y} width={c.width} height={c.height} z={c.z}
+		{fill} {grid} {aspect} {canvasWidth} {canvasHeight} {bounds} {minSize}
+		{tag} {attrs} {selfClose} {track} {style} class={klass}
+		pasteOf={sourceOf} pasteHost={blockId}
+	><slot /></svelte:self>
+{/each}
+
 <style>
 	.movable {
 		position: absolute;
@@ -576,6 +663,10 @@
 	}
 	.movable.active {
 		outline-style: solid;
+	}
+	/* A pasted copy is not in source until SAVE: warm outline, so it reads as new. */
+	.movable.editing.pasted {
+		outline-color: var(--adjust-warn-bg, #f0a33e);
 	}
 	/* A selected Block reads as the active object: a solid (not dashed) outline. */
 	.movable.selected {
