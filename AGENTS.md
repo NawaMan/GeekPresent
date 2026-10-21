@@ -500,7 +500,25 @@ than misleading the next agent.
   `<TextBlock name="api" …>API</TextBlock>`, styled by `--textblock-*` role tokens;
   `SvgBlock` is an INLINE SVG filling its box — `svg={x}` from `import x from './x.svg?raw'`,
   or shapes in its slot with a `viewBox` — so `currentColor` follows `--svgblock-fg`, which
-  an `ImageBlock` of the same file cannot; `fit` contain/cover/fill, markup in `utils/svgCore.ts`), `Connector` (an arrow auto-routed between two *named* `Block`s —
+  an `ImageBlock` of the same file cannot; `fit` contain/cover/fill, markup in `utils/svgCore.ts`),
+  `Group` (a logical group of those Blocks that moves and zooms as ONE: members are
+  authored in the group's local coordinates and mapped onto the canvas by a uniform
+  zoom + shift — placement `x`/`y`/`scale`, or a camera `focus="name" zoom={4}`,
+  `fit="name" pad={0.1}`, `view={{…}}`. Members still render REAL canvas boxes, not a CSS
+  transform on a wrapper, so a View-Transition morph between two slides glides each
+  named part crisply — that glide is how a deck zooms and pans (`transition/camera-*.html`,
+  one shared `CameraScene.svelte`). The pattern is ONE scene component used by every slide,
+  each passing its shot: `hide={['logo']}` takes parts out (visibility, so they keep their box
+  and fade as they glide), a `<slot />` inside the scene's Group takes that slide's extras in
+  scene coordinates, and `morph="cam" morphOn="camera"` names every member
+  `view-transition-name: cam-<name>` only during that transition kind — no CSS per part.
+  Content scales with its box. ADJUST drags members in
+  LOCAL units, so SAVE writes the scene's own numbers — into the scene component itself
+  when that's where the tags live (see the ADJUST playbook); anchors stay in canvas units, so
+  `Connector`/`Spotlight` are unchanged. Groups nest, and a named group publishes its
+  extent so an outer camera can `fit` it. A NAMED camera resolves once its target mounts —
+  on a server render (the handout, before hydration) it falls back to the placement.
+  Maths in `utils/groupCore.ts`), `Connector` (an arrow auto-routed between two *named* `Block`s —
   see the diagram playbook), `Cursor` (a fake mouse pointer for demoing a UI without a
   live app — a `Sprite` wearing a pointer under the hood, riding `<Draw>`; `path` glides
   between named/literal points, or chain `script` — `warpTo`/`moveTo`/`around`/`attention`
@@ -885,6 +903,18 @@ highest authority first:
 
 Offered is not active: the mode still starts **off**. Precedence lives in
 `src/lib/layout/layoutAccessCore.ts` (pure, unit-tested).
+
+**SAVE writes a Block into the file that WROTE it** — the slide's `+page.svelte`, or a
+component under `src/routes/` the slide uses (a shared scene, e.g.
+`transition/CameraScene.svelte`), so a drag on any slide that shows the scene updates
+the scene for all of them. The browser can't know where a tag was authored, so the dev
+server says it at compile time: `sourceStampPlugin` (`adjust/devSavePlugin.ts`, listed
+FIRST in `vite.config.ts` — after `sveltekit()` it would see compiled JS) stamps every
+`Block`/`ImageBlock`/`TextBlock`/`SvgBlock` tag in a route file with `__file="…"`, the
+Block sends it with its change, and the endpoint patches that file — refusing any stamp
+outside `src/routes`. Logic in `adjust/sourceTag.ts`. Two limits: a tag inside a **`$lib`**
+component is never stamped (it belongs to whoever uses it, so SAVE still looks in the
+slide), and **Draw shapes** still save into the slide only.
 
 **SAVE cannot follow ADJUST into a build.** It POSTs to `/__geekpresent/adjust-save`,
 an endpoint that exists only inside the vite dev server; a static host has no source

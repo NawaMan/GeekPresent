@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { patchSlideSource, type LayoutChange } from './patchSource';
 import { routeToPageFile } from './routeToPage';
+import { resolveStampedFile, stampPath, stampSourceFile } from './sourceTag';
 import { deckToPagesFile, deckToSlideDir } from '../deckEdit/routeToDeck';
 import {
 	insertPagesEntry,
@@ -39,7 +40,10 @@ const PAGE_REMOVE_ENDPOINT = '/__geekpresent/page-remove';
 interface AdjustSaveRequest {
 	/** The slide's `location.pathname`, e.g. `/slides/title.html`. */
 	route: string;
-	changes: LayoutChange[];
+	/** Each change may name the file its tag was WRITTEN in (the `__file` stamp,
+	    see sourceTag.ts) — a Block in a shared scene component, say. Without
+	    one, the change belongs to the slide's own +page.svelte. */
+	changes: (LayoutChange & { file?: string })[];
 }
 
 interface SourceSaveRequest {
@@ -107,25 +111,53 @@ async function readPageFile(server: ViteDevServer, route: string) {
 	}
 }
 
-async function handleAdjustSave(server: ViteDevServer, body: string) {
+/** Exported for tests/sourceTag.test.ts, which drives it against a temp project. */
+export async function handleAdjustSave(server: ViteDevServer, body: string) {
 	const { route, changes } = JSON.parse(body) as AdjustSaveRequest;
 	if (!route || !Array.isArray(changes)) {
 		return { status: 400, payload: { error: 'route and changes are required' } };
 	}
 
-	const loaded = await readPageFile(server, route);
-	if (loaded.status !== 200) return loaded;
-
-	const source = loaded.payload.content as string;
-	const fileRel = loaded.payload.file as string;
 	const root = server.config.root;
-	const file = routeToPageFile(route, server.config.base, root)!;
+	const pageFile = routeToPageFile(route, server.config.base, root);
+	if (!pageFile) {
+		return { status: 400, payload: { error: `cannot map route "${route}" to a file` } };
+	}
 
-	const { source: next, patched, unmatched } = patchSlideSource(source, changes);
-	if (patched.length && next !== source) {
-		await fs.writeFile(file, next, 'utf8');
+	// Sort the changes by the file they belong to: the slide's own +page.svelte,
+	// unless a change carries a stamp naming the component its tag was written in.
+	// A stamp that resolves outside src/routes is refused, never guessed at.
+	const byFile = new Map<string, LayoutChange[]>();
+	for (const { file: stamp, ...change } of changes) {
+		const target = stamp ? resolveStampedFile(stamp, root) : pageFile;
+		if (!target) {
+			return { status: 400, payload: { error: `refusing to write "${stamp}": not a .svelte file under src/routes` } };
+		}
+		if (!byFile.has(target)) byFile.set(target, []);
+		byFile.get(target)!.push(change);
+	}
 
-		// Tell Vite the file changed. This is NOT belt-and-braces — without it the
+	const patched: LayoutChange[] = [];
+	const unmatched: ReturnType<typeof patchSlideSource>['unmatched'] = [];
+	const written: string[] = [];
+	for (const [file, fileChanges] of byFile) {
+		let source: string;
+		try {
+			source = await fs.readFile(file, 'utf8');
+		} catch {
+			return { status: 404, payload: { error: `no such file: ${path.relative(root, file)}` } };
+		}
+		const result = patchSlideSource(source, fileChanges);
+		patched.push(...result.patched);
+		unmatched.push(...result.unmatched);
+		if (result.patched.length && result.source !== source) {
+			await fs.writeFile(file, result.source, 'utf8');
+			written.push(file);
+		}
+	}
+
+	if (written.length) {
+		// Tell Vite each file changed. This is NOT belt-and-braces — without it the
 		// write is invisible to the dev server: the watcher does not see writes made
 		// through a bind mount (and would not be trusted to be prompt even when it
 		// does), so the module graph keeps serving the transform it cached at first
@@ -133,7 +165,7 @@ async function handleAdjustSave(server: ViteDevServer, body: string) {
 		// the OLD baseline, and every save after the first is refused as drift — with
 		// the file on disk and the module being served disagreeing the whole time.
 		// Emitting the change drives Vite's ordinary invalidate + HMR path.
-		server.watcher.emit('change', file);
+		for (const file of written) server.watcher.emit('change', file);
 
 		// Force the page to re-mount from what we just wrote.
 		//
@@ -157,7 +189,9 @@ async function handleAdjustSave(server: ViteDevServer, body: string) {
 	return {
 		status: 200,
 		payload: {
-			file: fileRel,
+			file: path.relative(root, pageFile),
+			// Every file this save wrote — the slide, and any component it reached into.
+			files: written.map((f) => path.relative(root, f)),
 			patched: patched.length,
 			unmatched: unmatched.map((c) => ({
 				label: c.name || (c.before ? `${c.kind}@${c.before.x},${c.before.y}` : c.kind),
@@ -324,6 +358,29 @@ async function handlePageRemove(server: ViteDevServer, body: string) {
 			pages: path.relative(root, pagesFile),
 			// Phase 1: folder intentionally left on disk (unlist only).
 			unlisted: true
+		}
+	};
+}
+
+/** Dev-only: stamp every Block-family tag in a route file with the file it was
+    written in (`__file="src/routes/…"`), so ADJUST's SAVE can write a Block that
+    lives in a component back into THAT component. See sourceTag.ts. Runs before
+    the Svelte plugin, on the raw source; the insert stays on the tag's own line,
+    so line numbers in errors are unchanged. */
+export function sourceStampPlugin(): Plugin {
+	let root = process.cwd();
+	return {
+		name: 'geekpresent-source-stamp',
+		apply: 'serve',
+		enforce: 'pre',
+		configResolved(config) {
+			root = config.root;
+		},
+		transform(code, id) {
+			const file = stampPath(id, root);
+			if (!file) return null;
+			const stamped = stampSourceFile(code, file);
+			return stamped === code ? null : { code: stamped, map: null };
 		}
 	};
 }

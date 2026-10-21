@@ -82,14 +82,17 @@ export async function saveAdjust(): Promise<SaveResult> {
 			kind: e.kind,
 			name: e.pasteOf!.name || undefined,
 			before: e.pasteOf!.before,
-			paste: { name: e.name || undefined, after: e.after }
+			paste: { name: e.name || undefined, after: e.after },
+			file: e.file
 		}));
+	// `file`: the component a Block was written in, when it isn't the slide (the
+	// dev server's compile-time stamp); undefined drops out of the JSON entirely.
 	const blockChanges = dirty
 		.filter((e) => !e.pasteOf)
 		.map((e) =>
 			e.removed
-				? { kind: e.kind, name: e.name || undefined, before: e.before, remove: true }
-				: { kind: e.kind, name: e.name || undefined, before: e.before, after: e.after }
+				? { kind: e.kind, name: e.name || undefined, before: e.before, remove: true, file: e.file }
+				: { kind: e.kind, name: e.name || undefined, before: e.before, after: e.after, file: e.file }
 		);
 	const drawChanges = [...get(shapeChanges).values()]
 		.filter((e) => e.dirty)

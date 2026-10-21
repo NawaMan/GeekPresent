@@ -28,6 +28,10 @@
   The drag math divides screen-pixel pointer deltas by the element's LIVE rendered
   scale (getBoundingClientRect().width / offsetWidth), so a drag tracks the cursor
   1:1 whether the deck is FITTED (fit-to-window) or SCALED to any zoom factor.
+
+  Inside a <Group>, x/y/width/height are the group's local units: the Block draws
+  at the group's mapping of them (and scales its content to match), drags in local
+  units, and SAVEs them unchanged. See Group.svelte.
 -->
 <script lang="ts">
 	import { adjustMode, canAdjust } from '$lib/stores/adjustMode';
@@ -41,9 +45,20 @@
 	import { frontZ, backZ } from '$lib/utils/stackingCore';
 	import { trackPointer } from '$lib/utils/drag';
 	import { guardStyle } from '$lib/adjust/styleGuardCore';
+	import { getGroup } from '$lib/utils/groupContext';
+	import {
+		IDENTITY,
+		NOTHING_HIDDEN,
+		isHidden,
+		mapBox,
+		morphName,
+		visibleBox,
+		type Frame,
+		type HideState
+	} from '$lib/utils/groupCore';
 	import { browser } from '$app/environment';
 	import { onDestroy, onMount } from 'svelte';
-	import { get } from 'svelte/store';
+	import { get, readable } from 'svelte/store';
 
 	// Editing affordances only when the ADJUST control is BOTH available (dev or an
 	// opted-in `?adjust` session) and switched on. canAdjust keeps the published
@@ -155,6 +170,11 @@
 	/** On a pasted copy: the blockId of the source Block that renders it, so a
 	    copy of the copy is rendered by — and saved from — that same source. */
 	export let pasteHost: number | null = null;
+	/** The route file this tag was written in. Never authored: in `pnpm dev` the
+	    source-stamp plugin adds it to every Block-family tag (adjust/sourceTag.ts),
+	    so SAVE can patch a Block that lives in a component — a shared scene —
+	    instead of looking for it in the slide. Empty in a build. */
+	export let __file = '';
 
 	/** Inline style for the root element, applied last so it wins — EXCEPT for the
 	    properties this Block writes itself (left/top/width/height/inset/position),
@@ -180,7 +200,25 @@
 
 	let el: HTMLElement;
 
-	const snap = (n: number) => (grid > 1 ? Math.round(n / grid) * grid : Math.round(n));
+	// Inside a <Group>, x/y/width/height are the group's LOCAL units and `frame`
+	// maps them onto the canvas; `box` is where this Block is actually drawn.
+	// Outside any group the frame is the identity and box === the props, so a
+	// plain Block renders exactly as before. Drags, SAVE and the readout stay in
+	// local units (the numbers in source); the anchor and the DOM are in canvas.
+	const group = getGroup();
+	const groupFrame = group?.frame ?? readable<Frame>(IDENTITY);
+	$: frame = $groupFrame;
+	$: scaled = frame.s !== 1;
+	$: box = mapBox(frame, { x, y, width, height });
+	// The canvas, in local units: what bounds="canvas" clamps to.
+	$: stage = visibleBox(frame, canvasWidth, canvasHeight);
+	// The group's per-slide cast and morph names (see Group's `hide` / `morph`).
+	const groupHidden = group?.hidden ?? readable<HideState>(NOTHING_HIDDEN);
+	const groupMorph = group?.morph ?? readable<string | null>(null);
+	$: concealed = !!group && isHidden($groupHidden, name);
+	$: vtName = morphName($groupMorph, name);
+
+	const snap =(n: number) => (grid > 1 ? Math.round(n / grid) * grid : Math.round(n));
 	const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
 	// One pointer gesture, parameterised by which corner(s) it moves. `move` shifts
@@ -206,11 +244,18 @@
 		const ratio = typeof aspect === 'number' ? aspect : aspect === true ? startW / startH : null;
 
 		const free = bounds === 'none';
+		// Local bounds and units, fixed for the gesture (a camera doesn't move mid-drag).
+		const s = frame.s;
+		const right = stage.x + stage.width;
+		const bottom = stage.y + stage.height;
 		// The shared helper measures the live rendered scale from `el`, captures
-		// the pointer, and streams canvas-px deltas until pointerup / Esc.
+		// the pointer, and streams canvas-px deltas until pointerup / Esc — which
+		// the group's zoom turns into local units.
 		trackPointer(event, {
 			scaleFrom: el,
-			onMove: (dx, dy, e) => {
+			onMove: (cdx, cdy, e) => {
+				const dx = cdx / s;
+				const dy = cdy / s;
 				if (mode === 'move') {
 					// Hold Shift to lock the move to a single axis — whichever the pointer
 					// has travelled furthest along, from the drag's START. Re-evaluated on
@@ -223,8 +268,8 @@
 						if (Math.abs(dx) >= Math.abs(dy)) my = 0;
 						else mx = 0;
 					}
-					x = snap(free ? startX + mx : clamp(startX + mx, 0, canvasWidth - width));
-					y = snap(free ? startY + my : clamp(startY + my, 0, canvasHeight - height));
+					x = snap(free ? startX + mx : clamp(startX + mx, stage.x, right - width));
+					y = snap(free ? startY + my : clamp(startY + my, stage.y, bottom - height));
 				} else if (ratio && !e.altKey) {
 					// Aspect-locked: drive from the axis the pointer moved most, derive the
 					// other from `ratio`, then clamp to canvas + minSize without skewing —
@@ -240,13 +285,13 @@
 					}
 					if (w < minSize) { w = minSize; h = w / ratio; }
 					if (h < minSize) { h = minSize; w = h * ratio; }
-					if (!free && x + w > canvasWidth)  { w = canvasWidth  - x; h = w / ratio; }
-					if (!free && y + h > canvasHeight) { h = canvasHeight - y; w = h * ratio; }
+					if (!free && x + w > right)  { w = right  - x; h = w / ratio; }
+					if (!free && y + h > bottom) { h = bottom - y; w = h * ratio; }
 					width  = snap(w);
 					height = snap(h);
 				} else {
-					width = clamp(snap(startW + dx), minSize, free ? Infinity : canvasWidth - x);
-					height = clamp(snap(startH + dy), minSize, free ? Infinity : canvasHeight - y);
+					width = clamp(snap(startW + dx), minSize, free ? Infinity : right - x);
+					height = clamp(snap(startH + dy), minSize, free ? Infinity : bottom - y);
 				}
 			},
 			// On commit, record the net change (before → after) for global undo/redo —
@@ -332,8 +377,11 @@
 	function takePaste(req: PasteRequest | null) {
 		if (!req || req.host !== blockId || req.id <= lastPaste) return;
 		lastPaste = req.id;
-		const box = pasteBox(req, req.n, bounds === 'canvas' ? { width: canvasWidth, height: canvasHeight } : null);
-		const copy = { key: req.id, name: nextCopyName(req.baseName, get(blockAnchors).keys()), ...box, z: req.z };
+		// The canvas clamp assumes a stage at the origin, so inside a mapped group
+		// the copy just cascades unclamped (the drag that follows clamps it).
+		const plain = frame.s === 1 && frame.dx === 0 && frame.dy === 0;
+		const landed = pasteBox(req, req.n, bounds === 'canvas' && plain ? { width: canvasWidth, height: canvasHeight } : null);
+		const copy = { key: req.id, name: nextCopyName(req.baseName, get(blockAnchors).keys()), ...landed, z: req.z };
 		copies = [...copies, copy];
 		record({
 			undo: () => { copies = copies.filter((c) => c !== copy); },
@@ -365,10 +413,11 @@
 	// Clip just THIS element to the canvas rectangle, computed in its own local
 	// coords (local L maps to canvas x+L, so the visible band is -x … canvasWidth-x).
 	// While editing, no clip — the off-stage part (and its handles) stays grabbable.
+	// Canvas units throughout (`box`): the clip is about the stage, not the group.
 	$: clipPath =
 		!editing && bounds === 'none'
-			? `inset(${Math.max(0, -y)}px ${Math.max(0, x + width - canvasWidth)}px` +
-			  ` ${Math.max(0, y + height - canvasHeight)}px ${Math.max(0, -x)}px)`
+			? `inset(${Math.max(0, -box.y)}px ${Math.max(0, box.x + box.width - canvasWidth)}px` +
+			  ` ${Math.max(0, box.y + box.height - canvasHeight)}px ${Math.max(0, -box.x)}px)`
 			: 'none';
 
 	// The applied z-index folds the AUTHOR z and the transient editing lift into
@@ -477,6 +526,7 @@
 			id: changeId,
 			kind: tag,
 			name,
+			file: __file || undefined,
 			// A pasted copy is dirty for as long as it exists — it is not in source
 			// yet. Deleting it (or undoing the paste) leaves nothing to save.
 			dirty: pasteOf ? !removed : removed || snippet !== initialSnippet,
@@ -519,7 +569,9 @@
 		// A renamed Block must not leave its old name behind in the registry.
 		if (anchor.name && anchor.name !== name) withdrawAnchor(anchor.name);
 		anchor.name = name;
-		reportAnchor(name, { x, y, width, height });
+		// Canvas coordinates — where the box is drawn — so a Connector or Spotlight
+		// outside the group still finds it.
+		reportAnchor(name, box);
 	}
 	// A deleted Block takes its anchor with it; undo re-reports through the block above.
 	$: if (removed && anchor.name) {
@@ -527,6 +579,15 @@
 		anchor.name = '';
 	}
 	onDestroy(() => withdrawAnchor(anchor.name));
+
+	// Inside a group, a named Block reports its LOCAL box there too, so the group's
+	// camera can `fit` / `focus` on it by name.
+	const memberKey = {};
+	$: if (group) {
+		if (track && name && !removed) group.register(memberKey, name, { x, y, width, height });
+		else group.withdraw(memberKey);
+	}
+	onDestroy(() => group?.withdraw(memberKey));
 </script>
 
 <!-- svelte-ignore a11y-no-static-element-interactions a11y-no-noninteractive-element-interactions -->
@@ -537,18 +598,29 @@
 	class:active={dragging}
 	class:removed={removed}
 	class:pasted={!!pasteOf}
+	class:concealed
 	id={id || undefined}
+	data-gp-morph={vtName ?? undefined}
 	bind:this={el}
-	style="left:{x}px; top:{y}px; width:{width}px; height:{height}px; clip-path:{clipPath}; {zStyle} {guard.safe}"
+	style="left:{box.x}px; top:{box.y}px; width:{box.width}px; height:{box.height}px; clip-path:{clipPath}; {zStyle} {guard.safe}"
 	on:pointerdown={(e) => startDrag('move', e)}
 	on:pointerenter={() => (hovered = true)}
 	on:pointerleave={() => (hovered = false)}
 >
-	<div class="fill-layer" class:loose={!fill}><slot /></div>
+	<!-- Zoomed by a group: the content lays out at its LOCAL size and is scaled up
+	     as a whole (text, borders, picture), inside the real-size box. The
+	     transform sits on this inner layer, never on the Block itself, so a
+	     View-Transition snapshot of the Block is the true box, painted crisp. -->
+	<div
+		class="fill-layer"
+		class:loose={!fill}
+		class:scaled
+		style={scaled ? `width:${width}px; height:${height}px; transform:scale(${frame.s});` : undefined}
+	><slot /></div>
 
 	{#if editing}
 		<div class="readout">
-			{name ? name + ' · ' : ''}{Math.round(x)},{Math.round(y)} · {Math.round(width)}×{Math.round(height)}{z ? ' · z' + Math.round(z) : ''}
+			{name ? name + ' · ' : ''}{Math.round(x)},{Math.round(y)} · {Math.round(width)}×{Math.round(height)}{z ? ' · z' + Math.round(z) : ''}{scaled ? ' · ×' + +frame.s.toFixed(3) : ''}
 			<button
 				class="zbtn" type="button" title="Send to back" aria-label="Send to back"
 				on:pointerdown|stopPropagation on:click|stopPropagation={sendToBack}
@@ -619,7 +691,7 @@
 		name={c.name} x={c.x} y={c.y} width={c.width} height={c.height} z={c.z}
 		{fill} {grid} {aspect} {canvasWidth} {canvasHeight} {bounds} {minSize}
 		{tag} {attrs} {selfClose} {track} {style} class={klass}
-		pasteOf={sourceOf} pasteHost={blockId}
+		pasteOf={sourceOf} pasteHost={blockId} {__file}
 	><slot /></svelte:self>
 {/each}
 
@@ -632,6 +704,16 @@
 	   the content back exactly as it was (a Monaco editor, a video's position…). */
 	.movable.removed {
 		display: none;
+	}
+	/* Hidden by its group on this slide (Group `hide`). Visibility, not display:
+	   the box stays, so a morph still pairs it and fades it as it glides. In
+	   ADJUST it is faint instead — there to grab, plainly not on the slide. */
+	.movable.concealed {
+		visibility: hidden;
+	}
+	.movable.concealed.editing {
+		visibility: visible;
+		opacity: 0.3;
 	}
 
 	/* The wrapped content fills the box by default: a Block is a sizing frame, and
@@ -650,6 +732,19 @@
 	.fill-layer.loose {
 		position: static;
 		display: contents;
+	}
+	/* Scaled by a group: laid out at the local size (inline width/height), then
+	   zoomed from the top-left corner to fill the real box. A loose layer can't
+	   stay `display: contents` here — a transform needs a box to apply to. */
+	.fill-layer.scaled {
+		inset: auto;
+		left: 0;
+		top: 0;
+		transform-origin: 0 0;
+	}
+	.fill-layer.loose.scaled {
+		position: absolute;
+		display: block;
 	}
 	/* In edit mode the wrapper becomes a manipulable object: a dashed outline marks
 	   its bounds, the body is a move target, and text selection is suppressed so a
