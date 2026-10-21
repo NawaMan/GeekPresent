@@ -217,6 +217,13 @@
 	const groupMorph = group?.morph ?? readable<string | null>(null);
 	$: concealed = !!group && isHidden($groupHidden, name);
 	$: vtName = morphName($groupMorph, name);
+	// Glide (Group `glide`): a camera change within the slide animates instead of
+	// jumping. Not while editing — a drag must track the pointer, not chase it.
+	const groupGlide = group?.glide ?? readable(0);
+	$: gliding = $groupGlide > 0 && !editing;
+	// The content layer keeps its transform even at 1× while gliding, so a zoom
+	// back to 1:1 animates down to it rather than snapping when `scaled` flips.
+	$: zoomLayer = scaled || gliding;
 
 	const snap =(n: number) => (grid > 1 ? Math.round(n / grid) * grid : Math.round(n));
 	const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
@@ -599,10 +606,11 @@
 	class:removed={removed}
 	class:pasted={!!pasteOf}
 	class:concealed
+	class:gliding
 	id={id || undefined}
 	data-gp-morph={vtName ?? undefined}
 	bind:this={el}
-	style="left:{box.x}px; top:{box.y}px; width:{box.width}px; height:{box.height}px; clip-path:{clipPath}; {zStyle} {guard.safe}"
+	style="left:{box.x}px; top:{box.y}px; width:{box.width}px; height:{box.height}px; clip-path:{clipPath}; {gliding ? `--gp-glide:${$groupGlide}s;` : ''} {zStyle} {guard.safe}"
 	on:pointerdown={(e) => startDrag('move', e)}
 	on:pointerenter={() => (hovered = true)}
 	on:pointerleave={() => (hovered = false)}
@@ -614,8 +622,8 @@
 	<div
 		class="fill-layer"
 		class:loose={!fill}
-		class:scaled
-		style={scaled ? `width:${width}px; height:${height}px; transform:scale(${frame.s});` : undefined}
+		class:scaled={zoomLayer}
+		style={zoomLayer ? `width:${width}px; height:${height}px; transform:scale(${frame.s});` : undefined}
 	><slot /></div>
 
 	{#if editing}
@@ -714,6 +722,36 @@
 	.movable.concealed.editing {
 		visibility: visible;
 		opacity: 0.3;
+	}
+	/* Gliding (Group `glide`): the box and the content's zoom animate together, on
+	   the same curve as the deck's morphs. A part leaving the shot fades out as it
+	   moves; visibility flips at the END of the fade (and at the start of a fade
+	   in), so a hidden part never takes a click mid-way. */
+	.movable.gliding {
+		--gp-glide-ease: cubic-bezier(0.65, 0, 0.35, 1);
+		transition:
+			left var(--gp-glide) var(--gp-glide-ease),
+			top var(--gp-glide) var(--gp-glide-ease),
+			width var(--gp-glide) var(--gp-glide-ease),
+			height var(--gp-glide) var(--gp-glide-ease),
+			opacity var(--gp-glide) var(--gp-glide-ease),
+			visibility var(--gp-glide) step-end;
+	}
+	.movable.gliding .fill-layer {
+		transition: transform var(--gp-glide) var(--gp-glide-ease);
+	}
+	.movable.gliding.concealed {
+		opacity: 0;
+	}
+	.movable.gliding:not(.concealed) {
+		transition-timing-function: var(--gp-glide-ease), var(--gp-glide-ease), var(--gp-glide-ease),
+			var(--gp-glide-ease), var(--gp-glide-ease), step-start;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.movable.gliding,
+		.movable.gliding .fill-layer {
+			transition: none;
+		}
 	}
 
 	/* The wrapped content fills the box by default: a Block is a sizing frame, and

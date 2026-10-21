@@ -97,6 +97,12 @@
 	    page's `transition` in pages.ts) — so paging to an unrelated neighbour
 	    with a plain 'slide' leaves the parts alone. Omit to name them always. */
 	export let morphOn: string | string[] | null = null;
+	/** Animate changes WITHIN the slide: when the camera, a placement or `hide`
+	    changes, every member glides to its new box over this many seconds
+	    (ordinary CSS transitions — any browser, no deck setup). 0 = jump.
+	    Off while ADJUST is on, and under prefers-reduced-motion. Nested groups
+	    inherit it. Across slides, use `morph` instead. */
+	export let glide = 0;
 	/** The canvas a camera fills. Match the deck's width/height. */
 	export let canvasWidth = 1920;
 	export let canvasHeight = 1080;
@@ -118,6 +124,9 @@
 	$: hidden.set(childHide($parentHidden, name, hide));
 	const morphPrefix = writable<string | null>(null);
 	$: morphPrefix.set(morph ?? $parentMorph);
+	const parentGlide = parent?.glide ?? readable(0);
+	const glideSeconds = writable(0);
+	$: glideSeconds.set(Number.isFinite(glide) && glide > 0 ? glide : $parentGlide);
 
 	// Named members' LOCAL boxes, for fit/focus by name.
 	const members = writable<Map<object, { name: string; box: Box }>>(new Map());
@@ -129,6 +138,7 @@
 		frame,
 		hidden,
 		morph: morphPrefix,
+		glide: glideSeconds,
 		register(key, memberName, box) {
 			members.update((map) => {
 				const prev = map.get(key);

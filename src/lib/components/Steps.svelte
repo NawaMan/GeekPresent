@@ -17,6 +17,10 @@
       <Fragment tag="p" transition="fly">Then this one.</Fragment>
     </Steps>
 
+  The current step reaches the slide as a slot prop, `<Steps let:revealed>` — for
+  anything a Fragment cannot express, like a Group camera that moves on each Space
+  (animation/scene-camera.html).
+
   Keys: Space advances, Shift+Space reverses. While steps remain, Space reveals the
   next Fragment; once the build is spent Space falls through to NavigationBar and
   pages to the NEXT slide (and symmetrically, Shift+Space peels back until nothing
@@ -178,5 +182,7 @@
 </script>
 
 <!-- display:contents → Steps adds no box of its own; Fragments lay out exactly
-     where they sit in the parent's flow. -->
-<div class="steps {klass}" id={id || undefined} style="display: contents; {style}"><slot /></div>
+     where they sit in the parent's flow. `let:revealed` hands the slide the
+     current step, for anything a Fragment can't express — a Group camera that
+     moves on each Space, say (see animation/scene-camera.html). -->
+<div class="steps {klass}" id={id || undefined} style="display: contents; {style}"><slot revealed={$revealed} /></div>

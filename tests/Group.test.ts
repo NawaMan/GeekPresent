@@ -9,6 +9,7 @@ import { selectedBlock } from '../src/lib/stores/selectedBlock';
 import { blockAnchors } from '../src/lib/stores/blockAnchors';
 import { adjustChanges } from '../src/lib/stores/adjustChanges';
 import GroupHost from './GroupHost.svelte';
+import GroupStepsHost from './GroupStepsHost.svelte';
 
 // jsdom has no layout, so trackPointer's live scale falls back to 1 (see
 // BlockDrag.test.ts): a pointer move of N px is N canvas px.
@@ -151,6 +152,50 @@ describe('Group — hide and morph', () => {
 		const c = await mount({});
 		expect(block(c, 'A').hasAttribute('data-gp-morph')).toBe(false);
 		expect(c.querySelector('style')).toBeNull();
+	});
+});
+
+describe('Group — glide, driven by a Steps build', () => {
+	it('Steps hands the slide its step, and the camera follows it', async () => {
+		const r = render(GroupStepsHost, { props: {} });
+		await tick();
+		expect(r.container.querySelector('.step')?.textContent).toBe('0');
+		expect(rect(block(r.container, 'B')).width).toBe(100);
+
+		(r.component as unknown as { next: () => void }).next();
+		await tick();
+		await tick();
+		expect(r.container.querySelector('.step')?.textContent).toBe('1');
+		const b = rect(block(r.container, 'B'));
+		expect(b.width).toBe(200);
+		expect(b.x + b.width / 2).toBe(960);
+		expect(block(r.container, 'A').classList.contains('concealed')).toBe(true);
+	});
+
+	it('glides: members carry the duration, and keep their zoom layer even at 1×', async () => {
+		const r = render(GroupStepsHost, { props: { glide: 0.5 } });
+		await tick();
+		const a = block(r.container, 'A');
+		expect(a.classList.contains('gliding')).toBe(true);
+		expect(a.style.getPropertyValue('--gp-glide')).toBe('0.5s');
+		// At 1× the layer still wears its transform, so a zoom back DOWN animates.
+		expect((a.querySelector('.fill-layer') as HTMLElement).style.transform).toBe('scale(1)');
+	});
+
+	it('no glide: nothing changes for an ordinary group', async () => {
+		const r = render(GroupStepsHost, { props: { glide: 0 } });
+		await tick();
+		const a = block(r.container, 'A');
+		expect(a.classList.contains('gliding')).toBe(false);
+		expect(a.querySelector('.fill-layer')?.getAttribute('style')).toBeNull();
+	});
+
+	it('switches off while ADJUST is on, so a drag tracks the pointer', async () => {
+		canAdjust.set(true);
+		adjustMode.set(true);
+		const r = render(GroupStepsHost, { props: { glide: 0.5 } });
+		await tick();
+		expect(block(r.container, 'A').classList.contains('gliding')).toBe(false);
 	});
 });
 

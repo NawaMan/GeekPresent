@@ -3,8 +3,9 @@
 // A Group publishes these through Svelte context:
 //   - `frame`: its members' local → CANVAS map (already composed with every
 //     enclosing group), which a Block applies to draw itself;
-//   - `hidden` / `morph`: which members this slide hides, and the prefix their
-//     View-Transition names wear — both inherited down nested groups;
+//   - `hidden` / `morph` / `glide`: which members this slide hides, the prefix
+//     their View-Transition names wear, and how long an in-slide change takes —
+//     all inherited down nested groups;
 //   - `register` / `withdraw`: where a named member reports its LOCAL box, so a
 //     camera can `fit` or `focus` on it by name. A nested group forwards its
 //     members up, mapped into the parent's space, so an outer camera can aim at a
@@ -23,6 +24,9 @@ export interface GroupContext {
 	hidden: Readable<HideState>;
 	/** The morph-name prefix members wear (`data-gp-morph="<prefix>-<name>"`), or null. */
 	morph: Readable<string | null>;
+	/** Seconds a member takes to glide to a new box (a camera or `hide` change
+	    within the slide); 0 = jump. */
+	glide: Readable<number>;
 	/** Report (or update) a named member's box, in this group's local space. */
 	register(key: object, name: string, box: Box): void;
 	/** Forget a member (unmounted, deleted, or renamed to ''). */

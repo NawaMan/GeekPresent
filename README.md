@@ -259,6 +259,25 @@ Every slide lives on a fixed **1920×1080** canvas. Lay out with whatever CSS su
 
 You never write scaling code: in **FITTED** mode the framework transforms the whole canvas to fit the window (keeping the aspect ratio); in **SCALED** mode it shows the canvas at an exact factor (1:1 and beyond), centered and pannable.
 
+### Scenes: zoom and pan a drawing
+
+Put a drawing's parts in a `Group` and you can move them all with one tag — and aim it like a camera:
+
+```svelte
+<Group name="scene" focus="api" zoom={3} hide={['queue']} glide={0.9}>
+  <TextBlock name="api" x={620} y={380} width={340} height={220}>API</TextBlock>
+  <TextBlock name="db" x={1160} y={420} width={340} height={220}>DB</TextBlock>
+  <TextBlock name="queue" x={1160} y={710} width={240} height={140}>Queue</TextBlock>
+</Group>
+```
+
+- **Aim:** `focus` + `zoom` centres a part and zooms in; `fit="name"` makes a part fill the screen; `view` frames any rectangle; `x` / `y` / `scale` just moves and resizes the set.
+- **Per slide:** `hide` takes parts off stage — they fade rather than pop.
+- **Within a slide:** `glide={0.9}` animates every camera change; step it with Space through `<Steps let:revealed>` — see `animation/scene-camera.html`.
+- **Across slides:** write the drawing once as a component (a *scene*) and give each slide its own shot; in a View-Transition deck, `morph` makes paging glide every part from one shot to the next — see `transition/camera-wide.html`.
+- **Crisp at any zoom:** each part is redrawn at its true size, not blown up, so text and lines stay sharp.
+- **Edit once:** drag a part in ADJUST on any slide and SAVE writes it into the scene file, so every slide follows.
+
 ### Interactivity (it's just Svelte)
 
 Slides are Svelte components, so state and events work as usual — perfect for click-to-reveal, toggles, or anything interactive:
