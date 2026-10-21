@@ -51,6 +51,7 @@ import Column from '$lib/components/Column.svelte';
 import Fragment from '$lib/components/Fragment.svelte';
 import Highlight from '$lib/components/Highlight.svelte';
 import ImageBlock from '$lib/components/ImageBlock.svelte';
+import BlockNode from '$lib/components/BlockNode.svelte';
 import JavaCode from '$lib/components/JavaCode.svelte';
 import JavaCodeBox from '$lib/components/JavaCodeBox.svelte';
 import SourceView from '$lib/components/SourceView.svelte';
@@ -117,6 +118,7 @@ const COMPONENTS: Array<[string, any, Record<string, unknown>]> = [
 	// They are the likeliest of all of these to quietly swallow a prop, since "pass it
 	// on" is a step that can simply be missing — so they are worth an assertion each.
 	['ImageBlock', ImageBlock, { src: 'x.png', x: 0, y: 0, width: 10, height: 10 }],
+	['BlockNode', BlockNode, { x: 0, y: 0, width: 10, height: 10 }],
 	['WideDiv', WideDiv, {}],
 	['CodeBox', CodeBox, { code: 'x' }],
 	['JavaCodeBox', JavaCodeBox, { code: 'x' }],

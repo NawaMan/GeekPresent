@@ -12,6 +12,7 @@
 	import Callout     from '$lib/components/Callout.svelte';
 	import Connector   from '$lib/components/Connector.svelte';
 	import Block       from '$lib/components/Block.svelte';
+	import BlockNode   from '$lib/components/BlockNode.svelte';
 	import Hint        from '$lib/components/Hint.svelte';
 	import ViewSource  from '$lib/components/ViewSource.svelte';
 	import source      from './+page.svelte?raw';
@@ -25,11 +26,12 @@
 			Give a <b>Block</b> a <code>name</code> and it publishes its box. A
 			<b>Connector</b> looks two of them up and routes an arrow between them —
 			so a diagram is written in <i>names</i>, and the arrows follow the boxes
-			when you drag them in ADJUST mode.
+			when you drag them in ADJUST mode. <b>BlockNode</b> is the Block that
+			draws the box too — border, label and all.
 		</p>
 
-		<QuickCode style="margin-top: 0.6em;" lang="svelte" code={`<Block name="api" …>API</Block>
-<Block name="db"  …>DB</Block>
+		<QuickCode style="margin-top: 0.6em;" lang="svelte" code={`<BlockNode name="api" …>API</BlockNode>
+<BlockNode name="db"  …>DB</BlockNode>
 
 <Connector from="api" to="db" label="query" />`} />
 
@@ -43,21 +45,11 @@
 </ContentPage>
 
 <!-- The boxes. Names are the only thing the arrows below know about them. -->
-<Block name="browser" x={960}  y={250} width={240} height={110} grid={10}>
-	<div class="node">Browser</div>
-</Block>
-<Block name="edge"    x={1310} y={250} width={240} height={110} grid={10}>
-	<div class="node">Edge</div>
-</Block>
-<Block name="api"     x={1660} y={250} width={240} height={110} grid={10}>
-	<div class="node">API</div>
-</Block>
-<Block name="cache"   x={960}  y={580} width={240} height={110} grid={10}>
-	<div class="node">Cache</div>
-</Block>
-<Block name="db"      x={1560} y={580} width={240} height={110} grid={10}>
-	<div class="node">DB</div>
-</Block>
+<BlockNode name="browser" x={960}  y={250} width={240} height={110} grid={10}>Browser</BlockNode>
+<BlockNode name="edge"    x={1310} y={250} width={240} height={110} grid={10}>Edge</BlockNode>
+<BlockNode name="api"     x={1660} y={250} width={240} height={110} grid={10}>API</BlockNode>
+<BlockNode name="cache"   x={960}  y={580} width={240} height={110} grid={10}>Cache</BlockNode>
+<BlockNode name="db"      x={1560} y={580} width={240} height={110} grid={10}>DB</BlockNode>
 
 <!-- ...and the arrows. Coordinate-free: drag any box above and watch these
      re-route. Each connector demonstrates one route. -->
@@ -86,18 +78,3 @@
 
 <Hint text="Flip ADJUST (top-right) and drag a box — every arrow follows it" />
 <ViewSource {source} {path} />
-
-<style>
-	/* Block fills its content, so the node stretches to whatever shape the box
-	   is dragged into. */
-	.node {
-		display: grid;
-		place-items: center;
-		box-sizing: border-box;
-		border: 2px solid var(--surface-fg, #C0F1FF);
-		border-radius: 10px;
-		background: var(--surface-bg, #181818);
-		font-size: 0.9em;
-		font-weight: bold;
-	}
-</style>

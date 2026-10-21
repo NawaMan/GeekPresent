@@ -679,3 +679,162 @@ describe('patchSlideSource — attribute rewrite (Sprite stops)', () => {
 		expect(source).toContain('<Columns gap="1em" widths={[1.1, 0.9]}>');
 	});
 });
+
+describe('patchSlideSource — REMOVE (Delete a Block)', () => {
+	const del = (over: Partial<LayoutChange> = {}): LayoutChange => ({
+		kind: 'Block',
+		before: { x: 100, y: 200, width: 300, height: 400 },
+		remove: true,
+		...over
+	});
+
+	it('cuts a named element — open tag, children, close — and the lines it leaves empty', () => {
+		const src = [
+			'<p>keep</p>',
+			'\t<Block name="hero" x={1} y={2} width={3} height={4}>',
+			'\t\t<h2>hi</h2>',
+			'\t</Block>',
+			'<p>also keep</p>'
+		].join('\n');
+		const { source, patched, unmatched } = patchSlideSource(src, [del({ name: 'hero' })]);
+		expect(unmatched).toHaveLength(0);
+		expect(patched).toHaveLength(1);
+		expect(source).toBe('<p>keep</p>\n<p>also keep</p>');
+	});
+
+	it('matches by old geometry when the tag has no name', () => {
+		const src = `<Block x={10} y={20} width={30} height={40}>a</Block>\n<Block x={100} y={200} width={300} height={400}>b</Block>\n`;
+		const { source } = patchSlideSource(src, [del()]);
+		expect(source).toBe(`<Block x={10} y={20} width={30} height={40}>a</Block>\n`);
+	});
+
+	it('pairs the RIGHT closing tag when Blocks nest', () => {
+		const src = [
+			'<Block name="outer" x={0} y={0} width={9} height={9}>',
+			'\t<Block name="inner" x={1} y={1} width={2} height={2}>in</Block>',
+			'\t<p>outer body</p>',
+			'</Block>',
+			'<Block name="after" x={5} y={5} width={5} height={5}>after</Block>'
+		].join('\n');
+		const outer = patchSlideSource(src, [del({ name: 'outer' })]).source;
+		expect(outer).toBe('<Block name="after" x={5} y={5} width={5} height={5}>after</Block>');
+		const inner = patchSlideSource(src, [del({ name: 'inner' })]).source;
+		expect(inner).not.toContain('inner');
+		expect(inner).toContain('<p>outer body</p>');
+		expect(inner).toContain('name="after"');
+	});
+
+	it('removes a self-closing ImageBlock', () => {
+		const src = `<div>\n\t<ImageBlock name="pic" src={photo} alt="x" x={1} y={2} width={3} height={4} />\n</div>`;
+		const { source } = patchSlideSource(src, [del({ kind: 'ImageBlock', name: 'pic' })]);
+		expect(source).toBe('<div>\n</div>');
+	});
+
+	it('keeps the rest of a shared line, cutting only the element', () => {
+		const src = `<div><Block name="a" x={1} y={1} width={1} height={1}>a</Block><p>b</p></div>`;
+		expect(patchSlideSource(src, [del({ name: 'a' })]).source).toBe('<div><p>b</p></div>');
+	});
+
+	it('refuses an ambiguous twin and an unknown tag, leaving the source alone', () => {
+		const twin = `<Block x={100} y={200} width={300} height={400}>a</Block>\n<Block x={100} y={200} width={300} height={400}>b</Block>`;
+		const a = patchSlideSource(twin, [del()]);
+		expect(a.source).toBe(twin);
+		expect(a.unmatched[0].reason).toBe('ambiguous');
+		const b = patchSlideSource(twin, [del({ name: 'ghost' })]);
+		expect(b.source).toBe(twin);
+		expect(b.unmatched[0].reason).toBe('not-found');
+	});
+
+	it('refuses when the closing tag is missing', () => {
+		const src = `<Block name="a" x={1} y={1} width={1} height={1}>never closed`;
+		const r = patchSlideSource(src, [del({ name: 'a' })]);
+		expect(r.source).toBe(src);
+		expect(r.unmatched[0].reason).toBe('not-found');
+	});
+});
+
+describe('patchSlideSource — PASTE (duplicate a Block)', () => {
+	const paste = (over: Partial<LayoutChange> = {}, name?: string): LayoutChange => ({
+		kind: 'Block',
+		before: { x: 100, y: 200, width: 300, height: 400 },
+		paste: { name, after: { x: 120, y: 220, width: 300, height: 400 } },
+		...over
+	});
+
+	it('duplicates a named element after itself, renamed and moved, children intact', () => {
+		const src = [
+			'<p>before</p>',
+			'\t<Block name="hero" x={100} y={200} width={300} height={400} grid={10}>',
+			'\t\t<h2>hi</h2>',
+			'\t</Block>',
+			'<p>after</p>'
+		].join('\n');
+		const { source, patched } = patchSlideSource(src, [paste({ name: 'hero' }, 'hero-2')]);
+		expect(patched).toHaveLength(1);
+		expect(source).toBe(
+			[
+				'<p>before</p>',
+				'\t<Block name="hero" x={100} y={200} width={300} height={400} grid={10}>',
+				'\t\t<h2>hi</h2>',
+				'\t</Block>',
+				'\t<Block name="hero-2" x={120} y={220} width={300} height={400} grid={10}>',
+				'\t\t<h2>hi</h2>',
+				'\t</Block>',
+				'<p>after</p>'
+			].join('\n')
+		);
+	});
+
+	it('duplicates an unnamed element found by geometry, still unnamed', () => {
+		const src = `<Block x={100} y={200} width={300} height={400}>a</Block>`;
+		const { source } = patchSlideSource(src, [paste()]);
+		expect(source).toBe(
+			`<Block x={100} y={200} width={300} height={400}>a</Block>\n<Block x={120} y={220} width={300} height={400}>a</Block>`
+		);
+	});
+
+	it('copies nested Blocks along with their parent', () => {
+		const src = '<Block name="o" x={1} y={1} width={1} height={1}><Block name="i" x={2} y={2} width={2} height={2}>in</Block>body</Block>';
+		const { source } = patchSlideSource(src, [paste({ name: 'o' }, 'o-2')]);
+		expect(source.match(/name="i"/g)).toHaveLength(2);
+		expect(source.endsWith('<Block name="o-2" x={120} y={220} width={300} height={400}><Block name="i" x={2} y={2} width={2} height={2}>in</Block>body</Block>')).toBe(true);
+	});
+
+	it('duplicates a self-closing ImageBlock and drops its id', () => {
+		const src = '<ImageBlock name="pic" id="logo" src={photo} x={100} y={200} width={300} height={400} />';
+		const { source } = patchSlideSource(src, [paste({ kind: 'ImageBlock', name: 'pic' }, 'pic-2')]);
+		expect(source).toBe(src + '\n<ImageBlock name="pic-2" src={photo} x={120} y={220} width={300} height={400} />');
+	});
+
+	it('refuses a copy name already in the file', () => {
+		const src = '<Block name="a" x={100} y={200} width={300} height={400}></Block>\n<Block name="a-2" x={0} y={0} width={9} height={9}></Block>';
+		const r = patchSlideSource(src, [paste({ name: 'a' }, 'a-2')]);
+		expect(r.source).toBe(src);
+		expect(r.unmatched[0].reason).toBe('ambiguous');
+	});
+
+	it('pastes before a move of the same original still finds it', () => {
+		const src = '<Block x={100} y={200} width={300} height={400}>a</Block>';
+		const move: LayoutChange = { kind: 'Block', before: { x: 100, y: 200, width: 300, height: 400 }, after: { x: 0, y: 0, width: 300, height: 400 } };
+		const { source, unmatched } = patchSlideSource(src, [paste(), move]);
+		expect(unmatched).toHaveLength(0);
+		expect(source).toContain('<Block x={0} y={0} width={300} height={400}>a</Block>');
+		expect(source).toContain('<Block x={120} y={220} width={300} height={400}>a</Block>');
+	});
+});
+
+describe('patchSlideSource — a BlockNode is found by its own tag', () => {
+	const src = '<BlockNode name="api" x={100} y={200} width={300} height={400} grid={10}>API</BlockNode>';
+	const before = { x: 100, y: 200, width: 300, height: 400 };
+
+	it('pastes a one-line copy', () => {
+		const { source } = patchSlideSource(src, [
+			{ kind: 'BlockNode', name: 'api', before, paste: { name: 'api-2', after: { x: 120, y: 220, width: 300, height: 400 } } }
+		]);
+		expect(source).toBe(src + '\n<BlockNode name="api-2" x={120} y={220} width={300} height={400} grid={10}>API</BlockNode>');
+	});
+
+	it('deletes it', () => {
+		expect(patchSlideSource(src, [{ kind: 'BlockNode', name: 'api', before, remove: true }]).source).toBe('');
+	});
+});

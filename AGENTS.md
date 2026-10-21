@@ -494,9 +494,10 @@ than misleading the next agent.
   on any slide reached by a CLIENT-SIDE navigation, i.e. a View-Transition deck or an appendix
   with `transition`, because Monaco's CDN loader renders blank after a `goto`; EDIT still opens
   the same unscaled popup),
-  `Block` / `ImageBlock` (absolutely-positioned
+  `Block` / `ImageBlock` / `BlockNode` (absolutely-positioned
   wrappers you place at exact canvas pixels — drag/resize them in **ADJUST mode**,
-  see that playbook), `Connector` (an arrow auto-routed between two *named* `Block`s —
+  see that playbook; `BlockNode` is the diagram box — border and centred label,
+  `<BlockNode name="api" …>API</BlockNode>`, styled by `--node-*` role tokens), `Connector` (an arrow auto-routed between two *named* `Block`s —
   see the diagram playbook), `Cursor` (a fake mouse pointer for demoing a UI without a
   live app — a `Sprite` wearing a pointer under the hood, riding `<Draw>`; `path` glides
   between named/literal points, or chain `script` — `warpTo`/`moveTo`/`around`/`attention`
@@ -1221,8 +1222,8 @@ Don't compute arrow coordinates. Give each box a **`name`** and let **`Connector
 between them — then a ADJUST-mode drag moves the box *and* its arrows together.
 
 ```svelte
-<Block name="api" x={200} y={400} width={280} height={140}>API</Block>
-<Block name="db"  x={900} y={400} width={280} height={140}>DB</Block>
+<BlockNode name="api" x={200} y={400} width={280} height={140}>API</BlockNode>
+<BlockNode name="db"  x={900} y={400} width={280} height={140}>DB</BlockNode>
 
 <!-- AFTER the Blocks — see the ordering rule below -->
 <Connector from="api" to="db" label="query" />

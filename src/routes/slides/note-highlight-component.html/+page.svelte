@@ -20,7 +20,7 @@
 	import ContentPage from '$lib/templates/ContentPage.svelte';
 	import QuickCode   from '$lib/components/QuickCode.svelte';
 	import Connector   from '$lib/components/Connector.svelte';
-	import Block       from '$lib/components/Block.svelte';
+	import BlockNode   from '$lib/components/BlockNode.svelte';
 	import Note        from '$lib/components/Note.svelte';
 	import Hint        from '$lib/components/Hint.svelte';
 	import ViewSource  from '$lib/components/ViewSource.svelte';
@@ -43,7 +43,7 @@
 			space, so it tracks the box even in ADJUST mode.
 		</p>
 
-		<QuickCode style="margin-top: 0.5em;" lang="svelte" code={`<Block name="db" …>DB</Block>
+		<QuickCode style="margin-top: 0.5em;" lang="svelte" code={`<BlockNode name="db" …>DB</BlockNode>
 
 <Note>
   <li data-highlight="db">Now the query hits the database</li>
@@ -68,21 +68,11 @@
 </ContentPage>
 
 <!-- The boxes. Their names are all the note lines / buttons above know about them. -->
-<Block name="browser" x={1020} y={300} width={220} height={110} grid={10}>
-	<div class="node">Browser</div>
-</Block>
-<Block name="edge" x={1360} y={300} width={220} height={110} grid={10}>
-	<div class="node">Edge</div>
-</Block>
-<Block name="api" x={1700} y={300} width={200} height={110} grid={10}>
-	<div class="node">API</div>
-</Block>
-<Block name="cache" x={1160} y={620} width={220} height={110} grid={10}>
-	<div class="node">Cache</div>
-</Block>
-<Block name="db" x={1600} y={620} width={220} height={110} grid={10}>
-	<div class="node">DB</div>
-</Block>
+<BlockNode name="browser" x={1020} y={300} width={220} height={110} grid={10}>Browser</BlockNode>
+<BlockNode name="edge" x={1360} y={300} width={220} height={110} grid={10}>Edge</BlockNode>
+<BlockNode name="api" x={1700} y={300} width={200} height={110} grid={10}>API</BlockNode>
+<BlockNode name="cache" x={1160} y={620} width={220} height={110} grid={10}>Cache</BlockNode>
+<BlockNode name="db" x={1600} y={620} width={220} height={110} grid={10}>DB</BlockNode>
 
 <!-- Connectors come AFTER the boxes they link (they resolve names at prerender). -->
 <Connector from="browser" to="edge" label="GET" />
@@ -104,16 +94,6 @@
 <ViewSource {source} {path} />
 
 <style>
-	.node {
-		display: grid;
-		place-items: center;
-		box-sizing: border-box;
-		border: 2px solid var(--surface-fg, #C0F1FF);
-		border-radius: 10px;
-		background: var(--surface-bg, #181818);
-		font-size: 0.9em;
-		font-weight: bold;
-	}
 	.btns {
 		display: flex;
 		flex-wrap: wrap;

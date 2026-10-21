@@ -65,8 +65,18 @@ export interface LayoutChange {
 	//      `const` the tag references by name — leaving the author's line breaks and
 	//      every other prop alone. Derived from `oldTag`/`newTag`; no extra payload.
 	//
-	// A literal change (oldTag present) takes precedence, then an insert; otherwise
-	// geometry is used.
+	//   5. REMOVE (Delete on a selected Block): give `remove` plus `before` and the
+	//      WHOLE element — opening tag, children, matching closing tag — is cut out,
+	//      along with the lines it leaves empty. The target is chosen exactly as a
+	//      geometry change chooses it, so a delete is refused wherever a drag would be.
+	//
+	//   6. PASTE (Ctrl+V on a copied Block): give `paste` plus `before` and the whole
+	//      matched element is DUPLICATED right after itself — its opening tag carrying
+	//      the paste's geometry and name, its children copied byte for byte. Found
+	//      exactly as REMOVE finds it.
+	//
+	// A paste goes first, then a remove; then a literal change (oldTag present),
+	// then an insert; otherwise geometry is used.
 	/** Geometry as the tag was mounted (matches the current source). */
 	before?: Geometry;
 	/** Geometry to write. */
@@ -83,6 +93,13 @@ export interface LayoutChange {
 	    slide's existing draw import, or added as a new one — without this, an
 	    inserted <Polyline> is a build error rather than a shape. */
 	insertImports?: string[];
+	/** Delete the matched element outright (mode 5). Needs `before` (and `name`
+	    when it has one) to find it; `after` is ignored. */
+	remove?: boolean;
+	/** Duplicate the matched element (mode 6). `name` is the copy's own name
+	    (omitted for an unnamed Block); `after` its box. Needs `before` (and
+	    `name` when the original has one) to find the original. */
+	paste?: { name?: string; after: Geometry };
 }
 
 /** WHY a change couldn't be placed — so the UI can tell the author the true
@@ -721,6 +738,100 @@ function applyInsert(source: string, change: LayoutChange): InsertResult {
 	return { ok: true, source: before + block + (after ? '\n' + after : '') };
 }
 
+// --- REMOVE: cutting a whole element out (Delete) -----------------------------
+//
+// The opening tag is found the way geometry mode finds it; what's new is finding
+// where the ELEMENT ends. A self-closing tag ends with itself. Otherwise we walk
+// forward counting same-kind opens and closes, so a <Block> nested inside the one
+// being deleted can't end it early. No matching close → refuse, never guess.
+
+/** Index just past the element whose opening tag is `open`, or -1 when its
+    closing tag can't be found. */
+function elementEnd(source: string, kind: string, open: TagSpan): number {
+	if (/\/\s*>$/.test(open.text)) return open.end;
+	const close = `</${kind}>`;
+	let depth = 1;
+	let from = open.end;
+	const opens = findOpeningTags(source, kind).filter((s) => s.start >= open.end);
+	for (;;) {
+		const nextClose = source.indexOf(close, from);
+		if (nextClose === -1) return -1;
+		// Every unclosed same-kind open before this close nests one level deeper.
+		for (const s of opens) {
+			if (s.start >= from && s.start < nextClose && !/\/\s*>$/.test(s.text)) depth++;
+		}
+		depth--;
+		if (depth === 0) return nextClose + close.length;
+		from = nextClose + close.length;
+	}
+}
+
+/** Cut [start, end) out of `source`. When the element is alone on its lines, the
+    whole lines go with it — indentation before, newline after — so a delete leaves
+    no blank line behind. Sharing a line with other markup, only the element goes. */
+function cutElement(source: string, start: number, end: number): string {
+	const lineStart = source.lastIndexOf('\n', start - 1) + 1;
+	const aloneBefore = /^[ \t]*$/.test(source.slice(lineStart, start));
+	const nl = source.indexOf('\n', end);
+	const lineEnd = nl === -1 ? source.length : nl;
+	const aloneAfter = /^[ \t]*$/.test(source.slice(end, lineEnd));
+	if (aloneBefore && aloneAfter) {
+		// Take the trailing newline; at EOF take the preceding one instead.
+		if (nl !== -1) return source.slice(0, lineStart) + source.slice(nl + 1);
+		return source.slice(0, Math.max(0, lineStart - 1)) + source.slice(lineEnd);
+	}
+	return source.slice(0, start) + source.slice(end);
+}
+
+function applyRemove(source: string, change: LayoutChange): AttrResult {
+	const target = chooseTarget(findOpeningTags(source, change.kind), change);
+	if (typeof target === 'string') return { ok: false, reason: target };
+	const end = elementEnd(source, change.kind, target);
+	if (end === -1) return { ok: false, reason: 'not-found' };
+	return { ok: true, source: cutElement(source, target.start, end) };
+}
+
+// --- PASTE: duplicating a whole element (Copy / Paste) -----------------------
+//
+// The original is found and bounded exactly as REMOVE does it; the copy is its
+// text with the opening tag rewritten — new geometry, new name, and NO `id`, since
+// a DOM id must stay unique and the live copy never rendered one either. It lands
+// right after the original: on a line of its own when the original had its own
+// lines, otherwise straight after it on the same line.
+
+function applyPaste(source: string, change: LayoutChange): AttrResult {
+	const paste = change.paste!;
+	// A copy's name must be new to the file — a Connector or a later SAVE would
+	// otherwise find two Blocks answering to it.
+	if (paste.name && new RegExp(`\\bname=(["'])${escapeRegExp(paste.name)}\\1`).test(source)) {
+		return { ok: false, reason: 'ambiguous' };
+	}
+	const target = chooseTarget(findOpeningTags(source, change.kind), change);
+	if (typeof target === 'string') return { ok: false, reason: target };
+	const end = elementEnd(source, change.kind, target);
+	if (end === -1) return { ok: false, reason: 'not-found' };
+
+	let open = applyGeometry(target.text, paste.after);
+	open = open.replace(/\s+id=("[^"]*"|'[^']*'|\{[^}]*\})/, '');
+	if (paste.name) {
+		const named = /(\bname=)(["'])[^"']*\2/;
+		open = named.test(open)
+			? open.replace(named, `$1$2${paste.name}$2`)
+			: open.replace(new RegExp(`^<${escapeRegExp(change.kind)}`), (m) => `${m} name="${paste.name}"`);
+	}
+	const copy = open + source.slice(target.end, end);
+
+	const lineStart = source.lastIndexOf('\n', target.start - 1) + 1;
+	const indent = source.slice(lineStart, target.start);
+	const nl = source.indexOf('\n', end);
+	const lineEnd = nl === -1 ? source.length : nl;
+	const ownLines = /^[ \t]*$/.test(indent) && /^[ \t]*$/.test(source.slice(end, lineEnd));
+	if (ownLines) {
+		return { ok: true, source: source.slice(0, lineEnd) + '\n' + indent + copy + source.slice(lineEnd) };
+	}
+	return { ok: true, source: source.slice(0, end) + copy + source.slice(end) };
+}
+
 /**
  * Apply ADJUST geometry changes to a slide's Svelte source. Each change is
  * matched to one opening tag and its x/y/width/height rewritten in place; the
@@ -733,6 +844,30 @@ export function patchSlideSource(source: string, changes: LayoutChange[]): Patch
 	const unmatched: PatchResult['unmatched'] = [];
 
 	for (const change of changes) {
+		// Paste: duplicate the whole element.
+		if (change.paste) {
+			const result = applyPaste(current, change);
+			if (!result.ok) {
+				unmatched.push({ ...change, reason: result.reason });
+				continue;
+			}
+			current = result.source;
+			patched.push(change);
+			continue;
+		}
+
+		// Delete: cut the whole element out.
+		if (change.remove) {
+			const result = applyRemove(current, change);
+			if (!result.ok) {
+				unmatched.push({ ...change, reason: result.reason });
+				continue;
+			}
+			current = result.source;
+			patched.push(change);
+			continue;
+		}
+
 		// Literal whole-tag replacement (Draw shapes): find the exact old tag and
 		// swap it. Draw authors its shape tags in the order it serializes, so the
 		// old tag is a byte-for-byte source match.
