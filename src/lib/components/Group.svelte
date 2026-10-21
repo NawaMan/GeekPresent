@@ -31,6 +31,10 @@
   each slide with that slide's shot. Per slide, `hide={['logo']}` takes parts
   out (they keep their box, so they fade as they glide), and a `<slot />` inside
   the scene's Group lets a slide add its own extras in scene coordinates.
+  `move={{ db: { x: 480 } }}` puts a part somewhere else on this slide — shifted
+  in the drawing's units, `scale` about its own centre — by name, like `hide`, so
+  a scene forwards one prop and a slide can move any part (a nested group's
+  name moves all of it). A drag in ADJUST still saves where the part is DRAWN.
   `morph="cam"` names every member for the glide (`view-transition-name:
   cam-<name>`), and `morphOn="camera"` keeps those names to that one transition
   kind — no hand-written CSS per part.
@@ -57,7 +61,12 @@
 	import {
 		IDENTITY,
 		NOTHING_HIDDEN,
+		NOTHING_MOVED,
 		childHide,
+		childMoves,
+		isIdentity,
+		moveFor,
+		moveFrame,
 		compose,
 		mapBox,
 		morphRules,
@@ -65,7 +74,8 @@
 		unionBox,
 		type Box,
 		type Frame,
-		type HideState
+		type HideState,
+		type MoveMap
 	} from '$lib/utils/groupCore';
 
 	/** Label in ADJUST mode; a named group also publishes its members' bounding
@@ -90,6 +100,11 @@
 	    keeps its box and its morph name, so it fades out (or in) as it glides
 	    rather than popping. In ADJUST it shows faint instead, still draggable. */
 	export let hide: string[] = [];
+	/** Members to put somewhere else on THIS slide, by name — or a nested group's
+	    name, which moves all of it: `{ db: { x: 480, y: 0, scale: 1.2 } }`. x/y are
+	    the drawing's units, `scale` is about the part's own centre. The part's
+	    source x/y stay where it is drawn, and a drag in ADJUST saves those. */
+	export let move: MoveMap = {};
 	/** Name every named member for a View-Transition morph:
 	    `view-transition-name: <morph>-<name>`. Nested groups inherit it. */
 	export let morph: string | null = null;
@@ -119,6 +134,10 @@
 	const parentFrame = parent?.frame ?? readable<Frame>(IDENTITY);
 	const parentHidden = parent?.hidden ?? readable<HideState>(NOTHING_HIDDEN);
 	const parentMorph = parent?.morph ?? readable<string | null>(null);
+	const parentMoves = parent?.moves ?? readable<MoveMap>(NOTHING_MOVED);
+
+	const moves = writable<MoveMap>(NOTHING_MOVED);
+	$: moves.set(childMoves($parentMoves, move));
 
 	const hidden = writable<HideState>(NOTHING_HIDDEN);
 	$: hidden.set(childHide($parentHidden, name, hide));
@@ -136,6 +155,7 @@
 	const frame = writable<Frame>(IDENTITY);
 	setGroup({
 		frame,
+		moves,
 		hidden,
 		morph: morphPrefix,
 		glide: glideSeconds,
@@ -165,7 +185,13 @@
 	};
 
 	$: resolved = resolveFrame({ x, y, scale, view, fit, pad, focus, zoom }, lookup, canvasWidth, canvasHeight);
-	$: frame.set(compose($parentFrame, resolved.frame));
+	// Moved by an enclosing group's `move` (by this group's name): applied on top,
+	// about the group's own extent in the parent.
+	$: extent = unionBox([...$members.values()].map((m) => m.box));
+	$: selfMove = moveFrame(moveFor($parentMoves, name), mapBox(resolved.frame, extent ?? { x: 0, y: 0, width: 0, height: 0 }));
+	$: moved = !isIdentity(selfMove);
+	$: local = compose(selfMove, resolved.frame);
+	$: frame.set(compose($parentFrame, local));
 
 	// Forward members up, mapped into the parent's space — so an outer camera can
 	// aim at a part of this group — plus, when named, the group's own extent.
@@ -174,12 +200,11 @@
 	$: if (parent) {
 		const now = new Set<object>();
 		for (const [key, m] of $members) {
-			parent.register(key, m.name, mapBox(resolved.frame, m.box));
+			parent.register(key, m.name, mapBox(local, m.box));
 			now.add(key);
 		}
-		const extent = name ? unionBox([...$members.values()].map((m) => m.box)) : null;
-		if (extent) {
-			parent.register(selfKey, name, mapBox(resolved.frame, extent));
+		if (name && extent) {
+			parent.register(selfKey, name, mapBox(local, extent));
 			now.add(selfKey);
 		}
 		for (const key of forwarded) if (!now.has(key)) parent.withdraw(key);
@@ -199,7 +224,7 @@
 	// ADJUST: outline the members' extent on the canvas, and say who's in charge.
 	$: editing = $canAdjust && $adjustMode;
 	$: outline = editing ? unionBox([...$members.values()].map((m) => mapBox($frame, m.box))) : null;
-	$: label = (() => {
+	$: label = (moved ? 'moved · ' : '') + (() => {
 		const r = resolved.frame;
 		const zoomText = `×${+r.s.toFixed(3)}`;
 		switch (resolved.source) {

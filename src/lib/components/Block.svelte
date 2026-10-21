@@ -49,12 +49,18 @@
 	import {
 		IDENTITY,
 		NOTHING_HIDDEN,
+		NOTHING_MOVED,
+		compose,
 		isHidden,
+		isIdentity,
+		moveFor,
+		moveFrame,
 		mapBox,
 		morphName,
 		visibleBox,
 		type Frame,
-		type HideState
+		type HideState,
+		type MoveMap
 	} from '$lib/utils/groupCore';
 	import { browser } from '$app/environment';
 	import { onDestroy, onMount } from 'svelte';
@@ -207,7 +213,13 @@
 	// local units (the numbers in source); the anchor and the DOM are in canvas.
 	const group = getGroup();
 	const groupFrame = group?.frame ?? readable<Frame>(IDENTITY);
-	$: frame = $groupFrame;
+	// Moved on this slide by the group's `move` (by name): one more map, about the
+	// Block's own centre, between its source numbers and the group's frame. The
+	// source numbers — what a drag changes and SAVE writes — stay where it is drawn.
+	const groupMoves = group?.moves ?? readable<MoveMap>(NOTHING_MOVED);
+	$: ownMove = moveFrame(moveFor($groupMoves, name), { x, y, width, height });
+	$: moved = !isIdentity(ownMove);
+	$: frame = moved ? compose($groupFrame, ownMove) : $groupFrame;
 	$: scaled = frame.s !== 1;
 	$: box = mapBox(frame, { x, y, width, height });
 	// The canvas, in local units: what bounds="canvas" clamps to.
@@ -219,8 +231,19 @@
 	$: vtName = morphName($groupMorph, name);
 	// Glide (Group `glide`): a camera change within the slide animates instead of
 	// jumping. Not while editing — a drag must track the pointer, not chase it.
+	// Nor before the first frame is painted: a slide that opens part-way through
+	// a build (paged back into, see Steps) sets its camera during mount, and that
+	// is where it starts, not something to glide to.
 	const groupGlide = group?.glide ?? readable(0);
-	$: gliding = $groupGlide > 0 && !editing;
+	let settled = false;
+	onMount(() => {
+		if (!group) return;
+		let raf = requestAnimationFrame(() => {
+			raf = requestAnimationFrame(() => (settled = true));
+		});
+		return () => cancelAnimationFrame(raf);
+	});
+	$: gliding = settled && $groupGlide > 0 && !editing;
 	// The content layer keeps its transform even at 1× while gliding, so a zoom
 	// back to 1:1 animates down to it rather than snapping when `scaled` flips.
 	$: zoomLayer = scaled || gliding;
@@ -252,7 +275,10 @@
 
 		const free = bounds === 'none';
 		// Local bounds and units, fixed for the gesture (a camera doesn't move mid-drag).
-		const s = frame.s;
+		const s = $groupFrame.s;
+		// A move's scale is about the centre: a resize then shows on the dragged
+		// edge at (1 + scale) / 2 of its size change, so the pointer is divided by that.
+		const grow = (1 + ownMove.s) / 2;
 		const right = stage.x + stage.width;
 		const bottom = stage.y + stage.height;
 		// The shared helper measures the live rendered scale from `el`, captures
@@ -261,8 +287,8 @@
 		trackPointer(event, {
 			scaleFrom: el,
 			onMove: (cdx, cdy, e) => {
-				const dx = cdx / s;
-				const dy = cdy / s;
+				const dx = cdx / s / (mode === 'move' ? 1 : grow);
+				const dy = cdy / s / (mode === 'move' ? 1 : grow);
 				if (mode === 'move') {
 					// Hold Shift to lock the move to a single axis — whichever the pointer
 					// has travelled furthest along, from the drag's START. Re-evaluated on
@@ -386,7 +412,7 @@
 		lastPaste = req.id;
 		// The canvas clamp assumes a stage at the origin, so inside a mapped group
 		// the copy just cascades unclamped (the drag that follows clamps it).
-		const plain = frame.s === 1 && frame.dx === 0 && frame.dy === 0;
+		const plain = isIdentity($groupFrame);
 		const landed = pasteBox(req, req.n, bounds === 'canvas' && plain ? { width: canvasWidth, height: canvasHeight } : null);
 		const copy = { key: req.id, name: nextCopyName(req.baseName, get(blockAnchors).keys()), ...landed, z: req.z };
 		copies = [...copies, copy];
@@ -590,8 +616,9 @@
 	// Inside a group, a named Block reports its LOCAL box there too, so the group's
 	// camera can `fit` / `focus` on it by name.
 	const memberKey = {};
+	// Where it is on THIS slide (moved), so a camera aims at the part, not its old spot.
 	$: if (group) {
-		if (track && name && !removed) group.register(memberKey, name, { x, y, width, height });
+		if (track && name && !removed) group.register(memberKey, name, mapBox(ownMove, { x, y, width, height }));
 		else group.withdraw(memberKey);
 	}
 	onDestroy(() => group?.withdraw(memberKey));
@@ -628,7 +655,7 @@
 
 	{#if editing}
 		<div class="readout">
-			{name ? name + ' · ' : ''}{Math.round(x)},{Math.round(y)} · {Math.round(width)}×{Math.round(height)}{z ? ' · z' + Math.round(z) : ''}{scaled ? ' · ×' + +frame.s.toFixed(3) : ''}
+			{name ? name + ' · ' : ''}{Math.round(x)},{Math.round(y)} · {Math.round(width)}×{Math.round(height)}{z ? ' · z' + Math.round(z) : ''}{scaled ? ' · ×' + +frame.s.toFixed(3) : ''}{moved ? ' · moved' : ''}
 			<button
 				class="zbtn" type="button" title="Send to back" aria-label="Send to back"
 				on:pointerdown|stopPropagation on:click|stopPropagation={sendToBack}

@@ -15,9 +15,9 @@ describe('scene-camera slide (SSR)', () => {
 		expect(body).toContain('Scene camera — press Space');
 	});
 
-	it('starts with the replica hidden, and the parts set to glide', () => {
+	it('starts with the replica hidden; the glide arms only in the browser, after the first paint', () => {
 		const { body } = render(Slide, { props: {} });
 		expect(body).toMatch(/class="movable[^"]*concealed[^"]*"[^>]*left:1580px/);
-		expect(body).toContain('--gp-glide:0.9s');
+		expect(body).not.toContain('--gp-glide');
 	});
 });

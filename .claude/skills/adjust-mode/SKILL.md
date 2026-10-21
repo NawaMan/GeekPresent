@@ -117,7 +117,8 @@ outline appears around each `Block`.
   `ImageBlock` emits a `src={…}` placeholder; keep your real imported `src`.
 - **Inside a zoomed `Group`** (a scene camera), a Block drags in the drawing's OWN units, so the readout,
   Copy and SAVE all carry the numbers in source, not the zoomed ones — at `zoom={21}` one unit is ~21 screen
-  px, so drags are coarse. A part the slide `hide`s shows faint and stays draggable; moving it moves it on
+  px, so drags are coarse. A part the slide `move`s drags from where it is shown, but SAVE writes where it
+  is DRAWN (the slide's `move` stays on top). A part the slide `hide`s shows faint and stays draggable; moving it moves it on
   every slide. `glide` is off while ADJUST is on. See AGENTS.md → "Zoom and pan a drawing".
 
 ## Diagrams: name the boxes, let Connector route

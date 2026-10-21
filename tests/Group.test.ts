@@ -176,6 +176,9 @@ describe('Group — glide, driven by a Steps build', () => {
 		const r = render(GroupStepsHost, { props: { glide: 0.5 } });
 		await tick();
 		const a = block(r.container, 'A');
+		expect(a.classList.contains('gliding')).toBe(false); // armed after the first paint
+		await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+		await tick();
 		expect(a.classList.contains('gliding')).toBe(true);
 		expect(a.style.getPropertyValue('--gp-glide')).toBe('0.5s');
 		// At 1× the layer still wears its transform, so a zoom back DOWN animates.
@@ -196,6 +199,67 @@ describe('Group — glide, driven by a Steps build', () => {
 		const r = render(GroupStepsHost, { props: { glide: 0.5 } });
 		await tick();
 		expect(block(r.container, 'A').classList.contains('gliding')).toBe(false);
+	});
+});
+
+describe('Group — move, per slide, by name', () => {
+	it('moves one named member; the others stay where they are drawn', async () => {
+		const c = await mount({ move: { a: { x: 480, y: -40 } } });
+		expect(rect(block(c, 'A'))).toEqual({ x: 580, y: 60, width: 200, height: 100 });
+		expect(rect(block(c, 'B'))).toEqual({ x: 400, y: 300, width: 100, height: 50 });
+	});
+
+	it('moves in the drawing\'s units, and scales about the part\'s centre', async () => {
+		const c = await mount({ scale: 2, move: { a: { x: 10 } } });
+		expect(rect(block(c, 'A'))).toEqual({ x: 220, y: 200, width: 400, height: 200 }); // 2 × (110, 100)
+		const d = await mount({ move: { b: { scale: 2 } } });
+		expect(rect(block(d, 'B'))).toEqual({ x: 350, y: 275, width: 200, height: 100 });
+	});
+
+	it("a nested group's name moves all of it", async () => {
+		const c = await mount({ nested: true, outerMove: { inner: { x: 100 } } });
+		expect(rect(block(c, 'A')).x).toBe(200);
+		expect(rect(block(c, 'B')).x).toBe(500);
+	});
+
+	it('a camera and a Connector find the part where it was moved to', async () => {
+		const c = await mount({ focus: 'b', zoom: 1, move: { b: { x: 500 } } });
+		const b = rect(block(c, 'B'));
+		expect(b.x + b.width / 2).toBe(960); // centred at its MOVED spot
+		await mount({ move: { a: { x: 50 } } });
+		expect(get(blockAnchors).get('a')).toEqual({ x: 150, y: 100, width: 200, height: 100 });
+	});
+
+	it('a drag moves where the part is DRAWN — what SAVE writes — with the move still on top', async () => {
+		canAdjust.set(true);
+		adjustMode.set(true);
+		const c = await mount({ move: { a: { x: 480 } } });
+		const a = block(c, 'A');
+		a.dispatchEvent(pointer('pointerdown', 0, 0));
+		window.dispatchEvent(pointer('pointermove', 30, 20));
+		window.dispatchEvent(pointer('pointerup', 30, 20));
+		await tick();
+
+		expect(rect(a)).toEqual({ x: 610, y: 120, width: 200, height: 100 });
+		expect(a.querySelector('.readout')?.textContent).toContain('a · 130,120');
+		expect(a.querySelector('.readout')?.textContent).toContain('moved');
+		const entry = [...get(adjustChanges).values()].find((e) => e.name === 'a')!;
+		expect(entry.after).toMatchObject({ x: 130, y: 120 });
+	});
+
+	it('a resize of a scaled part follows the pointer at its dragged edge', async () => {
+		canAdjust.set(true);
+		adjustMode.set(true);
+		const c = await mount({ move: { a: { scale: 3 } } });
+		const a = block(c, 'A');
+		const right = () => rect(a).x + rect(a).width;
+		const before = right();
+		const grip = a.querySelector('.handle') as HTMLElement;
+		grip.dispatchEvent(pointer('pointerdown', 0, 0));
+		window.dispatchEvent(pointer('pointermove', 60, 0));
+		window.dispatchEvent(pointer('pointerup', 60, 0));
+		await tick();
+		expect(right() - before).toBeCloseTo(60, 0);
 	});
 });
 

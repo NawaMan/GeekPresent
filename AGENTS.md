@@ -502,7 +502,7 @@ than misleading the next agent.
   or shapes in its slot with a `viewBox` — so `currentColor` follows `--svgblock-fg`, which
   an `ImageBlock` of the same file cannot; `fit` contain/cover/fill, markup in `utils/svgCore.ts`),
   `Group` (a set of those Blocks that moves, zooms and pans as ONE — a camera on a drawing:
-  `focus="api" zoom={3}`, `fit`, `view`, or plain `x`/`y`/`scale`; per-slide `hide`; `glide`
+  `focus="api" zoom={3}`, `fit`, `view`, or plain `x`/`y`/`scale`; per-slide `hide` and `move`; `glide`
   to animate within a slide, `morph` to glide across slides; write the drawing once as a
   *scene* component and give each slide its shot. See the playbook "Zoom and pan a drawing"),
   `Connector` (an arrow auto-routed between two *named* `Block`s —
@@ -833,7 +833,9 @@ build steps, emphasis):
 - To **zoom and pan a whole drawing** — dive into one part, pan to the next, pull back — put
   its Blocks in a `Group` and change the camera: `glide` animates it within a slide (stepped
   by Space through `<Steps let:revealed>`), `morph` glides it across slides. See the playbook
-  "Zoom and pan a drawing" and `animation/scene-camera.html`.
+  "Zoom and pan a drawing" and `animation/scene-camera.html`. To move one part and keep it moved on
+  the slides after, see that playbook's "Move a part on one slide and leave it there"
+  (`animation/scene-move.html`); paging back into a build opens it spent.
 
 For **scrubbed, timeline animation** — shapes drawing themselves in, elements flying —
 use the Draw family (`$lib/draw`) with one `<AnimationBar />`: every shape's animation
@@ -1312,6 +1314,14 @@ box, and `Connector` / `Spotlight` find a grouped part by name at its zoomed pos
 which hides all of it. Hidden is `visibility`, not removal: the part keeps its box, so it fades
 out as it glides instead of popping. In ADJUST it shows faint and stays draggable.
 
+**Per slide: `move`.** `move={{ db: { x: 480, y: -40, scale: 1.2 } }}` puts parts somewhere else on
+this slide, by name like `hide` — or a nested group's name, which moves all of it. `x`/`y` are the
+drawing's units; `scale` is about the part's own centre. It is inherited down nested groups (an
+inner group's entry wins for its members), a camera `fit`/`focus` aims at the moved spot, and a
+`Connector` follows. The part's source `x`/`y` stay where it is DRAWN: a drag in ADJUST changes
+those (so every slide follows) and the slide's `move` still applies on top; the readout says
+`moved`.
+
 **Moving the camera WITHIN a slide — `glide`.** `glide={0.9}` animates any change of the camera,
 placement or `hide` over 0.9 s with ordinary CSS transitions: any browser, no deck setup. Drive the
 change from a build: `<Steps let:revealed>` hands the slide its current step, so each Space can pick
@@ -1348,14 +1358,46 @@ Group, and render it on every slide with that slide's shot:
   EP001 deck in CodingBoothPromotion uses `slot="after-booth"` to put a glow *behind* later parts.
 - **Per-part touches** (a different picture, an extra style or class on one slide) are the scene's
   own props — expressions on `src` / `style` / `class` are fine. **Geometry must stay literal
-  numbers** (`x={620}`), or SAVE can't find the tag; move a part with a nested Group instead.
+  numbers** (`x={620}`), or SAVE can't find the tag; move a part per slide with `move` instead.
 - **SAVE writes into the scene.** A drag in ADJUST on *any* slide that shows the scene lands in the
   scene component, so every slide follows (see "Place an element visually"). It drags in the
   drawing's own units whatever the zoom, so at 21× one unit is ~21 screen px.
 
+**Move a part on one slide and leave it there.** Each slide is its own page, so "where a part is"
+never carries over by itself: every slide states it. Have the scene forward `move` to its Group,
+once, as it forwards `hide` — then no part needs a prop of its own. The slides before the move pass
+nothing; the slide that moves it steps it on Space; every slide after passes the moved value, so
+paging forward shows no jump:
+
+```svelte
+<!-- MoveScene.svelte -->
+<script> export let move = {}; </script>
+<Group glide={0.9} {move}> …
+  <TextBlock name="db" x={1120} …>DB</TextBlock>
+</Group>
+
+<!-- the slide that moves it -->
+<Steps let:revealed><MoveScene move={revealed >= 1 ? { db: { x: 480 } } : {}} /> … <Fragment>…</Fragment></Steps>
+
+<!-- every slide after -->
+<MoveScene move={{ db: { x: 480 } }} />
+```
+
+Paging BACK into the moving slide (PREV, ←, Shift+Space off the next slide) opens its build
+**spent** — every Fragment showing, the part where it was left — so nothing jumps back and
+Shift+Space plays the move in reverse. This is true of every `<Steps>`, not only scenes: PREV
+leaves a short-lived mark in `sessionStorage` naming the slide it pages to (`utils/arrivalCore.ts`,
+written by `deckNav.navigate({ arriveAtEnd })`), and that slide's Steps reads it once. FIRST, NEXT,
+the TOC, a reload and the browser's Back button start at `start` as before; `backTo="start"` opts a
+build out. A glide arms only after the first frame is painted, so a slide that opens part-way
+through a build starts at that shot instead of gliding to it. Worked example:
+`animation/scene-move.html` → `scene-moved.html`. A presenter-console window that follows PREV
+does not get the mark, so it opens the build at the start.
+
 **Nesting.** Groups compose: an inner group's `x`/`y`/`scale` moves its members inside the outer
 drawing, and a **named** inner group publishes its extent, so an outer `fit="storage"` frames all of
-it and `hide={['storage']}` hides all of it. `hide`, `morph` and `glide` are inherited downward.
+it, `hide={['storage']}` hides all of it and `move={{ storage: { y: -200 } }}` moves all of it.
+`hide`, `move`, `morph` and `glide` are inherited downward.
 
 **Limits.** A named camera (`fit` / `focus="name"`) resolves once its target has mounted — always so
 in the browser, but a server render (the handout, before hydration) draws the placement instead;

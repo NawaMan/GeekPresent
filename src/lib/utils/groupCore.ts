@@ -96,6 +96,49 @@ export function isHidden(state: HideState, name: string): boolean {
 	return state.all || (!!name && state.names.has(name));
 }
 
+// --- move: one scene, a part somewhere else on this slide -----------------------
+
+/** Where a part sits on THIS slide, relative to where it is drawn: shifted by
+    x/y (the drawing's units) and scaled about its own centre. */
+export interface Move {
+	x?: number;
+	y?: number;
+	scale?: number;
+}
+
+/** Parts to move, by name — a Block's name, or a nested group's (which moves
+    all of it). */
+export type MoveMap = Readonly<Record<string, Move>>;
+
+export const NOTHING_MOVED: MoveMap = Object.freeze({});
+
+/** A group's moves: its parent's, then its own on top (its own win). */
+export function childMoves(parent: MoveMap, move: MoveMap | null | undefined): MoveMap {
+	if (!move || typeof move !== 'object') return parent;
+	const own = Object.entries(move).filter(([n, m]) => n && m && typeof m === 'object');
+	return own.length ? { ...parent, ...Object.fromEntries(own) } : parent;
+}
+
+/** The move for `name`, or null (unnamed, or not in the map). */
+export function moveFor(moves: MoveMap, name: string): Move | null {
+	return name && Object.prototype.hasOwnProperty.call(moves, name) ? moves[name] : null;
+}
+
+/** `m` as a frame for a part whose box is `b`: scale about b's centre, then shift.
+    Junk (a NaN, a zero or negative scale) is ignored, never a vanished part. */
+export function moveFrame(m: Move | null, b: Box): Frame {
+	if (!m) return IDENTITY;
+	const s = goodScale(m.scale ?? 1);
+	const cx = b.x + b.width / 2;
+	const cy = b.y + b.height / 2;
+	return { s, dx: cx * (1 - s) + finite(m.x ?? 0), dy: cy * (1 - s) + finite(m.y ?? 0) };
+}
+
+/** True when `f` changes nothing. */
+export function isIdentity(f: Frame): boolean {
+	return f.s === 1 && f.dx === 0 && f.dy === 0;
+}
+
 // --- morph: naming the parts for a View-Transition glide ----------------------
 
 /** A string usable as a view-transition-name: a CSS identifier that isn't one of

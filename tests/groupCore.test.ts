@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
 	IDENTITY,
 	NOTHING_HIDDEN,
+	NOTHING_MOVED,
 	childHide,
+	childMoves,
+	isIdentity,
+	moveFor,
+	moveFrame,
 	isHidden,
 	morphName,
 	morphRules,
@@ -193,5 +198,34 @@ describe('resolveFrame — precedence and fall-through', () => {
 	it('junk zoom and scale fall back to 1, junk offsets to 0', () => {
 		expect(resolveFrame({ focus: [0, 0], zoom: 0 }, none, CW, CH).frame.s).toBe(1);
 		expect(resolveFrame({ scale: -2, x: NaN }, none, CW, CH).frame).toEqual(IDENTITY);
+	});
+});
+
+describe('move', () => {
+	const box = { x: 100, y: 100, width: 200, height: 100 };
+
+	it('shifts a part, and scales it about its own centre', () => {
+		expect(mapBox(moveFrame({ x: 480 }, box), box)).toEqual({ x: 580, y: 100, width: 200, height: 100 });
+		expect(mapBox(moveFrame({ scale: 2 }, box), box)).toEqual({ x: 0, y: 50, width: 400, height: 200 });
+	});
+
+	it('no move, or junk, leaves the part where it is drawn', () => {
+		expect(moveFrame(null, box)).toEqual(IDENTITY);
+		expect(isIdentity(moveFrame({ x: NaN, y: Infinity, scale: 0 }, box))).toBe(true);
+	});
+
+	it('inherits down nested groups; the inner entry wins', () => {
+		const outer = childMoves(NOTHING_MOVED, { db: { x: 1 }, api: { y: 2 } });
+		const inner = childMoves(outer, { db: { x: 9 } });
+		expect(inner).toEqual({ db: { x: 9 }, api: { y: 2 } });
+		expect(childMoves(outer, null)).toBe(outer);
+		expect(childMoves(outer, { '': { x: 1 } })).toBe(outer);
+	});
+
+	it('looks a part up by name only', () => {
+		const moves = childMoves(NOTHING_MOVED, { db: { x: 1 } });
+		expect(moveFor(moves, 'db')).toEqual({ x: 1 });
+		expect(moveFor(moves, '')).toBeNull();
+		expect(moveFor(moves, 'toString')).toBeNull();
 	});
 });

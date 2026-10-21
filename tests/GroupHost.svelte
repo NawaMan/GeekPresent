@@ -23,19 +23,21 @@
 	export let outerFit: string | null = null;
 	export let outerHide: string[] = [];
 	export let hide: string[] = [];
+	export let move: Record<string, { x?: number; y?: number; scale?: number }> = {};
+	export let outerMove: Record<string, { x?: number; y?: number; scale?: number }> = {};
 	export let morph: string | null = null;
 	export let morphOn: string | string[] | null = null;
 </script>
 
 {#if nested}
-	<Group x={outerX} scale={outerScale} fit={outerFit} hide={outerHide} {morph} {morphOn}>
-		<Group name="inner" {x} {y} {scale} {view} {fit} {pad} {focus} {zoom} {hide}>
+	<Group x={outerX} scale={outerScale} fit={outerFit} hide={outerHide} move={outerMove} {morph} {morphOn}>
+		<Group name="inner" {x} {y} {scale} {view} {fit} {pad} {focus} {zoom} {hide} {move}>
 			<Block name="a" x={100} y={100} width={200} height={100} {bounds}>A</Block>
 			<Block name="b" x={400} y={300} width={100} height={50} {bounds}>B</Block>
 		</Group>
 	</Group>
 {:else}
-	<Group {x} {y} {scale} {view} {fit} {pad} {focus} {zoom} {hide} {morph} {morphOn}>
+	<Group {x} {y} {scale} {view} {fit} {pad} {focus} {zoom} {hide} {move} {morph} {morphOn}>
 		<Block name="a" x={100} y={100} width={200} height={100} {bounds}>A</Block>
 		<Block name="b" x={400} y={300} width={100} height={50} {bounds}>B</Block>
 	</Group>

@@ -80,12 +80,14 @@
 	// Navigate to `href`, animating in `direction` when this deck uses view
 	// transitions (delegated to the shared deckNav helper so a followed navigation
 	// in SlideDeck animates identically).
-	function navigate(href: string, direction: Dir) {
-		pageNavigate(decorate(href), { viewTransitions, kind: kindFor(direction), direction });
+	// PREV (and ← / Shift+Space) lands on the previous slide with its build spent,
+	// as it was left; FIRST is a fresh start, so it does not.
+	function navigate(href: string, direction: Dir, arriveAtEnd = false) {
+		pageNavigate(decorate(href), { viewTransitions, kind: kindFor(direction), direction, arriveAtEnd });
 	}
 
 	$: onFirst = () => navigate(firstLink, 'back');
-	$: onPrev  = () => navigate(prevLink,  'back');
+	$: onPrev  = () => navigate(prevLink,  'back', true);
 	$: onNext  = () => navigate(nextLink,  'forward');
 	$: onLast  = () => navigate(lastLink,  'forward');
 
@@ -121,7 +123,7 @@
 		if (isInteractiveTarget(event.target)) return;
 		if (event.key === 'ArrowLeft' && prevLink) {
 			event.preventDefault();
-			navigate(prevLink, 'back');
+			navigate(prevLink, 'back', true);
 
 		} else if (event.key === 'ArrowRight' && nextLink) {
 			event.preventDefault();
@@ -138,7 +140,7 @@
 				navigate(nextLink, 'forward');
 			} else if (intent === 'page-prev' && prevLink) {
 				event.preventDefault();
-				navigate(prevLink, 'back');
+				navigate(prevLink, 'back', true);
 			}
 		}
 	}

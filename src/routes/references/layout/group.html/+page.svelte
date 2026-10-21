@@ -20,9 +20,10 @@
 			<li><code>fit pad</code> — a part fills the canvas, with a margin</li>
 			<li><code>view</code> — a rectangle of the drawing fills the canvas</li>
 			<li><code>hide</code> — parts off stage on this slide (they fade, not pop)</li>
+			<li><code>move={'{{'} db: {'{'} x: 480 {'}'} {'}}'}</code> — a part somewhere else on this slide, by name</li>
 			<li><code>glide</code> — seconds to animate a change within the slide</li>
 			<li><code>morph morphOn</code> — name the parts for a glide between slides</li>
-			<li><code>name</code> — a nested group's name hides or frames all of it</li>
+			<li><code>name</code> — a nested group's name hides, moves or frames all of it</li>
 	</ul>
 
 	<p style="margin-top: 0.7em; font-size: 0.85em; opacity: 0.85;">Write the drawing once in a component and render it on every slide with that slide's shot — a <i>scene</i>. ADJUST drags parts in the drawing's own units and SAVE writes them into the scene file. Worked examples: <code>animation/scene-camera.html</code> (within a slide) and <code>transition/camera-*.html</code> (across slides).</p>

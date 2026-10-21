@@ -3,6 +3,8 @@
 // A Group publishes these through Svelte context:
 //   - `frame`: its members' local → CANVAS map (already composed with every
 //     enclosing group), which a Block applies to draw itself;
+//   - `moves`: which members this slide moves, by name (a Block applies its own;
+//     a nested group applies the one for ITS name to everything inside);
 //   - `hidden` / `morph` / `glide`: which members this slide hides, the prefix
 //     their View-Transition names wear, and how long an in-slide change takes —
 //     all inherited down nested groups;
@@ -15,11 +17,13 @@
 // has. That is the compatibility promise: nothing outside a <Group> changes.
 import { getContext, setContext } from 'svelte';
 import type { Readable } from 'svelte/store';
-import type { Box, Frame, HideState } from './groupCore';
+import type { Box, Frame, HideState, MoveMap } from './groupCore';
 
 export interface GroupContext {
 	/** Members' local → canvas map. */
 	frame: Readable<Frame>;
+	/** Which members this slide moves (the group's `move`, and its ancestors'). */
+	moves: Readable<MoveMap>;
 	/** Which members this slide hides (the group's `hide`, and its ancestors'). */
 	hidden: Readable<HideState>;
 	/** The morph-name prefix members wear (`data-gp-morph="<prefix>-<name>"`), or null. */

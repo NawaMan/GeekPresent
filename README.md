@@ -274,6 +274,7 @@ Put a drawing's parts in a `Group` and you can move them all with one tag — an
 - **Aim:** `focus` + `zoom` centres a part and zooms in; `fit="name"` makes a part fill the screen; `view` frames any rectangle; `x` / `y` / `scale` just moves and resizes the set.
 - **Per slide:** `hide` takes parts off stage — they fade rather than pop.
 - **Within a slide:** `glide={0.9}` animates every camera change; step it with Space through `<Steps let:revealed>` — see `animation/scene-camera.html`.
+- **Move it and leave it there:** `move={{ db: { x: 480 } }}` puts a part somewhere else on one slide, by name like `hide`; a scene forwards `move` once and any part can move. The slide that moves it steps it on Space, and every slide after passes the moved value. Paging back into a build opens it already spent, so nothing jumps back — see `animation/scene-move.html`.
 - **Across slides:** write the drawing once as a component (a *scene*) and give each slide its own shot; in a View-Transition deck, `morph` makes paging glide every part from one shot to the next — see `transition/camera-wide.html`.
 - **Crisp at any zoom:** each part is redrawn at its true size, not blown up, so text and lines stay sharp.
 - **Edit once:** drag a part in ADJUST on any slide and SAVE writes it into the scene file, so every slide follows.
