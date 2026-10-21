@@ -494,10 +494,13 @@ than misleading the next agent.
   on any slide reached by a CLIENT-SIDE navigation, i.e. a View-Transition deck or an appendix
   with `transition`, because Monaco's CDN loader renders blank after a `goto`; EDIT still opens
   the same unscaled popup),
-  `Block` / `ImageBlock` / `BlockNode` (absolutely-positioned
+  `Block` / `ImageBlock` / `TextBlock` (absolutely-positioned
   wrappers you place at exact canvas pixels — drag/resize them in **ADJUST mode**,
-  see that playbook; `BlockNode` is the diagram box — border and centred label,
-  `<BlockNode name="api" …>API</BlockNode>`, styled by `--node-*` role tokens), `Connector` (an arrow auto-routed between two *named* `Block`s —
+  see that playbook; `TextBlock` is the diagram box — border and centred label,
+  `<TextBlock name="api" …>API</TextBlock>`, styled by `--textblock-*` role tokens;
+  `SvgBlock` is an INLINE SVG filling its box — `svg={x}` from `import x from './x.svg?raw'`,
+  or shapes in its slot with a `viewBox` — so `currentColor` follows `--svgblock-fg`, which
+  an `ImageBlock` of the same file cannot; `fit` contain/cover/fill, markup in `utils/svgCore.ts`), `Connector` (an arrow auto-routed between two *named* `Block`s —
   see the diagram playbook), `Cursor` (a fake mouse pointer for demoing a UI without a
   live app — a `Sprite` wearing a pointer under the hood, riding `<Draw>`; `path` glides
   between named/literal points, or chain `script` — `warpTo`/`moveTo`/`around`/`attention`
@@ -1222,8 +1225,8 @@ Don't compute arrow coordinates. Give each box a **`name`** and let **`Connector
 between them — then a ADJUST-mode drag moves the box *and* its arrows together.
 
 ```svelte
-<BlockNode name="api" x={200} y={400} width={280} height={140}>API</BlockNode>
-<BlockNode name="db"  x={900} y={400} width={280} height={140}>DB</BlockNode>
+<TextBlock name="api" x={200} y={400} width={280} height={140}>API</TextBlock>
+<TextBlock name="db"  x={900} y={400} width={280} height={140}>DB</TextBlock>
 
 <!-- AFTER the Blocks — see the ordering rule below -->
 <Connector from="api" to="db" label="query" />

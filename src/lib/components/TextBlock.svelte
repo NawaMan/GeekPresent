@@ -1,18 +1,18 @@
 <!--
-  BlockNode — a Block that IS a diagram box: bordered, rounded, its label centred.
+  TextBlock — a Block that IS a diagram box: bordered, rounded, its label centred.
 
-      <BlockNode name="api" x={1660} y={250} width={240} height={110} grid={10}>API</BlockNode>
+      <TextBlock name="api" x={1660} y={250} width={240} height={110} grid={10}>API</TextBlock>
 
   is the one-line form of what every boxes-and-arrows slide used to spell out —
 
       <Block name="api" …><div class="node">API</div></Block>
 
   — plus a `.node` rule copied into the slide's own style block. The look now lives
-  here, on role tokens (`--node-*`), so one theme reskins every node.
+  here, on role tokens (`--textblock-*`), so one theme reskins every node.
 
   It is a Block in every way that matters: `name` publishes its box for Connector /
   Spotlight, and ADJUST drags, SAVEs, deletes and copy/pastes it like any Block —
-  through `tag="BlockNode"`, so the source patcher looks for `<BlockNode` (the same
+  through `tag="TextBlock"`, so the source patcher looks for `<TextBlock` (the same
   move ImageBlock makes). The label is a slot, so richer markup works too.
 
   All Block props (x/y/width/height/name/grid/aspect/z/bounds/canvas*/minSize/fill)
@@ -50,7 +50,7 @@
 <Block
 	{x} {y} {width} {height} {name} {z} {fill} {grid} {aspect} {canvasWidth} {canvasHeight} {bounds} {minSize}
 	{style} {id} class={klass}
-	tag="BlockNode"
+	tag="TextBlock"
 >
 	<div class="node"><slot /></div>
 </Block>
@@ -64,10 +64,10 @@
 		place-items: center;
 		box-sizing: border-box;
 		text-align: center;
-		color: var(--node-fg, #C0F1FF);
-		background: var(--node-bg, #181818);
-		border: var(--node-border-width, 2px) solid var(--node-border, #C0F1FF);
-		border-radius: var(--node-radius, 10px);
+		color: var(--textblock-fg, #C0F1FF);
+		background: var(--textblock-bg, #181818);
+		border: var(--textblock-border-width, 2px) solid var(--textblock-border, #C0F1FF);
+		border-radius: var(--textblock-radius, 10px);
 		font-size: 0.9em;
 		font-weight: bold;
 	}

@@ -20,7 +20,7 @@
 	import ContentPage from '$lib/templates/ContentPage.svelte';
 	import QuickCode   from '$lib/components/QuickCode.svelte';
 	import Connector   from '$lib/components/Connector.svelte';
-	import BlockNode   from '$lib/components/BlockNode.svelte';
+	import TextBlock   from '$lib/components/TextBlock.svelte';
 	import Note        from '$lib/components/Note.svelte';
 	import Hint        from '$lib/components/Hint.svelte';
 	import ViewSource  from '$lib/components/ViewSource.svelte';
@@ -43,7 +43,7 @@
 			space, so it tracks the box even in ADJUST mode.
 		</p>
 
-		<QuickCode style="margin-top: 0.5em;" lang="svelte" code={`<BlockNode name="db" …>DB</BlockNode>
+		<QuickCode style="margin-top: 0.5em;" lang="svelte" code={`<TextBlock name="db" …>DB</TextBlock>
 
 <Note>
   <li data-highlight="db">Now the query hits the database</li>
@@ -68,11 +68,11 @@
 </ContentPage>
 
 <!-- The boxes. Their names are all the note lines / buttons above know about them. -->
-<BlockNode name="browser" x={1020} y={300} width={220} height={110} grid={10}>Browser</BlockNode>
-<BlockNode name="edge" x={1360} y={300} width={220} height={110} grid={10}>Edge</BlockNode>
-<BlockNode name="api" x={1700} y={300} width={200} height={110} grid={10}>API</BlockNode>
-<BlockNode name="cache" x={1160} y={620} width={220} height={110} grid={10}>Cache</BlockNode>
-<BlockNode name="db" x={1600} y={620} width={220} height={110} grid={10}>DB</BlockNode>
+<TextBlock name="browser" x={1020} y={300} width={220} height={110} grid={10}>Browser</TextBlock>
+<TextBlock name="edge" x={1360} y={300} width={220} height={110} grid={10}>Edge</TextBlock>
+<TextBlock name="api" x={1700} y={300} width={200} height={110} grid={10}>API</TextBlock>
+<TextBlock name="cache" x={1160} y={620} width={220} height={110} grid={10}>Cache</TextBlock>
+<TextBlock name="db" x={1600} y={620} width={220} height={110} grid={10}>DB</TextBlock>
 
 <!-- Connectors come AFTER the boxes they link (they resolve names at prerender). -->
 <Connector from="browser" to="edge" label="GET" />

@@ -12,7 +12,7 @@
 	import Callout     from '$lib/components/Callout.svelte';
 	import Connector   from '$lib/components/Connector.svelte';
 	import Block       from '$lib/components/Block.svelte';
-	import BlockNode   from '$lib/components/BlockNode.svelte';
+	import TextBlock   from '$lib/components/TextBlock.svelte';
 	import Hint        from '$lib/components/Hint.svelte';
 	import ViewSource  from '$lib/components/ViewSource.svelte';
 	import source      from './+page.svelte?raw';
@@ -26,12 +26,12 @@
 			Give a <b>Block</b> a <code>name</code> and it publishes its box. A
 			<b>Connector</b> looks two of them up and routes an arrow between them —
 			so a diagram is written in <i>names</i>, and the arrows follow the boxes
-			when you drag them in ADJUST mode. <b>BlockNode</b> is the Block that
+			when you drag them in ADJUST mode. <b>TextBlock</b> is the Block that
 			draws the box too — border, label and all.
 		</p>
 
-		<QuickCode style="margin-top: 0.6em;" lang="svelte" code={`<BlockNode name="api" …>API</BlockNode>
-<BlockNode name="db"  …>DB</BlockNode>
+		<QuickCode style="margin-top: 0.6em;" lang="svelte" code={`<TextBlock name="api" …>API</TextBlock>
+<TextBlock name="db"  …>DB</TextBlock>
 
 <Connector
 	from="api"
@@ -46,11 +46,11 @@
 		</p>
 	</div>
 
-	<BlockNode name="browser" x={960}  y={250} width={240} height={110} grid={10}>Browser</BlockNode>
-	<BlockNode name="edge"    x={1310} y={250} width={240} height={110} grid={10}>Edge</BlockNode>
-	<BlockNode name="api"     x={1660} y={250} width={240} height={110} grid={10}>API</BlockNode>
-	<BlockNode name="cache"   x={960}  y={580} width={240} height={110} grid={10}>Cache</BlockNode>
-	<BlockNode name="db"      x={1560} y={580} width={240} height={110} grid={10}>DB</BlockNode>
+	<TextBlock name="browser" x={960}  y={250} width={240} height={110} grid={10}>Browser</TextBlock>
+	<TextBlock name="edge"    x={1310} y={250} width={240} height={110} grid={10}>Edge</TextBlock>
+	<TextBlock name="api"     x={1660} y={250} width={240} height={110} grid={10}>API</TextBlock>
+	<TextBlock name="cache"   x={960}  y={580} width={240} height={110} grid={10}>Cache</TextBlock>
+	<TextBlock name="db"      x={1560} y={580} width={240} height={110} grid={10}>DB</TextBlock>
 
 	<!-- ...and the arrows. Coordinate-free: drag any box above and watch these
 		re-route. Each connector demonstrates one route. -->
