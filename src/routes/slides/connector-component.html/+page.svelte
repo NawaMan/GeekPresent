@@ -33,7 +33,10 @@
 		<QuickCode style="margin-top: 0.6em;" lang="svelte" code={`<BlockNode name="api" …>API</BlockNode>
 <BlockNode name="db"  …>DB</BlockNode>
 
-<Connector from="api" to="db" label="query" />`} />
+<Connector
+	from="api"
+	to="db"
+	label="query" />`} />
 
 		<p style="margin-top: 0.7em;">
 			<code>route</code> picks the shape: <code>straight</code> attaches wherever
@@ -42,39 +45,38 @@
 			automatically — pin one with <code>fromSide</code> / <code>toSide</code>.
 		</p>
 	</div>
+
+	<BlockNode name="browser" x={960}  y={250} width={240} height={110} grid={10}>Browser</BlockNode>
+	<BlockNode name="edge"    x={1310} y={250} width={240} height={110} grid={10}>Edge</BlockNode>
+	<BlockNode name="api"     x={1660} y={250} width={240} height={110} grid={10}>API</BlockNode>
+	<BlockNode name="cache"   x={960}  y={580} width={240} height={110} grid={10}>Cache</BlockNode>
+	<BlockNode name="db"      x={1560} y={580} width={240} height={110} grid={10}>DB</BlockNode>
+
+	<!-- ...and the arrows. Coordinate-free: drag any box above and watch these
+		re-route. Each connector demonstrates one route. -->
+	<Connector from="browser" to="edge" label="GET" />
+	<Connector from="edge"    to="api"  label="route" />
+	<Connector from="api"     to="db"   route="ortho" radius={16} label="query" labelOffset={26} />
+	<Connector from="db"      to="cache" label="warm" dash />
+	<Connector
+		from="cache"
+		to="browser"
+		route="curve"
+		fromSide="left"
+		toSide="left"
+		label="hit"
+		labelOffset={-40}
+		color="var(--callout-tip-accent, #00B356)"
+	/>
+
+	<!-- Sits under the diagram it's warning about. Unnamed, so it adds no anchor. -->
+	<Block x={890} y={760} width={1010} height={150} grid={10}>
+		<Callout kind="warn" title="Order matters" style="font-size: 0.8em;">
+			A Connector resolves its names while the slide is <i>prerendered</i>, and Blocks
+			register in document order — so put connectors <b>after</b> the boxes they link.
+		</Callout>
+	</Block>
 </ContentPage>
-
-<!-- The boxes. Names are the only thing the arrows below know about them. -->
-<BlockNode name="browser" x={960}  y={250} width={240} height={110} grid={10}>Browser</BlockNode>
-<BlockNode name="edge"    x={1310} y={250} width={240} height={110} grid={10}>Edge</BlockNode>
-<BlockNode name="api"     x={1660} y={250} width={240} height={110} grid={10}>API</BlockNode>
-<BlockNode name="cache"   x={960}  y={580} width={240} height={110} grid={10}>Cache</BlockNode>
-<BlockNode name="db"      x={1560} y={580} width={240} height={110} grid={10}>DB</BlockNode>
-
-<!-- ...and the arrows. Coordinate-free: drag any box above and watch these
-     re-route. Each connector demonstrates one route. -->
-<Connector from="browser" to="edge" label="GET" />
-<Connector from="edge"    to="api"  label="route" />
-<Connector from="api"     to="db"   route="ortho" radius={16} label="query" labelOffset={26} />
-<Connector from="db"      to="cache" label="warm" dash />
-<Connector
-	from="cache"
-	to="browser"
-	route="curve"
-	fromSide="left"
-	toSide="left"
-	label="hit"
-	labelOffset={-40}
-	color="var(--callout-tip-accent, #00B356)"
-/>
-
-<!-- Sits under the diagram it's warning about. Unnamed, so it adds no anchor. -->
-<Block x={890} y={760} width={1010} height={150} grid={10}>
-	<Callout kind="warn" title="Order matters" style="font-size: 0.8em;">
-		A Connector resolves its names while the slide is <i>prerendered</i>, and Blocks
-		register in document order — so put connectors <b>after</b> the boxes they link.
-	</Callout>
-</Block>
 
 <Hint text="Flip ADJUST (top-right) and drag a box — every arrow follows it" />
 <ViewSource {source} {path} />
