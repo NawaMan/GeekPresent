@@ -8,8 +8,10 @@
 	import Label       from '$lib/components/Label.svelte';
 	import Block       from '$lib/components/Block.svelte';
 	import ImageBlock  from '$lib/components/ImageBlock.svelte';
+	import SvgBlock    from '$lib/components/SvgBlock.svelte';
 	import ViewSource  from '$lib/components/ViewSource.svelte';
 	import codecat     from './codecat.png';
+	import brackets    from './brackets.svg?raw';
 	import source      from './+page.svelte?raw';
 
 	const path = 'src/routes/slides/block-component.html/+page.svelte';
@@ -32,6 +34,9 @@
 			ratio (hold <b>Alt</b> to reshape it). Press <b>Esc</b> mid-drag to cancel,
 			or <b>Ctrl+Z</b> / <b>Ctrl+Shift+Z</b> to undo / redo. The <b>Copy</b> button
 			hands back an updated <code>&lt;ImageBlock&gt;</code> tag.
+			The two <code>&lt;/&gt;</code> marks are <Label>SvgBlock</Label>s &mdash;
+			one an imported <code>.svg?raw</code> file, one drawn in place &mdash; inlined
+			so they take the theme's ink.
 		</p>
 		<p style="margin-top: 0.6em; opacity: 0.8;">
 			Overlapping Blocks paint in DOM order &mdash; give one a <code>z</code> to
@@ -57,13 +62,24 @@
      the box into (fit="fill", the default). -->
 <ImageBlock name="cat" src={codecat} alt="Coding Booth cat" x={786} y={798} width={249} height={249} bounds="none" />
 
+<!-- SvgBlock: (a) an SVG file imported as text, (b) shapes written in place.
+     Both are inline, so `currentColor` is the theme's ink (--svgblock-fg). -->
+<SvgBlock name="svg-file" svg={brackets} title="Brackets, from a file" x={1373} y={321} width={200} height={200} />
+<SvgBlock name="svg-inline" viewBox="0 0 120 120" title="Brackets, drawn in place" x={1616} y={313} width={200} height={200}>
+	<g fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+		<circle cx="60" cy="60" r="54" stroke-width="4" />
+		<polyline points="44,38 22,60 44,82" />
+		<polyline points="76,38 98,60 76,82" />
+	</g>
+</SvgBlock>
+
 <!-- Stacking order: `front` comes FIRST in the markup, so DOM paint order alone
      would bury it — but z={1} lifts it over `back` (default z=0). Flip ADJUST on
      and use the ⤒ / ⤓ buttons to reorder them; Copy/Save writes the z back. -->
-<Block name="front" x={1216} y={298} width={280} height={168} z={1}>
+<Block name="front" x={855} y={359} width={280} height={168} z={1}>
 	<div class="demo c"><b>front</b><br/>z=1</div>
 </Block>
-<Block name="back" x={1439} y={338} width={280} height={168}>
+<Block name="back" x={1056} y={358} width={280} height={168}>
 	<div class="demo d"><b>back</b><br/>z=0 (default)</div>
 </Block>
 

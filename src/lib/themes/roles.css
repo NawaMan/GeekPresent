@@ -409,11 +409,15 @@
 	--progress-fill:     var(--ACCENT, #2980B9);
 	--progress-track:    color-mix(in srgb, var(--progress-fill) 20%, transparent);
 
-	/* Diagram node (BlockNode.svelte) — a bordered box on the canvas surface, its
+	/* Diagram node (TextBlock.svelte) — a bordered box on the canvas surface, its
 	   border and label in the canvas ink. Fallbacks are the dark default. */
-	--node-fg:           var(--INK, #C0F1FF);
-	--node-bg:           var(--PAPER, #181818);
-	--node-border:       var(--INK, #C0F1FF);
+	--textblock-fg:      var(--INK, #C0F1FF);
+	--textblock-bg:      var(--PAPER, #181818);
+	--textblock-border:  var(--INK, #C0F1FF);
+
+	/* Inline SVG (SvgBlock.svelte) — `currentColor` inside the drawing. The canvas
+	   ink by default, so a monochrome SVG follows the theme. */
+	--svgblock-fg:       var(--INK, #C0F1FF);
 
 	/* ── METRICS (non-colour) ──────────────────────────────────────────────────
 	   Sizes and spacing a theme may legitimately want to move. Same contract as
@@ -438,7 +442,7 @@
 	/* Progress bar: its thickness (ProgressBar.svelte). */
 	--progress-height:    6px;
 
-	/* Diagram node (BlockNode.svelte): border weight and corner rounding. */
-	--node-border-width:  2px;
-	--node-radius:        10px;
+	/* Diagram node (TextBlock.svelte): border weight and corner rounding. */
+	--textblock-border-width: 2px;
+	--textblock-radius:       10px;
 }

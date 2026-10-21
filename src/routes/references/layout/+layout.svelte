@@ -18,7 +18,7 @@
 <SlideDeck
 	{pages}
 	title="References — Layout"
-	description="GeekPresent layout: Block, ImageBlock, Connector, Columns, ScrollDiv, ADJUST."
+	description="GeekPresent layout: Block, ImageBlock, SvgBlock, Connector, Columns, ScrollDiv, ADJUST."
 	width={1920}
 	height={1080}
 	fill

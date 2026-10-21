@@ -823,18 +823,35 @@ describe('patchSlideSource — PASTE (duplicate a Block)', () => {
 	});
 });
 
-describe('patchSlideSource — a BlockNode is found by its own tag', () => {
-	const src = '<BlockNode name="api" x={100} y={200} width={300} height={400} grid={10}>API</BlockNode>';
+describe('patchSlideSource — a TextBlock is found by its own tag', () => {
+	const src = '<TextBlock name="api" x={100} y={200} width={300} height={400} grid={10}>API</TextBlock>';
 	const before = { x: 100, y: 200, width: 300, height: 400 };
 
 	it('pastes a one-line copy', () => {
 		const { source } = patchSlideSource(src, [
-			{ kind: 'BlockNode', name: 'api', before, paste: { name: 'api-2', after: { x: 120, y: 220, width: 300, height: 400 } } }
+			{ kind: 'TextBlock', name: 'api', before, paste: { name: 'api-2', after: { x: 120, y: 220, width: 300, height: 400 } } }
 		]);
-		expect(source).toBe(src + '\n<BlockNode name="api-2" x={120} y={220} width={300} height={400} grid={10}>API</BlockNode>');
+		expect(source).toBe(src + '\n<TextBlock name="api-2" x={120} y={220} width={300} height={400} grid={10}>API</TextBlock>');
 	});
 
 	it('deletes it', () => {
-		expect(patchSlideSource(src, [{ kind: 'BlockNode', name: 'api', before, remove: true }]).source).toBe('');
+		expect(patchSlideSource(src, [{ kind: 'TextBlock', name: 'api', before, remove: true }]).source).toBe('');
+	});
+});
+
+describe('patchSlideSource — SvgBlock in both forms', () => {
+	const before = { x: 100, y: 200, width: 300, height: 400 };
+	const after = { x: 120, y: 220, width: 300, height: 400 };
+
+	it('pastes the self-closing file form', () => {
+		const src = '<SvgBlock name="logo" svg={logo} x={100} y={200} width={300} height={400} />';
+		const { source } = patchSlideSource(src, [{ kind: 'SvgBlock', name: 'logo', before, paste: { name: 'logo-2', after } }]);
+		expect(source).toBe(src + '\n<SvgBlock name="logo-2" svg={logo} x={120} y={220} width={300} height={400} />');
+	});
+
+	it('deletes the slot form, shapes and all', () => {
+		const src = '<p>a</p>\n<SvgBlock name="mark" viewBox="0 0 1 1" x={100} y={200} width={300} height={400}>\n\t<circle r="1" />\n</SvgBlock>\n<p>b</p>';
+		const { source } = patchSlideSource(src, [{ kind: 'SvgBlock', name: 'mark', before, remove: true }]);
+		expect(source).toBe('<p>a</p>\n<p>b</p>');
 	});
 });
