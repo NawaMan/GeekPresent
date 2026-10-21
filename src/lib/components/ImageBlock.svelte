@@ -15,7 +15,7 @@
     - 'cover'   fill the panel and crop the overflow, keeping the image's aspect.
     - 'contain' fit inside the panel and letterbox, keeping the image's aspect.
 
-  All other props (x/y/width/height/name/grid/aspect/canvas*/minSize) pass straight
+  All other props (x/y/width/height/name/z/grid/aspect/canvas*/minSize) pass straight
   through to Block. `aspect` defaults to true here (lock); pass `false` for
   freeform. Dragging, snapping, Esc-to-cancel and Copy all work as on a bare Block.
 -->
@@ -33,6 +33,8 @@
 	export let width = 200;
 	export let height = 120;
 	export let name = '';
+	/** Stacking order — forwarded so an authored or ADJUST-saved `z` takes effect. */
+	export let z = 0;
 	export let grid = 1;
 	/** Aspect lock — defaults to ON for images (resize keeps the panel's shape; hold
 	    Alt to break it). Pass a number for an explicit ratio, or `false` for freeform. */
@@ -62,7 +64,7 @@
 </script>
 
 <Block
-	{x} {y} {width} {height} {name} {grid} {aspect} {canvasWidth} {canvasHeight} {minSize} {bounds}
+	{x} {y} {width} {height} {name} {z} {grid} {aspect} {canvasWidth} {canvasHeight} {minSize} {bounds}
 	{style} {id} class={klass}
 	tag="ImageBlock"
 	attrs={snippetAttrs(alt, fit)}

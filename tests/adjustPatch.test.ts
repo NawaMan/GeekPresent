@@ -822,3 +822,19 @@ describe('patchSlideSource — PASTE (duplicate a Block)', () => {
 		expect(source).toContain('<Block x={120} y={220} width={300} height={400}>a</Block>');
 	});
 });
+
+describe('patchSlideSource — a BlockNode is found by its own tag', () => {
+	const src = '<BlockNode name="api" x={100} y={200} width={300} height={400} grid={10}>API</BlockNode>';
+	const before = { x: 100, y: 200, width: 300, height: 400 };
+
+	it('pastes a one-line copy', () => {
+		const { source } = patchSlideSource(src, [
+			{ kind: 'BlockNode', name: 'api', before, paste: { name: 'api-2', after: { x: 120, y: 220, width: 300, height: 400 } } }
+		]);
+		expect(source).toBe(src + '\n<BlockNode name="api-2" x={120} y={220} width={300} height={400} grid={10}>API</BlockNode>');
+	});
+
+	it('deletes it', () => {
+		expect(patchSlideSource(src, [{ kind: 'BlockNode', name: 'api', before, remove: true }]).source).toBe('');
+	});
+});
