@@ -6,6 +6,7 @@ export const pages = [
 	{ path: "block.html", title: "Block" },
 	{ path: "imageblock.html", title: "ImageBlock" },
 	{ path: "svgblock.html", title: "SvgBlock" },
+	{ path: "group.html", title: "Group" },
 	{ path: "connector.html", title: "Connector" },
 	{ path: "columns.html", title: "Columns & Column" },
 	{ path: "scrolldiv.html", title: "ScrollDiv & WideDiv" },

@@ -21,6 +21,11 @@ export const pages = [
     { path: "sprite-multi.html",      title: "Draw — Sprites × Many" },
     { path: "draw-keyframe.html",     title: "Draw × Sprite" },
     { path: "sprite-group.html",      title: "Draw — Sprite as Group" },
+    // Moving a whole drawing at once: a Group camera, stepped by Space.
+    { path: "scene-camera.html",      title: "Scene Camera — Zoom & Pan" },
+    // Move one part on Space and keep it moved on the slides after (paging back opens spent).
+    { path: "scene-move.html",        title: "Scene — Move It" },
+    { path: "scene-moved.html",       title: "Scene — Left There" },
     // Imperative escape hatch: JS/TS pixels on the same playhead.
     { path: "canvas-draw.html",       title: "Canvas — JS Drawing" },
     // A different paradigm: scroll drives the playhead.

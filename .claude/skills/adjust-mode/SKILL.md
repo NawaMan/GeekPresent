@@ -91,6 +91,15 @@ has exactly one, into a fresh top-level `<Draw>` when it has none, and **`ambigu
 — never a guess. The needed `$lib/draw` import is merged in at the same time, because an inserted
 `<Polyline>` without it is a build error rather than a shape.
 
+**SAVE writes a Block into the file that WROTE it — not always the slide.** A Block in a component under
+`src/routes/` (a shared *scene*, e.g. `src/routes/transition/CameraScene.svelte`) saves into that component,
+so a drag on any slide showing the scene updates all of them. The dev server stamps each Block-family tag
+in a route file with `__file` at compile time (`src/lib/adjust/sourceTag.ts`, via `sourceStampPlugin`, which
+must stay FIRST in `vite.config.ts`); the endpoint patches that file and refuses any stamp outside
+`src/routes`. A tag inside a `$lib` component is never stamped, and Draw shapes still save into the slide.
+In a scene, keep each part's `x`/`y`/`width`/`height` **literal** — expressions on `src`/`style`/`class` are
+fine, geometry expressions make the tag `not-found`.
+
 ## Dragging (what to tell the user)
 
 Ask the user to open the slide in *their* dev server — you never run it. The top-centre tool bar
@@ -106,6 +115,11 @@ outline appears around each `Block`.
   **Ctrl/Cmd+Shift+Z** / **Ctrl+Y** redoes, globally across every `Block` on the page.
 - **Copy** puts the current tag, with live coordinates, on the clipboard — paste it over the original tag.
   `ImageBlock` emits a `src={…}` placeholder; keep your real imported `src`.
+- **Inside a zoomed `Group`** (a scene camera), a Block drags in the drawing's OWN units, so the readout,
+  Copy and SAVE all carry the numbers in source, not the zoomed ones — at `zoom={21}` one unit is ~21 screen
+  px, so drags are coarse. A part the slide `move`s drags from where it is shown, but SAVE writes where it
+  is DRAWN (the slide's `move` stays on top). A part the slide `hide`s shows faint and stays draggable; moving it moves it on
+  every slide. `glide` is off while ADJUST is on. See AGENTS.md → "Zoom and pan a drawing".
 
 ## Diagrams: name the boxes, let Connector route
 

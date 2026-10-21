@@ -51,6 +51,8 @@
 	export let canvasHeight = 1080;
 	export let bounds: 'canvas' | 'none' = 'canvas';
 	export let minSize = 24;
+	/** Dev-only source stamp (see Block) — forwarded so SAVE finds this tag in the file that wrote it. */
+	export let __file = '';
 
 	/** Inline style for the root element, applied last so it wins. */
 	export let style: string = '';
@@ -78,7 +80,7 @@
 
 <Block
 	{x} {y} {width} {height} {name} {z} {grid} {aspect} {canvasWidth} {canvasHeight} {bounds} {minSize}
-	{style} {id} class={klass}
+	{style} {id} class={klass} {__file}
 	tag="SvgBlock"
 	attrs={snippetAttrs(svg, viewBox, fit, title)}
 	selfClose={!!svg}

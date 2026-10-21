@@ -87,6 +87,26 @@ html[data-vt-kind="morph"]::view-transition-group(morph-4) {
 	animation-timing-function: cubic-bezier(0.5, 0, 0.2, 1);
 }
 
+/* ── camera: one <Group> scene, a different shot per slide (CameraScene.svelte).
+      The parts NAME THEMSELVES — the scene's Group has morph="cam" morphOn="camera",
+      so `cam-api` etc. exist only while a 'camera' transition runs, the same
+      scoping as morph above. Each glides from one TRUE box to the other, so the
+      parts zoom and pan together and stay crisp at any zoom. All this file adds
+      is the timing. The root cross-fades underneath, kept at full brightness by
+      plus-lighter (the `animation` shorthand would otherwise drop the browser's
+      own blend). */
+
+html[data-vt-kind="camera"]::view-transition-old(root) { animation: vt-fade-out 700ms ease both; mix-blend-mode: plus-lighter; }
+html[data-vt-kind="camera"]::view-transition-new(root) { animation: vt-fade-in 700ms ease both; mix-blend-mode: plus-lighter; }
+html[data-vt-kind="camera"]::view-transition-group(*) {
+	animation-duration: 900ms;
+	animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+}
+html[data-vt-kind="camera"]::view-transition-old(*),
+html[data-vt-kind="camera"]::view-transition-new(*) {
+	animation-duration: 900ms;
+}
+
 /* ── zoom: forward pushes IN — the new slide grows from small while the old blooms
       past you. Back pulls OUT — the old slide shrinks away while the new settles in
       from large. So ← genuinely reverses the motion (zoom-out, not zoom-in again). */

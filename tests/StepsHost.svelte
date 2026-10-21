@@ -4,9 +4,11 @@
 <script lang="ts">
 	import Steps from '../src/lib/components/Steps.svelte';
 	import Fragment from '../src/lib/components/Fragment.svelte';
+
+	export let backTo: 'end' | 'start' = 'end';
 </script>
 
-<Steps>
+<Steps {backTo}>
 	<p>base</p>
 	<Fragment tag="p">one</Fragment>
 	<Fragment tag="p">two</Fragment>

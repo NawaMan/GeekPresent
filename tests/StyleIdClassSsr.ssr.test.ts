@@ -53,6 +53,7 @@ import Highlight from '$lib/components/Highlight.svelte';
 import ImageBlock from '$lib/components/ImageBlock.svelte';
 import TextBlock from '$lib/components/TextBlock.svelte';
 import SvgBlock from '$lib/components/SvgBlock.svelte';
+import Group from '$lib/components/Group.svelte';
 import JavaCode from '$lib/components/JavaCode.svelte';
 import JavaCodeBox from '$lib/components/JavaCodeBox.svelte';
 import SourceView from '$lib/components/SourceView.svelte';
@@ -121,6 +122,8 @@ const COMPONENTS: Array<[string, any, Record<string, unknown>]> = [
 	['ImageBlock', ImageBlock, { src: 'x.png', x: 0, y: 0, width: 10, height: 10 }],
 	['TextBlock', TextBlock, { x: 0, y: 0, width: 10, height: 10 }],
 	['SvgBlock', SvgBlock, { svg: '<svg viewBox="0 0 1 1"></svg>', x: 0, y: 0, width: 10, height: 10 }],
+	// No box of its own (display: contents), but the attributes still land on its root.
+	['Group', Group, {}],
 	['WideDiv', WideDiv, {}],
 	['CodeBox', CodeBox, { code: 'x' }],
 	['JavaCodeBox', JavaCodeBox, { code: 'x' }],

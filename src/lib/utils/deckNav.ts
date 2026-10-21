@@ -10,6 +10,7 @@
 // (seo/routes.ts). This file pulls in $app/navigation, so it stays separate.
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
+import { ARRIVAL_KEY, arrivalMark, arrivesAtEnd } from './arrivalCore';
 
 export type NavDirection = 'forward' | 'back';
 
@@ -23,6 +24,41 @@ export interface NavigateOptions {
 	kind?: string;
 	/** Direction, for the data-vt attribute the view-transition keyframes read. */
 	direction?: NavDirection;
+	/** Land on the target with its <Steps> build already spent — what PREV wants,
+	    so paging back shows a slide as it was left (see arrivalCore.ts). */
+	arriveAtEnd?: boolean;
+}
+
+/** Leave the arrive-at-end mark for `href`. Storage can throw (private mode, a
+    full quota); a lost mark only means the build starts at step 0 as before. */
+function markArrivalAtEnd(href: string): void {
+	try {
+		const mark = arrivalMark(href, window.location.href, Date.now());
+		if (mark) sessionStorage.setItem(ARRIVAL_KEY, mark);
+	} catch {
+		/* no storage → no mark */
+	}
+}
+
+/** Was this slide reached by PREV? Read by <Steps> as it starts; the mark stays
+    until `clearArrival`, so every Steps on the slide sees the same answer. */
+export function readArrivalAtEnd(): boolean {
+	if (!browser) return false;
+	try {
+		return arrivesAtEnd(sessionStorage.getItem(ARRIVAL_KEY), window.location.pathname, Date.now());
+	} catch {
+		return false;
+	}
+}
+
+/** Drop the mark, once the slide that wanted it has mounted. */
+export function clearArrival(): void {
+	if (!browser) return;
+	try {
+		sessionStorage.removeItem(ARRIVAL_KEY);
+	} catch {
+		/* nothing to clear */
+	}
 }
 
 /** Navigate to `href`, animating when this deck uses view transitions and the
@@ -30,7 +66,11 @@ export interface NavigateOptions {
     reload/blink), then to a full-page load. */
 export function navigate(href: string, opts: NavigateOptions = {}): void {
 	if (!href) return;
-	const { viewTransitions = false, kind = 'slide', direction = 'forward' } = opts;
+	const { viewTransitions = false, kind = 'slide', direction = 'forward', arriveAtEnd = false } = opts;
+	if (browser) {
+		if (arriveAtEnd) markArrivalAtEnd(href);
+		else clearArrival();
+	}
 
 	if (!viewTransitions) {
 		if (browser) window.location.href = href;

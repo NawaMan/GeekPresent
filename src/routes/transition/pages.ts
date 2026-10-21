@@ -30,6 +30,13 @@ export const pages = [
     { path: "morph-from.html",       title: "Shared-Element Morph (from)",   transition: "morph" },
     { path: "morph-to.html",         title: "Shared-Element Morph (to)",     transition: "slide", transitionBack: "morph" },
 
+    // A <Group> camera: one scene (CameraScene.svelte), four shots. Wide → zoom → pan
+    // → out all morph, both ways; the 'camera' kind is in view-transitions.css.
+    { path: "camera-wide.html",      title: "Group Camera (wide)",           transition: "camera" },
+    { path: "camera-zoom.html",      title: "Group Camera (zoom)",           transition: "camera", transitionBack: "camera" },
+    { path: "camera-pan.html",       title: "Group Camera (pan)",            transition: "camera", transitionBack: "camera" },
+    { path: "camera-out.html",       title: "Group Camera (out)",            transition: "slide", transitionBack: "camera" },
+
     { path: "limitations.html",      title: "Limits & Browser Support",      transition: "slide" },
 
     { path: "thank-you.html",        title: "Now Go Animate Your Deck",      transition: "slide" },
