@@ -31,7 +31,8 @@ and the anchor other components resolve against), `grid` (snap step), `aspect` (
 - `Block` **fills its content to the box** by default (`fill={false}` opts out) — so whatever you wrap
   stretches to the shape you drag. Don't add per-component fill props.
 - `ImageBlock` for pictures: the image fills the panel and reshapes with the box, aspect locked by default
-  (Alt breaks it).
+  (Alt breaks it). `live` (SVG only) inlines it so an embedded GIF plays; `live="after-transition"`
+  waits for the slide's view transition to land first.
 
 ## Who may offer ADJUST
 

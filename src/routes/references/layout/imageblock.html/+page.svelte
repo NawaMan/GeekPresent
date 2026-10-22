@@ -21,6 +21,8 @@
 			<li><code>src / alt</code> — image source (imported) and accessible text</li>
 			<li><code>x y width height</code> — canvas box</li>
 			<li><code>aspect</code> — true | number | false</li>
+			<li><code>fit</code> — fill | cover | contain</li>
+			<li><code>live</code> — SVG only: inline it so an embedded GIF plays; <code>live="after-transition"</code> waits for the slide's view transition to land first</li>
 	</ul>
 
 	</div>

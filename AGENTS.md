@@ -961,6 +961,10 @@ There are two distinct causes, and the tooltip tells the one that actually happe
    ```svelte
    <ImageBlock src={photo} alt="…" x={760} y={560} width={320} height={320} />
    ```
+   An SVG with an animated GIF inside (an Excalidraw export) is frozen through `<img>`;
+   `live` inlines it in the browser so the GIF plays, and `live="after-transition"` waits
+   until the view transition that brought the slide in has landed (the GIF starts on the
+   settled slide, not mid-morph). The prerender stays the plain `<img>` either way.
 2. Have the user open the slide in their dev server. The top-centre tool bar
    (`📌 │ PRESENT │ ANNOTATE │ ADJUST │ DISPLAY │ ☰`) now shows an **ADJUST** toggle — turn it on. A dashed
    outline appears around each `Block`.

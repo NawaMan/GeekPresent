@@ -95,3 +95,24 @@ export function navigate(href: string, opts: NavigateOptions = {}): void {
 		delete root.dataset.vtKind;
 	});
 }
+
+/** Run `then` once the view transition in progress (if any) has finished — at
+    once when there is none. navigate() keeps data-vt-kind on <html> for exactly
+    the length of a transition, so its removal is the signal. A slide mounted by
+    a transition mounts while the attribute is still set. Returns a cancel, for
+    a component that unmounts first. */
+export function afterViewTransition(then: () => void): () => void {
+	if (!browser) return () => {};
+	const root = document.documentElement;
+	if (!root.dataset.vtKind) {
+		then();
+		return () => {};
+	}
+	const watch = new MutationObserver(() => {
+		if (root.dataset.vtKind) return;
+		watch.disconnect();
+		then();
+	});
+	watch.observe(root, { attributes: true, attributeFilter: ['data-vt-kind'] });
+	return () => watch.disconnect();
+}

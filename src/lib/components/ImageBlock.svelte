@@ -15,17 +15,58 @@
     - 'cover'   fill the panel and crop the overflow, keeping the image's aspect.
     - 'contain' fit inside the panel and letterbox, keeping the image's aspect.
 
+  `live` (SVG only) puts the SVG into the page inline, once the slide is in the
+  browser. Through <img>, a browser renders an SVG as a static picture, so an
+  animated GIF embedded in it is stuck on its first frame; inline, it plays. The
+  prerendered markup stays the plain <img> (see utils/imageBlockCore.ts).
+
+  `live="after-transition"` does the same, but waits for the view transition that
+  brought the slide in to finish — so a GIF starts on the landed slide, not while a
+  morph or zoom is still moving it. With no transition (opened directly, a
+  full-page-load deck), it is the same as `live`.
+
   All other props (x/y/width/height/name/z/grid/aspect/canvas*/minSize) pass straight
   through to Block. `aspect` defaults to true here (lock); pass `false` for
   freeform. Dragging, snapping, Esc-to-cancel and Copy all work as on a bare Block.
 -->
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 	import Block from '$lib/components/Block.svelte';
+	import { afterViewTransition } from '$lib/utils/deckNav';
+	import { inlineSvg } from '$lib/utils/imageBlockCore';
 
 	export let src: string;
 	export let alt = '';
 	/** How the image maps onto the panel. 'fill' stretches with the box. */
 	export let fit: 'fill' | 'cover' | 'contain' = 'fill';
+	/** SVG only: inline it in the browser, so an animated GIF inside it plays.
+	    'after-transition' waits for the slide's view transition to finish first. */
+	export let live: Live = false;
+
+	// The inline SVG once fetched; '' shows the <img> (SSR, before the fetch, or on failure).
+	let svg = '';
+	// Guards against a slow fetch for an old src landing after a newer one.
+	let wanted = '';
+	// For 'after-transition': no view transition is (still) moving the slide.
+	let landed = false;
+	onMount(() => afterViewTransition(() => (landed = true)));
+	$: on = live === 'after-transition' ? landed : live;
+	$: if (browser && on) load(src, fit);
+	$: if (!live) svg = '';
+
+	async function load(url: string, how: typeof fit) {
+		const key = `${url}|${how}`;
+		wanted = key;
+		let text = '';
+		try {
+			const res = await fetch(url);
+			if (res.ok) text = await res.text();
+		} catch {
+			// Network or URL trouble: keep the <img>.
+		}
+		if (wanted === key) svg = inlineSvg(text, how);
+	}
 
 	// Geometry/behaviour props — forwarded verbatim to Block.
 	export let x = 0;
@@ -58,19 +99,33 @@
 </script>
 
 <script context="module" lang="ts">
+	import { liveAttr, type Live } from '$lib/utils/imageBlockCore';
+
 	// src is an imported asset (unknown variable name at runtime), so the copied
 	// snippet emits a `src={…}` placeholder for the author to fill; alt/fit carry
-	// across verbatim. fit is omitted when it's the default.
-	const snippetAttrs = (alt: string, fit: string) =>
-		` src={…}` + (alt ? ` alt="${alt}"` : '') + (fit !== 'fill' ? ` fit="${fit}"` : '');
+	// across verbatim. fit is omitted when it's the default, live when it's off.
+	const snippetAttrs = (alt: string, fit: string, live: Live) =>
+		` src={…}` + (alt ? ` alt="${alt}"` : '') + (fit !== 'fill' ? ` fit="${fit}"` : '') + liveAttr(live);
 </script>
 
 <Block
 	{x} {y} {width} {height} {name} {z} {grid} {aspect} {canvasWidth} {canvasHeight} {minSize} {bounds}
 	{style} {id} class={klass} {__file}
 	tag="ImageBlock"
-	attrs={snippetAttrs(alt, fit)}
+	attrs={snippetAttrs(alt, fit, live)}
 	selfClose
 >
-	<img {src} {alt} style="display:block; width:100%; height:100%; object-fit:{fit};" />
+	{#if svg}
+		<!-- pointer-events: none, so a drag in ADJUST mode reaches the Block as it does over <img>. -->
+		<div
+			role="img"
+			aria-label={alt || undefined}
+			aria-hidden={alt ? undefined : 'true'}
+			style="width:100%; height:100%; pointer-events:none;"
+		>
+			{@html svg}
+		</div>
+	{:else}
+		<img {src} {alt} style="display:block; width:100%; height:100%; object-fit:{fit};" />
+	{/if}
 </Block>
