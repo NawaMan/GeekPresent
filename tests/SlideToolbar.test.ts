@@ -11,6 +11,8 @@ import { annotationMode, canAnnotate, resetAllInk } from '../src/lib/stores/anno
 import { toolBarPinned } from '../src/lib/stores/chromePin';
 import { armChrome, disarmChrome, moreMenuOpen, toggleMoreMenu } from '../src/lib/stores/chromeArm';
 import { overviewOpen } from '../src/lib/stores/overviewOpen';
+import { setChromeBareDeck } from '../src/lib/stores/chromeBare';
+import { consoleLive } from '../src/lib/stores/presenter';
 
 beforeEach(() => {
 	localStorage.clear();
@@ -187,5 +189,40 @@ describe('SlideToolbar ☰ menu', () => {
 		await tick();
 		// `armed` is gone (the 5s timer owns it) but `menu-open` holds the same seat.
 		expect(document.querySelector('.annot-tools')?.classList.contains('menu-open')).toBe(true);
+	});
+
+	describe('bare', () => {
+		beforeEach(() => {
+			setChromeBareDeck(false);
+			consoleLive.set(false);
+			disarmChrome();
+		});
+
+		it('marks the tool bar bare while a presenter console is live, and drops it after', async () => {
+			render(SlideToolbarHost);
+			const bar = document.querySelector('.annot-tools');
+			expect(bar?.classList.contains('bare')).toBe(false);
+			consoleLive.set(true);
+			await tick();
+			expect(bar?.classList.contains('bare')).toBe(true);
+			consoleLive.set(false);
+			await tick();
+			expect(bar?.classList.contains('bare')).toBe(false);
+		});
+
+		it('stays bare when pinned, and Alt+. still arms it back into view', async () => {
+			// "Nothing visible" beats PIN; the CSS lets only .armed (and the hover/focus that
+			// follows it) override .bare, so both classes must be present together.
+			toolBarPinned.set(true);
+			setChromeBareDeck(true);
+			render(SlideToolbarHost);
+			const bar = document.querySelector('.annot-tools');
+			expect(bar?.classList.contains('bare')).toBe(true);
+			expect(bar?.classList.contains('pinned')).toBe(true);
+			armChrome();
+			await tick();
+			expect(bar?.classList.contains('armed')).toBe(true);
+			expect(bar?.classList.contains('bare')).toBe(true);
+		});
 	});
 });

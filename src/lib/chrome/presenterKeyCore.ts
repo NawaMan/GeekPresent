@@ -41,6 +41,7 @@ export type PresenterKeyIntent =
 	| 'toc'
 	| 'checks'
 	| 'ink'
+	| 'bars'
 	| 'close'
 	| 'next'
 	| 'prev'
@@ -102,6 +103,9 @@ export function presenterKeyIntent(
 		case 'a':
 			// Inert unless the pen (and so the reset-ink control) is actually offered.
 			return inkOffered ? 'ink' : 'ignore';
+		case 'b':
+			// The audience window's bars, shown or hidden (stores/chromeBare).
+			return 'bars';
 		default:
 			return 'ignore';
 	}

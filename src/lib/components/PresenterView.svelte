@@ -15,7 +15,7 @@
   The audience window pages from its own NavigationBar; the console has no such bar
   (SlideDeck gates it under `!present`), so this component's keydown drives BOTH the
   console's menus and its paging (see presenterKeyCore): T / C / A toggle the TOC /
-  reset-checks / reset-ink menus, Esc closes them, →/← page the deck, Space relays a
+  reset-checks / reset-ink menus, B hides/shows the audience's bars, Esc closes them, →/← page the deck, Space relays a
   CONTINUE pulse (advances a build, never pages), and Shift+Space walks back. Paging
   reuses the bottom bar's go()/doContinue(), so the audience follows exactly as a
   button click would — over the same localStorage nav / gp:continue channels.
@@ -43,6 +43,7 @@
 	} from '$lib/stores/presenter';
 	import { canAnnotate, strokes, resetSlideInk, resetAllInk } from '$lib/stores/annotation';
 	import { presenterKeyIntent } from '$lib/chrome/presenterKeyCore';
+	import { audienceBare, setBareChoice } from '$lib/stores/chromeBare';
 	import { overviewOpen } from '$lib/stores/overviewOpen';
 	import type { Page } from '$lib/utils/navigate';
 	import type { AnimState } from '$lib/utils/slideAnim';
@@ -246,6 +247,13 @@
 		closeMenus();
 		overviewOpen.set(true);
 	}
+	// BARS — hide or show the audience window's tool bar and control bar. The click records a
+	// sticky choice (as `?bare` / `?bare=off` do), which the audience window follows at once.
+	function toggleBars() {
+		setBareChoice(!$audienceBare);
+	}
+	$: barsText = $audienceBare ? '▭ Bars: hidden' : '▭ Bars: shown';
+
 	function onKeydown(e: KeyboardEvent) {
 		switch (presenterKeyIntent(e, $canAnnotate, tocOpen)) {
 			case 'close':
@@ -272,6 +280,10 @@
 				inkOpen = open;
 				break;
 			}
+			case 'bars':
+				e.preventDefault();
+				toggleBars();
+				break;
 			// Paging from the console — the same go()/doContinue() the bottom-bar
 			// buttons call, so the audience follows over the localStorage channel
 			// exactly as a click would. →/← page; Space relays a CONTINUE pulse that
@@ -564,6 +576,18 @@
 			</div>
 			{/if}
 		</div>
+
+		<!-- BARS (B) — the audience window's top and bottom bars. hoverText mirrors text so
+		     the label never changes width under the pointer. -->
+		<span class="bars-btn" title="Hide or show the bars on the audience screen (B)">
+			<CtrlBtn
+				text={barsText}
+				hoverText={barsText}
+				mnemonic="B"
+				isSelected={$audienceBare}
+				on:click={toggleBars}
+			/>
+		</span>
 
 		<!-- Reset the speaker's ink. Shown only where the pen is offered, and it reports how
 		     much ink is on the current slide so "reset" is never a shot in the dark. -->

@@ -16,7 +16,7 @@ function key(
 	} as KeyboardEvent;
 }
 
-describe('presenterKeyIntent — the three console mnemonics', () => {
+describe('presenterKeyIntent — the console mnemonics', () => {
 	it('maps T / C to the TOC and reset-checks menus', () => {
 		expect(presenterKeyIntent(key({ key: 't' }))).toBe('toc');
 		expect(presenterKeyIntent(key({ key: 'c' }))).toBe('checks');
@@ -38,7 +38,7 @@ describe('presenterKeyIntent — the three console mnemonics', () => {
 	});
 
 	it('ignores every other letter', () => {
-		for (const k of ['b', 'x', 'z', 's', 'q', '1']) {
+		for (const k of ['x', 'z', 's', 'q', '1']) {
 			expect(presenterKeyIntent(key({ key: k }), true)).toBe('ignore');
 		}
 	});
@@ -158,5 +158,11 @@ describe('presenterKeyIntent — total on garbage', () => {
 		expect(presenterKeyIntent(key({ key: '' }), true)).toBe('ignore');
 		expect(presenterKeyIntent({} as KeyboardEvent, true)).toBe('ignore');
 		expect(presenterKeyIntent(key({ key: 'undefined' as unknown as string }))).toBe('ignore');
+	});
+
+	it('reads B as the audience-bars toggle, with no modifier and not while typing', () => {
+		expect(presenterKeyIntent(key({ key: 'b' }))).toBe('bars');
+		expect(presenterKeyIntent(key({ key: 'B' }))).toBe('bars');
+		expect(presenterKeyIntent(key({ key: 'b', ctrlKey: true }))).toBe('ignore');
 	});
 });

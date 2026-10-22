@@ -5,6 +5,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { get } from 'svelte/store';
 import ControlBarHost from './ControlBarHost.svelte';
 import { controlBarPinned, toolBarPinned } from '../src/lib/stores/chromePin';
+import { setChromeBareDeck } from '../src/lib/stores/chromeBare';
+import { consoleLive } from '../src/lib/stores/presenter';
+import { tick } from 'svelte';
+import { armChrome, disarmChrome } from '../src/lib/stores/chromeArm';
 
 beforeEach(() => {
 	localStorage.clear();
@@ -54,5 +58,40 @@ describe('ControlBar', () => {
 		expect(localStorage.getItem('controlBarPinned')).toBe('true');
 		// Top bar was never toggled, so its key stays absent (still reads as unpinned).
 		expect(localStorage.getItem('toolBarPinned')).toBeNull();
+	});
+
+	describe('bare', () => {
+		beforeEach(() => {
+			setChromeBareDeck(false);
+			consoleLive.set(false);
+			disarmChrome();
+		});
+
+		it('marks the control bar bare while a presenter console is live, and drops it after', async () => {
+			render(ControlBarHost);
+			const bar = document.querySelector('.ctrl-bar');
+			expect(bar?.classList.contains('bare')).toBe(false);
+			consoleLive.set(true);
+			await tick();
+			expect(bar?.classList.contains('bare')).toBe(true);
+			consoleLive.set(false);
+			await tick();
+			expect(bar?.classList.contains('bare')).toBe(false);
+		});
+
+		it('stays bare when pinned, and Alt+. still arms it back into view', async () => {
+			// "Nothing visible" beats PIN; the CSS lets only .armed (and the hover/focus that
+			// follows it) override .bare, so both classes must be present together.
+			controlBarPinned.set(true);
+			setChromeBareDeck(true);
+			render(ControlBarHost);
+			const bar = document.querySelector('.ctrl-bar');
+			expect(bar?.classList.contains('bare')).toBe(true);
+			expect(bar?.classList.contains('pinned')).toBe(true);
+			armChrome();
+			await tick();
+			expect(bar?.classList.contains('armed')).toBe(true);
+			expect(bar?.classList.contains('bare')).toBe(true);
+		});
 	});
 });

@@ -28,6 +28,7 @@
 	import { browser } from '$app/environment';
 	import { annotationMode, canAnnotate } from '$lib/stores/annotation';
 	import { toolBarPinned } from '$lib/stores/chromePin';
+	import { chromeBare } from '$lib/stores/chromeBare';
 	import { chromeArmed, moreMenuOpen, closeMoreMenu, toggleMoreMenu } from '$lib/stores/chromeArm';
 	import { overviewOpen } from '$lib/stores/overviewOpen';
 	import SizeMode from './SizeMode.svelte';
@@ -137,6 +138,7 @@
 		class:armed={$chromeArmed}
 		class:menu-open={$moreMenuOpen}
 		class:overview-open={$overviewOpen}
+		class:bare={$chromeBare}
 		role="group"
 		aria-label="Slide tools"
 		aria-hidden={$overviewOpen ? 'true' : undefined}
@@ -293,6 +295,16 @@
 	.annot-tools.armed,
 	.annot-tools.menu-open {
 		transform: translateX(-50%) translateY(0);
+	}
+
+	/* BARE (see chrome/chromeBareCore) — hidden completely, no peek strip, PIN or not. Only
+	   Alt+. (`.armed`) brings it back; once it is up, hover / focus / an open ☰ hold it there
+	   until the pointer and focus leave. `visibility` keeps a hidden bar from being hovered
+	   or tabbed into, so nothing but Alt+. can start that. */
+	.annot-tools.bare:not(.armed):not(.menu-open):not(:hover):not(:focus-within) {
+		transform: translateX(-50%) translateY(-120%);
+		visibility: hidden;
+		pointer-events: none;
 	}
 
 	/* OVERVIEW owns the screen — hide the window tool bar completely (not just tuck).

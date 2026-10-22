@@ -41,6 +41,7 @@
 	import { applyPageRule } from '$lib/handout/pageRuleDom';
 	import { printNotes } from '$lib/stores/printNotes';
 	import { overviewOpen } from '$lib/stores/overviewOpen';
+	import { setChromeBareDeck, applyBareParam } from '$lib/stores/chromeBare';
 	import {
 		pageSourceCanView,
 		pageSourceCanEdit,
@@ -236,6 +237,12 @@
 	   way under `?clean` / `?present`. */
 	export let toolBar = true;
 
+	/* Hide BOTH window-edge bars completely on every slide — no peek strip, PIN or not —
+	   for a deck that is only ever shown to an audience. Alt+. still raises them. The
+	   audience window goes bare by itself while a presenter console is live, and a sticky
+	   `?bare` / `?bare=off` outranks both (chrome/chromeBareCore). */
+	export let hideChrome = false;
+
 	/* Offer the ADJUST authoring control on EVERY slide of this deck, even in a build.
 	   Almost no deck wants this — ADJUST is off in production by default, and the usual
 	   way to demo it is per-slide: set `adjust: true` on the individual pages.ts entries
@@ -425,6 +432,8 @@
 	// per-slide flag to fold in, so this is set once from the prop rather than per page.
 	$: if (browser) setAnnotateOffered(annotate);
 	$: if (browser) applyAnnotateParam($page.url);
+	$: if (browser) setChromeBareDeck(hideChrome);
+	$: if (browser) applyBareParam($page.url);
 	$: inkStaleAfterMs.set(Math.max(0, (Number(inkStaleAfter) || 24)) * 60 * 60 * 1000);
 
 	// Point the ink at THIS slide. Ink is persisted per slide (stores/annotation.inkBook), so

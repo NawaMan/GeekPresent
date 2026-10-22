@@ -1043,6 +1043,16 @@ stay out of the audience's way. A speaker who is actively using one often wants 
 - **Default is auto-hide.** Offered is not active: a first visit still tucks. Click the pin to
   seat the bar fully open (`class="pinned"` forces `translateY(0)`); click again to return to
   auto-hide. The choice survives a slide change and a reload.
+- **Gone completely while presenting (BARE).** While a presenter console is live, the
+  audience window hides **both** bars outright — no peek strip, and PIN does not keep them.
+  `<SlideDeck hideChrome>` does the same on every slide without a console, and a sticky
+  `?bare` / `?bare=off` outranks both (`?bare=off` keeps the bars while a console runs).
+  The console's own **▭ Bars** button (key **B**) records that same choice, and the audience
+  window follows it at once through the `storage` event — no reload.
+  **Alt+.** still raises them, and hover / focus / an open ☰ hold them up until you leave.
+  A hidden bar is `visibility: hidden`, so nothing else — a stray pointer, a Tab — can bring
+  it back on the audience's screen. Pure core: `chrome/chromeBareCore.ts`; store:
+  `stores/chromeBare.ts`.
 - **Opt-out of a whole bar.** `<SlideDeck toolBar={false}>` / `controlBar={false}` (default
   **on**) drop the top authoring cluster or the bottom TOC/pager for a bare canvas. Independent
   of PIN. Hidden either way under `?clean` / `?present`.

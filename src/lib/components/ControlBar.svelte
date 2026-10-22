@@ -25,6 +25,7 @@
 	import { onMount, type Snippet } from 'svelte';
 	import { animBarSlot, hostedAnim } from '$lib/stores/localChrome';
 	import { controlBarPinned } from '$lib/stores/chromePin';
+	import { chromeBare } from '$lib/stores/chromeBare';
 	import { chromeArmed } from '$lib/stores/chromeArm';
 	import { overviewOpen } from '$lib/stores/overviewOpen';
 
@@ -58,6 +59,7 @@
 		class:pinned={$controlBarPinned}
 		class:armed={$chromeArmed}
 		class:overview-open={$overviewOpen}
+		class:bare={$chromeBare}
 		role="group"
 		aria-label="Slide controls"
 		aria-hidden={$overviewOpen ? 'true' : undefined}
@@ -164,6 +166,13 @@
 		box-shadow:
 			0 -3px 14px rgba(0, 0, 0, 0.4),
 			0 0 0 2px color-mix(in srgb, var(--ctrl-bar-fg, var(--annot-toggle-fg, #F0A33E)) 55%, transparent);
+	}
+
+	/* BARE — hidden completely, PIN or not, until Alt+. raises it (mirror of SlideToolbar). */
+	.ctrl-bar.bare:not(.armed):not(:hover):not(:focus-within) {
+		transform: translateX(-50%) translateY(120%);
+		visibility: hidden;
+		pointer-events: none;
 	}
 
 	/* OVERVIEW owns the screen — hide the control bar completely (mirror of SlideToolbar). */
