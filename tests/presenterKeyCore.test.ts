@@ -37,6 +37,12 @@ describe('presenterKeyIntent — the console mnemonics', () => {
 		expect(presenterKeyIntent(key({ key: 'a' }), false)).toBe('ignore');
 	});
 
+	it('E opens the note editor', () => {
+		expect(presenterKeyIntent(key({ key: 'e' }))).toBe('editNote');
+		expect(presenterKeyIntent(key({ key: 'E', shiftKey: true }))).toBe('editNote');
+		expect(presenterKeyIntent(key({ key: 'e', ctrlKey: true }))).toBe('ignore');
+	});
+
 	it('ignores every other letter', () => {
 		for (const k of ['x', 'z', 's', 'q', '1']) {
 			expect(presenterKeyIntent(key({ key: k }), true)).toBe('ignore');

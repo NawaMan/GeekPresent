@@ -30,6 +30,8 @@
 <script lang="ts">
 	import CtrlBtn from './CtrlBtn.svelte';
 	import PresenterAnim from './PresenterAnim.svelte';
+	import NoteEditor from './NoteEditor.svelte';
+	import { canSave } from '$lib/stores/adjustMode';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 	import { onMount, onDestroy } from 'svelte';
@@ -254,6 +256,28 @@
 	}
 	$: barsText = $audienceBare ? '▭ Bars: hidden' : '▭ Bars: shown';
 
+	// NOTE EDIT — the slide's <Note> source, edited in place over the notes panel and
+	// written back by the dev server. A static host has no source tree, so the button
+	// does not grey out there: it refuses on press and says why (ADJUST SAVE's bargain).
+	let editingNote = false;
+	let noteRefused = false;
+	let noteRefusedTimer: ReturnType<typeof setTimeout> | undefined;
+	function editNote() {
+		if (editingNote) return;
+		closeMenus();
+		if (!$canSave) {
+			noteRefused = true;
+			clearTimeout(noteRefusedTimer);
+			noteRefusedTimer = setTimeout(() => (noteRefused = false), 2500);
+			return;
+		}
+		editingNote = true;
+	}
+	$: noteText = noteRefused ? 'NOT ALLOWED' : 'EDIT NOTE';
+	$: noteTitle = noteRefused
+		? 'Editing notes needs the dev server (pnpm dev) — there is no source to write here.'
+		: 'Edit this slide\'s speaker note (E)';
+
 	function onKeydown(e: KeyboardEvent) {
 		switch (presenterKeyIntent(e, $canAnnotate, tocOpen)) {
 			case 'close':
@@ -283,6 +307,10 @@
 			case 'bars':
 				e.preventDefault();
 				toggleBars();
+				break;
+			case 'editNote':
+				e.preventDefault();
+				editNote();
 				break;
 			// Paging from the console — the same go()/doContinue() the bottom-bar
 			// buttons call, so the audience follows over the localStorage channel
@@ -459,6 +487,7 @@
 	});
 	onDestroy(() => {
 		if (timer) clearInterval(timer);
+		clearTimeout(noteRefusedTimer);
 		if (typeof document !== 'undefined') {
 			document.body.classList.remove('gp-present');
 			document.body.style.removeProperty('--gp-split');
@@ -496,6 +525,10 @@
 		</div>
 	</div>
 </div>
+
+{#if editingNote}
+	<NoteEditor route={$page.url.pathname} on:close={() => (editingNote = false)} />
+{/if}
 
 <!-- Draggable divider on the split line — resizes previews vs. notes (--gp-split). -->
 <div
@@ -586,6 +619,16 @@
 				mnemonic="B"
 				isSelected={$audienceBare}
 				on:click={toggleBars}
+			/>
+		</span>
+
+		<span class="note-btn" title={noteTitle}>
+			<CtrlBtn
+				text={noteText}
+				hoverText={noteText}
+				mnemonic={noteRefused ? '' : 'E'}
+				isSelected={editingNote}
+				on:click={editNote}
 			/>
 		</span>
 

@@ -14,6 +14,7 @@ import {
 	LAYOUT_JS,
 	listEntryPaths
 } from '../deckEdit/pageEditCore';
+import { fingerprint, readNote, writeNote, REFUSAL_TEXT } from '../note/noteSourceCore';
 
 // Dev-only Vite plugin that lets authoring tools read/write a slide's source.
 // It exists solely under `vite dev` (apply: 'serve'): a built site has no Node
@@ -27,6 +28,8 @@ import {
 //   GET  /__geekpresent/source-load   — ViewSource EDIT REFRESH: read +page.svelte
 //   POST /__geekpresent/page-add      — Overview EDIT: new slide folder + pages.ts entry
 //   POST /__geekpresent/page-remove   — Overview EDIT: unlist from pages.ts (folder stays)
+//   GET  /__geekpresent/note-load     — presenter NOTE EDIT: the <Note>'s inner source
+//   POST /__geekpresent/note-save     — presenter NOTE EDIT: splice it back (see noteSourceCore)
 //
 // Tags ADJUST cannot confidently place come back as `unmatched` so the UI can
 // tell the author to paste those by hand. Source SAVE writes the whole buffer.
@@ -36,6 +39,8 @@ const SOURCE_SAVE_ENDPOINT = '/__geekpresent/source-save';
 const SOURCE_LOAD_ENDPOINT = '/__geekpresent/source-load';
 const PAGE_ADD_ENDPOINT = '/__geekpresent/page-add';
 const PAGE_REMOVE_ENDPOINT = '/__geekpresent/page-remove';
+const NOTE_LOAD_ENDPOINT = '/__geekpresent/note-load';
+const NOTE_SAVE_ENDPOINT = '/__geekpresent/note-save';
 
 interface AdjustSaveRequest {
 	/** The slide's `location.pathname`, e.g. `/slides/title.html`. */
@@ -50,6 +55,14 @@ interface SourceSaveRequest {
 	route: string;
 	/** Full new contents of the slide's `+page.svelte`. */
 	content: string;
+}
+
+interface NoteSaveRequest {
+	route: string;
+	/** The edited inner source, dedented as note-load handed it out. */
+	text: string;
+	/** note-load's fingerprint of the file; a mismatch means it changed meanwhile. */
+	fingerprint: string;
 }
 
 interface PageAddRequest {
@@ -243,6 +256,44 @@ async function handleSourceLoad(server: ViteDevServer, url: string) {
 	return readPageFile(server, route);
 }
 
+/** Exported for tests/noteEdit.test.ts, which drives it against a temp project. */
+export async function handleNoteLoad(server: ViteDevServer, url: string) {
+	const route = parseRouteQuery(url);
+	if (!route) {
+		return { status: 400, payload: { error: 'route query parameter is required' } };
+	}
+	const read = await readPageFile(server, route);
+	if (read.status !== 200) return read;
+	const { file, content } = read.payload as { file: string; content: string };
+	const note = readNote(content);
+	if (!note.ok) {
+		return { status: 409, payload: { error: REFUSAL_TEXT[note.reason], reason: note.reason } };
+	}
+	return { status: 200, payload: { file, text: note.text, fingerprint: fingerprint(content) } };
+}
+
+/** Exported for tests/noteEdit.test.ts. */
+export async function handleNoteSave(server: ViteDevServer, body: string) {
+	const { route, text, fingerprint: seen } = JSON.parse(body) as NoteSaveRequest;
+	if (!route || typeof text !== 'string' || typeof seen !== 'string') {
+		return { status: 400, payload: { error: 'route, text and fingerprint are required' } };
+	}
+	const read = await readPageFile(server, route);
+	if (read.status !== 200) return read;
+	const { file, content } = read.payload as { file: string; content: string };
+	if (fingerprint(content) !== seen) {
+		return { status: 409, payload: { error: REFUSAL_TEXT.conflict, reason: 'conflict' } };
+	}
+	const next = writeNote(content, text);
+	if (!next.ok) {
+		return { status: 409, payload: { error: REFUSAL_TEXT[next.reason], reason: next.reason } };
+	}
+	if (next.source !== content) {
+		await fs.writeFile(path.resolve(server.config.root, file), next.source, 'utf8');
+	}
+	return { status: 200, payload: { file, fingerprint: fingerprint(next.source) } };
+}
+
 async function handlePageAdd(server: ViteDevServer, body: string) {
 	const req = JSON.parse(body) as PageAddRequest;
 	const deck = String(req.deck ?? '').trim();
@@ -406,18 +457,25 @@ export function adjustSavePlugin(): Plugin {
 				const isPageRemove =
 					pathOnly === PAGE_REMOVE_ENDPOINT ||
 					pathOnly.startsWith(PAGE_REMOVE_ENDPOINT + '/');
-				if (!isAdjust && !isSourceSave && !isSourceLoad && !isPageAdd && !isPageRemove) {
+				const isNoteLoad = pathOnly === NOTE_LOAD_ENDPOINT;
+				const isNoteSave = pathOnly === NOTE_SAVE_ENDPOINT;
+				if (
+					!isAdjust && !isSourceSave && !isSourceLoad && !isPageAdd && !isPageRemove &&
+					!isNoteLoad && !isNoteSave
+				) {
 					return next();
 				}
 
 				try {
-					if (isSourceLoad) {
+					if (isSourceLoad || isNoteLoad) {
 						if (req.method !== 'GET') {
 							res.statusCode = 405;
 							res.end('method not allowed');
 							return;
 						}
-						const { status, payload } = await handleSourceLoad(server, req.url);
+						const { status, payload } = isNoteLoad
+							? await handleNoteLoad(server, req.url)
+							: await handleSourceLoad(server, req.url);
 						res.statusCode = status;
 						res.setHeader('content-type', 'application/json');
 						res.end(JSON.stringify(payload));
@@ -432,7 +490,9 @@ export function adjustSavePlugin(): Plugin {
 					// Source saves carry a whole file; structure edits and ADJUST patches are tiny.
 					const maxBytes = isSourceSave ? 5_000_000 : 1_000_000;
 					const body = await readBody(req, maxBytes);
-					const { status, payload } = isPageAdd
+					const { status, payload } = isNoteSave
+						? await handleNoteSave(server, body)
+						: isPageAdd
 						? await handlePageAdd(server, body)
 						: isPageRemove
 							? await handlePageRemove(server, body)

@@ -22,6 +22,8 @@
 		<Kbd keys="T" /> opens the table of contents, <Kbd keys="C" /> the reset-checks menu, and
 		<Kbd keys="A" /> the reset-annotations menu — <Kbd keys="Esc" /> closes any of them. Each
 		key is the underlined letter in its button, so there is no legend to memorise.
+		<Kbd keys="E" /> (<b>EDIT NOTE</b>) opens this note's source right in the console; under
+		<code>pnpm dev</code> SAVE writes it back to the slide.
 	</p>
 	<p>
 		The console <b>pages the deck</b> too, so your hands never leave it:

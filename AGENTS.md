@@ -547,6 +547,12 @@ than misleading the next agent.
   to offer it),
   plus framework-internal `Copyright`, `CtrlBtn`,
   `NavigationBar`, `TableOfContent`,
+  `NoteEditor` (the presenter console's **EDIT NOTE**, key **E** — edits the source between the
+  slide's `<Note>` and `</Note>` in place over the notes panel; SAVE goes through the dev-only
+  `/__geekpresent/note-load` / `note-save`, which find the note with Svelte's own parser (so a
+  `<Note>` inside a `QuickCode` sample never counts) and refuse rather than guess: no note, two
+  notes, a file changed since load, or an edit that would no longer parse. Static host: NOT
+  ALLOWED. Core: `note/noteSourceCore.ts`),
   `OverviewPage` (the all-slides grid — press **O**, click a slide to jump, Escape closes. `SlideDeck`
   mounts it; no slide places it. Tiles are live `?clean` iframes, lazy-mounted; `hidden` appendices
   are omitted. In **`pnpm dev`**, **EDIT** (or **E**) arms deck-structure editing: **ADD**, between-page
