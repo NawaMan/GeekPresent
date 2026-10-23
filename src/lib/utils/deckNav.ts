@@ -11,6 +11,7 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { ARRIVAL_KEY, arrivalMark, arrivesAtEnd } from './arrivalCore';
+import { reportGoto, reportLeaving } from '$lib/record/recordBus';
 
 export type NavDirection = 'forward' | 'back';
 
@@ -70,10 +71,15 @@ export function navigate(href: string, opts: NavigateOptions = {}): void {
 	if (browser) {
 		if (arriveAtEnd) markArrivalAtEnd(href);
 		else clearArrival();
+		// A VOD recording hears every page turn here, whatever caused it (no-op otherwise).
+		reportGoto(href, direction === 'back', arriveAtEnd);
 	}
 
 	if (!viewTransitions) {
-		if (browser) window.location.href = href;
+		if (browser) {
+			reportLeaving(); // a full page load: the Recorder holds the picture until it lands
+			window.location.href = href;
+		}
 		return;
 	}
 	// @ts-ignore — startViewTransition is not in older lib.dom typings.

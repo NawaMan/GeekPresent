@@ -44,6 +44,7 @@ export type PresenterKeyIntent =
 	| 'ink'
 	| 'bars'
 	| 'editNote'
+	| 'record'
 	| 'close'
 	| 'next'
 	| 'prev'
@@ -111,6 +112,9 @@ export function presenterKeyIntent(
 		case 'e':
 			// The note editor (NoteEditor) over the notes panel.
 			return 'editNote';
+		case 'r':
+			// The VOD Recorder window (record/, specs/VOD-RECORD-1.md).
+			return 'record';
 		default:
 			return 'ignore';
 	}

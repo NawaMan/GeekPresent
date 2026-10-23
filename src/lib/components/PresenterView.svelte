@@ -53,6 +53,7 @@
 	import { searchDocs } from '$lib/utils/searchCore';
 	import { deckSearchDocs } from '$lib/utils/searchIndex';
 	import { stepTocSelection } from '$lib/chrome/presenterTocCore';
+	import { openRecorderWindow } from '$lib/record/ticker';
 
 	/** This deck's slide list (for nav, the TOC, and the current/next lookup). */
 	export let pages: Array<Page> = [];
@@ -254,6 +255,12 @@
 	function toggleBars() {
 		setBareChoice(!$audienceBare);
 	}
+
+	// ● REC (R) — the VOD Recorder, a window of its own that never navigates, which films
+	// the slides window and writes the timeline (record/, specs/VOD-RECORD-1.md).
+	function openRecorder() {
+		openRecorderWindow(deckKey);
+	}
 	$: barsText = $audienceBare ? '▭ Bars: hidden' : '▭ Bars: shown';
 
 	// NOTE EDIT — the slide's <Note> source, edited in place over the notes panel and
@@ -307,6 +314,10 @@
 			case 'bars':
 				e.preventDefault();
 				toggleBars();
+				break;
+			case 'record':
+				e.preventDefault();
+				openRecorder();
 				break;
 			case 'editNote':
 				e.preventDefault();
@@ -620,6 +631,10 @@
 				isSelected={$audienceBare}
 				on:click={toggleBars}
 			/>
+		</span>
+
+		<span class="rec-btn" title="Record the slides window to a video for YouTube, with a replayable timeline (R)">
+			<CtrlBtn text="● REC" hoverText="● REC" mnemonic="R" on:click={openRecorder} />
 		</span>
 
 		<span class="note-btn" title={noteTitle}>

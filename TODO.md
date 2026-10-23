@@ -808,6 +808,24 @@ relevant, themes via `roles.css`, adapts to presentation/text/present modes via
 
 ## Web & video embeds (requested)
 
+- [x] **VOD Recorder** — record a talk as a YouTube video, plus an editable timeline you can replay.
+  - Done: spec `specs/VOD-RECORD-1.md`; the Recorder window `src/routes/_recorder/` (opened from
+    the presenter console, **● REC** / key **R**); pure cores `src/lib/record/timelineCore.ts`
+    (the text grammar, paths, ink diff, video settings) and `replayCore.ts` (the scheduler);
+    `recordBus.ts` (the BroadcastChannel wire), `recordCapture.ts` (tab capture → exact-size
+    frames → MediaRecorder), `ticker.ts` (a Worker clock). Hooks: `deckNav.navigate`, the three
+    builds (`Steps` / `Terminal` / `Video`), `NavigationBar`'s onContinue, `AnimationBar`,
+    `fireTrigger`, `setHighlight`, `Stroke.ms` in `Annotate`. Tests: `timelineCore`, `replayCore`,
+    `recordBus`, `SlideDeckRecorder`.
+  - **The recorder is a third window because nothing else survives a page turn** — the slides
+    window AND the `?present` console both reload on every slide.
+  - **The timeline records outcomes, not keys**: a Space that revealed a step is `step`, one that
+    paged is `goto`, so a replay cannot drift into paging where the take stepped.
+- [ ] **Render a timeline offline (headless)** — replay a timeline in a headless Chrome at exactly the
+  canvas size, frame-perfect, with no monitor involved (`?shot` + the replay commands + a screencast
+  → ffmpeg). Blocked on the deck rendering blank in headless Chrome (see the capture-slides notes:
+  it renders over http with enough virtual time); would remove the "make the window 16:9" caveat.
+
 - [x] **`WebSite`** — a live website as a component, bounded to the space you give it.
   - Done: `src/lib/components/WebSite.svelte` — the engine behind both embeds. Fills its
     parent, so a `<Block>` places and sizes it in canvas pixels.

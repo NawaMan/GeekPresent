@@ -184,6 +184,21 @@ build *ARGS:
     RECIPE=build; {{ booth }}
     pnpm build "$@"
 
+# Build, then serve the BUILT site — page turns load far faster than under `just dev`.
+serve-build *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    RECIPE=serve-build; {{ booth }}
+    # The dev server bundles nothing, so every page turn fetches hundreds of modules; the
+    # built site loads a handful. That is the one to present (or record a video) from.
+    # Same container port as `just dev`, so stop that first; --strictPort says so if not.
+    pnpm build
+    port="${BOOTH_HOST_PORT:-}"
+    if [ -n "$port" ]; then
+        echo "▶ built slides on http://localhost:$((port + 173))/"
+    fi
+    pnpm exec vite preview --host --port 5173 --strictPort "$@"
+
 # Build a self-contained static site elsewhere. Defaults to ./dist.
 build-static *ARGS:
     #!/usr/bin/env bash

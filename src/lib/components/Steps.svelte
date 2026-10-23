@@ -61,6 +61,7 @@
 	import { getMode } from '$lib/presentation';
 	import { activeSteps } from '$lib/stores/activeSteps';
 	import { spaceIntent } from '$lib/utils/stepKeys';
+	import { reportAction } from '$lib/record/recordBus';
 	import { readArrivalAtEnd, clearArrival } from '$lib/utils/deckNav';
 
 	/** Transition each Fragment uses unless it overrides its own. */
@@ -123,11 +124,17 @@
 
 	/** Reveal the next hidden Fragment (no-op past the last). */
 	export function next() {
-		revealed.set(clamp($revealed + 1));
+		const was = $revealed;
+		const to = clamp(was + 1);
+		revealed.set(to);
+		if (drivesChrome && to !== was) reportAction({ kind: 'step' });
 	}
 	/** Hide the most recently revealed Fragment (no-op before the first). */
 	export function prev() {
-		revealed.set(clamp($revealed - 1));
+		const was = $revealed;
+		const to = clamp(was - 1);
+		revealed.set(to);
+		if (drivesChrome && to !== was) reportAction({ kind: 'step', back: true });
 	}
 	/** Show exactly `n` Fragments (clamped). */
 	export function goTo(n: number) {
@@ -153,7 +160,7 @@
 	// Only the keyboard-owning instance registers, matching who Space would drive.
 	const token = {};
 	$: drivesChrome = browser && !isText && keys === 'global';
-	$: if (drivesChrome) activeSteps.set({ owner: token, hasNext: !atEnd, hasPrev: !atStart, next });
+	$: if (drivesChrome) activeSteps.set({ owner: token, hasNext: !atEnd, hasPrev: !atStart, next, prev });
 
 	onDestroy(() => {
 		// Only clear it if we're still the registered build (a later Steps may own it).

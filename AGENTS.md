@@ -1194,6 +1194,56 @@ sticky `?kiosk` / always in `pnpm dev`); **running** is a separate session.
   (source node stays visually hidden; the panel is window-fixed so it is not trapped under the
   canvas `transform`).
 
+### "Record the talk as a video (VOD Recorder)"
+
+For a YouTube upload: the speaker presents by hand, and the deck is recorded to a video file at the
+canvas size (1920×1080 for a stock deck) with a **timeline** text file of every action. Edit the
+timeline and **REPLAY** it to record again, hands off. Spec: `specs/VOD-RECORD-1.md`.
+
+- **Open it from the presenter console**: **● REC**, key **R**. It opens `/_recorder?deck=<deckKey>`,
+  a window of its own. Nothing to place on a slide.
+- **Why a third window:** paging is a full page load, and the `?present` console reloads with the
+  audience. A recording held by either would die at the first page turn. Don't try to move the
+  recorder into `SlideDeck`/`PresenterView`.
+- **REC** asks which tab to share (pick the slides tab), reloads the current slide so live and replay
+  start from the same state, hides both bars (`chromeBare` ORs in `recordingLook`), shows the slide
+  FITTED, then rolls. **STOP** saves the video (streamed to a chosen file, else a download) and the
+  `.timeline.txt`. Options: size (default the canvas), 30/60 fps, microphone, tab sound, keep the ink
+  already drawn.
+- **Exact size whatever the window**: every frame is redrawn letterboxed onto a canvas of the output
+  size (`MediaStreamTrackProcessor`/`Generator`, Chromium). A non-16:9 window gets black bars and a
+  warning, not a wrong-sized file.
+- **The timeline records OUTCOMES at the level the deck performed them**, reported by the slides
+  window through `record/recordBus.reportAction` (a no-op unless that window is being recorded):
+  `navigate()` → `goto`, a build's next/prev → `step` / `step back` (`ActiveSteps.prev` exists for
+  replay), a slide's `onContinue` → `continue`, `AnimationBar` gestures and console scrubs → `anim`,
+  `fireTrigger` → `trigger`, `setHighlight` → `highlight`. **A new way to change what is on screen
+  needs a `reportAction` call and a case in `SlideDeck.applyReplayed`**, or the replay will not
+  reproduce it.
+- **Ink is the Recorder's own job**: it diffs the ink book (a `sync: true` store it sees too) and
+  writes strokes back on replay, redrawn over `Stroke.ms`. `Annotate` only stamps that duration.
+- **Replay waits for `here` after every `goto`** (a command sent to a page still loading is lost),
+  then fires what fell due at once — no accumulated drift. While replaying, the slides window
+  ignores the keyboard, the pointer (a transparent shield) and every console relay.
+- **No blank frames between slides.** A full page load paints an empty shell until the slide
+  hydrates. The slides window says `leaving` (`navigate()`, the replay's reload, and `pagehide` for
+  anything else) and the Recorder freezes the picture on the last frame (`Capture.hold`) until the
+  next `here`, plus ~150 ms; 8 s at most. A client-side (View Transition) turn says nothing — its
+  animation is the picture. The live window still blinks; the video does not.
+- **Neighbours are preloaded.** `SlideDeck` writes a `<script type="speculationrules">` naming the
+  next and previous slide (`?present` ones in the console; `utils/preloadCore.ts`), so Chrome loads
+  them in a hidden tab and a page turn swaps in a page that is already running. A preloaded page runs
+  its scripts while hidden, so **`SlideDeck` starts nothing until `prerenderingchange`** (`activated`):
+  no relay announcement, no `here`, no kiosk, no slide mounted. Anything new that announces itself
+  across windows belongs in `startDeck()`, or behind `activated`. `preloadNeighbours={false}` opts a
+  heavy deck out; View-Transition decks page client-side and preload nothing.
+- **Record from the build, not `just dev`.** Dev fetches hundreds of unbundled modules per page
+  turn (~1 s blank); **`just serve-build`** builds and serves `docs/` on the same port (stop
+  `just dev` first — they share container port 5173).
+- Grammar, paths, the ink diff and the video settings are pure (`record/timelineCore.ts`), as is the
+  scheduler (`record/replayCore.ts`); the Recorder clocks from a Worker (`record/ticker.ts`) because
+  a background window's timers are throttled.
+
 **Every slide to a PNG, offline** — `utils/capture-slides.sh` (for OG/social images, thumbnails,
 a contact sheet). It drives a real headless Chrome, so unlike the in-app button it captures
 **everything** — iframes, video, Monaco — because the browser's own rasteriser does the drawing.

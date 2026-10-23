@@ -98,6 +98,7 @@
 	import { activeSteps } from '$lib/stores/activeSteps';
 	import { kioskActive } from '$lib/stores/kiosk';
 	import { spaceIntent } from '$lib/utils/stepKeys';
+	import { reportAction } from '$lib/record/recordBus';
 	// Driving a group of staggered animations is one problem with one implementation,
 	// shared with AnimationBar and the presenter console. (Do not inline `a.play()`.)
 	import { pauseGroup, playGroup } from '$lib/utils/slideAnim';
@@ -205,7 +206,7 @@
 
 	// Only the keyboard-owning instance publishes itself, matching who Space would drive.
 	$: drivesChrome = browser && animating && ready && keys === 'global' && markers.length > 0;
-	$: if (drivesChrome) activeSteps.set({ owner: token, ...build, next: stepNext });
+	$: if (drivesChrome) activeSteps.set({ owner: token, ...build, next: stepNext, prev: stepPrev });
 
 	// --- The clock -------------------------------------------------------------------
 	// One group, one playhead. Each animation is clamped to its own end so the staggered
@@ -302,6 +303,7 @@
 		if (cp === null) return; // spent — Space pages the deck instead
 		target = cp;
 		playClock();
+		if (drivesChrome) reportAction({ kind: 'step' });
 	}
 
 	/** Jump back to the previous stop — the state the last forward step came from. */
@@ -310,6 +312,7 @@
 		const stop = prevCheckpoint(markers, playhead);
 		if (stop === null) return; // already at the beginning — Shift+Space pages back
 		jumpTo(stop);
+		if (drivesChrome) reportAction({ kind: 'step', back: true });
 	}
 
 	// --- Pointer seeking on the track ---------------------------------------------------

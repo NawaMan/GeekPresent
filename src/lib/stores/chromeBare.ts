@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
 import { derived, writable } from 'svelte/store';
 import { consoleLive } from './presenter';
+import { recordingLook } from '$lib/record/recordBus';
 import { BARE_KEY, readBareParam, readSticky, resolveChromeBare, type Choice } from '$lib/chrome/chromeBareCore';
 
 // Bare chrome — both window-edge bars hidden completely (see chrome/chromeBareCore).
@@ -21,9 +22,11 @@ function loadSticky(): Choice {
 const sticky = writable<Choice>(loadSticky());
 const deckWide = writable(false);
 
-/** True when both bars are hidden completely, PIN included. Alt+. still raises them. */
-export const chromeBare = derived([sticky, consoleLive, deckWide], ([$sticky, $live, $deck]) =>
-	resolveChromeBare($sticky, $live, $deck)
+/** True when both bars are hidden completely, PIN included. Alt+. still raises them.
+    A VOD recording in progress outranks every choice: the video is the slide alone. */
+export const chromeBare = derived(
+	[sticky, consoleLive, deckWide, recordingLook],
+	([$sticky, $live, $deck, $rec]) => $rec || resolveChromeBare($sticky, $live, $deck)
 );
 
 /** What the AUDIENCE window shows while this console is live — for the presenter console's

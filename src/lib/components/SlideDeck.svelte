@@ -95,6 +95,7 @@
 	import { page }       from '$app/stores';
 	import { base }       from '$app/paths';
 	import { onMount, tick } from 'svelte';
+	import { neighbourUrls, speculationRules } from '$lib/utils/preloadCore';
 	import { displayMode, displayFactor, clampFactor } from '$lib/stores/displayMode';
 	import type { DisplayMode } from '$lib/stores/displayMode';
 	import { adjustMode, canAdjust, canSave, setAdjustOffered, applyAdjustParam } from '$lib/stores/adjustMode';
@@ -138,6 +139,13 @@
 	import { setHighlight } from '$lib/stores/highlightTarget';
 	import { fireTrigger } from '$lib/stores/triggers';
 	import { collectFinite, applyState } from '$lib/utils/slideAnim';
+	import { get } from 'svelte/store';
+	import { activeSteps } from '$lib/stores/activeSteps';
+	import {
+		followRecorder, setReportingDeck, listen as listenRecorder, post as postRecorder,
+		recorderState, recordingLook, replaying, reportAction, reportLeaving
+	} from '$lib/record/recordBus';
+	import { resolveHref, type TimelineAction } from '$lib/record/timelineCore';
 	import { navigate } from '$lib/utils/deckNav';
 	import { documentTitle, getPageNavigation } from '$lib/utils/navigate';
 	import type { Page }  from '$lib/utils/navigate';
@@ -243,6 +251,12 @@
 	   `?bare` / `?bare=off` outranks both (chrome/chromeBareCore). */
 	export let hideChrome = false;
 
+	/* Ask Chrome to preload the next and previous slide (speculation rules), so a page turn
+	   swaps in a page that has already loaded instead of showing a blank one while it starts.
+	   Off for a deck whose slides are too heavy to keep two extra copies of. Other browsers
+	   ignore it. See utils/preloadCore. */
+	export let preloadNeighbours = true;
+
 	/* Offer the ADJUST authoring control on EVERY slide of this deck, even in a build.
 	   Almost no deck wants this — ADJUST is off in production by default, and the usual
 	   way to demo it is per-slide: set `adjust: true` on the individual pages.ts entries
@@ -310,12 +324,28 @@
 	let mode: DisplayMode = $displayMode;
 	let factor = clampFactor($displayFactor);
 	let initialized = false;
+	// A slide Chrome preloaded (see preloadNeighbours) runs its scripts while still hidden.
+	// Until it is SHOWN it must stay silent — announce no slide to the console, tell no
+	// Recorder it arrived, start no kiosk, mount no slide — or a page nobody turned to yet
+	// would drive the others. So the deck starts on `prerenderingchange`, not before; the
+	// scripts are loaded and the shell hydrated by then, which is the time saved.
+	let activated = !(browser && (document as Document & { prerendering?: boolean }).prerendering);
 	// On-screen scale of the slide content set by adjustSize() (the FITTED fit factor,
 	// or the SCALED zoom factor), exposed to the content as --view-scale for any chrome
 	// that needs to counter the slide transform. (DISPLAY no longer uses it — it's a
 	// viewport control now, sized independently of the slide.)
 	let viewScale = 1;
 	$: isFitted = mode === 'FITTED';
+
+	// A VOD take (record or replay — see record/recordBus) shows the slide FITTED, whatever
+	// this window was set to, and puts the speaker's own choice back when it ends. Local to
+	// this window: the persisted displayMode is never written.
+	let lookHeld = false;
+	$: if (initialized && $recordingLook !== lookHeld) {
+		lookHeld = $recordingLook;
+		mode = lookHeld ? 'FITTED' : get(displayMode);
+		apply(true);
+	}
 	$: aspectRatio = width / height;
 
 	// Minimap state (SCALED only): which slice of the slide is currently on screen,
@@ -342,10 +372,10 @@
 	// Nested return stack (hub → deck → appendix…), carried in `?return=` and mirrored
 	// into sessionStorage so full-page NEXT/PREV that drop the query can restore it.
 	// Re-stamped on every deck-level link so closing RETURN and nested appendices unwind.
-	$: if (browser) {
+	$: if (browser && activated) {
 		rememberReturnStack($page.url.searchParams, deckName, sessionStorage, pages);
 	}
-	$: returnStack = browser
+	$: returnStack = browser && activated
 		? resolveReturnStack($page.url.searchParams, deckName, sessionStorage, pages)
 		: [];
 	// The current slide's neighbours in the linear order, for the ControlBar's ONE
@@ -417,7 +447,7 @@
 	// ordinary tabs of one deck both publish and both follow, so paging in either yanks
 	// the other. deckKey answers "which deck?"; the role answers "who may drive whom?".
 	$: relayRole = roleOf(present);
-	$: if (isTopWindow && currentSlide) publishCurrentSlide(deckKey, currentSlide, relayRole);
+	$: if (isTopWindow && activated && currentSlide) publishCurrentSlide(deckKey, currentSlide, relayRole);
 	// Does THIS slide offer ADJUST? Its own pages.ts `adjust` flag, or the deck-wide
 	// `adjust` prop. Re-runs on every slide change, so paging off a ADJUST demo onto an
 	// ordinary slide takes the control away again. The sticky `?adjust` flag outranks
@@ -1113,9 +1143,92 @@
 		document.body.classList.remove('rendering');
 	}
 
+	/** Set this slide's finite animations to a relayed / replayed state. */
+	function applyAnim(cmd: { playing: boolean; fraction: number }) {
+		const root = document.querySelector('.content');
+		if (!root) return;
+		const anims = collectFinite(root);
+		if (anims.length) applyState(anims, cmd);
+	}
+
+	/** Perform one action a VOD replay sent — through the same function the live action
+	    used (see specs/VOD-RECORD-1.md). Ink is not here: the Recorder writes it to the
+	    ink book itself, and this window mirrors the book as it always does. */
+	function applyReplayed(a: TimelineAction) {
+		switch (a.kind) {
+			case 'goto': {
+				const target = resolveHref(a.href, deckKey);
+				// The same address again (the Recorder's "start from a fresh load") is a reload:
+				// a client-side goto to where we already are would change nothing.
+				if (target === $page.url.pathname.replace(/\/+$/, '') + $page.url.search) {
+					reportLeaving();
+					window.location.reload();
+					return;
+				}
+				const direction = a.back ? 'back' : 'forward';
+				const leaving = pages.find((p) => p.path === currentSlide);
+				const kind = (a.back ? leaving?.transitionBack : leaving?.transition) ?? 'slide';
+				navigate(target, { viewTransitions, kind, direction, arriveAtEnd: a.end === true });
+				return;
+			}
+			case 'step': {
+				const s = get(activeSteps);
+				if (a.back) s?.prev?.();
+				else s?.next();
+				return;
+			}
+			case 'continue':
+				window.dispatchEvent(new CustomEvent('gp:slide-continue'));
+				return;
+			case 'anim':
+				applyAnim(a);
+				return;
+			case 'trigger':
+				fireTrigger(a.name);
+				return;
+			case 'highlight':
+				setHighlight(a.name);
+				return;
+		}
+	}
+
+	// The neighbours to preload, as a speculation-rules script in <head>. Only the top window
+	// of a deck that pages by full loads (a View-Transition deck pages client-side, so there
+	// is nothing to preload), and only once this page is itself on screen.
+	$: if (browser && activated) setPreload(
+		preloadNeighbours && isTopWindow && !viewTransitions && !shot
+			? speculationRules(neighbourUrls(deckNavigation, present))
+			: ''
+	);
+	function setPreload(rules: string) {
+		const old = document.getElementById('gp-preload');
+		if (old?.textContent === rules) return;
+		old?.remove();
+		if (!rules || !HTMLScriptElement.supports?.('speculationrules')) return;
+		const script = document.createElement('script');
+		script.type = 'speculationrules';
+		script.id = 'gp-preload';
+		script.textContent = rules;
+		document.head.appendChild(script);
+	}
+
 	onMount(() => {
 		if (!browser) return;
-		const unsubMode   = displayMode.subscribe(v   => { mode = v;                  if (initialized) apply(true); });
+		if (activated) return startDeck();
+		let stop: (() => void) | undefined;
+		const show = () => {
+			activated = true;
+			stop = startDeck();
+		};
+		document.addEventListener('prerenderingchange', show, { once: true });
+		return () => {
+			document.removeEventListener('prerenderingchange', show);
+			stop?.();
+		};
+	});
+
+	function startDeck(): () => void {
+		const unsubMode   = displayMode.subscribe(v   => { if (lookHeld) return; mode = v; if (initialized) apply(true); });
 		const unsubFactor = displayFactor.subscribe(v => { factor = clampFactor(v);   if (initialized) apply(true); });
 		const onResize = () => adjustSize(false);
 		window.addEventListener('resize', onResize);
@@ -1146,6 +1259,7 @@
 		const stopFollow = (window.self === window.top)
 			? subscribeCurrentSlide(deckKey, (path) => {
 				if (!path || path === currentSlide) return;
+				if (get(replaying)) return; // a replay owns the deck — the console may not page it
 				const target = present ? `./${path}?present` : `./${path}`;
 				const targetIndex = pages.findIndex((p) => p.path === path);
 				const direction = targetIndex >= 0 && targetIndex < (currentIndex ?? 0) ? 'back' : 'forward';
@@ -1159,17 +1273,16 @@
 		// live slide animations. Top window only (an iframe preview must not react).
 		const stopAnim = (window.self === window.top)
 			? subscribeAnimCommand(deckKey, (cmd) => {
-				const root = document.querySelector('.content');
-				if (!root) return;
-				const anims = collectFinite(root);
-				if (anims.length) applyState(anims, cmd);
+				if (get(replaying)) return;
+				applyAnim(cmd);
+				reportAction({ kind: 'anim', ...cmd }); // the console scrubbed; a recording hears it
 			})
 			: () => {};
 
 		// A relayed CONTINUE pulse from the console becomes a `gp:continue` DOM event;
 		// NavigationBar routes it to the slide's onContinue hook. Top window only.
 		const stopContinue = (window.self === window.top)
-			? subscribeContinue(deckKey, () => window.dispatchEvent(new CustomEvent('gp:continue')))
+			? subscribeContinue(deckKey, () => { if (!get(replaying)) window.dispatchEvent(new CustomEvent('gp:continue')); })
 			: () => {};
 
 		// A relayed HIGHLIGHT from the console lights the named Block on this slide
@@ -1177,14 +1290,14 @@
 		// must not react, exactly like the anim/continue relays above. `setHighlight`
 		// clears the store on `null`, so leaving a note line turns the spotlight off.
 		const stopHighlight = (window.self === window.top)
-			? subscribeHighlight(deckKey, (name) => setHighlight(name))
+			? subscribeHighlight(deckKey, (name) => { if (!get(replaying)) setHighlight(name); })
 			: () => {};
 
 		// A relayed TRIGGER pulse from a checked <Note data-trigger> line fires the
 		// named local pulse (see stores/triggers) — a <Cursor startOn="name">, today,
 		// reacts. Top window only, same guard as the relays above.
 		const stopTrigger = (window.self === window.top)
-			? subscribeTrigger(deckKey, (name) => fireTrigger(name))
+			? subscribeTrigger(deckKey, (name) => { if (!get(replaying)) fireTrigger(name); })
 			: () => {};
 
 		// Console presence. In the ?present window this is the CONSOLE, so heartbeat —
@@ -1209,6 +1322,52 @@
 			stopConsole = () => { stopBeat(); window.clearInterval(poll); consoleLive.set(false); };
 		}
 
+		// VOD Recorder (record/recordBus). Only the deck's SLIDES window takes part — the top
+		// window that is not the console — since that is the window being filmed. It reports
+		// what it does while recording, says `here` when it has loaded (which replay waits on
+		// after a page turn), and obeys replayed commands. While replaying, the keyboard is
+		// held off (the pointer by the shield in the markup) so a stray key can't spoil a take.
+		let stopRecorder = () => {};
+		if (!present && window.self === window.top) {
+			setReportingDeck(deckKey);
+			const stopFollowRec = followRecorder(deckKey);
+			const sayHere = () => postRecorder({
+				type: 'here',
+				deck: deckKey,
+				here: {
+					href: $page.url.pathname + $page.url.search,
+					path: $page.url.pathname.replace(/\/+$/, ''),
+					width,
+					height,
+					title: docTitle
+				}
+			});
+			const stopListen = listenRecorder(deckKey, (m) => {
+				if (m.type === 'hello') sayHere();
+				else if (m.type === 'cmd' && get(recorderState) !== 'idle') applyReplayed(m.action);
+			});
+			const holdKeys = (e: KeyboardEvent) => {
+				if (!get(replaying)) return;
+				e.stopImmediatePropagation();
+				e.preventDefault();
+			};
+			window.addEventListener('keydown', holdKeys, true);
+			// Any unload navigate() did not announce (a plain link, the browser's Back) also
+			// freezes the video until the next page lands.
+			window.addEventListener('pagehide', reportLeaving);
+			// After the builds on this slide have registered (they do so as they mount, and a
+			// build reached by PREV settles a frame later) — replay's next `step` needs them.
+			let raf = requestAnimationFrame(() => { raf = requestAnimationFrame(sayHere); });
+			stopRecorder = () => {
+				cancelAnimationFrame(raf);
+				stopListen();
+				stopFollowRec();
+				setReportingDeck(null);
+				window.removeEventListener('keydown', holdKeys, true);
+				window.removeEventListener('pagehide', reportLeaving);
+			};
+		}
+
 		// NOTE: no ink subscription here. Ink rides a persisted(sync: true) store, so the
 		// `storage` event mirrors it between the two deck windows with nothing to wire up —
 		// and because it is keyed BY SLIDE, the console's next-slide <iframe> preview shows
@@ -1225,12 +1384,13 @@
 			stopHighlight();
 			stopTrigger();
 			stopConsole(); // stop the heartbeat / presence tracking; clears consoleLive
+			stopRecorder();
 			setHighlight(null); // don't leave a stale spotlight across a deck swap
 			// Ink is NOT cleared here — it is meant to survive. That is the whole point.
 			window.removeEventListener('resize', onResize);
 			window.removeEventListener('afterprint', onAfterPrint);
 		};
-	});
+	}
 </script>
 
 <!-- Seo owns the <title> + SEO/social tags; the favicon link stays here (its
@@ -1652,6 +1812,12 @@
 	/>
 {/if}
 
+<!-- VOD replay: a transparent shield over everything, so a stray click on the slides
+     window cannot change what the replay is filming (the keyboard is held in onMount). -->
+{#if browser && $replaying && !present}
+	<div class="replay-shield" aria-hidden="true"></div>
+{/if}
+
 <!-- Presenter console (this window loaded with ?present). Mounts OVER the hidden
      canvas; the current slide's own <Note> supplies the notes panel. -->
 {#if initialized && present}
@@ -1954,6 +2120,13 @@
 	.container.clean :global(.nav),
 	.container.clean :global(.anim-bar) {
 		display: none;
+	}
+
+	.replay-shield {
+		position: fixed;
+		inset: 0;
+		z-index: 2147483647;
+		cursor: none;
 	}
 
 	/* `?present`: hide the whole slide canvas (frame, background, slide body, its

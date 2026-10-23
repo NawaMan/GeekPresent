@@ -10,6 +10,7 @@
 	import { activeSteps } from '$lib/stores/activeSteps';
 	import { localNav, registerNav, unregisterNav } from '$lib/stores/localChrome';
 	import { spaceIntent, isInteractiveTarget } from '$lib/utils/stepKeys';
+	import { reportAction } from '$lib/record/recordBus';
 
 	export let firstLink = '';
 	export let prevLink  = '';
@@ -102,7 +103,15 @@
 
 	function doContinue() {
 		if (steps?.hasNext) steps.next();
-		onContinue?.();
+		runContinueHook();
+	}
+
+	/** The slide's own onContinue hook — reported to a VOD recording as `continue` (a build
+	    step reports itself as `step`), and replayed through `gp:slide-continue`. */
+	function runContinueHook() {
+		if (!onContinue) return;
+		onContinue();
+		reportAction({ kind: 'continue' });
 	}
 
 	function onTop() {
@@ -148,7 +157,14 @@
 	// A CONTINUE pulse relayed from the presenter console (SlideDeck turns it into
 	// this DOM event) drives the same onContinue hook as the on-screen CONTINUE button.
 	function handleRelayedContinue() {
-		onContinue?.();
+		runContinueHook();
+	}
+
+	// A VOD replay's `continue` runs the hook alone — the build steps were recorded, and
+	// are replayed, as their own `step` lines.
+	function handleReplayedContinue() {
+		if (dormant) return;
+		runContinueHook();
 	}
 
 	// A slide-local pager (NOT the deckLevel one) publishes itself so the deck-level
@@ -161,6 +177,7 @@
 		if (browser && mode !== 'text' && !handout) {
 			window.addEventListener('keydown', handleGlobalKeydown);
 			window.addEventListener('gp:continue', handleRelayedContinue);
+			window.addEventListener('gp:slide-continue', handleReplayedContinue);
 		}
 		if (browser && !deckLevel && !handout) registerNav(navOwner);
 	});
@@ -169,6 +186,7 @@
 		if (browser) {
 			window.removeEventListener('keydown', handleGlobalKeydown);
 			window.removeEventListener('gp:continue', handleRelayedContinue);
+			window.removeEventListener('gp:slide-continue', handleReplayedContinue);
 			if (!deckLevel && !handout) unregisterNav(navOwner);
 		}
 	});

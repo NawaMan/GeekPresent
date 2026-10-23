@@ -150,6 +150,9 @@
 
 	let surface: SVGSVGElement | undefined = $state();
 	let live: Point[] = $state([]);
+	/** When the pen went down — so a committed stroke can carry how long it took to draw
+	    (`Stroke.ms`), which the VOD recorder replays at the same speed. Not reactive. */
+	let liveStartedAt = 0;
 	let seq = 0;
 
 	// ── The eraser ────────────────────────────────────────────────────────────────────────
@@ -509,6 +512,7 @@
 		snapping = ev.shiftKey; // Shift may already be held as the pen goes down
 		capture(ev.pointerId, true);
 		live = [pointFrom(ev)];
+		liveStartedAt = performance.now();
 	}
 
 	function onPointerMove(ev: PointerEvent): void {
@@ -566,6 +570,8 @@
 
 		const stroke: Stroke = { id: `ink-${Date.now()}-${++seq}`, tool: drawTool, points };
 		if (color) stroke.color = color;
+		const ms = Math.round(performance.now() - liveStartedAt);
+		if (ms > 0) stroke.ms = ms;
 		addStroke(stroke);
 	}
 
