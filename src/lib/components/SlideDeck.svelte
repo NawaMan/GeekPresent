@@ -47,6 +47,9 @@
 		applyBareParam,
 		toggleBars
 	} from '$lib/stores/chromeBare';
+	import OnboardHint from '$lib/components/OnboardHint.svelte';
+	import { markOnboarded } from '$lib/stores/onboard';
+	import { DEFAULT_ONBOARD_DELAY_MS, isBeyondFirst, isFirstSlide } from '$lib/onboard/onboardCore';
 	import {
 		pageSourceCanView,
 		pageSourceCanEdit,
@@ -350,6 +353,13 @@
 
 	/* Words-per-minute when "use speaker notes for page timing" is on. */
 	export let kioskWpm = DEFAULT_WPM;
+	/** The first-visit hint (see <OnboardHint>): a viewer who sits on the first slide
+	   without paging or opening a bar is told about →/Space/← and the two bars. Per
+	   viewer, once per origin; never on a screen an audience watches. `false` opts out. */
+	export let onboardHint = true;
+	/** Idle ms on the first slide before that hint appears (a stray Enter/click/scroll
+	   brings it at once). */
+	export let onboardDelayMs = DEFAULT_ONBOARD_DELAY_MS;
 
 	let viewport: HTMLElement;
 	let container: HTMLElement;
@@ -442,6 +452,9 @@
 	// too), and it is the one mode that deliberately does NOT fit the slide to the window —
 	// fitting is what a human wants and exactly what a screenshot must not do.
 	$: shot = browser && $page.url.searchParams.has('shot');
+	// `?onboard` — show the first-visit hint now, on this slide, whatever this viewer has
+	// done before (and forget that they had). For trying the hint out, or demoing it.
+	$: onboardForced = browser && $page.url.searchParams.has('onboard');
 
 	// PRINTING one slide. The deck is a viewport — a canvas scaled to whatever window it found —
 	// and paper is not a window: it has a fixed size, no scrollbars and no JS. Left alone, Ctrl+P
@@ -484,6 +497,34 @@
 	$: relayRole = roleOf(present);
 	$: if (isTopWindow && activated && currentSlide)
 		publishCurrentSlide(deckKey, currentSlide, relayRole);
+
+	// First-visit hint. Reaching any slide past the first, by whatever route, is the proof
+	// the viewer found the way on — recorded on ARRIVAL, so keys, pager, TOC, links and a
+	// typed URL all count without hooking each one. Audience top window only: a ?clean
+	// tile or the console's preview arriving somewhere proves nothing about the viewer.
+	$: if (
+		isTopWindow &&
+		activated &&
+		!clean &&
+		!present &&
+		isBeyondFirst(pages, currentSlide ?? '')
+	) {
+		markOnboarded();
+	}
+	// Pointing at a bar (or tabbing into one) opens it — the hint's other lesson, learned.
+	// The overlay is pointer-events:none, so only its children (the bars, the minimap)
+	// raise these. Attached here rather than as on: attributes, which would make a plain
+	// <div> look interactive to the a11y lint. addEventListener dedupes a repeat.
+	$: if (chromeOverlay) {
+		chromeOverlay.addEventListener('pointerover', markOnboarded);
+		chromeOverlay.addEventListener('focusin', markOnboarded);
+	}
+	// Alt+. raises both bars from the keyboard — the same lesson.
+	$: if ($chromeArmed && !present) markOnboarded();
+	$: onboardFirst = isFirstSlide(pages, currentSlide ?? '');
+	// Never on a screen an audience may be watching, nor inside an embed.
+	$: onboardSuppressed =
+		!isTopWindow || !activated || $chromeBare || $kioskActive || $replaying || $recordingLook;
 	// Does THIS slide offer ADJUST? Its own pages.ts `adjust` flag, or the deck-wide
 	// `adjust` prop. Re-runs on every slide change, so paging off a ADJUST demo onto an
 	// ordinary slide takes the control away again. The sticky `?adjust` flag outranks
@@ -1988,6 +2029,15 @@
 	<KioskDialog />
 	<KioskIndicator />
 	<KioskRunner {pages} currentSlide={currentSlide ?? ''} prefix="./" wpm={kioskWpm} />
+	<OnboardHint
+		offered={onboardHint}
+		firstSlide={onboardFirst}
+		suppressed={onboardSuppressed}
+		bars={toolBar || controlBar}
+		delayMs={onboardDelayMs}
+		force={onboardForced}
+		themeClass={deckClass}
+	/>
 {/if}
 
 <!-- VOD replay: a transparent shield over everything, so a stray click on the slides

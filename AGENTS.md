@@ -552,7 +552,16 @@ than misleading the next agent.
   `Spotlight` (dims the canvas and rings a *named* `Block`, driven by a `<Note>` line the
   speaker covers in the console) and `Annotate` (the speaker's **pen** — freehand ink on the
   live slide, persisted per slide; see its playbook, and note the deck must pass `annotate`
-  to offer it),
+  to offer it), plus `OnboardHint` (window-fixed, outside the canvas: the first-visit hint.
+  A viewer who sits on the deck's first visible slide without paging or opening a bar is
+  told about →/Space/← and the two edge bars — after `onboardDelayMs` (default 8 s) of
+  nothing, or at once on a stray Enter/↑/↓, click or scroll. A paging key, a bar hover or
+  focus, Alt+., "Got it", or arriving at any later slide sets ONE per-origin flag
+  (`stores/onboard.ts`), and it never shows again. Never on a screen an audience may see:
+  off under `?clean`/`?present`, bare chrome (a live console, or bars hidden), kiosk, VOD record/replay
+  and embeds. On by default; `<SlideDeck onboardHint={false}>` opts out. **`?onboard`** on
+  any slide shows it at once and clears the flag — for trying or demoing it; only the
+  audience-screen cases above still hold it back. Rules in `onboard/onboardCore.ts`),
   plus framework-internal `Copyright`, `CtrlBtn`,
   `NavigationBar`, `TableOfContent`,
   `NoteEditor` (the presenter console's **EDIT NOTE**, key **E** — edits the source between the
