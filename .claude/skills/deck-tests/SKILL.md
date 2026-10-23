@@ -119,6 +119,6 @@ npm_config_verify_deps_before_run=false pnpm exec vite build    # static build
 ```
 
 There are no `test:dom` / `test:ssr` scripts; select a project with vitest's own flags if you need one.
-Note the hardened pnpm setup blocks a bare `pnpm dev` — use `./booth exec --run -- ./dev-run.sh` if you
+Note the hardened pnpm setup blocks a bare `pnpm dev` — use `just dev` if you
 need to start one, and **the dev server is usually already up anyway** (see AGENTS.md Rule 6).
 `prettier --check` does **not** pass at baseline; never `--write` the tree to "fix" it.

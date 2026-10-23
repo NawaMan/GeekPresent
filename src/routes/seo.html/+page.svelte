@@ -172,7 +172,7 @@ are in the prerendered HTML regardless — view source to confirm).</code></pre>
 	prerendered route, as absolute URLs) and <Link href="../robots.txt">robots.txt</Link>
 	into the output. The sitemap is generated from each presentation&rsquo;s
 	<code>pages.ts</code> plus the standalone texts, so new slides are picked up
-	automatically. (A single-route build &mdash; <code>build-static.sh ./out
+	automatically. (A single-route build &mdash; <code>scripts/build-static.sh ./out
 	seo.html</code> &mdash; omits the sitemap by design.)
 </p>
 

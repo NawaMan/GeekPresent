@@ -62,7 +62,7 @@ defaults. **Destructive steps confirm** unless `--yes` is set. Nothing is commit
 └─ <dir>/                               # GeekPresent, now plain files in your repo
    ├─ src/routes/<kept-deck>/           # author here
    ├─ .samples-ref/                     # (minimal) reference copies — gitignored, build-excluded
-   ├─ build-static.sh  booth  .booth/   # build into any folder; CodingBooth for host-free builds
+   ├─ scripts/build-static.sh  booth  .booth/   # build into any folder; CodingBooth for host-free builds
    └─ README.md  AGENTS.md              # authoring docs for the engine itself
 ```
 
@@ -84,7 +84,7 @@ defaults. **Destructive steps confirm** unless `--yes` is set. Nothing is commit
   starts off). Full playbook in `<dir>/AGENTS.md`.
 - **Build locally** (no host toolchain needed if CodingBooth is present):
   ```bash
-  cd <dir> && ./booth -- ./build-static.sh ./dist --zip   # or: pnpm install && ./build-static.sh ./dist
+  cd <dir> && scripts/build-static.sh ./dist --zip   # or: pnpm install && scripts/build-static.sh ./dist
   ```
 - **Deploy:** push; then one-time enable **Settings → Pages → Source: GitHub Actions**. The
   workflow rebuilds on changes under `<dir>/`.

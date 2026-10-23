@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# build-static.sh — build GeekPresent as a self-contained static site into a
+# scripts/build-static.sh — build GeekPresent as a self-contained static site into a
 # folder of your choice (independent of the docs/ + GitHub Pages flow).
 #
 # Usage:
-#   ./build-static.sh <output-dir> [route]
+#   scripts/build-static.sh <output-dir> [route]
 #
 #   <output-dir>   (required) where to write the static site. Created if missing.
 #                  If it already exists it must be empty or a previous output of
@@ -15,11 +15,11 @@
 #                  whole site (the home/landing page and every presentation).
 #
 # Examples:
-#   ./build-static.sh ./dist                 # whole site            -> ./dist
-#   ./build-static.sh /tmp/out geeklight     # just the geeklight deck -> /tmp/out
-#   ./build-static.sh ./out text.html        # just the text sample  -> ./out
-#   ./build-static.sh --force ./dist         # overwrite a non-empty ./dist
-#   ./build-static.sh --zip ./dist           # also produce ./dist.zip
+#   scripts/build-static.sh ./dist                 # whole site            -> ./dist
+#   scripts/build-static.sh /tmp/out geeklight     # just the geeklight deck -> /tmp/out
+#   scripts/build-static.sh ./out text.html        # just the text sample  -> ./out
+#   scripts/build-static.sh --force ./dist         # overwrite a non-empty ./dist
+#   scripts/build-static.sh --zip ./dist           # also produce ./dist.zip
 #
 # Flags:
 #   --force         overwrite a non-empty output dir not created by this script.
@@ -33,16 +33,17 @@
 # from any folder, any sub-path, or any static host. Just open index.html.
 
 set -euo pipefail
+source "$(dirname "$0")/_booth.sh"
 
 MARKER=".geekpresent-static"   # dropped in outputs we own, so rebuilds are safe to wipe
 
 usage() {
 	cat <<'EOF'
-build-static.sh — build GeekPresent as a self-contained static site into a
+scripts/build-static.sh — build GeekPresent as a self-contained static site into a
 folder of your choice (independent of the docs/ + GitHub Pages flow).
 
 Usage:
-  ./build-static.sh [flags] <output-dir> [route]
+  scripts/build-static.sh [flags] <output-dir> [route]
 
 Arguments:
   <output-dir>   (required) where to write the static site. Created if missing.
@@ -62,11 +63,11 @@ Flags:
   -h, --help      show this help and exit.
 
 Examples:
-  ./build-static.sh ./dist                 # whole site            -> ./dist
-  ./build-static.sh /tmp/out geeklight     # just the geeklight deck -> /tmp/out
-  ./build-static.sh ./out text.html        # just the text sample  -> ./out
-  ./build-static.sh --force ./dist         # overwrite a non-empty ./dist
-  ./build-static.sh --zip ./dist           # also produce ./dist.zip
+  scripts/build-static.sh ./dist                 # whole site            -> ./dist
+  scripts/build-static.sh /tmp/out geeklight     # just the geeklight deck -> /tmp/out
+  scripts/build-static.sh ./out text.html        # just the text sample  -> ./out
+  scripts/build-static.sh --force ./dist         # overwrite a non-empty ./dist
+  scripts/build-static.sh --zip ./dist           # also produce ./dist.zip
 EOF
 }
 
@@ -99,7 +100,7 @@ fi
 
 # --- resolve paths ----------------------------------------------------------
 START_PWD="$PWD"
-ROOT="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 case "$OUT" in
 	/*) ;;                       # already absolute
 	*)  OUT="$START_PWD/$OUT" ;; # relative to where the user invoked us

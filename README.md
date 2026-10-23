@@ -35,7 +35,7 @@ HTML-based slides aren't new — reveal.js, Slidev, Spectacle and Marp all exist
 - **Appendices — a slide you jump *into* and return *from*.** The deep-dive a talk only sometimes needs: a proof, a full API table, a backup demo. `AppendixLink` jumps in and stamps the calling slide into the URL as the return address, so the same appendix returns to whichever slide asked; `AppendixPage` gives it its way back. It behaves like a real book's appendix — several contiguous slides are one chapter you page through, and walking forward off the end *is* the return. Mark it `hidden` and it leaves the deck's forward march entirely (→/Space step over it, the TOC omits it); leave `hidden` off and it is ordinary back matter you can also page into.
 - **Two artifact types from one component set.** The same `$lib` components compile into either a click-through **presentation** or a long-form, scrollable **Text** — give the talk, then publish the reader-friendly version with no rewrite. A mode flag (`setMode`) lets shared components adapt (e.g. the nav bar collapses to a single TOP button).
 - **Multiple independent presentations in one project.** Navigation and the Table of Contents are scoped *per presentation* via Svelte context (`setPages` / `getPages`), not a single global config. Sibling route folders (`slides/`, `portrait/`, `geeklight/`) each carry their own slide list, theme, fonts, background, and favicon, and coexist without interfering.
-- **Genuinely portable, lean static output.** Every route prerenders with **relative** asset paths, so the build runs from GitHub Pages, any sub-path, S3, or straight off disk. `build-static.sh` can emit the whole site *or a single presentation*, and skips precompressed `.br`/`.gz` files by default (~170 files instead of ~490).
+- **Genuinely portable, lean static output.** Every route prerenders with **relative** asset paths, so the build runs from GitHub Pages, any sub-path, S3, or straight off disk. `scripts/build-static.sh` can emit the whole site *or a single presentation*, and skips precompressed `.br`/`.gz` files by default (~170 files instead of ~490).
 - **Visual placement that stays "just text."** Pixel-exact positioning doesn't mean guessing numbers. Wrap an element in a `Block` (or `ImageBlock`) and flip on **ADJUST mode** — an in-browser authoring aid (on in `pnpm dev`; on a built site via a sticky `?adjust` flag) — to drag and resize it on the canvas, with snapping, aspect-lock, and global undo/redo. Then either **Copy** the tag with its final `x`/`y`/`width`/`height` to paste back into source, or — in `pnpm dev` — hit **SAVE** to write every moved `Block` straight back into the slide's `.svelte` file (matched by `name`, or by its old geometry), and let hot-reload show the result. The write is dev-only — a static site has no server to write files, so there SAVE looks like an ordinary button and *refuses when pressed*, answering **NOT ALLOWED** with a tooltip explaining why; Copy is the way back. Either way the slide stays plain, diffable Svelte and nothing is guessed — a tag it can't confidently place is reported so you paste that one by hand. ADJUST is off in production, but an individual slide can offer it (`adjust: true` in `pages.ts`), so the slides that *teach* authoring can demonstrate the whole loop live in the deployed deck — this project's own deck does exactly that.
 - **A pen that draws on the live slide — and remembers.** Flip on **ANNOTATE** and the speaker can mark the slide up mid-talk with a bar of icon tools: a **pen** to circle the term freehand, a **line** and an **arrow** to point dead straight at the line of code, a **rectangle** to ring a whole region, a **highlighter** to swipe over the sentence someone just asked about, a **text** tool to drop a typed label (click to place, then re-edit or drag it), and an **eraser** that lights up the mark under it and lifts it whole. Hold **Shift** and the pen, line, or arrow snaps to a dead-straight horizontal or vertical — the underline or plumb line a wrist can't hold on stage — while the highlighter comes out *level* however wobbly your hand was, because a highlight belongs on the row you swiped rather than sloping across it. The ink is **kept, per slide, across reloads** — so a deck you marked up while rehearsing arrives at the podium marked up — and it mirrors to the audience window automatically. Keeping ink is also what makes it dangerous, so a slide whose marks are more than a day old *says so when you arrive* and offers to clear them; **RESET** / **RESET ALL** sit on the pen's bar and in the presenter console. Crucially the pen eats the *pointer*, never the *keyboard*: arrow keys keep paging, because a speaker who can't advance is worse off than one with a stray scribble.
 - **Capture a slide as a PNG at its *true* size.** Press **CAPTURE** and the slide downloads as a full **1920×1080** image — not a screenshot of your window, but the canvas *re-rendered*, so the file is identical whether you were presenting on a projector or squinting at a laptop (`captureScale={2}` gives you 3840×2160, still crisp, because it's re-rendered rather than upscaled). Your **annotations come with it** and the deck's chrome doesn't — capture reuses the same `.no-print` rule that already keeps the nav bar out of a printout. And it's honest about its one real limit: a slide holding a live `<iframe>` (a `WebSite`, `WebPage` or `YouTube` embed) is a separate document whose pixels the page may not read, so rather than hand you a PNG with a hole in it, CAPTURE *refuses when pressed* and names the embed in the way — the same bargain SAVE makes.
@@ -61,8 +61,8 @@ pnpm deploy     # publish docs/ to GitHub Pages
 ```
 
 ```bash
-./build-static.sh ./dist        # build the static site into any folder you choose
-./build-static.sh ./dist geeklight   # ...or just one presentation/text
+scripts/build-static.sh ./dist        # build the static site into any folder you choose
+scripts/build-static.sh ./dist geeklight   # ...or just one presentation/text
 ```
 
 ---
@@ -158,7 +158,7 @@ GeekPresent develops itself inside a [CodingBooth](https://codingbooth.io/) — 
 carries the whole toolchain — and both the `booth` wrapper and `.booth/` are tracked, so the clone
 hands you a working one. The script asks whether to keep it:
 
-- **`booth`** *(default)* — keep it. `cd <dir> && ./booth -- ./build-static.sh ./dist` builds your
+- **`booth`** *(default)* — keep it. `cd <dir> && scripts/build-static.sh ./dist` builds your
   deck with **nothing installed on the host but Docker or Podman** — no Node, no pnpm, no version
   drift. `./booth` on its own opens VS Code in the browser with the toolchain already in place.
 - **`host`** — remove `booth` and `.booth/`, and build with your own `node` + `pnpm`.
@@ -571,9 +571,9 @@ can't resolve relative URLs). One build-time variable supplies that base URL:
 | --- | --- | --- |
 | `GEEKPRESENT_SITE_URL` | `https://nawaman.github.io/GeekPresent` | Absolute base URL for the absolute-only metadata. Set it to your custom domain (`GEEKPRESENT_SITE_URL=https://my.site pnpm build`). Set it **empty** (`GEEKPRESENT_SITE_URL=`) to omit the absolute-only tags entirely — useful when you don't yet know the deploy URL, so no half-formed `og:url`/`canonical` ships. |
 
-It flows through `build-static.sh` too (env is inherited), e.g.
-`GEEKPRESENT_SITE_URL=https://my.site ./build-static.sh ./dist`. A single-route
-build (`./build-static.sh ./out text.html`) omits the sitemap by design.
+It flows through `scripts/build-static.sh` too (env is inherited), e.g.
+`GEEKPRESENT_SITE_URL=https://my.site scripts/build-static.sh ./dist`. A single-route
+build (`scripts/build-static.sh ./out text.html`) omits the sitemap by design.
 
 The default social image is [`static/og-default.png`](static/og-default.png)
 (1200×630); per-page images aren't auto-generated (a possible follow-up). Fonts
@@ -585,11 +585,11 @@ follow-up, not part of the SEO work.
 GitHub Pages is just *one* consumer of the static build. Because every route is
 prerendered with **relative** asset paths, the output is fully portable — you can
 drop it on any static host, serve it from any sub-path, or open it straight off
-disk. The `build-static.sh` helper builds into a folder you name, without touching
+disk. The `scripts/build-static.sh` helper builds into a folder you name, without touching
 the committed `docs/`:
 
 ```bash
-./build-static.sh <output-dir> [route]
+scripts/build-static.sh <output-dir> [route]
 ```
 
 - **`<output-dir>`** (required) — where to write the site. Created if missing; if it
@@ -605,11 +605,11 @@ overwrites a non-empty folder; `--precompress` keeps the `.br`/`.gz` copies (see
 below); `-h`/`--help` prints full usage.
 
 ```bash
-./build-static.sh ./dist                 # whole site            -> ./dist
-./build-static.sh /tmp/out geeklight     # just the geeklight deck -> /tmp/out
-./build-static.sh ./out text.html        # just the text sample  -> ./out
-./build-static.sh --force ./dist         # overwrite a non-empty ./dist
-./build-static.sh --zip ./dist           # build ./dist and ./dist.zip
+scripts/build-static.sh ./dist                 # whole site            -> ./dist
+scripts/build-static.sh /tmp/out geeklight     # just the geeklight deck -> /tmp/out
+scripts/build-static.sh ./out text.html        # just the text sample  -> ./out
+scripts/build-static.sh --force ./dist         # overwrite a non-empty ./dist
+scripts/build-static.sh --zip ./dist           # build ./dist and ./dist.zip
 ```
 
 Either way the result is self-contained. For a single presentation, the script
@@ -632,7 +632,7 @@ only serves the adapter's `docs/` dir, not a custom output folder.)
 
 ### No precompressed clutter
 
-`build-static.sh` skips the `.br`/`.gz` files by default, so the output stays lean
+`scripts/build-static.sh` skips the `.br`/`.gz` files by default, so the output stays lean
 (e.g. the whole site is ~170 files instead of ~490). Those precompressed copies are
 only useful when the host serves them directly (nginx `gzip_static`, Caddy, …); for
 opening off disk, a simple static server, or GitHub Pages / Netlify / S3 (which
@@ -640,7 +640,7 @@ compress on the fly) they're dead weight. Pass `--precompress` if your server
 actually consumes them:
 
 ```bash
-./build-static.sh --precompress ./dist
+scripts/build-static.sh --precompress ./dist
 ```
 
 > Under the hood the script sets `GEEKPRESENT_OUT` and `GEEKPRESENT_PRECOMPRESS`
@@ -648,4 +648,4 @@ actually consumes them:
 > to `docs/` with precompression on — exactly as before, so the GitHub Pages flow is
 > unchanged. A third build var, `GEEKPRESENT_SITE_URL` (the absolute base URL for SEO
 > metadata — see [SEO & social metadata](#seo--social-metadata)), is read by the SEO
-> layer and is inherited by `build-static.sh` if you export it.
+> layer and is inherited by `scripts/build-static.sh` if you export it.

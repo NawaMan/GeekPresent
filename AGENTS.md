@@ -71,55 +71,64 @@ top so they are hard to miss when a skill is loaded alone.
 This repo ships a **CodingBooth** wrapper (`./booth` + `.booth/`). **Agents run everything
 through the booth** — install, test, build, and the **dev server**. Many hosts have no Node or
 pnpm; the booth image does. Never assume host `pnpm` / `node` / bare `vite` exist. Details also
-live in `dev-run.sh` and `.booth/config.toml` — this section is the agent summary.
+live in `scripts/_booth.sh` and `.booth/config.toml` — this section is the agent summary.
 
 | Goal                                              | Command                                                                                |
 | ------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Dev server (**booth only** — see Rule 6)          | `./booth exec --run -- ./dev-run.sh`                                                   |
+| Dev server (**booth only** — see Rule 6)          | `just dev`                                                                             |
 | One-shot in the booth (tests, scripts, …)         | `./booth exec --run -- <command>`                                                      |
 | Run the test suite                                | `./booth exec --run -- pnpm test`                                                      |
-| Static build (into `docs/` via vite, or a folder) | `./booth exec --run -- pnpm build` or `./booth exec --run -- ./build-static.sh ./dist` |
+| Static build (into `docs/` via vite, or a folder) | `./booth exec --run -- pnpm build` or `just build-static ./dist`                         |
 
-**The short form: `just`.** Those commands also live as recipes in the root `justfile`, which is
-the better thing to reach for — a recipe carries the env and the sync step the long form leaves to
-you (see *First run in a fresh worktree* below), and `just` alone lists them all:
+**Two layers: `just` for people, `scripts/` for agents and automation.** The root `justfile` has
+only what a person needs to build and run the decks. Every other task is a script in `scripts/`.
+Both carry the env and the sync step that the long form leaves to you (see *First run in a fresh
+worktree* below):
 
-| Goal                        | Recipe                                          |
-| --------------------------- | ----------------------------------------------- |
-| Dev server                  | `just dev` — prints the slides URL for this booth |
-| Test suite (dom + ssr)      | `just test` · `just test-dom` · `just test-ssr`  |
-| Type-check (`svelte-check`) | `just check`                                     |
-| Build into `docs/`          | `just build`                                     |
-| Self-contained static site  | `just build-static ./dist`                       |
-| Lint (prettier + eslint)    | `just lint` — `just format-changed` fixes the formatting half |
-| The booth itself            | `just shell` · `just status` · `just stop` — host-only |
-| List every recipe           | `just`                                           |
+| Goal                         | Command                                                            |
+| ---------------------------- | ------------------------------------------------------------------ |
+| List the recipes             | `just`                                                             |
+| Dev server                   | `just dev` — prints the slides URL for this booth                  |
+| Build into `docs/`           | `just build`                                                       |
+| Build, then serve the build  | `just serve-build` — faster page turns; present or record from this one |
+| Serve the last build again   | `just serve` — no rebuild                                          |
+| Self-contained static site   | `just build-static ./dist` (`--zip ./dist` adds a zip)             |
+| A shell in the booth         | `just shell` — host-only                                           |
+| Test suite (dom + ssr)       | `scripts/test.sh` · `scripts/test.sh dom` · `scripts/test.sh ssr`  |
+| Type-check (`svelte-check`)  | `scripts/check.sh`                                                 |
+| Lint (prettier + eslint)     | `scripts/lint.sh` — `scripts/format-changed.sh` fixes the formatting half |
+| Format named paths / all     | `scripts/format.sh <paths>` · `scripts/format-all.sh`              |
+| Install / SvelteKit sync     | `scripts/install.sh` · `scripts/sync.sh`                           |
 
-**Every recipe re-enters the booth on its own.** Run from the host, a recipe `exec`s itself through
-`./booth exec --run --quiet -- just <recipe>` and its body only ever runs in the container; run
-inside a booth, it runs straight away. Same command either way, no booth flags to get right, exit
-code and arguments passed through (`just test Connector` filters by file name).
+**Every script goes into the booth on its own.** Each one starts with
+`source "$(dirname "$0")/_booth.sh"`. From the host, that runs the same script again through
+`./booth exec --run --quiet -- scripts/<name>.sh`, so its body only runs in the container. Inside a
+booth, it runs straight away. The command is the same either way, and the exit code and arguments
+pass through (`scripts/test.sh Connector` filters by file name). Run the scripts from the repo
+root; anywhere else they refuse. The `just` recipes only call these scripts.
+`scripts/format-changed.sh` is the exception: it makes its file list with git on the host, because
+git does not work in a worktree's booth, and then calls `scripts/format.sh`. `NO_BOOTH=1` keeps a
+script on the host (a build into a folder outside the repo, which the booth cannot see), and a
+checkout with no `./booth` (an adopter who chose their own node + pnpm) always runs in place.
 
-**The three that drive the booth refuse to run inside one.** `shell`, `status` and `stop` open, list
-and stop containers, which is not a thing to do from within a container — so they say so and exit 2
-rather than failing on a `./booth` that isn't there.
+**`scripts/lint.sh` is red, and that is the honest reading.** Prettier has never been run over most
+of this tree (~800 files) and eslint reports ~400 real problems. Don't "fix" it with
+`scripts/format-all.sh` as part of unrelated work — that is a tree-wide diff and wants a commit of
+its own. `scripts/format-changed.sh` is the one for day-to-day use: it reformats only what the
+current branch touched, so a branch leaves the tree a little cleaner than it found it without
+burying its own diff.
 
-**`just lint` is red, and that is the honest reading.** Prettier has never been run over most of this
-tree (~800 files) and eslint reports ~400 real problems. Don't "fix" it with `just format-all` as
-part of unrelated work — that is a tree-wide diff and wants a commit of its own. `just format-changed`
-is the one for day-to-day use: it reformats only what the current branch touched, so a branch leaves
-the tree a little cleaner than it found it without burying its own diff.
+**The scripts do not need `just`** on the host, only Docker. The `just` recipes do: `just` ships in
+the booth image (CodingBooth ≥ 0.77.0), but a host is not guaranteed to have it. Without it, use
+`./booth exec --run -- just <recipe>`, or call the script that the recipe calls (`scripts/dev.sh`,
+`scripts/build.sh`, `scripts/serve-build.sh`, `scripts/serve.sh`, `scripts/build-static.sh`).
 
-**Agents: use `./booth exec --run -- just <recipe>`.** `just` ships in the booth image (CodingBooth
-≥ 0.77.0 — which is why `.booth/tools/codingbooth.lock` pins it), but a host is not guaranteed to
-have it, and Rule 6 still means never running the toolchain on the host. A human who installs `just`
-locally can drop the prefix; an agent should not assume it is there.
 
 **A second booth (a worktree, a parallel session) needs no flags at all.** The same command works
 from any worktree; `port = "NEXT:31000"` takes the next free slot and the slides follow at +173:
 
 ```bash
-./booth exec --run -- ./dev-run.sh    # 1st: 31000/31173 · 2nd: 32000/32173 · …
+just dev    # 1st: 31000/31173 · 2nd: 32000/32173 · …
 ```
 
 **Read the port off `./booth list` — do not assume 31173, and do not hand-pick a port to "avoid"
@@ -206,9 +215,8 @@ Neither is a worktree or booth problem — any fresh checkout needs the same. Af
 `./booth exec --run -- pnpm test` works. (Verified in a worktree booth: 142 files, 2439 tests, all
 passing.)
 
-**Or just `./booth exec --run -- just test`** — the recipe exports both variables and syncs first,
-so a fresh worktree and a warm one take the same command. That is the whole reason the `justfile`
-exists; the long form above is what it runs.
+**Or `scripts/test.sh`** — it exports both variables and syncs first, so a fresh worktree and a
+warm one take the same command. The long form above is what it runs.
 
 Check that GitKraken will see it (open the **main** repo, not only the worktree path):
 
@@ -338,7 +346,7 @@ stop and tell the user what is unmerged or uncommitted, and let them decide.
 
 **A dev server you started only to verify your OWN change is yours to tear down — stop it when the
 check is done** (`./booth stop --name <booth>`), don't leave it running for the user to clean up.
-That is the common case: you spun up `./dev-run.sh` to eyeball a slide or watch a behaviour, and
+That is the common case: you spun up `just dev` to eyeball a slide or watch a behaviour, and
 once you (or the user) have confirmed it, the task no longer needs it. This is different from a dev
 server the user asked you to run *for them* — say so and **leave that one up**, with its URL. Either
 way, **never stop a booth you did not start**: once two share a folder it is no longer obvious which
@@ -698,7 +706,7 @@ are load-bearing when you touch anything nearby:
    default one). There is no `example/` folder anymore; don't recreate one.
 6. **Dev server runs only via booth — never host pnpm/Node.** When a live dev server is needed
    (user asks you to run it, or you must verify in the browser yourself), start it with
-   **`./booth exec --run -- ./dev-run.sh`** (see *Quick start for agents*). Check `./booth list`
+   **`just dev`** (see *Quick start for agents*). Check `./booth list`
    first: if this project's booth already has Vite up, use that URL — do not start a second one,
    and **never** kill someone else's booth or their running dev. Vite is always container
    `:5173`; the host port is the booth's control port **+173** (stock `http://localhost:31173/…`,
@@ -708,7 +716,7 @@ are load-bearing when you touch anything nearby:
    than leaving it for the user; leave it up only when they asked for a server to use themselves.
    Tests and static builds also go
    **only** through the booth (`./booth exec --run -- pnpm test`, `./booth exec --run -- pnpm build`
-   / `./build-static.sh …`) — not host `pnpm`. **Worktrees work** (CodingBooth ≥ 0.63.0): run the
+   / `just build-static …`) — not host `pnpm`. **Worktrees work** (CodingBooth ≥ 0.63.0): run the
    same command from the worktree, no flags — it gets its own booth and its own ports automatically
    (see *Quick start*); read the URL off `./booth list`. Git does **not** work *inside*
    a worktree booth — `git` / `lazygit` / `gh` there report `fatal: not a git repository`, because
@@ -1238,8 +1246,9 @@ timeline and **REPLAY** it to record again, hands off. Spec: `specs/VOD-RECORD-1
   across windows belongs in `startDeck()`, or behind `activated`. `preloadNeighbours={false}` opts a
   heavy deck out; View-Transition decks page client-side and preload nothing.
 - **Record from the build, not `just dev`.** Dev fetches hundreds of unbundled modules per page
-  turn (~1 s blank); **`just serve-build`** builds and serves `docs/` on the same port (stop
-  `just dev` first — they share container port 5173).
+  turn (~1 s blank); **`just serve-build`** builds and serves `docs/` on the same port, and
+  **`just serve`** serves the last build again without rebuilding (stop `just dev` first — they
+  share container port 5173).
 - Grammar, paths, the ink diff and the video settings are pure (`record/timelineCore.ts`), as is the
   scheduler (`record/replayCore.ts`); the Recorder clocks from a Worker (`record/ticker.ts`) because
   a background window's timers are throttled.

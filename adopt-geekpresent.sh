@@ -234,7 +234,7 @@ norm_path() {
 }
 
 # rel_from <from> <to> — both relative to the repo root; express <to> as seen from <from>.
-# The output folder is given from the repo root ("site"), but build-static.sh runs INSIDE the
+# The output folder is given from the repo root ("site"), but scripts/build-static.sh runs INSIDE the
 # subfolder, where that same folder is "../site". One of these two spellings is always wrong
 # for whoever is asking, so translate rather than guess.
 rel_from() {
@@ -374,7 +374,7 @@ deleting your files.")"
 carrying the whole toolchain — and the copy you just cloned brings a working one
 along. So this is not 'install a container', it is 'keep the one that came with it':
 
-  booth  keep it. 'cd $DIR && ./booth -- ./build-static.sh <out>' builds with
+  booth  keep it. 'cd $DIR && scripts/build-static.sh <out>' builds with
          NOTHING installed on this machine but Docker or Podman. No Node, no pnpm,
          no version drift. './booth' alone opens VS Code in the browser.
   host   remove it — deletes $DIR/booth and $DIR/.booth/ — and build with your
@@ -400,7 +400,7 @@ TARGET="$PWD/$DIR"
 #
 #   DIST      what you typed, relative to HERE (the repo root)          -> "site"
 #   CI_PATH   the same, normalised — what upload-pages-artifact wants   -> "site"
-#   OUT_REL   the same, seen from INSIDE $DIR — what build-static.sh
+#   OUT_REL   the same, seen from INSIDE $DIR — what scripts/build-static.sh
 #             takes, and what GEEKPRESENT_OUT means in CI (whose
 #             working-directory is $DIR)                                -> "../site"
 #
@@ -434,10 +434,14 @@ fi
 
 # THE build command, for these answers, run from inside $DIR. Computed once so the README we
 # generate and the Next-steps we print cannot drift into telling you two different things.
+# scripts/build-static.sh goes into the booth on its own when ./booth is there (scripts/_booth.sh);
+# NO_BOOTH=1 keeps it on the host, for an output folder the booth cannot see.
 if [ "$ENV_KIND" = "booth" ] && [ "$DIST_ESCAPES" = "0" ]; then
-	BUILD_CMD="./booth -- ./build-static.sh $OUT_REL"
+	BUILD_CMD="scripts/build-static.sh $OUT_REL"
+elif [ "$ENV_KIND" = "booth" ]; then
+	BUILD_CMD="pnpm install && NO_BOOTH=1 scripts/build-static.sh $OUT_REL"
 else
-	BUILD_CMD="pnpm install && ./build-static.sh $OUT_REL"
+	BUILD_CMD="pnpm install && scripts/build-static.sh $OUT_REL"
 fi
 
 # -----------------------------------------------------------------------------
@@ -700,7 +704,7 @@ EOF
 	# and no hint that anything went wrong.
 	[ -f "$README_SKEL" ] || die "readme template missing at utils/skeleton/readme/$README_KIND.md — is $SOURCE really GeekPresent?"
 	# '&' is 'the whole match' to sed, and the build command is full of '&&' — unescaped,
-	# 'pnpm install && ./build-static.sh' would come out as gibberish in the README.
+	# 'pnpm install && scripts/build-static.sh' would come out as gibberish in the README.
 	BUILD_SED="${BUILD_CMD//&/\\&}"
 	sed -e "s|__DIR__|$DIR|g" -e "s|__NAME__|$NAME|g" -e "s|__OUT__|$CI_PATH|g" \
 		-e "s|__BUILD__|$BUILD_SED|g" "$README_SKEL" > "$TARGET/README.md"
@@ -816,16 +820,16 @@ fi
 	echo
 	echo "${B}Next steps${RST}"
 	if [ "$ENV_KIND" = "booth" ] && [ "$DIST_ESCAPES" = "0" ]; then
-		echo "  • Local build (no host deps): ${DIM}cd $DIR && ./booth -- ./build-static.sh $OUT_REL --zip${RST}"
+		echo "  • Local build (no host deps): ${DIM}cd $DIR && scripts/build-static.sh --zip $OUT_REL${RST}"
 		echo "  • Or work inside it:          ${DIM}cd $DIR && ./booth${RST}  (VS Code in the browser, Node preinstalled)"
-		echo "  • Or native:                  ${DIM}cd $DIR && pnpm install && ./build-static.sh $OUT_REL${RST}"
+		echo "  • Or native:                  ${DIM}cd $DIR && pnpm install && NO_BOOTH=1 scripts/build-static.sh $OUT_REL${RST}"
 	elif [ "$ENV_KIND" = "booth" ]; then
 		# The booth is still there and still useful — it just can't reach $DIST from inside.
 		echo "  • Build (on the host — the booth cannot write outside $DIR/):"
-		echo "                                ${DIM}cd $DIR && pnpm install && ./build-static.sh $OUT_REL${RST}"
+		echo "                                ${DIM}cd $DIR && pnpm install && NO_BOOTH=1 scripts/build-static.sh $OUT_REL${RST}"
 		echo "  • Work inside the booth:      ${DIM}cd $DIR && ./booth${RST}  (VS Code in the browser, Node preinstalled)"
 	else
-		echo "  • Build:                      ${DIM}cd $DIR && pnpm install && ./build-static.sh $OUT_REL${RST}"
+		echo "  • Build:                      ${DIM}cd $DIR && pnpm install && scripts/build-static.sh $OUT_REL${RST}"
 	fi
 	echo "  • Built site lands in:        ${DIM}$CI_PATH/${RST}"
 	[ "$MODE" = "minimal" ] && echo "  • Edit your deck:            ${DIM}$DIR/src/routes/$NAME/${RST}  (samples: $DIR/.samples-ref/)"

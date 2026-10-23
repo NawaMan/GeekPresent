@@ -43,7 +43,7 @@
 <h2>Then</h2>
 
 <ul>
-	<li>Build the static site: <code>pnpm install &amp;&amp; ./build-static.sh ./dist</code></li>
+	<li>Build the static site: <code>pnpm install &amp;&amp; scripts/build-static.sh ./dist</code></li>
 	<li>
 		The conventions — authoring slides, adding components, LAYOUT mode, the test contract — are in
 		<code>AGENTS.md</code>, and as agent skills under <code>.claude/skills/</code>.

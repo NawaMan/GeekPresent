@@ -34,7 +34,7 @@
 		'vite v5.4.2  building SSR bundle...',
 		{ out: '✓ 128 modules transformed', tone: 'ok' as const },
 		{ out: 'warning: 1 chunk is larger than 500 kB', tone: 'warn' as const },
-		{ cmd: './build-static.sh ./dist' },
+		{ cmd: 'scripts/build-static.sh ./dist' },
 		{ out: 'prerendered 41 routes → dist/', tone: 'muted' as const },
 		{ out: '✓ done in 3.4s', tone: 'ok' as const }
 	];

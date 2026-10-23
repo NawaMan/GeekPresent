@@ -252,7 +252,8 @@ describe('adopt-geekpresent.sh — docs', () => {
 		expect(readme).not.toContain('__DIR__');
 		expect(readme).not.toContain('__NAME__');
 		expect(readme).toContain('src/routes/talks/'); // the deck they named
-		expect(readme).toContain('./booth -- ./build-static.sh dist'); // booth kept, output inside
+		expect(readme).toContain('scripts/build-static.sh dist'); // booth kept, output inside (the script enters it)
+		expect(readme).not.toContain('NO_BOOTH');
 		expect(readme).toContain('gp/dist/'); // where the site lands
 		expect(readme).toContain('.samples-ref/GeekPresent-README.md'); // the way back to the framework docs
 	});
@@ -261,7 +262,7 @@ describe('adopt-geekpresent.sh — docs', () => {
 	it('does not mangle && in the build command it bakes in', () => {
 		const host = adopt('--mode', 'skeleton', '--no-booth');
 		expect(readFileSync(join(host, 'README.md'), 'utf8')).toContain(
-			'pnpm install && ./build-static.sh dist'
+			'pnpm install && scripts/build-static.sh dist'
 		);
 	});
 
@@ -330,7 +331,7 @@ describe('adopt-geekpresent.sh (booth is the default)', () => {
 
 // The output folder. One answer has to satisfy three consumers — the local build, the
 // verification build and the CI upload — and before it was asked, they disagreed: CI
-// hardcoded $DIR/docs while build-static.sh wrote wherever you pointed it.
+// hardcoded $DIR/docs while scripts/build-static.sh wrote wherever you pointed it.
 describe('adopt-geekpresent.sh --dist', () => {
 	const workflow = (gp: string) => readFileSync(join(gp, '../.github/workflows/deploy-gp.yml'), 'utf8');
 

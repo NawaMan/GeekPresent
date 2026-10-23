@@ -91,7 +91,7 @@ Both auto-insert the nav bar. Slides are authored on a fixed **1920×1080** canv
 - **The dev server is usually already up** (the user keeps it running, default port 31173) — assume it
   exists and just ask them to open `http://localhost:31173/<deck>/<name>.html`. In a worktree, or any
   booth started with `--port <n>`, the port is `<n>+173` instead — check `./booth list`. If it isn't up
-  you *may* start one **via the booth** (`./booth exec --run -- ./dev-run.sh`) and tell them the URL — but never
+  you *may* start one **via the booth** (`just dev`) and tell them the URL — but never
   kill or restart a server you didn't start, and don't reach for a host `pnpm`. See AGENTS.md Rule 6.
 - What you *can* run unprompted:
   ```bash
