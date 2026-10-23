@@ -72,6 +72,28 @@ describe('normalizeLines', () => {
 		expect(normalizeLines([{ cmd: '' }])).toEqual([{ kind: 'cmd', text: '', tone: 'plain' }]);
 	});
 
+	it("carries an output line's lead, and only when there is one", () => {
+		expect(normalizeLines([{ lead: '├── ', out: '(T) user', tone: 'ok' }])).toEqual([
+			{ kind: 'out', text: '(T) user', tone: 'ok', lead: '├── ' }
+		]);
+		expect(normalizeLines([{ lead: '', out: 'x' }])[0]).not.toHaveProperty('lead');
+		expect(normalizeLines([{ lead: '$ ', cmd: 'ls' }])[0]).not.toHaveProperty('lead');
+	});
+
+	it('knows the comment tone', () => {
+		expect(normalizeLines([{ out: '# list them', tone: 'comment' }])).toEqual([
+			{ kind: 'out', text: '# list them', tone: 'comment' }
+		]);
+	});
+
+	it('marks a continued command, and only a command', () => {
+		expect(normalizeLines([{ cmd: '-- ls', cont: true }])).toEqual([
+			{ kind: 'cmd', text: '-- ls', tone: 'plain', cont: true }
+		]);
+		expect(normalizeLines([{ cmd: 'ls' }])[0]).not.toHaveProperty('cont');
+		expect(normalizeLines([{ out: 'x', cont: true }])[0]).not.toHaveProperty('cont');
+	});
+
 	it('is total: nullish input is an empty session', () => {
 		expect(normalizeLines(null)).toEqual([]);
 		expect(normalizeLines(undefined)).toEqual([]);
@@ -238,7 +260,7 @@ describe('checkpointsOf', () => {
 		expect(walked).toEqual(checkpointsOf(marks));
 	});
 
-	it('is NOT the commands\' starts — that mismatch made Space look like it skipped a tick', () => {
+	it("is NOT the commands' starts — that mismatch made Space look like it skipped a tick", () => {
 		expect(checkpointsOf(marks)).not.toEqual(marks.map((m) => m.start));
 	});
 

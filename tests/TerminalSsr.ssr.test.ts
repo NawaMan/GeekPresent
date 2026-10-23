@@ -29,10 +29,29 @@ describe('Terminal (SSR)', () => {
 	});
 
 	it('a bare string is an output line; tones become classes', () => {
-		const { body } = render(Terminal, { props: { lines: ['plain output', { out: 'x', tone: 'error' }] } });
+		const { body } = render(Terminal, {
+			props: { lines: ['plain output', { out: 'x', tone: 'error' }] }
+		});
 		expect(body).toContain('plain output');
 		expect(body).toContain('tone-plain');
 		expect(body).toContain('tone-error');
+	});
+
+	it('draws a lead in its own span, ahead of the toned text', () => {
+		const { body } = render(Terminal, {
+			props: { lines: [{ lead: '└── ', out: '(S) token', tone: 'warn' }] }
+		});
+		expect(body).toMatch(
+			/tone-warn[^>]*>(<!--[^>]*-->)*<span class="lead[^"]*">└── <\/span>(<!--[^>]*-->)*\(S\) token/
+		);
+	});
+
+	it('a continued command keeps a hidden prompt, so only the first line shows one', () => {
+		const { body } = render(Terminal, {
+			props: { lines: [{ cmd: 'a \\' }, { cmd: 'b', cont: true }], caret: false }
+		});
+		expect(body.match(/class="prompt[^"]*"/g)?.length).toBe(2);
+		expect(body.match(/class="prompt[^"]*\bcont\b/g)?.length).toBe(1);
 	});
 
 	it('carries the schedule as inline ms, and the step count for the typed span', () => {
@@ -70,7 +89,9 @@ describe('Terminal (SSR)', () => {
 	});
 
 	it('the resting caret sits at the end of the envelope; per-command carets are gated on typing', () => {
-		const { body } = render(Terminal, { props: { lines: [{ cmd: 'ab' }], charMs: 10, startMs: 100, pauseMs: 50 } });
+		const { body } = render(Terminal, {
+			props: { lines: [{ cmd: 'ab' }], charMs: 10, startMs: 100, pauseMs: 50 }
+		});
 		expect(body).toContain('rest-gate');
 		expect(body).toContain('animation-delay:170ms'); // 100 start + 20 typing + 50 pause
 

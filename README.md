@@ -15,11 +15,11 @@ the whole presentation is a static site, and it deploys to GitHub Pages.
 
 ## Why this project exists
 
-If you do any front-end work you already know HTML + CSS + JS, and you've probably wished you could just *use* that to make slides instead of fighting a WYSIWYG tool. GeekPresent lets you do exactly that — and takes care of the tedious parts:
+If you do any front-end work you already know HTML + CSS + JS, and you've probably wished you could just _use_ that to make slides instead of fighting a WYSIWYG tool. GeekPresent lets you do exactly that — and takes care of the tedious parts:
 
 - **No manual paging or navigation.** List your slides once in `pages.ts`; arrow keys, the on-screen nav bar, and the Table of Contents are wired up for you.
 - **Fixed canvas, automatic scaling.** You design on a fixed **1920×1080** canvas and position things with normal CSS — including absolute positioning at exact pixels — and the framework scales the whole slide to fit any screen. You think in one size; it handles the rest.
-- **Colocation, your choice.** Global CSS/JS/assets work, but each page can also keep its *own* assets (images, etc.) right next to it. Pick whatever keeps cognitive load low.
+- **Colocation, your choice.** Global CSS/JS/assets work, but each page can also keep its _own_ assets (images, etc.) right next to it. Pick whatever keeps cognitive load low.
 - **Real componentization.** Svelte is excellent at components, so reusable slide pieces (boxes, code viewers, notes…) are just imports.
 - **Navigation built in.** Arrow keys, on-screen buttons, a Table of Contents, and an **Overview Page** grid (press <kbd>O</kbd> to see every slide at once) — no wiring required.
 - **FITTED / SCALED modes.** Present fit-to-window, or switch to an exact zoom (1:1 and beyond) you can pan, with a minimap; speaker notes show below when zoomed out.
@@ -30,22 +30,22 @@ If you do any front-end work you already know HTML + CSS + JS, and you've probab
 HTML-based slides aren't new — reveal.js, Slidev, Spectacle and Marp all exist. What no mainstream tool focuses on is the particular set of choices GeekPresent combines:
 
 - **One slide = one route = one folder.** Slides aren't sections of a single giant document or fenced blocks in one markdown file — each slide is its own SvelteKit route folder (`src/routes/<name>.html/`). So slides diff cleanly one file at a time, each slide can **colocate its own assets** (images, QR codes) right next to it, and every slide is independently URL-addressable and prerendered to its own HTML.
-- **A fixed 1920×1080 canvas with pixel-exact positioning *and* auto-scaling.** You design against one fixed size — `left: 960px` means the same thing on every screen — and the framework scales the whole canvas to fit any window (FITTED) or shows it at an exact zoom you can pan (SCALED), with speaker notes below when zoomed out. Most HTML-slide tools push you toward responsive flow; GeekPresent deliberately gives you a fixed pixel coordinate space and does the scaling math for you.
-- **Slides that are their own documentation — and editable under `pnpm dev`.** Under **`pnpm dev`**, ☰ → **SOURCE** and **EDIT** work on **every** slide (the shell loads `+page.svelte` via a vite-dev endpoint). Drop `ViewSource` when you also want SOURCE on a *built* site, or the classic Text-mode corner control: it registers `?raw` bytes for the in-slide Monaco `CodeBox`. **EDIT** opens an *unscaled* popup at `/_source-edit` (Monaco's caret is not under the slide's CSS scale). In that window: **Ctrl/Cmd+S** SAVE, **Ctrl/Cmd+Shift+R** REFRESH, **Esc** CLOSE (confirms if dirty); **Alt+.** then **r**/**s**/**c** is the mnemonic path (one letter ends arm mode). SAVE answers **NOT ALLOWED** on a static host. (`SourceView` is the same idea with Shiki for client-side-navigation decks; its panel also offers **EDIT** into the same popup.)
-- **Appendices — a slide you jump *into* and return *from*.** The deep-dive a talk only sometimes needs: a proof, a full API table, a backup demo. `AppendixLink` jumps in and stamps the calling slide into the URL as the return address, so the same appendix returns to whichever slide asked; `AppendixPage` gives it its way back. It behaves like a real book's appendix — several contiguous slides are one chapter you page through, and walking forward off the end *is* the return. Mark it `hidden` and it leaves the deck's forward march entirely (→/Space step over it, the TOC omits it); leave `hidden` off and it is ordinary back matter you can also page into.
+- **A fixed 1920×1080 canvas with pixel-exact positioning _and_ auto-scaling.** You design against one fixed size — `left: 960px` means the same thing on every screen — and the framework scales the whole canvas to fit any window (FITTED) or shows it at an exact zoom you can pan (SCALED), with speaker notes below when zoomed out. Most HTML-slide tools push you toward responsive flow; GeekPresent deliberately gives you a fixed pixel coordinate space and does the scaling math for you.
+- **Slides that are their own documentation — and editable under `pnpm dev`.** Under **`pnpm dev`**, ☰ → **SOURCE** and **EDIT** work on **every** slide (the shell loads `+page.svelte` via a vite-dev endpoint). Drop `ViewSource` when you also want SOURCE on a _built_ site, or the classic Text-mode corner control: it registers `?raw` bytes for the in-slide Monaco `CodeBox`. **EDIT** opens an _unscaled_ popup at `/_source-edit` (Monaco's caret is not under the slide's CSS scale). In that window: **Ctrl/Cmd+S** SAVE, **Ctrl/Cmd+Shift+R** REFRESH, **Esc** CLOSE (confirms if dirty); **Alt+.** then **r**/**s**/**c** is the mnemonic path (one letter ends arm mode). SAVE answers **NOT ALLOWED** on a static host. (`SourceView` is the same idea with Shiki for client-side-navigation decks; its panel also offers **EDIT** into the same popup.)
+- **Appendices — a slide you jump _into_ and return _from_.** The deep-dive a talk only sometimes needs: a proof, a full API table, a backup demo. `AppendixLink` jumps in and stamps the calling slide into the URL as the return address, so the same appendix returns to whichever slide asked; `AppendixPage` gives it its way back. It behaves like a real book's appendix — several contiguous slides are one chapter you page through, and walking forward off the end _is_ the return. Mark it `hidden` and it leaves the deck's forward march entirely (→/Space step over it, the TOC omits it); leave `hidden` off and it is ordinary back matter you can also page into.
 - **Two artifact types from one component set.** The same `$lib` components compile into either a click-through **presentation** or a long-form, scrollable **Text** — give the talk, then publish the reader-friendly version with no rewrite. A mode flag (`setMode`) lets shared components adapt (e.g. the nav bar collapses to a single TOP button).
-- **Multiple independent presentations in one project.** Navigation and the Table of Contents are scoped *per presentation* via Svelte context (`setPages` / `getPages`), not a single global config. Sibling route folders (`slides/`, `portrait/`, `geeklight/`) each carry their own slide list, theme, fonts, background, and favicon, and coexist without interfering.
-- **Genuinely portable, lean static output.** Every route prerenders with **relative** asset paths, so the build runs from GitHub Pages, any sub-path, S3, or straight off disk. `scripts/build-static.sh` can emit the whole site *or a single presentation*, and skips precompressed `.br`/`.gz` files by default (~170 files instead of ~490).
-- **Visual placement that stays "just text."** Pixel-exact positioning doesn't mean guessing numbers. Wrap an element in a `Block` (or `ImageBlock`) and flip on **ADJUST mode** — an in-browser authoring aid (on in `pnpm dev`; on a built site via a sticky `?adjust` flag) — to drag and resize it on the canvas, with snapping, aspect-lock, and global undo/redo. Then either **Copy** the tag with its final `x`/`y`/`width`/`height` to paste back into source, or — in `pnpm dev` — hit **SAVE** to write every moved `Block` straight back into the slide's `.svelte` file (matched by `name`, or by its old geometry), and let hot-reload show the result. The write is dev-only — a static site has no server to write files, so there SAVE looks like an ordinary button and *refuses when pressed*, answering **NOT ALLOWED** with a tooltip explaining why; Copy is the way back. Either way the slide stays plain, diffable Svelte and nothing is guessed — a tag it can't confidently place is reported so you paste that one by hand. ADJUST is off in production, but an individual slide can offer it (`adjust: true` in `pages.ts`), so the slides that *teach* authoring can demonstrate the whole loop live in the deployed deck — this project's own deck does exactly that.
-- **A pen that draws on the live slide — and remembers.** Flip on **ANNOTATE** and the speaker can mark the slide up mid-talk with a bar of icon tools: a **pen** to circle the term freehand, a **line** and an **arrow** to point dead straight at the line of code, a **rectangle** to ring a whole region, a **highlighter** to swipe over the sentence someone just asked about, a **text** tool to drop a typed label (click to place, then re-edit or drag it), and an **eraser** that lights up the mark under it and lifts it whole. Hold **Shift** and the pen, line, or arrow snaps to a dead-straight horizontal or vertical — the underline or plumb line a wrist can't hold on stage — while the highlighter comes out *level* however wobbly your hand was, because a highlight belongs on the row you swiped rather than sloping across it. The ink is **kept, per slide, across reloads** — so a deck you marked up while rehearsing arrives at the podium marked up — and it mirrors to the audience window automatically. Keeping ink is also what makes it dangerous, so a slide whose marks are more than a day old *says so when you arrive* and offers to clear them; **RESET** / **RESET ALL** sit on the pen's bar and in the presenter console. Crucially the pen eats the *pointer*, never the *keyboard*: arrow keys keep paging, because a speaker who can't advance is worse off than one with a stray scribble.
-- **Capture a slide as a PNG at its *true* size.** Press **CAPTURE** and the slide downloads as a full **1920×1080** image — not a screenshot of your window, but the canvas *re-rendered*, so the file is identical whether you were presenting on a projector or squinting at a laptop (`captureScale={2}` gives you 3840×2160, still crisp, because it's re-rendered rather than upscaled). Your **annotations come with it** and the deck's chrome doesn't — capture reuses the same `.no-print` rule that already keeps the nav bar out of a printout. And it's honest about its one real limit: a slide holding a live `<iframe>` (a `WebSite`, `WebPage` or `YouTube` embed) is a separate document whose pixels the page may not read, so rather than hand you a PNG with a hole in it, CAPTURE *refuses when pressed* and names the embed in the way — the same bargain SAVE makes.
+- **Multiple independent presentations in one project.** Navigation and the Table of Contents are scoped _per presentation_ via Svelte context (`setPages` / `getPages`), not a single global config. Sibling route folders (`slides/`, `portrait/`, `geeklight/`) each carry their own slide list, theme, fonts, background, and favicon, and coexist without interfering.
+- **Genuinely portable, lean static output.** Every route prerenders with **relative** asset paths, so the build runs from GitHub Pages, any sub-path, S3, or straight off disk. `scripts/build-static.sh` can emit the whole site _or a single presentation_, and skips precompressed `.br`/`.gz` files by default (~170 files instead of ~490).
+- **Visual placement that stays "just text."** Pixel-exact positioning doesn't mean guessing numbers. Wrap an element in a `Block` (or `ImageBlock`) and flip on **ADJUST mode** — an in-browser authoring aid (on in `pnpm dev`; on a built site via a sticky `?adjust` flag) — to drag and resize it on the canvas, with snapping, aspect-lock, and global undo/redo. Then either **Copy** the tag with its final `x`/`y`/`width`/`height` to paste back into source, or — in `pnpm dev` — hit **SAVE** to write every moved `Block` straight back into the slide's `.svelte` file (matched by `name`, or by its old geometry), and let hot-reload show the result. The write is dev-only — a static site has no server to write files, so there SAVE looks like an ordinary button and _refuses when pressed_, answering **NOT ALLOWED** with a tooltip explaining why; Copy is the way back. Either way the slide stays plain, diffable Svelte and nothing is guessed — a tag it can't confidently place is reported so you paste that one by hand. ADJUST is off in production, but an individual slide can offer it (`adjust: true` in `pages.ts`), so the slides that _teach_ authoring can demonstrate the whole loop live in the deployed deck — this project's own deck does exactly that.
+- **A pen that draws on the live slide — and remembers.** Flip on **ANNOTATE** and the speaker can mark the slide up mid-talk with a bar of icon tools: a **pen** to circle the term freehand, a **line** and an **arrow** to point dead straight at the line of code, a **rectangle** to ring a whole region, a **highlighter** to swipe over the sentence someone just asked about, a **text** tool to drop a typed label (click to place, then re-edit or drag it), and an **eraser** that lights up the mark under it and lifts it whole. Hold **Shift** and the pen, line, or arrow snaps to a dead-straight horizontal or vertical — the underline or plumb line a wrist can't hold on stage — while the highlighter comes out _level_ however wobbly your hand was, because a highlight belongs on the row you swiped rather than sloping across it. The ink is **kept, per slide, across reloads** — so a deck you marked up while rehearsing arrives at the podium marked up — and it mirrors to the audience window automatically. Keeping ink is also what makes it dangerous, so a slide whose marks are more than a day old _says so when you arrive_ and offers to clear them; **RESET** / **RESET ALL** sit on the pen's bar and in the presenter console. Crucially the pen eats the _pointer_, never the _keyboard_: arrow keys keep paging, because a speaker who can't advance is worse off than one with a stray scribble.
+- **Capture a slide as a PNG at its _true_ size.** Press **CAPTURE** and the slide downloads as a full **1920×1080** image — not a screenshot of your window, but the canvas _re-rendered_, so the file is identical whether you were presenting on a projector or squinting at a laptop (`captureScale={2}` gives you 3840×2160, still crisp, because it's re-rendered rather than upscaled). Your **annotations come with it** and the deck's chrome doesn't — capture reuses the same `.no-print` rule that already keeps the nav bar out of a printout. And it's honest about its one real limit: a slide holding a live `<iframe>` (a `WebSite`, `WebPage` or `YouTube` embed) is a separate document whose pixels the page may not read, so rather than hand you a PNG with a hole in it, CAPTURE _refuses when pressed_ and names the embed in the way — the same bargain SAVE makes.
 - **Kiosk / auto-advance for booths and lobbies.** ☰ → **KIOSK** (or a sticky `?kiosk` link) runs the deck unattended: step pace for builds and note lines, page pace between slides, loop at the end. Optional **speaker notes** step **one `<Note>` child at a time** in a single draggable panel that also holds pause / progress / stop — not a wall of text. Exit is explicit only so a touch on the glass does not kill the loop. The panel needs no mouse either: **Alt+. K** reveals/hides it and **Alt+. U** pauses/resumes, so its idle opacity can go all the way to invisible (`--kiosk-idle: 0`, per slide/deck/site-wide) without becoming unfindable — hovering it also freezes the countdown, without touching the play/pause mode itself.
-- **…and every slide to a PNG, offline.** `utils/capture-slides.sh` renders the whole deck to images (thumbnails, a contact sheet) by driving a headless Chrome against a `?shot` URL — a render mode that puts the canvas at exactly 1:1 with no frame, no chrome and no letterbox, so the viewport *is* the slide and the PNG needs no cropping. Because a real browser does the drawing, this path captures what the in-app button can't: iframes, video, Monaco code blocks, all of it.
-- **Social cards that are the actual slide.** Share a slide's URL and the preview *is that slide*, not a generic site card. `utils/capture-slides.sh --og` captures every slide into `static/og/` and wires the PNGs into the deck's `pages.ts` `image:` field — and CI does it for you on every deploy (build → capture → build, since `og:image` is baked into each slide's prerendered HTML). The PNGs are gitignored build output, so nothing bloats the repo, and a slide added since the last run gets its card automatically. It never overwrites an `image` you set by hand.
+- **…and every slide to a PNG, offline.** `utils/capture-slides.sh` renders the whole deck to images (thumbnails, a contact sheet) by driving a headless Chrome against a `?shot` URL — a render mode that puts the canvas at exactly 1:1 with no frame, no chrome and no letterbox, so the viewport _is_ the slide and the PNG needs no cropping. Because a real browser does the drawing, this path captures what the in-app button can't: iframes, video, Monaco code blocks, all of it.
+- **Social cards that are the actual slide.** Share a slide's URL and the preview _is that slide_, not a generic site card. `utils/capture-slides.sh --og` captures every slide into `static/og/` and wires the PNGs into the deck's `pages.ts` `image:` field — and CI does it for you on every deploy (build → capture → build, since `og:image` is baked into each slide's prerendered HTML). The PNGs are gitignored build output, so nothing bloats the repo, and a slide added since the last run gets its card automatically. It never overwrites an `image` you set by hand.
 - **Presenting-specific touches.** A helper (`utils/prepare-youtube.sh`) fetches a video's thumbnail and generates a QR code into a slide folder, so the `YouTube` component shows a scannable QR overlay linking to the video.
 - **Chrome bars that tuck away — until you pin them (or raise them from the keyboard).** The top tool bar (PRESENT / ANNOTATE / ADJUST / …) and bottom control bar (TOC / pager) auto-hide to a peek strip; hover, focus, or **Alt+.** (**⌥.** on macOS) brings both fully up for a few seconds so letter mnemonics work (**a**/**j**/**z**/**p**/**m**/**t**). When the letter lives in the word it is **underlined** there (`PRESENT`, `ANNOTATE`, `ADJUST`, Table of Contents); when it does not, a trailing chip remains (`FITTED (Z)`, `☰ (M)`). A **pin** on each bar (independent, remembered) locks that bar open. Opt out of a whole bar with `<SlideDeck toolBar={false}>` or `controlBar={false}`. While a presenter console is open, the audience window hides both bars completely (no strip, pinned or not; **Alt+.** still raises them); `<SlideDeck hideChrome>` or `?bare` does the same without a console, and `?bare=off` keeps them. The console's **▭ Bars** button (**B**) flips it live.
 
-> **The design note:** slide-to-slide navigation is a full page load, not client-side routing. Animations live *within* a slide — and *cross-slide* transitions work too, via the platform's cross-document **View Transitions API** (`@view-transition { navigation: auto; }`), which is possible precisely *because* each slide is its own document (see the `transition/` deck: slide, flip, zoom, cross-fade, and shared-element morph). The route-per-slide design paying off rather than costing.
+> **The design note:** slide-to-slide navigation is a full page load, not client-side routing. Animations live _within_ a slide — and _cross-slide_ transitions work too, via the platform's cross-document **View Transitions API** (`@view-transition { navigation: auto; }`), which is possible precisely _because_ each slide is its own document (see the `transition/` deck: slide, flip, zoom, cross-fade, and shared-element morph). The route-per-slide design paying off rather than costing.
 
 ## Quick start
 
@@ -92,7 +92,7 @@ curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geek
   | bash -s -- --mode skeleton --kind text --name guide.html --yes
 ```
 
-It clones GeekPresent into a subfolder, removes its `.git` (so it becomes part of *your* repo),
+It clones GeekPresent into a subfolder, removes its `.git` (so it becomes part of _your_ repo),
 optionally trims the sample decks, and can scaffold a GitHub Actions workflow that builds the
 subfolder and deploys it. **Nothing is committed** — review, then `git add` what you want.
 
@@ -108,7 +108,7 @@ gitignored but stays on disk, so you (and your coding agent) can still read ever
 
 Skeleton then asks what to start you off with (`--kind`):
 
-- **`deck`** *(default)* — an empty slide deck: one title slide, ready to present.
+- **`deck`** _(default)_ — an empty slide deck: one title slide, ready to present.
 - **`text`** — a long-form **Text** page instead. GeekPresent builds two kinds of artifact, and a
   deck is dead weight if you adopted it for a docs site rather than a talk.
 - **`none`** — nothing at all. The framework, an empty tree, and a landing page that spells out the
@@ -122,7 +122,7 @@ which you then delete along with the rest of the scaffolding.
 `--dist` (prompted) says where the static build is written, **relative to where you run the
 script** — the same frame as `--dir`:
 
-- **`<dir>/dist`** *(default)* — inside the adopted folder, already gitignored. The usual answer.
+- **`<dir>/dist`** _(default)_ — inside the adopted folder, already gitignored. The usual answer.
 - **`site`** — a `site/` at your **repo root**, beside `<dir>`. This is the answer when the built
   site is what you publish and commit — say, an existing hand-written `site/` that you're adding a
   deck to.
@@ -138,16 +138,16 @@ thing it prints when it's done, for you to run when you're ready.
 
 ### The docs you end up with
 
-`minimal` and `skeleton` also sort out the documentation, because a clone carries *GeekPresent's*
+`minimal` and `skeleton` also sort out the documentation, because a clone carries _GeekPresent's_
 docs — and in your repo, most of them are about the wrong project:
 
 - **A generated `README.md`** lands in the adopted folder: what this folder is, where your deck
   lives, and the exact build command for the answers you gave.
-- **`AGENTS.md` stays.** It's the *authoring* manual — the one thing an AI agent most needs.
+- **`AGENTS.md` stays.** It's the _authoring_ manual — the one thing an AI agent most needs.
 - **This README, `AGENT.md` and `TODO.md` move** to `.samples-ref/`. This file remains GeekPresent's
   introduction and full reference, readable at `.samples-ref/GeekPresent-README.md` — it just isn't
-  *your* project's README.
-- **The `/todo` and `/pick-todo` skills move too.** They read `TODO.md` — *this* project's backlog —
+  _your_ project's README.
+- **The `/todo` and `/pick-todo` skills move too.** They read `TODO.md` — _this_ project's backlog —
   so left in place they'd offer your agent a menu of GeekPresent features to go implement.
 
 `full` keeps all of it (full means full) and warns you about those two skills instead.
@@ -158,28 +158,28 @@ GeekPresent develops itself inside a [CodingBooth](https://codingbooth.io/) — 
 carries the whole toolchain — and both the `booth` wrapper and `.booth/` are tracked, so the clone
 hands you a working one. The script asks whether to keep it:
 
-- **`booth`** *(default)* — keep it. `cd <dir> && scripts/build-static.sh ./dist` builds your
+- **`booth`** _(default)_ — keep it. `cd <dir> && scripts/build-static.sh ./dist` builds your
   deck with **nothing installed on the host but Docker or Podman** — no Node, no pnpm, no version
   drift. `./booth` on its own opens VS Code in the browser with the toolchain already in place.
 - **`host`** — remove `booth` and `.booth/`, and build with your own `node` + `pnpm`.
 
-The booth is used as it comes — the script never reconfigures or re-pins it, because being *the same
-environment GeekPresent is built in* is the entire point. The wrapper finds its `.booth/` next to
+The booth is used as it comes — the script never reconfigures or re-pins it, because being _the same
+environment GeekPresent is built in_ is the entire point. The wrapper finds its `.booth/` next to
 itself, so the copy in your subfolder is self-contained and won't collide with a booth your own repo
 may already have at its root.
 
-| Flag | What it does | Default |
-| --- | --- | --- |
-| `--dir <name>` | subfolder to create | `geekpresent` |
-| `--mode <mode>` | `skeleton` \| `minimal` \| `full` — see above | `minimal` |
-| `--keep <deck>` | which deck to keep in minimal mode | `slides` |
-| `--kind <kind>` | what skeleton scaffolds: `deck` \| `text` \| `none` | `deck` |
-| `--name <name>` | what to call the scaffolded deck/page | `slides` / `guide.html` |
-| `--booth` / `--no-booth` | keep the CodingBooth, or remove it and build on the host | `--booth` |
-| `--dist <path>` | where the built site lands, relative to **here** — e.g. `site` | `<dir>/dist` |
-| `--base </path>` | GitHub Pages base path for a project site | none |
-| `--ci` / `--no-ci` | scaffold the deploy workflow | prompted |
-| `--yes`, `-y` | accept defaults, skip prompts (for CI / `curl … \| bash`) | off |
+| Flag                     | What it does                                                   | Default                 |
+| ------------------------ | -------------------------------------------------------------- | ----------------------- |
+| `--dir <name>`           | subfolder to create                                            | `geekpresent`           |
+| `--mode <mode>`          | `skeleton` \| `minimal` \| `full` — see above                  | `minimal`               |
+| `--keep <deck>`          | which deck to keep in minimal mode                             | `slides`                |
+| `--kind <kind>`          | what skeleton scaffolds: `deck` \| `text` \| `none`            | `deck`                  |
+| `--name <name>`          | what to call the scaffolded deck/page                          | `slides` / `guide.html` |
+| `--booth` / `--no-booth` | keep the CodingBooth, or remove it and build on the host       | `--booth`               |
+| `--dist <path>`          | where the built site lands, relative to **here** — e.g. `site` | `<dir>/dist`            |
+| `--base </path>`         | GitHub Pages base path for a project site                      | none                    |
+| `--ci` / `--no-ci`       | scaffold the deploy workflow                                   | prompted                |
+| `--yes`, `-y`            | accept defaults, skip prompts (for CI / `curl … \| bash`)      | off                     |
 
 > **Deploy at a domain root** (user/org Pages or a custom domain). A project sub-path (`--base`)
 > currently breaks prerender, because the SEO wiring emits a root-absolute `/sitemap.xml`. See
@@ -195,9 +195,9 @@ List your slides, in order, in the presentation's `pages.ts` (`src/routes/slides
 
 ```ts
 export const pages = [
-    { path: "title.html", title: "Title" },
-    { path: "intro.html", title: "Introduction" },
-    { path: "demo.html",  title: "Demo" },
+	{ path: 'title.html', title: 'Title' },
+	{ path: 'intro.html', title: 'Introduction' },
+	{ path: 'demo.html', title: 'Demo' }
 ];
 ```
 
@@ -223,13 +223,13 @@ Two templates cover most slides.
 
 ```svelte
 <script>
-  import TitlePage from '$lib/templates/TitlePage.svelte';
+	import TitlePage from '$lib/templates/TitlePage.svelte';
 </script>
 
 <TitlePage>
-  <span slot="title">GeekPresent</span>
-  <span slot="subtitle">How to Build Presentations</span>
-  <span slot="subsubtitle">Your Name</span>
+	<span slot="title">GeekPresent</span>
+	<span slot="subtitle">How to Build Presentations</span>
+	<span slot="subsubtitle">Your Name</span>
 </TitlePage>
 ```
 
@@ -237,14 +237,14 @@ Two templates cover most slides.
 
 ```svelte
 <script>
-  import ContentPage from '$lib/templates/ContentPage.svelte';
+	import ContentPage from '$lib/templates/ContentPage.svelte';
 </script>
 
 <ContentPage title="Introduction" subtitle="What we'll cover">
-  <ul>
-    <li>First point</li>
-    <li>Second point</li>
-  </ul>
+	<ul>
+		<li>First point</li>
+		<li>Second point</li>
+	</ul>
 </ContentPage>
 ```
 
@@ -265,9 +265,9 @@ Put a drawing's parts in a `Group` and you can move them all with one tag — an
 
 ```svelte
 <Group name="scene" focus="api" zoom={3} hide={['queue']} glide={0.9}>
-  <TextBlock name="api" x={620} y={380} width={340} height={220}>API</TextBlock>
-  <TextBlock name="db" x={1160} y={420} width={340} height={220}>DB</TextBlock>
-  <TextBlock name="queue" x={1160} y={710} width={240} height={140}>Queue</TextBlock>
+	<TextBlock name="api" x={620} y={380} width={340} height={220}>API</TextBlock>
+	<TextBlock name="db" x={1160} y={420} width={340} height={220}>DB</TextBlock>
+	<TextBlock name="queue" x={1160} y={710} width={240} height={140}>Queue</TextBlock>
 </Group>
 ```
 
@@ -275,7 +275,7 @@ Put a drawing's parts in a `Group` and you can move them all with one tag — an
 - **Per slide:** `hide` takes parts off stage — they fade rather than pop.
 - **Within a slide:** `glide={0.9}` animates every camera change; step it with Space through `<Steps let:revealed>` — see `animation/scene-camera.html`.
 - **Move it and leave it there:** `move={{ db: { x: 480 } }}` puts a part somewhere else on one slide, by name like `hide`; a scene forwards `move` once and any part can move. The slide that moves it steps it on Space, and every slide after passes the moved value. Paging back into a build opens it already spent, so nothing jumps back — see `animation/scene-move.html`.
-- **Across slides:** write the drawing once as a component (a *scene*) and give each slide its own shot; in a View-Transition deck, `morph` makes paging glide every part from one shot to the next — see `transition/camera-wide.html`.
+- **Across slides:** write the drawing once as a component (a _scene_) and give each slide its own shot; in a View-Transition deck, `morph` makes paging glide every part from one shot to the next — see `transition/camera-wide.html`.
 - **Crisp at any zoom:** each part is redrawn at its true size, not blown up, so text and lines stay sharp.
 - **Edit once:** drag a part in ADJUST on any slide and SAVE writes it into the scene file, so every slide follows.
 
@@ -285,24 +285,24 @@ Slides are Svelte components, so state and events work as usual — perfect for 
 
 ```svelte
 <script>
-  import Box from '$lib/components/Box.svelte';
-  let show = false;
+	import Box from '$lib/components/Box.svelte';
+	let show = false;
 </script>
 
-<button on:click={() => show = true}>Show the answer</button>
+<button on:click={() => (show = true)}>Show the answer</button>
 
 <Box bind:expanded={show} width={600} height={400}>
-  <img src="answer.png" alt="the answer" />
+	<img src="answer.png" alt="the answer" />
 </Box>
 ```
 
 ### Box — expandable overlay
 
-`Box` pops its content up as a dimmed overlay. It opens when you set `expanded`, and closes on **CLOSE**, a click **outside**, or **Escape** — clicks *inside* are left alone, so the content stays interactive (e.g. selecting text).
+`Box` pops its content up as a dimmed overlay. It opens when you set `expanded`, and closes on **CLOSE**, a click **outside**, or **Escape** — clicks _inside_ are left alone, so the content stays interactive (e.g. selecting text).
 
 ```svelte
 <Box bind:expanded={show} width={600} height={400}>
-  <!-- any HTML or components -->
+	<!-- any HTML or components -->
 </Box>
 ```
 
@@ -314,9 +314,9 @@ Read-only code viewers built on the Monaco editor:
 
 ```svelte
 <script>
-  import Code    from '$lib/components/Code.svelte';
-  import CodeBox from '$lib/components/CodeBox.svelte';
-  let show = false;
+	import Code from '$lib/components/Code.svelte';
+	import CodeBox from '$lib/components/CodeBox.svelte';
+	let show = false;
 </script>
 
 <!-- inline, any language -->
@@ -337,8 +337,8 @@ Under **`pnpm dev`**, **☰ → SOURCE** and **EDIT** are available on **every**
 
 ```svelte
 <script>
-  import ViewSource from '$lib/components/ViewSource.svelte';
-  import source     from './+page.svelte?raw';   // Vite hands back the file's bytes
+	import ViewSource from '$lib/components/ViewSource.svelte';
+	import source from './+page.svelte?raw'; // Vite hands back the file's bytes
 </script>
 
 <!-- ...slide content... -->
@@ -355,11 +355,11 @@ Under **`pnpm dev`**, **☰ → SOURCE** and **EDIT** are available on **every**
 
 ### Animation controls
 
-`AnimationBar` adds playback controls — a progress bar plus pause/play and restart — for a slide's own keyframe (`@keyframes`) animation. It drives the animations through the [Web Animations API](https://developer.mozilla.org/docs/Web/API/Web_Animations_API) (`getAnimations`), so you can pause to detach the animation from wall-clock time, drag the bar to scrub to any point, and restart from the top. It governs only the *in-page* CSS animations on the slide — page-to-page view transitions are untouched.
+`AnimationBar` adds playback controls — a progress bar plus pause/play and restart — for a slide's own keyframe (`@keyframes`) animation. It drives the animations through the [Web Animations API](https://developer.mozilla.org/docs/Web/API/Web_Animations_API) (`getAnimations`), so you can pause to detach the animation from wall-clock time, drag the bar to scrub to any point, and restart from the top. It governs only the _in-page_ CSS animations on the slide — page-to-page view transitions are untouched.
 
 ```svelte
 <script>
-  import AnimationBar from '$lib/components/AnimationBar.svelte';
+	import AnimationBar from '$lib/components/AnimationBar.svelte';
 </script>
 
 <!-- a slide element with a finite @keyframes animation -->
@@ -368,8 +368,8 @@ Under **`pnpm dev`**, **☰ → SOURCE** and **EDIT** are available on **every**
 <AnimationBar />
 ```
 
-- **Self-gating.** It renders *nothing* on a slide with no finite, seekable `@keyframes` animation (CSS *transitions* and infinite loops are ignored), so it's safe to leave in a shared template — it simply won't appear where there's nothing to control.
-- **Hosted in the ControlBar.** A plain deck-level bar (default `scope=".content"`, no `driven`/`host`) is the slide's one central control, so it's lifted out of the scaled slide and *portaled* into the deck's bottom ControlBar, next to the Table of Contents and pager. A **scoped** bar (`scope=".set-a"`, `<AnimationScene>`), a `driven` rail, or a `host`-set bar governs a region and stays in the slide. Pass `barHosted={false}` to force a plain bar back into the slide, or `barHosted` to force hosting.
+- **Self-gating.** It renders _nothing_ on a slide with no finite, seekable `@keyframes` animation (CSS _transitions_ and infinite loops are ignored), so it's safe to leave in a shared template — it simply won't appear where there's nothing to control.
+- **Hosted in the ControlBar.** A plain deck-level bar (default `scope=".content"`, no `driven`/`host`) is the slide's one central control, so it's lifted out of the scaled slide and _portaled_ into the deck's bottom ControlBar, next to the Table of Contents and pager. A **scoped** bar (`scope=".set-a"`, `<AnimationScene>`), a `driven` rail, or a `host`-set bar governs a region and stays in the slide. Pass `barHosted={false}` to force a plain bar back into the slide, or `barHosted` to force hosting.
 - **Collapsed by default.** It first shows a low-profile **ANIMATE** button; clicking it reveals the bar (a one-way reveal).
 - Props: `scope` (CSS selector for the subtree it searches, default `.content`), `highlight` (emphasize the ANIMATE button with the accent look), `startExpanded` (skip the button and show the controls straight away), and `barHosted` (override the auto host/in-slide placement). In a view-transition deck it re-detects on every navigation, so one bar in the deck layout serves every slide. The `slides/animation-bar.html` slide is a live demo; `transition/*-from.html` use it to scrub an in-page re-creation of each transition effect.
 
@@ -379,7 +379,7 @@ Keep a page's images next to its `+page.svelte` and `import` them — Vite bundl
 
 ```svelte
 <script>
-  import diagram from './diagram.png';
+	import diagram from './diagram.png';
 </script>
 
 <img src={diagram} alt="diagram" />
@@ -398,8 +398,8 @@ then feed the thumbnail to the `YouTube` component, which shows it with a QR ove
 
 ```svelte
 <script>
-  import YouTube   from '$lib/components/YouTube.svelte';
-  import thumbnail from './my-video-TN.png';
+	import YouTube from '$lib/components/YouTube.svelte';
+	import thumbnail from './my-video-TN.png';
 </script>
 
 <YouTube {thumbnail} alt="My talk" youtubeId="<id>" />
@@ -437,7 +437,7 @@ Add notes with the `Note` component (shown below the slide in SCALED mode; hidde
 
 ```svelte
 <script>
-  import Note from '$lib/components/Note.svelte';
+	import Note from '$lib/components/Note.svelte';
 </script>
 
 <Note><p>Remember to mention X.</p></Note>
@@ -447,25 +447,25 @@ Add notes with the `Note` component (shown below the slide in SCALED mode; hidde
 
 The nav bar (FIRST / PREV / NEXT / LAST), the **Table of Contents**, and the **Overview Page** grid are added automatically (window-edge chrome; opt out with `toolBar={false}` / `controlBar={false}` on `<SlideDeck>`).
 
-| Key         | Action                       |
-|-------------|------------------------------|
-| Arrow Left  | Previous slide               |
-| Arrow Right | Next slide                   |
-| Space       | Next step, else next slide   |
-| O           | Open the Overview Page grid  |
-| E           | Toggle Overview **EDIT** deck (while Overview is open; dev) |
-| Alt+. (⌥. on Mac) | Raise both chrome bars briefly for letter mnemonics |
-| a / j / z / p / m / t / u | While bars raised: ANNOTATE / ADJUST / open zoom menu / PRESENT / ☰ / TOC / pause-resume a *live* Kiosk (underlined in the label when the letter fits; else a trailing chip; **u** is inert with no kiosk running). Zoom menu: ↑/↓, **c** → custom %, Enter |
-| o / k / c / r / s / e | While bars raised or ☰ open: OVERVIEW / KIOSK / CAPTURE / PRINT / SOURCE / EDIT (PRINT is **r**; then flyout **cCwWtT**). **k** opens the Kiosk dialog while off, but toggles the panel's visibility while a kiosk is *live* — mouse-click ☰ → KIOSK still reaches the dialog either way |
-| ← / → / ↑ / ↓ (chrome up) | Rove focus on the tool bar and ☰ rows (↓ opens ☰ from the hamburger; Enter activates) |
-| Escape      | Close Overview / ToC / Box / ☰ / Kiosk dialog; disarm chrome raise |
-| Enter (Kiosk dialog) | Start / OK |
-| (in EDIT window) Ctrl+S / Ctrl+Shift+R / Esc | SAVE / REFRESH / CLOSE; Alt+. then r/s/c same (one-shot arm) |
+| Key                                          | Action                                                                                                                                                                                                                                                                                                                                                          |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Arrow Left                                   | Previous slide                                                                                                                                                                                                                                                                                                                                                  |
+| Arrow Right                                  | Next slide                                                                                                                                                                                                                                                                                                                                                      |
+| Space                                        | Next step, else next slide                                                                                                                                                                                                                                                                                                                                      |
+| O                                            | Open the Overview Page grid                                                                                                                                                                                                                                                                                                                                     |
+| E                                            | Toggle Overview **EDIT** deck (while Overview is open; dev)                                                                                                                                                                                                                                                                                                     |
+| Alt+. (⌥. on Mac)                            | Raise both chrome bars briefly for letter mnemonics                                                                                                                                                                                                                                                                                                             |
+| a / j / z / p / m / t / u                    | While bars raised: ANNOTATE / ADJUST / open zoom menu / PRESENT / ☰ / TOC / pause-resume a _live_ Kiosk (underlined in the label when the letter fits; else a trailing chip; **u** is inert with no kiosk running). Zoom menu: ↑/↓, **c** → custom %, Enter                                                                                                    |
+| o / k / c / r / s / e / b                    | While bars raised or ☰ open: OVERVIEW / KIOSK / CAPTURE / PRINT / SOURCE / EDIT / HIDE-SHOW BARS (PRINT is **r**; **b** hides both bars at once, or brings them back; then flyout **cCwWtT**). **k** opens the Kiosk dialog while off, but toggles the panel's visibility while a kiosk is _live_ — mouse-click ☰ → KIOSK still reaches the dialog either way |
+| ← / → / ↑ / ↓ (chrome up)                    | Rove focus on the tool bar and ☰ rows (↓ opens ☰ from the hamburger; Enter activates)                                                                                                                                                                                                                                                                         |
+| Escape                                       | Close Overview / ToC / Box / ☰ / Kiosk dialog; disarm chrome raise                                                                                                                                                                                                                                                                                             |
+| Enter (Kiosk dialog)                         | Start / OK                                                                                                                                                                                                                                                                                                                                                      |
+| (in EDIT window) Ctrl+S / Ctrl+Shift+R / Esc | SAVE / REFRESH / CLOSE; Alt+. then r/s/c same (one-shot arm)                                                                                                                                                                                                                                                                                                    |
 
 `Space` advances a `<Steps>` build while one is running and pages the deck once it's spent, so a
 build simply inserts sub-steps into the deck's forward march (`Shift+Space` reverses).
 
-`O` opens the **Overview Page** — every slide at once, click one to jump. The tiles are the *real*
+`O` opens the **Overview Page** — every slide at once, click one to jump. The tiles are the _real_
 slides (each is the prerendered page in an `<iframe>`, scaled to fit), not screenshots, so they're
 never stale and there's nothing to generate. They mount lazily as they scroll into view, so opening
 a 65-slide deck boots the dozen you can see rather than all 65. Appendices (`hidden: true`) stay
@@ -475,7 +475,7 @@ not fire while you're typing in a text field.
 
 ## Printing — and the handout
 
-Each slide is its own page, so **Ctrl/Cmd-P on a slide prints that one slide** — and it prints as a *slide*: the whole canvas on paper its own shape, inside a half-inch margin, centred (the deck's chrome drops out, and the dark background is printed rather than dropped).
+Each slide is its own page, so **Ctrl/Cmd-P on a slide prints that one slide** — and it prints as a _slide_: the whole canvas on paper its own shape, inside a half-inch margin, centred (the deck's chrome drops out, and the dark background is printed rather than dropped).
 
 There's also a **PRINT** entry in the top tool bar's hamburger (☰) menu — groups are Overview · Capture/Print · Source/Edit. Hover **PRINT** for a nested flyout (keys **cCwWtT** while open):
 
@@ -485,18 +485,18 @@ There's also a **PRINT** entry in the top tool bar's hamburger (☰) menu — gr
 
 The grids are `/_handout/<deck>.html?grid` and `?grid&notes`; like the handout they render the real slides (not screenshots) and let the browser paginate — as many tiles or rows as fit.
 
-| URL | What prints |
-| --- | --- |
-| *any slide* | That slide, one page. |
-| *any slide* `?notes` | That slide **and its `<Note>`** beneath it, still one page. |
-| `/_handout/slides.html` | **The whole deck** — every slide, one per page. |
+| URL                           | What prints                                                                |
+| ----------------------------- | -------------------------------------------------------------------------- |
+| _any slide_                   | That slide, one page.                                                      |
+| _any slide_ `?notes`          | That slide **and its `<Note>`** beneath it, still one page.                |
+| `/_handout/slides.html`       | **The whole deck** — every slide, one per page.                            |
 | `/_handout/slides.html?notes` | The same, with each slide's number, title and `<Note>` printed beneath it. |
 
-Then Ctrl/Cmd-P → *Save as PDF*. The browser is the PDF engine, so there is no export step and no dependency. Every deck has a handout (`/_handout/<deck>.html`), a portrait deck prints on portrait paper, and a slide printed on its own is *exactly* the size it is inside the handout — both ask the same module.
+Then Ctrl/Cmd-P → _Save as PDF_. The browser is the PDF engine, so there is no export step and no dependency. Every deck has a handout (`/_handout/<deck>.html`), a portrait deck prints on portrait paper, and a slide printed on its own is _exactly_ the size it is inside the handout — both ask the same module.
 
 The slide is **centred inside a margin** rather than bled to the edge, and both of those are load-bearing: a real printer cannot reach the edge of the paper, and a browser that declines the custom page size (Chrome and Edge honour it) prints on A4 instead — centred, the leftover splits evenly rather than pooling at the bottom.
 
-The handout lives *outside* the deck on purpose: a deck is a folder of slides you own, so GeekPresent doesn't keep one of the names for itself. (It renders the slides as if it stood inside the deck — a `<base>` tag — so their relative links still work.)
+The handout lives _outside_ the deck on purpose: a deck is a folder of slides you own, so GeekPresent doesn't keep one of the names for itself. (It renders the slides as if it stood inside the deck — a `<base>` tag — so their relative links still work.)
 
 It renders the real slide components — not screenshots — so it cannot drift from the deck, and your annotations print with it. Its one honest limit is the same one CAPTURE has: a slide holding a live `<iframe>` (a `WebSite` or `WebPage` embed) cannot be printed, so the handout names the embed on the sheet rather than leaving you a blank rectangle to puzzle over.
 
@@ -508,7 +508,7 @@ export const deck = { width: 1080, height: 1920, baseFontSize: '1.8em' };
 
 ## Text view (long-form)
 
-Alongside slides, GeekPresent builds a second artifact type — a **Text**: *one long page* (fluid width that follows the window, capped at 1080px; height grows with the content) that you author by hand and scroll, reusing the same components. It's the read-at-your-own-pace counterpart to a deck.
+Alongside slides, GeekPresent builds a second artifact type — a **Text**: _one long page_ (fluid width that follows the window, capped at 1080px; height grows with the content) that you author by hand and scroll, reusing the same components. It's the read-at-your-own-pace counterpart to a deck.
 
 - The site's **landing page** (`/`) and the sample at **`/text.html`** are Text artifacts — see `src/routes/(home)/` and `src/routes/text.html/`.
 - The Table of Contents' "View as article" link opens `/text.html`.
@@ -567,8 +567,8 @@ disk), but a handful of metadata fields — `og:url`, `og:image`, `twitter:image
 `canonical`, and the sitemap — **must be absolute** (scrapers and search engines
 can't resolve relative URLs). One build-time variable supplies that base URL:
 
-| Variable | Default | Meaning |
-| --- | --- | --- |
+| Variable               | Default                                 | Meaning                                                                                                                                                                                                                                                                                                               |
+| ---------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GEEKPRESENT_SITE_URL` | `https://nawaman.github.io/GeekPresent` | Absolute base URL for the absolute-only metadata. Set it to your custom domain (`GEEKPRESENT_SITE_URL=https://my.site pnpm build`). Set it **empty** (`GEEKPRESENT_SITE_URL=`) to omit the absolute-only tags entirely — useful when you don't yet know the deploy URL, so no half-formed `og:url`/`canonical` ships. |
 
 It flows through `scripts/build-static.sh` too (env is inherited), e.g.
@@ -582,7 +582,7 @@ follow-up, not part of the SEO work.
 
 ## Build to a static folder of your choice
 
-GitHub Pages is just *one* consumer of the static build. Because every route is
+GitHub Pages is just _one_ consumer of the static build. Because every route is
 prerendered with **relative** asset paths, the output is fully portable — you can
 drop it on any static host, serve it from any sub-path, or open it straight off
 disk. The `scripts/build-static.sh` helper builds into a folder you name, without touching

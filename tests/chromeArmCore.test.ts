@@ -6,9 +6,7 @@ import {
 	isChromeTypingTarget
 } from '../src/lib/chrome/chromeArmCore';
 
-function key(
-	partial: Partial<KeyboardEvent> & { key: string; code?: string }
-): KeyboardEvent {
+function key(partial: Partial<KeyboardEvent> & { key: string; code?: string }): KeyboardEvent {
 	return {
 		key: partial.key,
 		code: partial.code ?? '',
@@ -32,9 +30,7 @@ describe('isChromeTypingTarget', () => {
 describe('chromeKeyIntent', () => {
 	it('Alt+. arms (by code or key)', () => {
 		expect(chromeKeyIntent(key({ key: '.', code: 'Period', altKey: true }), false)).toBe('arm');
-		expect(chromeKeyIntent(key({ key: 'Dead', code: 'Period', altKey: true }), false)).toBe(
-			'arm'
-		);
+		expect(chromeKeyIntent(key({ key: 'Dead', code: 'Period', altKey: true }), false)).toBe('arm');
 	});
 
 	it('does not arm with Ctrl/Meta+Alt+.', () => {
@@ -92,9 +88,11 @@ describe('moreMenuKeyIntent — ☰ row letters', () => {
 		expect(moreMenuKeyIntent(key({ key: 'r' }), false, false)).toBe('ignore');
 	});
 
-	it('maps O/K/C/R/S/E while the drop is open (even if arm timed out)', () => {
+	it('maps O/K/B/C/R/S/E while the drop is open (even if arm timed out)', () => {
 		expect(moreMenuKeyIntent(key({ key: 'o' }), true, false)).toBe('overview');
 		expect(moreMenuKeyIntent(key({ key: 'k' }), true, false)).toBe('kiosk');
+		expect(moreMenuKeyIntent(key({ key: 'b' }), true, false)).toBe('bars');
+		expect(moreMenuKeyIntent(key({ key: 'B' }), true, false)).toBe('bars');
 		expect(moreMenuKeyIntent(key({ key: 'c' }), true, false)).toBe('capture');
 		expect(moreMenuKeyIntent(key({ key: 'C' }), true, false)).toBe('capture');
 		// PRINT is R — P is PRESENT on the bar.
@@ -107,6 +105,8 @@ describe('moreMenuKeyIntent — ☰ row letters', () => {
 		// Alt+. then c should open ☰ and run CAPTURE — the underline is not a lie.
 		expect(moreMenuKeyIntent(key({ key: 'c' }), false, true)).toBe('capture');
 		expect(moreMenuKeyIntent(key({ key: 'r' }), false, true)).toBe('print');
+		// Alt+. then b hides the bars, and brings them back once they are hidden.
+		expect(moreMenuKeyIntent(key({ key: 'b' }), false, true)).toBe('bars');
 	});
 
 	it('does not claim bar-level letters (those stay on chromeKeyIntent)', () => {

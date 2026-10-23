@@ -17,13 +17,13 @@
   is the way to hand the clock back to a bar.
 -->
 <script lang="ts">
-	import ContentPage  from '$lib/templates/ContentPage.svelte';
-	import Terminal     from '$lib/components/Terminal.svelte';
-	import QuickCode    from '$lib/components/QuickCode.svelte';
-	import Block        from '$lib/components/Block.svelte';
-	import Hint         from '$lib/components/Hint.svelte';
-	import ViewSource   from '$lib/components/ViewSource.svelte';
-	import source       from './+page.svelte?raw';
+	import ContentPage from '$lib/templates/ContentPage.svelte';
+	import Terminal from '$lib/components/Terminal.svelte';
+	import QuickCode from '$lib/components/QuickCode.svelte';
+	import Block from '$lib/components/Block.svelte';
+	import Hint from '$lib/components/Hint.svelte';
+	import ViewSource from '$lib/components/ViewSource.svelte';
+	import source from './+page.svelte?raw';
 
 	const path = 'src/routes/slides/terminal-component.html/+page.svelte';
 
@@ -34,7 +34,9 @@
 		'vite v5.4.2  building SSR bundle...',
 		{ out: '✓ 128 modules transformed', tone: 'ok' as const },
 		{ out: 'warning: 1 chunk is larger than 500 kB', tone: 'warn' as const },
-		{ cmd: 'scripts/build-static.sh ./dist' },
+		{ out: '# then the static copy', tone: 'comment' as const },
+		{ cmd: 'scripts/build-static.sh \\' },
+		{ cmd: './dist', cont: true },
 		{ out: 'prerendered 41 routes → dist/', tone: 'muted' as const },
 		{ out: '✓ done in 3.4s', tone: 'ok' as const }
 	];
@@ -43,9 +45,15 @@
 <ContentPage title="Terminal" subtitle="A typed command, its output — on the animation clock">
 	<div style="max-width: 800px;">
 		<p>
-			<b>Terminal</b> types a command out character by character, pauses as if thinking, then
-			prints the output — <code>ok</code> / <code>warn</code> / <code>error</code> /
-			<code>muted</code> tones, all <code>roles.css</code> tokens (<code>--terminal-*</code>).
+			<b>Terminal</b> types a command out character by character, pauses as if thinking, then prints
+			the output — <code>ok</code> / <code>warn</code> / <code>error</code> /
+			<code>muted</code> / <code>comment</code> tones, all <code>roles.css</code> tokens (<code
+				>--terminal-*</code
+			>).
+		</p>
+		<p style="margin-top: 0.6em;">
+			A long command split with a trailing <code>\</code> carries on in
+			<code>cont: true</code>, with no prompt of its own.
 		</p>
 		<p style="margin-top: 0.6em;">
 			The typing is plain CSS <code>@keyframes</code>, never a timer — so the session is
@@ -58,7 +66,9 @@
 <!-- Usage sample, parked top-right so it clears the intro on the left. fill=false
      keeps QuickCode at its natural size instead of stretching to the box. -->
 <Block name="usage" x={980} y={220} width={840} height={280} grid={10} fill={false}>
-	<QuickCode lang="svelte" code={`<Terminal
+	<QuickCode
+		lang="svelte"
+		code={`<Terminal
   title="zsh — geekpresent"
   keys="global"  <!-- Space steps -->
   lines={[
@@ -66,7 +76,8 @@
     'vite v5.4.2  building...',
     { out: '✓ done', tone: 'ok' },
   ]}
-/>`} />
+/>`}
+	/>
 </Block>
 
 <!-- The console itself, in a Block so ADJUST mode can place and size it. Block fills

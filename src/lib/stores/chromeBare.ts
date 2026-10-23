@@ -1,8 +1,15 @@
 import { browser } from '$app/environment';
-import { derived, writable } from 'svelte/store';
+import { derived, get, writable } from 'svelte/store';
 import { consoleLive } from './presenter';
 import { recordingLook } from '$lib/record/recordBus';
-import { BARE_KEY, readBareParam, readSticky, resolveChromeBare, type Choice } from '$lib/chrome/chromeBareCore';
+import { chromeArmed, disarmChrome } from './chromeArm';
+import {
+	BARE_KEY,
+	readBareParam,
+	readSticky,
+	resolveChromeBare,
+	type Choice
+} from '$lib/chrome/chromeBareCore';
 
 // Bare chrome — both window-edge bars hidden completely (see chrome/chromeBareCore).
 //
@@ -54,6 +61,33 @@ if (browser) {
 	window.addEventListener('storage', (e) => {
 		if (e.key === BARE_KEY || e.key === null) sticky.set(loadSticky());
 	});
+}
+
+/** True from the moment the bars are hidden by hand (☰ → HIDE BARS, Alt+. → B) until Alt+.
+    raises them again. A bare bar normally stays up while it is hovered or focused — right,
+    after Alt+. raised it, but wrong here: the pointer is still ON the row just clicked, so the
+    bars would wait for it to leave. While this is set, both bars go at once, hover or not. */
+export const bareTucked = writable(false);
+
+// Alt+. is the way back, so a raise ends the "go at once" — after it, hover holds a bar as usual.
+chromeArmed.subscribe((armed) => {
+	if (armed) bareTucked.set(false);
+});
+
+/** Hide both bars now, or bring them back — what ☰ → HIDE / SHOW BARS and Alt+. → B do. */
+export function toggleBars(): void {
+	if (get(chromeBare)) {
+		setBareChoice(false);
+		bareTucked.set(false);
+		return;
+	}
+	setBareChoice(true);
+	// Drop the Alt+. raise and the focus a bar button kept, so neither holds the bars up.
+	disarmChrome();
+	bareTucked.set(true);
+	if (browser && document.activeElement instanceof HTMLElement) {
+		if (document.activeElement.closest('.annot-tools, .ctrl-bar')) document.activeElement.blur();
+	}
 }
 
 /** Declare whether the DECK is always shown bare (SlideDeck's `hideChrome` prop). */
