@@ -46,6 +46,15 @@ describe('Terminal (SSR)', () => {
 		);
 	});
 
+	it('draws a mixed line: a piece of another tone in its own span, the rest bare', () => {
+		const { body } = render(Terminal, {
+			props: { lines: [{ out: ['A <- [', { text: 'gh/token', tone: 'warn' }, ']'] }] }
+		});
+		expect(body).toMatch(
+			/tone-plain[^>]*>(<!--[^>]*-->)*A &lt;- \[(<!--[^>]*-->)*<span class="part tone-warn[^"]*">gh\/token<\/span>(<!--[^>]*-->)*\]/
+		);
+	});
+
 	it('a continued command keeps a hidden prompt, so only the first line shows one', () => {
 		const { body } = render(Terminal, {
 			props: { lines: [{ cmd: 'a \\' }, { cmd: 'b', cont: true }], caret: false }

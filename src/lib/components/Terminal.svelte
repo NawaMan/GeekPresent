@@ -65,10 +65,13 @@
     />
 
   A bare string in `lines` is shorthand for an output line. Tones are `ok` / `warn` /
-  `error` / `muted` / `comment` / `plain`; every colour is a roles.css token
+  `error` / `muted` / `comment` / `dir` / `plain`; every colour is a roles.css token
   (`--terminal-*`). A tone colours the whole line; to keep the start of it plain (a tree's
   `├── `), put that part in `lead`: `{ lead: '│   └── ', out: '(T) region', tone: 'ok' }`.
   A shell comment is an output line in tone `comment`: `{ out: '# list them', tone: 'comment' }`.
+  A folder, as `ls` draws one, is tone `dir`. To mix colours on one line, give `out` as a list:
+  a bare string takes the line's tone, `{ text, tone }` its own —
+  `{ out: ['GH_TOKEN <- [', { text: 'gh/token', tone: 'warn' }, ']'] }`.
   A long command split with a trailing `\` carries on in `{ cmd: '…', cont: true }`: no
   prompt, the text lined up under the command above.
 
@@ -479,7 +482,10 @@
 						class="line out tone-{line.tone}"
 						style={rowStyle('out', line.delayMs, line.durationMs)}
 					>
-						{#if line.lead}<span class="lead">{line.lead}</span>{/if}{line.text}
+						{#if line.lead}<span class="lead">{line.lead}</span
+							>{/if}{#if line.parts}{#each line.parts as part, p (p)}{#if part.tone === line.tone}{part.text}{:else}<span
+										class="part tone-{part.tone}">{part.text}</span
+									>{/if}{/each}{:else}{line.text}{/if}
 					</div>
 				{/if}
 			{/each}
@@ -711,6 +717,15 @@
 	.tone-comment {
 		color: var(--terminal-comment, #8b949e);
 		font-style: italic;
+	}
+	/* A folder, as `ls` and `tree` colour one: bold blue. */
+	.tone-dir {
+		color: var(--terminal-dir, #4f8fe6);
+		font-weight: bold;
+	}
+	/* A piece of a mixed line set back to plain, inside a line of another tone. */
+	.part.tone-plain {
+		color: var(--terminal-fg, #e6edf3);
 	}
 	/* A line's `lead` (a tree's `├── `) keeps the plain colour under any tone. */
 	.lead {

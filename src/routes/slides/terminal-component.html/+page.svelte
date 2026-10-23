@@ -47,13 +47,13 @@
 		<p>
 			<b>Terminal</b> types a command out character by character, pauses as if thinking, then prints
 			the output — <code>ok</code> / <code>warn</code> / <code>error</code> /
-			<code>muted</code> / <code>comment</code> tones, all <code>roles.css</code> tokens (<code
-				>--terminal-*</code
-			>).
+			<code>muted</code> / <code>comment</code> / <code>dir</code> tones, all <code>roles.css</code>
+			tokens (<code>--terminal-*</code>).
 		</p>
 		<p style="margin-top: 0.6em;">
 			A long command split with a trailing <code>\</code> carries on in
-			<code>cont: true</code>, with no prompt of its own.
+			<code>cont: true</code>, with no prompt of its own. Give <code>out</code> as a list of pieces to
+			mix colours on one line.
 		</p>
 		<p style="margin-top: 0.6em;">
 			The typing is plain CSS <code>@keyframes</code>, never a timer — so the session is

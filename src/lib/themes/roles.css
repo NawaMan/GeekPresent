@@ -361,6 +361,7 @@
 	--terminal-warn: var(--ACCENT-WARM, #f0a33e);
 	--terminal-error: var(--DANGER, #e5484d); /* `muted` is the fg, dimmed in-component */
 	--terminal-comment: #8b949e; /* `# …` lines; a literal, like the screen */
+	--terminal-dir: #4f8fe6; /* folders, bold, as ls and tree draw them */
 	--terminal-accent: var(--ACCENT, #2980b9); /* transport fill, knob, play disc */
 	--terminal-track: #e6edf3; /* empty track + ticks, at low alpha */
 

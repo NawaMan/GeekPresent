@@ -13,6 +13,7 @@ import {
 	snapTime,
 	stepsFor
 } from '../src/lib/utils/terminalCore';
+import type { Tone } from '../src/lib/utils/terminalCore';
 
 describe('duration', () => {
 	it('accepts any finite non-negative number, zero included', () => {
@@ -84,6 +85,36 @@ describe('normalizeLines', () => {
 		expect(normalizeLines([{ out: '# list them', tone: 'comment' }])).toEqual([
 			{ kind: 'out', text: '# list them', tone: 'comment' }
 		]);
+	});
+
+	it('takes out as a list of pieces: a string has the line tone, an object its own', () => {
+		const [line] = normalizeLines([
+			{
+				out: [
+					'A <- [',
+					{ text: 'gh/token', tone: 'warn' },
+					{ text: 'x', tone: 'purple' as Tone },
+					']'
+				],
+				tone: 'muted'
+			}
+		]);
+		expect(line).toEqual({
+			kind: 'out',
+			text: 'A <- [gh/tokenx]',
+			tone: 'muted',
+			parts: [
+				{ text: 'A <- [', tone: 'muted' },
+				{ text: 'gh/token', tone: 'warn' },
+				{ text: 'x', tone: 'muted' },
+				{ text: ']', tone: 'muted' }
+			]
+		});
+		// Junk in the list is dropped; a plain string `out` has no parts.
+		// @ts-expect-error — the junk an author can type
+		expect(normalizeLines([{ out: ['a', 7, null, { tone: 'ok' }] }])[0].text).toBe('a');
+		expect(normalizeLines([{ out: 'a' }])[0]).not.toHaveProperty('parts');
+		expect(normalizeLines([{ out: 'src', tone: 'dir' }])[0].tone).toBe('dir');
 	});
 
 	it('marks a continued command, and only a command', () => {

@@ -15,10 +15,14 @@
 // rides the AnimationBar clock": a CSS @keyframes animation is also a Web Animations
 // object, so AnimationBar scrubs the typing without this component knowing it exists.
 
-/** How an output line reads. `plain` inherits the console's foreground. */
-export type Tone = 'plain' | 'ok' | 'warn' | 'error' | 'muted' | 'comment';
+/** How an output line reads. `plain` inherits the console's foreground; `dir` is a folder, as
+ *  `ls` and `tree` draw one. */
+export type Tone = 'plain' | 'ok' | 'warn' | 'error' | 'muted' | 'comment' | 'dir';
 
-const TONES: readonly Tone[] = ['plain', 'ok', 'warn', 'error', 'muted', 'comment'];
+const TONES: readonly Tone[] = ['plain', 'ok', 'warn', 'error', 'muted', 'comment', 'dir'];
+
+/** A piece of an output line given as a list: a bare string takes the line's tone, an object its own. */
+export type OutPart = string | { text: string; tone?: Tone };
 
 /**
  * One line of the session, as an author writes it.
@@ -32,8 +36,9 @@ export interface TerminalLine {
 	/** On a command: it carries on the one above (after a trailing `\`), so no prompt is drawn —
 	 *  the text sits under the command it continues. Ignored on output. */
 	cont?: boolean;
-	/** Program output: rendered without a prompt, revealed all at once. */
-	out?: string;
+	/** Program output: rendered without a prompt, revealed all at once. A list of pieces mixes
+	 *  colours on one line: `['GH_TOKEN <- [', { text: 'gh/token', tone: 'warn' }, ']']`. */
+	out?: string | OutPart[];
 	/** Colour role for an output line. Ignored on a command. */
 	tone?: Tone;
 	/** Text drawn before an output line's `out`, in the plain colour whatever the tone —
@@ -53,6 +58,9 @@ export interface NormalizedLine {
 	lead?: string;
 	/** A command that continues the one above; only there when true. */
 	cont?: boolean;
+	/** An output line's pieces, each with its tone resolved; only there when `out` was a list.
+	 *  `text` is then the pieces joined. */
+	parts?: { text: string; tone: Tone }[];
 }
 
 /** A normalized line once it has a place on the timeline. */
@@ -124,13 +132,37 @@ export function normalizeLines(
 			const line: NormalizedLine = { kind: 'cmd', text: entry.cmd, tone: 'plain' };
 			if (entry.cont === true) line.cont = true;
 			lines.push(line);
-		} else if (typeof entry.out === 'string') {
-			const line: NormalizedLine = { kind: 'out', text: entry.out, tone };
+		} else if (typeof entry.out === 'string' || Array.isArray(entry.out)) {
+			const parts = Array.isArray(entry.out) ? normalizeParts(entry.out, tone) : undefined;
+			const text = parts ? parts.map((p) => p.text).join('') : (entry.out as string);
+			const line: NormalizedLine = { kind: 'out', text, tone };
+			if (parts) line.parts = parts;
 			if (typeof entry.lead === 'string' && entry.lead) line.lead = entry.lead;
 			lines.push(line);
 		}
 	}
 	return lines;
+}
+
+/**
+ * Resolve the pieces of an output line given as a list. A bare string takes the line's tone;
+ * an object takes its own, or the line's when it has none or an unknown one. Anything else is
+ * dropped.
+ */
+function normalizeParts(input: readonly unknown[], lineTone: Tone): { text: string; tone: Tone }[] {
+	const parts: { text: string; tone: Tone }[] = [];
+	for (const part of input) {
+		if (typeof part === 'string') parts.push({ text: part, tone: lineTone });
+		else if (
+			part &&
+			typeof part === 'object' &&
+			typeof (part as { text?: unknown }).text === 'string'
+		) {
+			const { text, tone } = part as { text: string; tone?: unknown };
+			parts.push({ text, tone: TONES.includes(tone as Tone) ? (tone as Tone) : lineTone });
+		}
+	}
+	return parts;
 }
 
 /**
