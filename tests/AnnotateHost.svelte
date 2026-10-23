@@ -10,6 +10,7 @@
 	export let canvasHeight = 1080;
 	export let inkColors: (string | null)[] = [null, '#E5484D', '#3FA9F5'];
 	export let snapPen = true;
+	export let freehand: import('../src/lib/annotate/freehandCore').FreehandInput | false = {};
 </script>
 
-<Annotate {canvasWidth} {canvasHeight} {inkColors} {snapPen} />
+<Annotate {canvasWidth} {canvasHeight} {inkColors} {snapPen} {freehand} />

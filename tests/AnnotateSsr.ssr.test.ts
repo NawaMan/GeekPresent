@@ -13,7 +13,13 @@
 import { render } from 'svelte/server';
 import { afterEach, describe, expect, it } from 'vitest';
 import Annotate from '../src/lib/components/Annotate.svelte';
-import { annotationMode, canAnnotate, inkBook, inkPath, resetAllInk } from '../src/lib/stores/annotation';
+import {
+	annotationMode,
+	canAnnotate,
+	inkBook,
+	inkPath,
+	resetAllInk
+} from '../src/lib/stores/annotation';
 
 const SLIDE = '/slides/intro.html';
 
@@ -56,7 +62,21 @@ describe('Annotate (SSR)', () => {
 		// stranger about "your annotations from 3 days ago" would be nonsense.
 		canAnnotate.set(true);
 		inkPath.set(SLIDE);
-		inkBook.set({ [SLIDE]: { strokes: [{ id: 'a', tool: 'pen', points: [[0, 0], [9, 9]] }], ts: 1 } });
+		inkBook.set({
+			[SLIDE]: {
+				strokes: [
+					{
+						id: 'a',
+						tool: 'pen',
+						points: [
+							[0, 0],
+							[9, 9]
+						]
+					}
+				],
+				ts: 1
+			}
+		});
 		const { body } = render(Annotate, { props: {} });
 		expect(body).not.toContain('annot-stale');
 		expect(body).not.toContain('RESET SLIDE');
@@ -68,16 +88,35 @@ describe('Annotate (SSR)', () => {
 		// pointer-transparent because the pen is down.
 		inkPath.set(SLIDE);
 		inkBook.set({
-			[SLIDE]: { strokes: [{ id: 'a', tool: 'pen', points: [[0, 0], [100, 100], [200, 0]] }], ts: 1 }
+			[SLIDE]: {
+				strokes: [
+					{
+						id: 'a',
+						tool: 'pen',
+						points: [
+							[0, 0],
+							[100, 100],
+							[200, 0]
+						]
+					}
+				],
+				ts: 1
+			}
 		});
 		const { body } = render(Annotate, { props: {} });
 
 		expect(body).toContain('annot-surface');
 		expect(body).toContain('viewBox="0 0 1920 1080"');
 		expect(body).toContain('pointer-events:none');
-		expect(body).toContain('M 0 0');
-		expect(body).toContain('C '); // smoothPath's cubics, same as Polyline
+		// The pen is freehand by default: one closed, filled outline (freehandCore).
+		expect(body).toContain('freehand');
+		expect(body).toMatch(/d="M[\d.-]+,[\d.-]+ Q[^"]*Z"/);
 		expect(body).not.toContain('annot-bar'); // the pen is not armed; nothing to put down
+
+		// With freehand off, the classic line: drawCore's smoothing, same as Polyline.
+		const classic = render(Annotate, { props: { freehand: false } }).body;
+		expect(classic).toContain('M 0 0');
+		expect(classic).toContain('C ');
 	});
 
 	it('draws a Shift-snapped pen stroke as a STRAIGHT ruler, not a bowed curve', () => {
@@ -86,18 +125,59 @@ describe('Annotate (SSR)', () => {
 		// points — not smoothPath's cubic — or the audience would see a bowed "straight" edge.
 		inkPath.set(SLIDE);
 		inkBook.set({
-			[SLIDE]: { strokes: [{ id: 'r', tool: 'pen', points: [[100, 200], [500, 200]] }], ts: 1 }
+			[SLIDE]: {
+				strokes: [
+					{
+						id: 'r',
+						tool: 'pen',
+						points: [
+							[100, 200],
+							[500, 200]
+						]
+					}
+				],
+				ts: 1
+			}
 		});
+		// Freehand: the outline hugs the ruler — every vertex within the ink's reach of y=200,
+		// spanning the full 100→500 run.
 		const { body } = render(Annotate, { props: {} });
+		const d = body.match(
+			/class="annot-stroke[^"]*"[^>]*\sd="([^"]+)"|\sd="([^"]+)"[^>]*class="annot-stroke/
+		);
+		const path = (d?.[1] ?? d?.[2] ?? '')
+			.replace(/[MQTZ]/g, ' ')
+			.trim()
+			.split(/\s+/);
+		const pts = path.map((p) => p.split(',').map(Number));
+		expect(pts.length).toBeGreaterThan(10);
+		for (const [, y] of pts) expect(Math.abs(y - 200)).toBeLessThanOrEqual(12.75 + 1e-6);
+		const xs = pts.map(([x]) => x);
+		expect(Math.min(...xs)).toBeLessThan(100);
+		expect(Math.max(...xs)).toBeGreaterThan(500);
 
-		expect(body).toContain('M 100 200 L 500 200');
-		expect(body).not.toContain('C '); // dead straight, no Bézier bow
+		// Classic pen: strokeD's straight M…L for two points, not smoothPath's cubic.
+		const classic = render(Annotate, { props: { freehand: false } }).body;
+		expect(classic).toContain('M 100 200 L 500 200');
+		expect(classic).not.toContain('C '); // dead straight, no Bézier bow
 	});
 
 	it('never emits NaN geometry from a junk stroke', () => {
 		inkPath.set(SLIDE);
 		inkBook.set({
-			[SLIDE]: { strokes: [{ id: 'x', tool: 'highlighter', points: [[NaN, 0], [Infinity, 10]] }], ts: 1 }
+			[SLIDE]: {
+				strokes: [
+					{
+						id: 'x',
+						tool: 'highlighter',
+						points: [
+							[NaN, 0],
+							[Infinity, 10]
+						]
+					}
+				],
+				ts: 1
+			}
 		});
 		const { body } = render(Annotate, { props: {} });
 		expect(body).not.toContain('NaN');
@@ -127,7 +207,19 @@ describe('Annotate — FREEZE (SSR)', () => {
 		// so ink mirrored into a static page can carry no pick with it, however it got there.
 		inkPath.set(SLIDE);
 		inkBook.set({
-			[SLIDE]: { strokes: [{ id: 'a', tool: 'pen', points: [[0, 0], [9, 9]] }], ts: 1 }
+			[SLIDE]: {
+				strokes: [
+					{
+						id: 'a',
+						tool: 'pen',
+						points: [
+							[0, 0],
+							[9, 9]
+						]
+					}
+				],
+				ts: 1
+			}
 		});
 		const { body } = render(Annotate, { props: {} });
 

@@ -50,7 +50,10 @@ function stroke(svg: Element, points: [number, number][]): void {
 /** The same gesture with Shift held — the pen's straight-edge modifier (snapAxis). */
 function shiftStroke(svg: Element, points: [number, number][]): void {
 	const at = (type: string, [clientX, clientY]: [number, number]) =>
-		fireEvent(svg, new MouseEvent(type, { clientX, clientY, bubbles: true, button: 0, shiftKey: true }));
+		fireEvent(
+			svg,
+			new MouseEvent(type, { clientX, clientY, bubbles: true, button: 0, shiftKey: true })
+		);
 
 	at('pointerdown', points[0]);
 	for (const p of points.slice(1)) at('pointermove', p);
@@ -75,7 +78,14 @@ beforeEach(() => {
 	canAnnotate.set(true);
 	annotationMode.set(false);
 	annotateTool.set('pen');
-	annotateColor.set({ pen: null, line: null, arrow: null, rectangle: null, highlighter: null, text: null });
+	annotateColor.set({
+		pen: null,
+		line: null,
+		arrow: null,
+		rectangle: null,
+		highlighter: null,
+		text: null
+	});
 	inkStaleAfterMs.set(INK_STALE_AFTER_MS);
 	barPos.set(null);
 	inkPath.set('');
@@ -90,7 +100,11 @@ describe('Annotate — armed', () => {
 
 	it('turns a pointer gesture into a smoothed stroke in canvas pixels', () => {
 		render(AnnotateHost);
-		stroke(surfaceAt(), [[100, 100], [200, 150], [300, 100]]);
+		stroke(surfaceAt(), [
+			[100, 100],
+			[200, 150],
+			[300, 100]
+		]);
 
 		const list = get(strokes);
 		expect(list).toHaveLength(1);
@@ -98,16 +112,62 @@ describe('Annotate — armed', () => {
 		// Half-size surface → client 100,100 is canvas 200,200.
 		expect(list[0].points[0]).toEqual([200, 200]);
 
+		// The pen is FREEHAND by default: a filled, closed outline around the centre line.
 		const path = document.querySelector('.annot-stroke');
+		expect(path?.classList.contains('freehand')).toBe(true);
+		expect(path?.getAttribute('d')).toMatch(/^M[\d.]+,[\d.]+ Q.*Z$/);
+	});
+
+	it('draws the classic constant-width pen line when freehand is off', () => {
+		render(AnnotateHost, { freehand: false });
+		stroke(surfaceAt(), [
+			[100, 100],
+			[200, 150],
+			[300, 100]
+		]);
+
+		const path = document.querySelector('.annot-stroke');
+		expect(path?.classList.contains('freehand')).toBe(false);
 		expect(path?.getAttribute('d')).toContain('M 200 200');
 		expect(path?.getAttribute('stroke-width')).toBe('6');
+	});
+
+	it('paints a picked colour as the FILL of a freehand mark, the stroke of any other', () => {
+		annotateColor.set({
+			pen: '#E5484D',
+			line: '#3FA9F5',
+			arrow: null,
+			rectangle: null,
+			highlighter: null,
+			text: null
+		});
+		render(AnnotateHost);
+		stroke(surfaceAt(), [
+			[100, 100],
+			[200, 150],
+			[300, 100]
+		]);
+		const style = document.querySelector('.annot-stroke')?.getAttribute('style') ?? '';
+		expect(style.replace(/\s/g, '')).toBe('fill:#E5484D;');
+
+		annotateTool.set('line');
+		stroke(surfaceAt(), [
+			[100, 300],
+			[300, 300]
+		]);
+		const marks = document.querySelectorAll('.annot-stroke');
+		expect(marks).toHaveLength(2);
+		expect((marks[1].getAttribute('style') ?? '').replace(/\s/g, '')).toBe('stroke:#3FA9F5;');
 	});
 
 	it('files the ink under the SLIDE, and survives paging away and back', () => {
 		// The reversal: ink used to die on navigation. Now it is a book, and paging just turns
 		// the page — the drawing is still there when you come back.
 		render(AnnotateHost);
-		stroke(surfaceAt(), [[10, 10], [60, 60]]);
+		stroke(surfaceAt(), [
+			[10, 10],
+			[60, 60]
+		]);
 		expect(get(strokes)).toHaveLength(1);
 
 		setInkPath(OTHER);
@@ -120,7 +180,10 @@ describe('Annotate — armed', () => {
 
 	it('writes the ink to localStorage, which is also how the other window hears it', () => {
 		render(AnnotateHost);
-		stroke(surfaceAt(), [[10, 10], [60, 60]]);
+		stroke(surfaceAt(), [
+			[10, 10],
+			[60, 60]
+		]);
 
 		const raw = localStorage.getItem('geekpresent:ink');
 		expect(raw).toBeTruthy();
@@ -132,7 +195,10 @@ describe('Annotate — armed', () => {
 	it('paints the highlighter as a fat band, not a line', () => {
 		render(AnnotateHost);
 		annotateTool.set('highlighter');
-		stroke(surfaceAt(), [[10, 10], [200, 10]]);
+		stroke(surfaceAt(), [
+			[10, 10],
+			[200, 10]
+		]);
 
 		const path = document.querySelector('.annot-stroke');
 		expect(path?.classList.contains('highlighter')).toBe(true);
@@ -144,7 +210,12 @@ describe('Annotate — armed', () => {
 		// with your wrist. Client y wobbles 50→60→45; canvas y is double that.
 		render(AnnotateHost);
 		annotateTool.set('highlighter');
-		stroke(surfaceAt(), [[10, 50], [100, 60], [200, 45], [300, 50]]);
+		stroke(surfaceAt(), [
+			[10, 50],
+			[100, 60],
+			[200, 45],
+			[300, 50]
+		]);
 
 		const pts = get(strokes)[0].points;
 		expect(pts).toHaveLength(2); // reduced to a level segment…
@@ -155,11 +226,16 @@ describe('Annotate — armed', () => {
 	it('does NOT level the pen — freehand stays freehand', () => {
 		render(AnnotateHost);
 		annotateTool.set('pen');
-		stroke(surfaceAt(), [[10, 50], [100, 60], [200, 45], [300, 50]]);
+		stroke(surfaceAt(), [
+			[10, 50],
+			[100, 60],
+			[200, 45],
+			[300, 50]
+		]);
 
 		const pts = get(strokes)[0].points;
 		expect(pts.length).toBeGreaterThan(2);
-		expect(document.querySelector('.annot-stroke')?.getAttribute('d')).toContain('C ');
+		expect(document.querySelector('.annot-stroke')?.classList.contains('freehand')).toBe(true);
 	});
 
 	it('snaps a Shift-held pen stroke to a dead-level underline', () => {
@@ -167,7 +243,12 @@ describe('Annotate — armed', () => {
 		// Client y wobbles 50→60→45→50; canvas is double, and horizontal travel wins.
 		render(AnnotateHost);
 		annotateTool.set('pen');
-		shiftStroke(surfaceAt(), [[10, 50], [100, 60], [200, 45], [300, 50]]);
+		shiftStroke(surfaceAt(), [
+			[10, 50],
+			[100, 60],
+			[200, 45],
+			[300, 50]
+		]);
 
 		const pts = get(strokes)[0].points;
 		expect(pts).toHaveLength(2); // reduced to a ruler…
@@ -179,7 +260,12 @@ describe('Annotate — armed', () => {
 		// The other axis: travel is far in Y, so the ruler stands vertical at the press X.
 		render(AnnotateHost);
 		annotateTool.set('pen');
-		shiftStroke(surfaceAt(), [[50, 10], [56, 100], [45, 200], [52, 300]]);
+		shiftStroke(surfaceAt(), [
+			[50, 10],
+			[56, 100],
+			[45, 200],
+			[52, 300]
+		]);
 
 		const pts = get(strokes)[0].points;
 		expect(pts).toHaveLength(2);
@@ -192,11 +278,16 @@ describe('Annotate — armed', () => {
 		// becomes inert rather than straightening the mark.
 		render(AnnotateHost, { props: { snapPen: false } });
 		annotateTool.set('pen');
-		shiftStroke(surfaceAt(), [[10, 50], [100, 60], [200, 45], [300, 50]]);
+		shiftStroke(surfaceAt(), [
+			[10, 50],
+			[100, 60],
+			[200, 45],
+			[300, 50]
+		]);
 
 		const pts = get(strokes)[0].points;
 		expect(pts.length).toBeGreaterThan(2);
-		expect(document.querySelector('.annot-stroke')?.getAttribute('d')).toContain('C ');
+		expect(document.querySelector('.annot-stroke')?.classList.contains('freehand')).toBe(true);
 	});
 
 	it('draws a LINE as a dead-straight two-point segment, no head, whatever the hand did', () => {
@@ -205,7 +296,11 @@ describe('Annotate — armed', () => {
 		// second sub-path for a head).
 		render(AnnotateHost);
 		annotateTool.set('line');
-		stroke(surfaceAt(), [[10, 10], [150, 40], [300, 200]]);
+		stroke(surfaceAt(), [
+			[10, 10],
+			[150, 40],
+			[300, 200]
+		]);
 
 		const list = get(strokes);
 		expect(list).toHaveLength(1);
@@ -222,7 +317,11 @@ describe('Annotate — armed', () => {
 	it('snaps a Shift-held line to a dead-straight axis, like the pen and the arrow', () => {
 		render(AnnotateHost);
 		annotateTool.set('line');
-		shiftStroke(surfaceAt(), [[10, 50], [100, 60], [300, 45]]);
+		shiftStroke(surfaceAt(), [
+			[10, 50],
+			[100, 60],
+			[300, 45]
+		]);
 
 		const pts = get(strokes)[0].points;
 		expect(pts).toHaveLength(2);
@@ -234,7 +333,11 @@ describe('Annotate — armed', () => {
 		// tail→head line, and renders a shaft plus a two-line head (a second M sub-path).
 		render(AnnotateHost);
 		annotateTool.set('arrow');
-		stroke(surfaceAt(), [[10, 10], [150, 40], [300, 200]]);
+		stroke(surfaceAt(), [
+			[10, 10],
+			[150, 40],
+			[300, 200]
+		]);
 
 		const list = get(strokes);
 		expect(list).toHaveLength(1);
@@ -251,7 +354,10 @@ describe('Annotate — armed', () => {
 	it('is NOT a highlighter — an arrow paints opaque, like the pen', () => {
 		render(AnnotateHost);
 		annotateTool.set('arrow');
-		stroke(surfaceAt(), [[10, 10], [200, 10]]);
+		stroke(surfaceAt(), [
+			[10, 10],
+			[200, 10]
+		]);
 		expect(document.querySelector('.annot-stroke')?.classList.contains('highlighter')).toBe(false);
 	});
 
@@ -260,7 +366,11 @@ describe('Annotate — armed', () => {
 		// at the press Y, so the arrow points dead sideways.
 		render(AnnotateHost);
 		annotateTool.set('arrow');
-		shiftStroke(surfaceAt(), [[10, 50], [100, 60], [300, 45]]);
+		shiftStroke(surfaceAt(), [
+			[10, 50],
+			[100, 60],
+			[300, 45]
+		]);
 
 		const pts = get(strokes)[0].points;
 		expect(pts).toHaveLength(2);
@@ -271,7 +381,10 @@ describe('Annotate — armed', () => {
 		// The hover preview: the mark a delete right here WOULD take gets the `erasing` class,
 		// so the speaker deletes exactly the one they meant. Pen mark runs along canvas y=200.
 		render(AnnotateHost);
-		stroke(surfaceAt(), [[100, 100], [140, 100]]);
+		stroke(surfaceAt(), [
+			[100, 100],
+			[140, 100]
+		]);
 		expect(get(strokes)).toHaveLength(1);
 
 		annotateTool.set('eraser');
@@ -284,7 +397,10 @@ describe('Annotate — armed', () => {
 
 	it('erases the whole stroke under an eraser tap', () => {
 		render(AnnotateHost);
-		stroke(surfaceAt(), [[100, 100], [140, 100]]);
+		stroke(surfaceAt(), [
+			[100, 100],
+			[140, 100]
+		]);
 		expect(get(strokes)).toHaveLength(1);
 
 		annotateTool.set('eraser');
@@ -296,16 +412,31 @@ describe('Annotate — armed', () => {
 	it('wipes every stroke the eraser is dragged across', () => {
 		render(AnnotateHost);
 		const svg = surfaceAt();
-		stroke(svg, [[100, 100], [140, 100]]); // canvas y=200
-		stroke(svg, [[100, 140], [140, 140]]); // canvas y=280
+		stroke(svg, [
+			[100, 100],
+			[140, 100]
+		]); // canvas y=200
+		stroke(svg, [
+			[100, 140],
+			[140, 140]
+		]); // canvas y=280
 		expect(get(strokes)).toHaveLength(2);
 
 		annotateTool.set('eraser');
 		const e = surfaceAt();
 		// Press on the first mark, then drag down onto the second before releasing.
-		fireEvent(e, new MouseEvent('pointerdown', { clientX: 120, clientY: 100, bubbles: true, button: 0 }));
-		fireEvent(e, new MouseEvent('pointermove', { clientX: 120, clientY: 140, bubbles: true, button: 0 }));
-		fireEvent(e, new MouseEvent('pointerup', { clientX: 120, clientY: 140, bubbles: true, button: 0 }));
+		fireEvent(
+			e,
+			new MouseEvent('pointerdown', { clientX: 120, clientY: 100, bubbles: true, button: 0 })
+		);
+		fireEvent(
+			e,
+			new MouseEvent('pointermove', { clientX: 120, clientY: 140, bubbles: true, button: 0 })
+		);
+		fireEvent(
+			e,
+			new MouseEvent('pointerup', { clientX: 120, clientY: 140, bubbles: true, button: 0 })
+		);
 		expect(get(strokes)).toHaveLength(0);
 	});
 
@@ -314,8 +445,14 @@ describe('Annotate — armed', () => {
 		// top), because that is the only one a click will take.
 		render(AnnotateHost);
 		const svg = surfaceAt();
-		stroke(svg, [[100, 100], [140, 100]]);
-		stroke(svg, [[100, 100], [140, 100]]);
+		stroke(svg, [
+			[100, 100],
+			[140, 100]
+		]);
+		stroke(svg, [
+			[100, 100],
+			[140, 100]
+		]);
 
 		annotateTool.set('eraser');
 		hover(surfaceAt(), [120, 100]);
@@ -328,8 +465,14 @@ describe('Annotate — armed', () => {
 		// clearing the whole stack in one tap.
 		render(AnnotateHost);
 		const svg = surfaceAt();
-		stroke(svg, [[100, 100], [140, 100]]); // A, drawn first → underneath
-		stroke(svg, [[100, 100], [140, 100]]); // B, drawn second → on top
+		stroke(svg, [
+			[100, 100],
+			[140, 100]
+		]); // A, drawn first → underneath
+		stroke(svg, [
+			[100, 100],
+			[140, 100]
+		]); // B, drawn second → on top
 		const [aId, bId] = get(strokes).map((s) => s.id);
 		expect(aId).not.toBe(bId);
 
@@ -345,7 +488,10 @@ describe('Annotate — armed', () => {
 		// The eraser removes; it never adds. A press-and-release on nothing must not commit a
 		// dot the way the pen would.
 		render(AnnotateHost);
-		stroke(surfaceAt(), [[100, 100], [140, 100]]);
+		stroke(surfaceAt(), [
+			[100, 100],
+			[140, 100]
+		]);
 		expect(get(strokes)).toHaveLength(1);
 
 		annotateTool.set('eraser');
@@ -366,7 +512,11 @@ describe('Annotate — armed', () => {
 	it('draws a RECTANGLE as a closed box between two corners', () => {
 		render(AnnotateHost);
 		annotateTool.set('rectangle');
-		stroke(surfaceAt(), [[50, 50], [100, 80], [150, 120]]); // drag corner to corner
+		stroke(surfaceAt(), [
+			[50, 50],
+			[100, 80],
+			[150, 120]
+		]); // drag corner to corner
 
 		const list = get(strokes);
 		expect(list).toHaveLength(1);
@@ -442,7 +592,10 @@ describe('Annotate — armed', () => {
 			surfaceAt(),
 			new MouseEvent('pointerdown', { clientX: 100, clientY: 100, bubbles: true, button: 0 })
 		);
-		await fireEvent(window, new MouseEvent('pointerup', { clientX: 100, clientY: 100, bubbles: true }));
+		await fireEvent(
+			window,
+			new MouseEvent('pointerup', { clientX: 100, clientY: 100, bubbles: true })
+		);
 		input = document.querySelector('.annot-text-input') as HTMLInputElement;
 		expect(input).not.toBeNull();
 		expect(input.value).toBe('first');
@@ -472,8 +625,14 @@ describe('Annotate — armed', () => {
 			surfaceAt(),
 			new MouseEvent('pointerdown', { clientX: 100, clientY: 100, bubbles: true, button: 0 })
 		);
-		await fireEvent(window, new MouseEvent('pointermove', { clientX: 150, clientY: 130, bubbles: true }));
-		await fireEvent(window, new MouseEvent('pointerup', { clientX: 150, clientY: 130, bubbles: true }));
+		await fireEvent(
+			window,
+			new MouseEvent('pointermove', { clientX: 150, clientY: 130, bubbles: true })
+		);
+		await fireEvent(
+			window,
+			new MouseEvent('pointerup', { clientX: 150, clientY: 130, bubbles: true })
+		);
 
 		// 50/30 screen px at half scale = 100/60 canvas px, from [200,200] → [300,260].
 		expect(get(strokes)[0].id).toBe(id);
@@ -501,18 +660,48 @@ describe('Annotate — armed', () => {
 	it('renders a lone tap as a dot rather than nothing', () => {
 		render(AnnotateHost);
 		const svg = surfaceAt();
-		fireEvent(svg, new MouseEvent('pointerdown', { clientX: 50, clientY: 50, bubbles: true, button: 0 }));
-		fireEvent(svg, new MouseEvent('pointerup', { clientX: 50, clientY: 50, bubbles: true, button: 0 }));
+		fireEvent(
+			svg,
+			new MouseEvent('pointerdown', { clientX: 50, clientY: 50, bubbles: true, button: 0 })
+		);
+		fireEvent(
+			svg,
+			new MouseEvent('pointerup', { clientX: 50, clientY: 50, bubbles: true, button: 0 })
+		);
 
 		expect(get(strokes)).toHaveLength(1);
+		// The freehand pen turns it into a small closed blob around the tap (canvas 100,100)…
+		const d = document.querySelector('.annot-stroke')?.getAttribute('d') ?? '';
+		expect(d).toMatch(/Z$/);
+		const nums = d.match(/-?[\d.]+/g)!.map(Number);
+		for (const n of nums) expect(Math.abs(n - 100)).toBeLessThan(15);
+	});
+
+	it('renders a lone tap as a round-cap dot with the classic pen', () => {
+		render(AnnotateHost, { freehand: false });
+		const svg = surfaceAt();
+		fireEvent(
+			svg,
+			new MouseEvent('pointerdown', { clientX: 50, clientY: 50, bubbles: true, button: 0 })
+		);
+		fireEvent(
+			svg,
+			new MouseEvent('pointerup', { clientX: 50, clientY: 50, bubbles: true, button: 0 })
+		);
 		expect(document.querySelector('.annot-stroke')?.getAttribute('d')).toBe('M 100 100 L 100 100');
 	});
 
 	it('takes back one stroke with UNDO and this slide with RESET', async () => {
 		render(AnnotateHost);
 		const svg = surfaceAt();
-		stroke(svg, [[10, 10], [60, 60]]);
-		stroke(svg, [[80, 80], [120, 120]]);
+		stroke(svg, [
+			[10, 10],
+			[60, 60]
+		]);
+		stroke(svg, [
+			[80, 80],
+			[120, 120]
+		]);
 		expect(get(strokes)).toHaveLength(2);
 
 		await fireEvent.click(screen.getByText('UNDO'));
@@ -528,9 +717,15 @@ describe('Annotate — armed', () => {
 
 	it('RESET ALL wipes every slide, not just this one', async () => {
 		render(AnnotateHost);
-		stroke(surfaceAt(), [[10, 10], [60, 60]]);
+		stroke(surfaceAt(), [
+			[10, 10],
+			[60, 60]
+		]);
 		setInkPath(OTHER);
-		stroke(surfaceAt(), [[10, 10], [60, 60]]);
+		stroke(surfaceAt(), [
+			[10, 10],
+			[60, 60]
+		]);
 		expect(Object.keys(get(inkBook))).toHaveLength(2);
 
 		await fireEvent.click(screen.getByText('RESET ALL'));
@@ -542,14 +737,20 @@ describe('Annotate — armed', () => {
 
 		// A picked colour rides on the stroke and lands as an inline style…
 		await fireEvent.click(screen.getByLabelText('Colour #E5484D'));
-		stroke(surfaceAt(), [[10, 10], [60, 60]]);
+		stroke(surfaceAt(), [
+			[10, 10],
+			[60, 60]
+		]);
 		expect(get(strokes)[0].color).toBe('#E5484D');
 		expect(document.querySelector('.annot-stroke')?.getAttribute('style')).toContain('#E5484D');
 
 		// …whereas the THEME swatch stores nothing, so the role token paints it and the ink
 		// follows a re-theme instead of freezing today's hex.
 		await fireEvent.click(screen.getByLabelText('Theme colour'));
-		stroke(surfaceAt(), [[200, 10], [260, 60]]);
+		stroke(surfaceAt(), [
+			[200, 10],
+			[260, 60]
+		]);
 		const latest = get(strokes)[1];
 		expect(latest.color).toBeUndefined();
 	});
@@ -580,7 +781,10 @@ describe('Annotate — armed', () => {
 
 	it('undoes on Ctrl+Z', async () => {
 		render(AnnotateHost);
-		stroke(surfaceAt(), [[10, 10], [60, 60]]);
+		stroke(surfaceAt(), [
+			[10, 10],
+			[60, 60]
+		]);
 
 		await fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
 		expect(get(strokes)).toHaveLength(0);
@@ -606,11 +810,26 @@ describe('Annotate — armed', () => {
 
 		const bar = document.querySelector('.annot-bar') as HTMLElement;
 		bar.getBoundingClientRect = () =>
-			({ left: 100, top: 400, width: 200, height: 30, right: 300, bottom: 430, x: 100, y: 400 }) as DOMRect;
+			({
+				left: 100,
+				top: 400,
+				width: 200,
+				height: 30,
+				right: 300,
+				bottom: 430,
+				x: 100,
+				y: 400
+			}) as DOMRect;
 
 		const grip = document.querySelector('.annot-grip') as HTMLElement;
-		await fireEvent(grip, new MouseEvent('pointerdown', { clientX: 0, clientY: 0, bubbles: true, button: 0 }));
-		await fireEvent(window, new MouseEvent('pointermove', { clientX: 50, clientY: 25, bubbles: true }));
+		await fireEvent(
+			grip,
+			new MouseEvent('pointerdown', { clientX: 0, clientY: 0, bubbles: true, button: 0 })
+		);
+		await fireEvent(
+			window,
+			new MouseEvent('pointermove', { clientX: 50, clientY: 25, bubbles: true })
+		);
 		await fireEvent(window, new MouseEvent('pointerup', { bubbles: true }));
 
 		// Bar was at canvas (200, 800); the pointer moved 50/25 screen px = 100/50 canvas px.
@@ -629,11 +848,26 @@ describe('Annotate — armed', () => {
 
 		const bar = document.querySelector('.annot-bar') as HTMLElement;
 		bar.getBoundingClientRect = () =>
-			({ left: 100, top: 400, width: 200, height: 30, right: 300, bottom: 430, x: 100, y: 400 }) as DOMRect;
+			({
+				left: 100,
+				top: 400,
+				width: 200,
+				height: 30,
+				right: 300,
+				bottom: 430,
+				x: 100,
+				y: 400
+			}) as DOMRect;
 
 		const grip = document.querySelector('.annot-grip') as HTMLElement;
-		await fireEvent(grip, new MouseEvent('pointerdown', { clientX: 0, clientY: 0, bubbles: true, button: 0 }));
-		await fireEvent(window, new MouseEvent('pointermove', { clientX: 50, clientY: 25, bubbles: true }));
+		await fireEvent(
+			grip,
+			new MouseEvent('pointerdown', { clientX: 0, clientY: 0, bubbles: true, button: 0 })
+		);
+		await fireEvent(
+			window,
+			new MouseEvent('pointermove', { clientX: 50, clientY: 25, bubbles: true })
+		);
 		await fireEvent(window, new MouseEvent('pointerup', { bubbles: true }));
 		expect(get(barPos)).toEqual({ x: 300, y: 850 });
 
@@ -666,8 +900,14 @@ describe('Annotate — armed', () => {
 		surfaceAt();
 		const grip = document.querySelector('.annot-grip') as HTMLElement;
 
-		await fireEvent(grip, new MouseEvent('pointerdown', { clientX: 10, clientY: 10, bubbles: true, button: 0 }));
-		await fireEvent(window, new MouseEvent('pointermove', { clientX: 60, clientY: 40, bubbles: true }));
+		await fireEvent(
+			grip,
+			new MouseEvent('pointerdown', { clientX: 10, clientY: 10, bubbles: true, button: 0 })
+		);
+		await fireEvent(
+			window,
+			new MouseEvent('pointermove', { clientX: 60, clientY: 40, bubbles: true })
+		);
 		await fireEvent(window, new MouseEvent('pointerup', { bubbles: true }));
 
 		expect(get(strokes)).toHaveLength(0);
@@ -681,8 +921,14 @@ describe('Annotate — armed', () => {
 			({ left: 0, top: 0, width: 200, height: 30, right: 200, bottom: 30, x: 0, y: 0 }) as DOMRect;
 
 		const grip = document.querySelector('.annot-grip') as HTMLElement;
-		await fireEvent(grip, new MouseEvent('pointerdown', { clientX: 0, clientY: 0, bubbles: true, button: 0 }));
-		await fireEvent(window, new MouseEvent('pointermove', { clientX: -9999, clientY: -9999, bubbles: true }));
+		await fireEvent(
+			grip,
+			new MouseEvent('pointerdown', { clientX: 0, clientY: 0, bubbles: true, button: 0 })
+		);
+		await fireEvent(
+			window,
+			new MouseEvent('pointermove', { clientX: -9999, clientY: -9999, bubbles: true })
+		);
 		await fireEvent(window, new MouseEvent('pointerup', { bubbles: true }));
 
 		// Dragged off the top-left, it stops at the corner — because a bar off the edge is a bar
@@ -696,7 +942,21 @@ describe('Annotate — the stale-ink notice', () => {
 
 	it('offers to clear ink drawn before the threshold', async () => {
 		// Ink from a previous sitting is exactly what a persisted pen risks putting on stage.
-		inkBook.set({ [SLIDE]: { strokes: [{ id: 'a', tool: 'pen', points: [[0, 0], [9, 9]] }], ts: Date.now() - 3 * DAY } });
+		inkBook.set({
+			[SLIDE]: {
+				strokes: [
+					{
+						id: 'a',
+						tool: 'pen',
+						points: [
+							[0, 0],
+							[9, 9]
+						]
+					}
+				],
+				ts: Date.now() - 3 * DAY
+			}
+		});
 		render(AnnotateHost);
 
 		expect(screen.getByText(/3 days ago/)).toBeTruthy();
@@ -706,7 +966,21 @@ describe('Annotate — the stale-ink notice', () => {
 	});
 
 	it('says nothing about ink you drew today', () => {
-		inkBook.set({ [SLIDE]: { strokes: [{ id: 'a', tool: 'pen', points: [[0, 0], [9, 9]] }], ts: Date.now() - 1000 } });
+		inkBook.set({
+			[SLIDE]: {
+				strokes: [
+					{
+						id: 'a',
+						tool: 'pen',
+						points: [
+							[0, 0],
+							[9, 9]
+						]
+					}
+				],
+				ts: Date.now() - 1000
+			}
+		});
 		render(AnnotateHost);
 		expect(screen.queryByText('RESET SLIDE')).toBeNull();
 	});
@@ -717,7 +991,21 @@ describe('Annotate — the stale-ink notice', () => {
 	});
 
 	it('KEEP dismisses it for this visit only, not for good', async () => {
-		inkBook.set({ [SLIDE]: { strokes: [{ id: 'a', tool: 'pen', points: [[0, 0], [9, 9]] }], ts: Date.now() - 3 * DAY } });
+		inkBook.set({
+			[SLIDE]: {
+				strokes: [
+					{
+						id: 'a',
+						tool: 'pen',
+						points: [
+							[0, 0],
+							[9, 9]
+						]
+					}
+				],
+				ts: Date.now() - 3 * DAY
+			}
+		});
 		render(AnnotateHost);
 
 		await fireEvent.click(screen.getByText('KEEP'));
@@ -744,11 +1032,27 @@ describe('Annotate — disarmed', () => {
 	it('still SHOWS ink it is mirroring, with the pen down and the pointer let through', () => {
 		// The audience window: it never arms the pen, but it must draw what the speaker's
 		// window wrote — that is how the ink reaches the room.
-		inkBook.set({ [SLIDE]: { strokes: [{ id: 'a', tool: 'pen', points: [[0, 0], [100, 100]] }], ts: Date.now() } });
+		inkBook.set({
+			[SLIDE]: {
+				strokes: [
+					{
+						id: 'a',
+						tool: 'pen',
+						points: [
+							[0, 0],
+							[100, 100]
+						]
+					}
+				],
+				ts: Date.now()
+			}
+		});
 		render(AnnotateHost);
 
 		expect(document.querySelectorAll('.annot-stroke')).toHaveLength(1);
-		expect((document.querySelector('.annot-surface') as SVGElement).style.pointerEvents).toBe('none');
+		expect((document.querySelector('.annot-surface') as SVGElement).style.pointerEvents).toBe(
+			'none'
+		);
 		expect(screen.queryByLabelText('Pen')).toBeNull(); // no palette in the audience's window
 	});
 
@@ -759,12 +1063,29 @@ describe('Annotate — disarmed', () => {
 		// A stale persisted `annotationMode: true` from another deck must stay inert here.
 		canAnnotate.set(false);
 		annotationMode.set(true);
-		inkBook.set({ [SLIDE]: { strokes: [{ id: 'a', tool: 'pen', points: [[0, 0], [10, 10]] }], ts: Date.now() } });
+		inkBook.set({
+			[SLIDE]: {
+				strokes: [
+					{
+						id: 'a',
+						tool: 'pen',
+						points: [
+							[0, 0],
+							[10, 10]
+						]
+					}
+				],
+				ts: Date.now()
+			}
+		});
 		render(AnnotateHost);
 
 		const svg = surfaceAt();
 		expect(svg.style.pointerEvents).toBe('none');
-		stroke(svg, [[10, 10], [60, 60]]);
+		stroke(svg, [
+			[10, 10],
+			[60, 60]
+		]);
 		expect(get(strokes)).toHaveLength(1); // the existing one, and nothing new
 	});
 });
@@ -785,14 +1106,23 @@ describe('Annotate — FREEZE', () => {
 		copied = [];
 		Object.defineProperty(navigator, 'clipboard', {
 			configurable: true,
-			value: { writeText: (t: string) => { copied.push(t); return Promise.resolve(); } }
+			value: {
+				writeText: (t: string) => {
+					copied.push(t);
+					return Promise.resolve();
+				}
+			}
 		});
 	});
 
 	/** Draw a mark with the pen, then switch to FREEZE. Svelte 5 flushes on a microtask,
 	    so a store set needs a tick before the bar reflects it. */
 	async function drawThenFreeze(svg: Element): Promise<void> {
-		stroke(svg, [[100, 100], [200, 150], [300, 100]]);
+		stroke(svg, [
+			[100, 100],
+			[200, 150],
+			[300, 100]
+		]);
 		annotateTool.set('freeze');
 		await tick();
 	}
@@ -865,7 +1195,10 @@ describe('Annotate — FREEZE', () => {
 		const svg = surfaceAt();
 		annotateTool.set('text');
 		await tick();
-		fireEvent(svg, new MouseEvent('pointerdown', { clientX: 100, clientY: 100, bubbles: true, button: 0 }));
+		fireEvent(
+			svg,
+			new MouseEvent('pointerdown', { clientX: 100, clientY: 100, bubbles: true, button: 0 })
+		);
 		await tick();
 		const input = document.querySelector('.annot-text-input') as HTMLInputElement;
 		await fireEvent.input(input, { target: { value: 'note' } });

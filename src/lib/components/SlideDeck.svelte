@@ -114,6 +114,7 @@
 		applyAdjustParam
 	} from '$lib/stores/adjustMode';
 	import Annotate from '$lib/components/Annotate.svelte';
+	import type { FreehandInput } from '$lib/annotate/freehandCore';
 	import {
 		annotationMode,
 		canAnnotate,
@@ -330,6 +331,12 @@
 	   along with the hand that drew it. A highlighter is not a pen — nobody wants a wonky
 	   highlight. Set false for a genuinely freehand highlighter. */
 	export let levelHighlight = true;
+
+	/* The PEN's freehand shape — perfect-freehand options over the defaults (size 15, thinning
+	   0.7, streamline 0.6, smoothing 0.5, round caps, no taper); see annotate/freehandCore.
+	   The ink is a filled outline that thins with the hand's speed. `false` restores the old
+	   constant-width pen line. */
+	export let freehand: FreehandInput | false = {};
 
 	/* Offer CAPTURE — download the current slide as a PNG at TRUE canvas resolution (1920x1080),
 	   not at whatever size the window is showing it. Annotations are included; the deck's own
@@ -1578,7 +1585,13 @@
 			     stroke lands on top of the cue it is drawn next to. Renders nothing at all
 			     until there is ink or the pen is armed — so it is inert (and SSR-inert) on
 			     every deck that never offers it. -->
-				<Annotate canvasWidth={width} canvasHeight={height} {inkColors} {levelHighlight} />
+				<Annotate
+					canvasWidth={width}
+					canvasHeight={height}
+					{inkColors}
+					{levelHighlight}
+					{freehand}
+				/>
 				<!-- The all-slides grid (press O). Canvas-space, like the ToC — its tiles are
 			     live `?clean` iframes of the real slides.
 
