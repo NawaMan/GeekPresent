@@ -1044,12 +1044,12 @@ Nothing to place: `SlideDeck` mounts `<Annotate>` once, like `Spotlight`. One pr
 - **The pen is FREEHAND ink** — perfect-freehand, vendored as `annotate/freehandCore.ts` (MIT notice
   inside; zero npm deps, and its output matches upstream 1.2.3 for the same input). A stroke is still
   stored as centre-line `points`; the outline is DERIVED at render, a filled polygon that thins
-  where the hand moved fast (simulated pressure — no pressure is stored). Defaults: size 15,
+  where the hand moved fast (simulated pressure — no pressure is stored). Defaults: size 12,
   thinning 0.7, streamline 0.6, smoothing 0.5, linear easing, round caps, no taper; override any
   of them with `<SlideDeck freehand={{ … }}>`, or `freehand={false}` for the old constant-width
   line. Only the pen: the highlighter stays a levelled band, line/arrow/rectangle stay crisp.
   `size` is the width at middling pressure, NOT a ceiling — slow ink swells to
-  `freehandMaxRadius` (12.75px radius by default), which is also the eraser's reach. A freehand
+  `freehandMaxRadius` (10.2px radius by default), which is also the eraser's reach. A freehand
   pen commits with `simplifyPoints(…, 2)`, not 4: thinning reads the sample spacing, and the
   coarser decimation flattened it and made the stroke jump at the lift.
 - **Anything clickable must out-rank the ink surface** (z-index 40). While armed it owns every

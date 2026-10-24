@@ -116,7 +116,7 @@
 		snapPen?: boolean;
 		/** The PEN's freehand shape (perfect-freehand options, see annotate/freehandCore): a
 		 *  filled outline whose width breathes with the hand's speed. Any field left out takes
-		 *  the default (size 15, thinning 0.7, streamline 0.6, smoothing 0.5, round caps, no
+		 *  the default (size 12, thinning 0.7, streamline 0.6, smoothing 0.5, round caps, no
 		 *  taper). `false` brings back the old constant-width line at `penWidth`. Only the pen
 		 *  is freehand — the highlighter stays a level band, and line/arrow/rectangle stay crisp. */
 		freehand?: FreehandInput | false;

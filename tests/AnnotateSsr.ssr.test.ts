@@ -151,7 +151,7 @@ describe('Annotate (SSR)', () => {
 			.split(/\s+/);
 		const pts = path.map((p) => p.split(',').map(Number));
 		expect(pts.length).toBeGreaterThan(10);
-		for (const [, y] of pts) expect(Math.abs(y - 200)).toBeLessThanOrEqual(12.75 + 1e-6);
+		for (const [, y] of pts) expect(Math.abs(y - 200)).toBeLessThanOrEqual(10.2 + 1e-6);
 		const xs = pts.map(([x]) => x);
 		expect(Math.min(...xs)).toBeLessThan(100);
 		expect(Math.max(...xs)).toBeGreaterThan(500);

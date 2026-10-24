@@ -332,7 +332,7 @@
 	   highlight. Set false for a genuinely freehand highlighter. */
 	export let levelHighlight = true;
 
-	/* The PEN's freehand shape — perfect-freehand options over the defaults (size 15, thinning
+	/* The PEN's freehand shape — perfect-freehand options over the defaults (size 12, thinning
 	   0.7, streamline 0.6, smoothing 0.5, round caps, no taper); see annotate/freehandCore.
 	   The ink is a filled outline that thins with the hand's speed. `false` restores the old
 	   constant-width pen line. */

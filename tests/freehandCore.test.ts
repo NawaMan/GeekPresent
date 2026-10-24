@@ -25,9 +25,9 @@ function halfWidthNear(outline: Point[], atX: number, tol = 6): number {
 }
 
 describe('resolveFreehand', () => {
-	it('defaults to the deck pen: size 15, thinning 0.7, streamline 0.6, smoothing 0.5, round caps', () => {
+	it('defaults to the deck pen: size 12, thinning 0.7, streamline 0.6, smoothing 0.5, round caps', () => {
 		expect(resolveFreehand()).toEqual({
-			size: 15,
+			size: 12,
 			thinning: 0.7,
 			streamline: 0.6,
 			smoothing: 0.5,
@@ -55,7 +55,7 @@ describe('resolveFreehand', () => {
 			easing: 'wobbly' as never,
 			start: { taper: -5, cap: 'yes' as never }
 		});
-		expect(o.size).toBe(15);
+		expect(o.size).toBe(12);
 		expect(o.thinning).toBe(1);
 		expect(o.streamline).toBe(0);
 		expect(o.smoothing).toBe(0.5);
@@ -77,13 +77,13 @@ describe('freehandOutline', () => {
 
 	it('never strays further from the line than freehandMaxRadius', () => {
 		// A slow stroke along y=300 — slow is where simulated pressure, and so the width, peaks.
-		expect(freehandMaxRadius()).toBeCloseTo(12.75, 9);
+		expect(freehandMaxRadius()).toBeCloseTo(10.2, 9);
 		const line: Point[] = Array.from({ length: 200 }, (_, i) => [100 + i, 300]);
 		const out = freehandOutline(line);
 		const reach = Math.max(...out.map(([, y]) => Math.abs(y - 300)));
 		expect(reach).toBeLessThanOrEqual(freehandMaxRadius() + 1e-6);
-		expect(reach).toBeGreaterThan(7.5); // wider than size/2: slow ink swells
-		expect(freehandMaxRadius({ thinning: 0 })).toBe(7.5);
+		expect(reach).toBeGreaterThan(6); // wider than size/2: slow ink swells
+		expect(freehandMaxRadius({ thinning: 0 })).toBe(6);
 	});
 
 	it('thins where the hand moved fast — the simulated pressure', () => {
@@ -100,8 +100,8 @@ describe('freehandOutline', () => {
 		for (let x = 0; x <= 200; x += 2) pts.push([x, 500]);
 		for (let x = 225; x <= 1200; x += 25) pts.push([x, 500]);
 		const out = freehandOutline(pts, { thinning: 0 });
-		expect(halfWidthNear(out, 900, 14)).toBeCloseTo(7.5, 1);
-		expect(halfWidthNear(out, 150)).toBeCloseTo(7.5, 1);
+		expect(halfWidthNear(out, 900, 14)).toBeCloseTo(6, 1);
+		expect(halfWidthNear(out, 150)).toBeCloseTo(6, 1);
 	});
 
 	it('turns a tap — one point — into a small closed blob around it', () => {

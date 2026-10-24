@@ -65,10 +65,10 @@ export interface FreehandOptions {
 
 export type FreehandEasing = 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
 
-/** The deck's default pen: a size-15 marker that thins noticeably with speed, rounded at
+/** The deck's default pen: a size-12 marker that thins noticeably with speed, rounded at
     both ends, no taper — chosen in perfect-freehand's playground for presenter ink. */
 export const DEFAULT_FREEHAND: FreehandOptions = {
-	size: 15,
+	size: 12,
 	thinning: 0.7,
 	streamline: 0.6,
 	smoothing: 0.5,
@@ -116,7 +116,7 @@ export function resolveFreehand(input?: FreehandInput | null): FreehandOptions {
 
 /** The widest the ink can get, as a RADIUS in canvas px. `size` is the width at middling
     pressure, not a ceiling: with thinning, a slow (high simulated pressure) stretch swells to
-    `size × ease(0.5 + |thinning|/2)` — 12.75 for the default size 15 / thinning 0.7. The eraser
+    `size × ease(0.5 + |thinning|/2)` — 10.2 for the default size 12 / thinning 0.7. The eraser
     reaches by this, so a fat slow loop is as easy to catch as it looks. */
 export function freehandMaxRadius(options?: FreehandInput | null): number {
 	const o = resolveFreehand(options);
