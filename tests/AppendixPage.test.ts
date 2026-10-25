@@ -161,6 +161,16 @@ describe('AppendixPage — RETURN, the shortcut out of the middle', () => {
 		expect(navigate).not.toHaveBeenCalledWith('./detail.html?return=caller.html', expect.anything());
 	});
 
+	// Cmd+↑ is the deck's FIRST (stepKeys.pageKeyIntent), not RETURN — the run's FIRST, so
+	// it stays inside the appendix rather than leaving it.
+	it('Cmd+↑ is FIRST, not RETURN', async () => {
+		at('detail-2.html', '?return=caller.html');
+		render(AppendixHost);
+
+		await fireEvent.keyDown(window, { key: 'ArrowUp', metaKey: true });
+		expect(navigate).not.toHaveBeenCalledWith('./caller.html', expect.anything());
+	});
+
 	// A key that navigates must not fire while someone is typing (a Draw label, a filter
 	// box). Backspace there means "delete a character".
 	it('Backspace while typing is left alone', async () => {

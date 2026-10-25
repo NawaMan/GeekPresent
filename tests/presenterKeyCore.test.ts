@@ -172,3 +172,27 @@ describe('presenterKeyIntent — total on garbage', () => {
 		expect(presenterKeyIntent(key({ key: 'b', ctrlKey: true }))).toBe('ignore');
 	});
 });
+
+describe('presenterKeyIntent — first / last and clicker keys', () => {
+	it('Home / End and Cmd+↑ / Cmd+↓ jump to the ends of the deck', () => {
+		expect(presenterKeyIntent(key({ key: 'Home' }))).toBe('first');
+		expect(presenterKeyIntent(key({ key: 'End' }))).toBe('last');
+		expect(presenterKeyIntent(key({ key: 'ArrowUp', metaKey: true }))).toBe('first');
+		expect(presenterKeyIntent(key({ key: 'ArrowDown', metaKey: true }))).toBe('last');
+	});
+
+	it('PageUp / PageDown page like ← / →', () => {
+		expect(presenterKeyIntent(key({ key: 'PageUp' }))).toBe('prev');
+		expect(presenterKeyIntent(key({ key: 'PageDown' }))).toBe('next');
+	});
+
+	it('never fires while the speaker is typing', () => {
+		const input = document.createElement('input');
+		expect(presenterKeyIntent(key({ key: 'Home', target: input }))).toBe('ignore');
+	});
+
+	it('an open TOC still owns bare ↑/↓, but Cmd+↑ is FIRST', () => {
+		expect(presenterKeyIntent(key({ key: 'ArrowUp' }), false, true)).toBe('tocUp');
+		expect(presenterKeyIntent(key({ key: 'ArrowUp', metaKey: true }), false, true)).toBe('first');
+	});
+});

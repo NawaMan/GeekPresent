@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isSpaceKey, isInteractiveTarget, spaceIntent } from '../src/lib/utils/stepKeys';
+import { isSpaceKey, isInteractiveTarget, spaceIntent, pageKeyIntent } from '../src/lib/utils/stepKeys';
 
 // The single decision both Space listeners consult (Steps reveals/peels,
 // NavigationBar pages). Testing it here means the handoff is pinned down without
@@ -61,5 +61,41 @@ describe('spaceIntent', () => {
 		const ev = key();
 		btn.dispatchEvent(ev); // sets ev.target
 		expect(spaceIntent(ev, null)).toBe('ignore');
+	});
+});
+
+describe('pageKeyIntent', () => {
+	const press = (key: string, mods: KeyboardEventInit = {}) =>
+		new KeyboardEvent('keydown', { key, cancelable: true, ...mods });
+
+	it('Home / End jump to the first / last slide (Fn+← / Fn+→ on a Mac laptop)', () => {
+		expect(pageKeyIntent(press('Home'))).toBe('first');
+		expect(pageKeyIntent(press('End'))).toBe('last');
+	});
+
+	it('Cmd+↑ / Cmd+↓ are the Mac spelling of the same jump', () => {
+		expect(pageKeyIntent(press('ArrowUp', { metaKey: true }))).toBe('first');
+		expect(pageKeyIntent(press('ArrowDown', { metaKey: true }))).toBe('last');
+	});
+
+	it('PageUp / PageDown — a clicker — step one slide', () => {
+		expect(pageKeyIntent(press('PageUp'))).toBe('prev');
+		expect(pageKeyIntent(press('PageDown'))).toBe('next');
+	});
+
+	it('leaves bare arrows, Space and other chords alone', () => {
+		expect(pageKeyIntent(press('ArrowUp'))).toBe('ignore');
+		expect(pageKeyIntent(press('ArrowRight'))).toBe('ignore');
+		expect(pageKeyIntent(press(' '))).toBe('ignore');
+		expect(pageKeyIntent(press('Home', { ctrlKey: true }))).toBe('ignore');
+		expect(pageKeyIntent(press('End', { shiftKey: true }))).toBe('ignore');
+		expect(pageKeyIntent(press('Home', { metaKey: true }))).toBe('ignore');
+		expect(pageKeyIntent(press('ArrowLeft', { metaKey: true }))).toBe('ignore');
+	});
+
+	it('yields a key a focused control already claimed (the AnimationBar rail)', () => {
+		const e = press('Home');
+		e.preventDefault();
+		expect(pageKeyIntent(e)).toBe('ignore');
 	});
 });
