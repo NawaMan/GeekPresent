@@ -33,8 +33,8 @@
 	</ul>
 	<p style="margin-top: 0.6em;">
 		Same components, separate worlds:
-		<Link href="../../portrait/title.html">GeekPortrait (1080&times;1920) &rarr;</Link>
+		<Link href="../portrait/title.html">GeekPortrait (1080&times;1920) &rarr;</Link>
 		&nbsp;&middot;&nbsp;
-		<Link href="../../geeklight/title.html">GeekLight (light theme) &rarr;</Link>
+		<Link href="../geeklight/title.html">GeekLight (light theme) &rarr;</Link>
 	</p>
 </ContentPage>

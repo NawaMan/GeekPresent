@@ -1552,8 +1552,13 @@ This needs facts before code — **ask first**:
 - What URL should the presentation sit at? (e.g. `myblog.com/talks/`)
 
 Key levers:
-- **Subpath hosting** → set `kit.paths.base` in `svelte.config.js` (e.g. `base: '/talks'`). Because all
-  assets here are `import`ed (not hardcoded), they'll pick up the base automatically.
+- **Subpath hosting** → build with `GEEKPRESENT_BASE_PATH=/talks`, which `svelte.config.js` turns
+  into `kit.paths.base`. It is NOT optional under a subpath: `paths.relative` is `false`, so the
+  build fetches `/_app/…` root-absolute, and without the base every page loads unstyled and every
+  slide stays blank. `deploy-pages.yml` sets it to `/<Repo>`; local builds leave it empty, because
+  `just serve-build`, the recorder and `utils/capture-slides.sh` serve from the root (capture
+  follows the variable, or `--base`). `siteUrl` must END in the same path; `Seo` strips the base
+  from the pathname so `canonical` doesn't repeat it.
 - **Output location** → the build currently writes to `../docs/` and `pnpm deploy` publishes that with
   `gh-pages`. To live beside a blog, either publish into a subfolder of the blog's published output, or
   keep a separate Pages deployment (see next playbook). Coordinate so the presentation doesn't overwrite the

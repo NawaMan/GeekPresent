@@ -20,6 +20,11 @@ concurrency:
 jobs:
   Build-And-Deploy:
     runs-on: ubuntu-latest
+    # A project page is served at https://<owner>.github.io/<Repo>/, not at the domain root,
+    # and the build fetches its scripts root-absolute (svelte.config.js). Without this every
+    # page loads unstyled and every slide stays blank. Both builds and the capture read it.
+    env:
+      GEEKPRESENT_BASE_PATH: /${{ github.event.repository.name }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

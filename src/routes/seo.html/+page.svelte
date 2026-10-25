@@ -61,8 +61,8 @@
 	</li>
 	<li>a <code>&lt;link rel="canonical"&gt;</code>;</li>
 	<li>
-		a site-wide <Link href="../sitemap.xml">sitemap.xml</Link> and
-		<Link href="../robots.txt">robots.txt</Link> in the build output.
+		a site-wide <Link href="./sitemap.xml">sitemap.xml</Link> and
+		<Link href="./robots.txt">robots.txt</Link> in the build output.
 	</li>
 </ul>
 
@@ -141,7 +141,7 @@ GEEKPRESENT_SITE_URL= pnpm build</code></pre>
 <p>
 	The cascade is: <b>slide</b> value &rarr; <b>deck</b> default &rarr;
 	<b>site</b> default. Images fall back to the bundled
-	<Link href="../og-default.png">1200&times;630 default card</Link>.
+	<Link href="./og-default.png">1200&times;630 default card</Link>.
 </p>
 
 <h2 id="emitted">What this page emits</h2>
@@ -168,8 +168,8 @@ are in the prerendered HTML regardless — view source to confirm).</code></pre>
 <h2>Sitemap &amp; robots</h2>
 
 <p>
-	A full build also writes <Link href="../sitemap.xml">sitemap.xml</Link> (every
-	prerendered route, as absolute URLs) and <Link href="../robots.txt">robots.txt</Link>
+	A full build also writes <Link href="./sitemap.xml">sitemap.xml</Link> (every
+	prerendered route, as absolute URLs) and <Link href="./robots.txt">robots.txt</Link>
 	into the output. The sitemap is generated from each presentation&rsquo;s
 	<code>pages.ts</code> plus the standalone texts, so new slides are picked up
 	automatically. (A single-route build &mdash; <code>scripts/build-static.sh ./out
@@ -178,8 +178,8 @@ are in the prerendered HTML regardless — view source to confirm).</code></pre>
 
 <p>
 	That&rsquo;s the whole feature. Back to the
-	<Link href="../">home page</Link>, or read the
-	<Link href="../text.html">sample Text</Link> next door.
+	<Link href="./">home page</Link>, or read the
+	<Link href="./text.html">sample Text</Link> next door.
 </p>
 
 <style>

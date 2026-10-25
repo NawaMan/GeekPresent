@@ -34,6 +34,12 @@ export default {
 
 `GEEKPRESENT_SITE_URL`, when set, overrides `siteUrl` for one build.
 
+**Served below the domain root** (a GitHub project page, `https://<you>.github.io/<Repo>/`)? Set
+`kit.paths.base` in `svelte.config.js` for that build — e.g.
+`base: process.env.GEEKPRESENT_BASE_PATH || ''` and `GEEKPRESENT_BASE_PATH=/<Repo>` in the deploy
+workflow — and end `siteUrl` in the same path. Without it every page fetches its scripts from the
+domain root and loads blank.
+
 **2. Vite** — the plugin goes **before** `sveltekit()`:
 
 ```ts

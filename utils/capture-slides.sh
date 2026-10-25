@@ -25,6 +25,9 @@
 #   --scale <f>      device scale factor            (default: 1; 2 → a 2x PNG)
 #   --port <n>       port for the local server      (default: 8123)
 #   --slide <file>   capture just this one (e.g. title.html); repeatable
+#   --base <path>    the path the site was BUILT under (default: $GEEKPRESENT_BASE_PATH, else
+#                    none). A build for a subpath fetches its scripts from <path>/_app/…, so
+#                    it is served under that path here too, or every slide comes out blank.
 #
 #   --og             SOCIAL CARDS. Capture into static/og/<deck>/ (gitignored; regenerated
 #                    in CI before the build), then wire each PNG into the deck's pages.ts
@@ -42,6 +45,7 @@
 set -euo pipefail
 
 SITE="docs"; DECK="slides"; OUT=""; SIZE="1920x1080"; PORT="8123"; SCALE=""; OG=0; WIRE=1; ONLY=()
+BASE="${GEEKPRESENT_BASE_PATH:-}"
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -52,14 +56,17 @@ while [[ $# -gt 0 ]]; do
 		--scale) SCALE="$2"; shift 2 ;;
 		--port)  PORT="$2";  shift 2 ;;
 		--slide) ONLY+=("$2"); shift 2 ;;
+		--base)  BASE="$2";  shift 2 ;;
 		--og)      OG=1;     shift ;;
 		--no-wire) WIRE=0;   shift ;;
-		-h|--help) sed -n '2,42p' "$0"; exit 0 ;;
+		-h|--help) sed -n '2,45p' "$0"; exit 0 ;;
 		*) echo "unknown option: $1" >&2; exit 2 ;;
 	esac
 done
 
 W="${SIZE%x*}"; H="${SIZE#*x}"
+# Same shape svelte.config.js gives it: '' or '/Name', no trailing slash.
+BASE="$(printf '%s' "$BASE" | sed -E 's#^/*#/#; s#/+$##')"
 
 # --og: social cards. They land in static/, because that is the directory the build copies to
 # the site root — so `static/og/slides/title.png` is served at `/og/slides/title.png`, which is
@@ -113,12 +120,19 @@ mkdir -p "$OUT"
 # module, and file:// blocks module scripts, so the deck would never hydrate and every
 # PNG would come out an empty dark frame. (That symptom was once written off as "the deck
 # doesn't render headless". It renders fine; it just needs an origin.)
-python3 -m http.server "$PORT" --directory "$SITE" >/dev/null 2>&1 &
+# A build under a base path is served from a scratch root holding a link at that path.
+ROOT="$SITE"
+if [[ -n "$BASE" ]]; then
+	ROOT="$(mktemp -d)"
+	mkdir -p "$ROOT$(dirname "$BASE")"
+	ln -s "$(cd "$SITE" && pwd)" "$ROOT$BASE"
+fi
+python3 -m http.server "$PORT" --directory "$ROOT" >/dev/null 2>&1 &
 SERVER=$!
 trap 'kill "$SERVER" 2>/dev/null || true' EXIT
 
 for _ in $(seq 1 50); do
-	curl -sf "http://localhost:$PORT/" >/dev/null 2>&1 && break
+	curl -sf "http://localhost:$PORT$BASE/" >/dev/null 2>&1 && break
 	sleep 0.1
 done
 
@@ -160,7 +174,7 @@ for i in "${!SLIDES[@]}"; do
 			--run-all-compositor-stages-before-draw \
 			--virtual-time-budget="$1" \
 			--screenshot="$png" \
-			"http://localhost:$PORT/$DECK/$slide?shot" >/dev/null 2>&1 || true
+			"http://localhost:$PORT$BASE/$DECK/$slide?shot" >/dev/null 2>&1 || true
 	}
 	size() { [[ -f "$png" ]] && stat -c%s "$png" || echo 0; }
 

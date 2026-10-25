@@ -44,6 +44,15 @@ export function absoluteUrl(pathname: string): string | undefined {
 	return SITE_URL + path;
 }
 
+/** A page's pathname with the site's base path taken off, so it can be joined to SITE_URL
+    (which already ends in that path). `/GeekPresent/slides/a.html` under `/GeekPresent` is
+    `/slides/a.html`; a pathname outside the base is returned as it is. */
+export function stripBase(pathname: string, base: string): string {
+	if (!base) return pathname;
+	if (pathname === base) return '/';
+	return pathname.startsWith(base + '/') ? pathname.slice(base.length) : pathname;
+}
+
 /** Resolve an image prop to an ABSOLUTE URL for OG/Twitter tags: pass through an
     already-absolute URL, make a site-relative path absolute, or fall back to the
     default OG image. Returns undefined when nothing resolves absolutely (no base

@@ -10,6 +10,12 @@ const outDir = process.env.GEEKPRESENT_OUT || 'docs';
 // `scripts/build-static.sh` sets GEEKPRESENT_PRECOMPRESS=0 to skip the dead copies.
 const precompress = process.env.GEEKPRESENT_PRECOMPRESS !== '0';
 
+// The path the site is served under, for a host that puts it below the domain root — a
+// GitHub project page lives at `/<Repo>/`. Default '' (the root), which is what every local
+// build, `just serve-build` and the recorder expect; the Pages workflow sets
+// GEEKPRESENT_BASE_PATH=/GeekPresent. SvelteKit wants a leading slash and no trailing one.
+const basePath = (process.env.GEEKPRESENT_BASE_PATH || '').trim().replace(/^\/*/, '/').replace(/\/+$/, '');
+
 export default {
 
 	preprocess: vitePreprocess(),
@@ -34,9 +40,10 @@ export default {
 		}),
 		// Root-absolute asset URLs (`/_app/…`). Required so a handout's `<base href>` for a
 		// nested deck (`/references/shell/`) does not re-root relative `../_app/…` links into
-		// `/references/_app/…`. Domain-root deploys (the stock GeekPresent shape) are fine;
-		// a future subpath deploy still goes through kit.paths.base.
+		// `/references/_app/…`. Root-absolute means a subpath deploy MUST set the base, or
+		// every script and stylesheet is fetched from the domain root and 404s.
 		paths: {
+			base: basePath,
 			relative: false
 		},
 		prerender: {

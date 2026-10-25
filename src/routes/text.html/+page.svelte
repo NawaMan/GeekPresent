@@ -130,8 +130,8 @@
 </p>
 
 <p>
-	Prefer slides? Head to the <Link href="../slides/title.html">presentation</Link>, or
-	back to the <Link href="../">home page</Link>.
+	Prefer slides? Head to the <Link href="./slides/title.html">presentation</Link>, or
+	back to the <Link href="./">home page</Link>.
 </p>
 
 <style>
