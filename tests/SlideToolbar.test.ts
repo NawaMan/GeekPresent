@@ -26,6 +26,19 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
+describe('SlideToolbar — which GeekPresent this is', () => {
+	it('names the version, quietly, at the foot of the ☰ menu and in its tooltip', () => {
+		const { container } = render(SlideToolbarHost);
+		const about = container.querySelector('.annot-drop .menu-about');
+		// In this repo the version is the package's own, marked -dev (see $lib/version).
+		expect(about?.textContent).toMatch(/^GeekPresent \d+\.\d+\.\d+-dev$/);
+		// Plain text, not a row: nothing to click, and the arrow-key roving skips it.
+		expect(about?.closest('button')).toBeNull();
+		expect(about?.matches('.annot-tool')).toBe(false);
+		expect(screen.getByLabelText('More tools (M)').getAttribute('title')).toContain(about?.textContent);
+	});
+});
+
 describe('SlideToolbar', () => {
 	it('arms and disarms the pen from the ANNOTATE toggle', async () => {
 		render(SlideToolbarHost);

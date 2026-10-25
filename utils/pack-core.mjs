@@ -112,6 +112,18 @@ export function moduleExports(files) {
 	return Object.fromEntries(Object.entries(out).sort(([a], [b]) => a.localeCompare(b)));
 }
 
+/** The `version.ts` a packed tarball carries: the released number as a literal. The repo's
+    own version.ts reads packages/core/package.json, which is outside the package.
+
+    @param {string} version  e.g. "0.1.0"
+    @returns {string} */
+export function versionModule(version) {
+	return (
+		'// Which GeekPresent this is. Written by utils/pack-core.mjs when the package was packed.\n' +
+		`export const GEEKPRESENT_VERSION: string = ${JSON.stringify(String(version))};\n`
+	);
+}
+
 /** The next version for a release. Plain MAJOR.MINOR.PATCH only — no pre-release tags,
     which a hand-pressed release button has no use for.
 
@@ -185,6 +197,10 @@ async function main() {
 		console.error(`pack-core: $lib imports survived the rewrite:\n  ${leftovers.join('\n  ')}`);
 		process.exit(1);
 	}
+
+	// 1b. The released version, stamped over the repo's `-dev` reader (see src/lib/version.ts).
+	const { version: stampVersion } = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8'));
+	writeFileSync(join(stage, 'src/version.ts'), versionModule(stampVersion));
 
 	// 2. The route stubs a project copies, pointed at the package.
 	for (const route of FRAMEWORK_ROUTES) {

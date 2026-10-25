@@ -12,6 +12,7 @@ import {
 	libImports,
 	moduleExports,
 	nextVersion,
+	versionModule,
 	relativeSpecifier,
 	rewriteLibImports,
 	stubForProject
@@ -83,6 +84,21 @@ describe('nextVersion — the release button’s bump', () => {
 		expect(() => nextVersion('1.2', 'patch')).toThrow(/MAJOR.MINOR.PATCH/);
 		expect(() => nextVersion('1.2.3-beta', 'patch')).toThrow(/MAJOR.MINOR.PATCH/);
 		expect(() => nextVersion('1.2.3', 'huge')).toThrow(/patch, minor or major/);
+	});
+});
+
+describe('versionModule — the version a project sees', () => {
+	it('is the plain released number, with no -dev and no import out of the package', () => {
+		const src = versionModule('0.1.0');
+		expect(src).toContain('export const GEEKPRESENT_VERSION: string = "0.1.0";');
+		expect(src).not.toContain('-dev');
+		expect(src).not.toMatch(/\bimport\b/);
+	});
+
+	it('replaces the repo’s own version.ts, which reads the package.json outside src/lib', () => {
+		const repo = readFileSync(join(__dirname, '../src/lib/version.ts'), 'utf8');
+		expect(repo).toContain('packages/core/package.json');
+		expect(repo).toContain('-dev');
 	});
 });
 

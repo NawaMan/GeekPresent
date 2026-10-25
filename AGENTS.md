@@ -1146,7 +1146,9 @@ stay out of the audience's way. A speaker who is actively using one often wants 
   the focused control. Yields to the DISPLAY zoom menu while that menu is open. Prevents deck
   paging from stealing the arrows.
 - **☰ menu groups.** Navigate (OVERVIEW **O**, KIOSK **K**) · export (CAPTURE **C**, PRINT **R**
-  with nested flyout **cCwWtT**) · source (SOURCE **S**, EDIT **E**). After **m** opens the drop
+  with nested flyout **cCwWtT**) · source (SOURCE **S**, EDIT **E**). A dim footer under the last group
+  names the version (`GeekPresent 0.1.0`; `-dev` when built from this repo, `$lib/version`), also in
+  the ☰ tooltip — text, not a row, so roving and mnemonics skip it. After **m** opens the drop
   (or while chrome is armed), those letters activate the row. Picking a row (or a PRINT
   destination) closes ☰; focus inside the menu is blurred so CSS `:focus-within` cannot stick it
   open. PRINT opens on hover or **r**, then the flyout's own keys take over (Esc closes only the
