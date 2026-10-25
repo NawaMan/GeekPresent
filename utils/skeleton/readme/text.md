@@ -19,7 +19,7 @@ The finished static site lands in **`__OUT__/`** — that is what gets published
 | --- | --- |
 | `src/routes/__NAME__/` | **your page.** One long page that scrolls. |
 | `src/routes/(home)/` | the landing page at `/` (delete or rewrite it; it is scaffolding) |
-| `src/lib/seo/routes.ts` | `TEXT_ROUTES` — the sitemap's list of standalone pages |
+| `geekpresent.config.ts` | the site's settings — `textRoutes` is the sitemap's list of standalone pages |
 | `src/lib/` | the framework: components, themes, layouts — yours to change |
 | `.samples-ref/` | a worked example of every component (see *Reference*) |
 
@@ -28,8 +28,8 @@ The finished static site lands in **`__OUT__/`** — that is what gets published
 Copy `src/routes/__NAME__/` to `src/routes/<name>.html/` and edit it. The name **is** the URL, so it
 ends in `.html`.
 
-Then — and this is the one that bites — **add `'/<name>.html'` to `TEXT_ROUTES` in
-`src/lib/seo/routes.ts`.** A deck is *discovered* by the sitemap (it globs for `pages.ts`); a Text
+Then — and this is the one that bites — **add `'/<name>.html'` to `textRoutes` in
+`geekpresent.config.ts`.** A deck is *discovered* by the sitemap (it globs for `pages.ts`); a Text
 page is **not**. Miss that line and the page builds perfectly, is served perfectly, and is never
 indexed by anything.
 

@@ -17,7 +17,7 @@ const write = (path: string, body: string) => {
 };
 
 /** The handful of things the script actually reaches for: two decks (a deck IS a dir with
- *  a pages.ts), the standalone sample routes, the SEO route list, the landing page, the
+ *  a pages.ts), the standalone sample routes, the settings file (textRoutes), the landing page, the
  *  demo-coupled test — and the real skeleton template it copies. */
 export function fixtureSource(root: string) {
 	const routes = join(root, 'src/routes');
@@ -29,7 +29,10 @@ export function fixtureSource(root: string) {
 	write(join(routes, 'seo.html/+page.svelte'), '<h1>seo</h1>\n');
 	write(join(routes, 'robots.txt/+server.ts'), 'export const GET = () => new Response("");\n');
 	write(join(routes, '(home)/+page.svelte'), '<a href="/slides/demo.html">slides</a>\n');
-	write(join(root, 'src/lib/seo/routes.ts'), `const TEXT_ROUTES = ['/', '/text.html'];\nexport { TEXT_ROUTES };\n`);
+	write(
+		join(root, 'geekpresent.config.ts'),
+		`export default {\n\tsiteName: 'GeekPresent',\n\ttextRoutes: ['/', '/text.html', '/seo.html'],\n\tsiteUrl: ''\n};\n`
+	);
 	write(join(root, 'tests/PathDemoSource.ssr.test.ts'), '// reads the demo slides\n');
 	write(join(root, 'tests/Other.test.ts'), '// a framework test — must survive\n');
 	write(join(root, '.gitignore'), '/docs/\n');

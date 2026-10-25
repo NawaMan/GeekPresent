@@ -99,6 +99,7 @@ worktree* below):
 | Lint (prettier + eslint)     | `scripts/lint.sh` — `scripts/format-changed.sh` fixes the formatting half |
 | Format named paths / all     | `scripts/format.sh <paths>` · `scripts/format-all.sh`              |
 | Install / SvelteKit sync     | `scripts/install.sh` · `scripts/sync.sh`                           |
+| Pack `@geekpresent/core`     | `scripts/pack.sh` → `.pack/geekpresent-core-<version>.tgz`         |
 
 **Every script goes into the booth on its own.** Each one starts with
 `source "$(dirname "$0")/_booth.sh"`. From the host, that runs the same script again through
@@ -635,7 +636,7 @@ linking to the sample Text (`/text.html`) and the two presentations.
 
 ### And a third, which nobody authors: the handout
 
-`/_handout/<deck>.html` (`src/routes/_handout/[deck].html/`) is every slide of a deck stacked
+`/_handout/<deck>.html` (`src/routes/_handout/[deck].html/`, a stub over `$lib/framework/HandoutPage.svelte`) is every slide of a deck stacked
 into one printable document — `Ctrl+P → Save as PDF` — with `?notes` adding a band of speaker
 notes under each. Two compact OVERVIEW layouts share the route: **`?grid`** (a landscape
 thumbnail contact-sheet) and **`?grid&notes`** (a portrait list, thumbnail left / `<Note>` right).
@@ -679,6 +680,36 @@ are load-bearing when you touch anything nearby:
   - **Round the printed box, then derive the scale from it** — never the reverse. A rounded scale
     multiplied back put the canvas a tenth of a pixel outside the paper, which a printer answers by
     shrinking the whole deck.
+
+## Shipping GeekPresent to other projects (the package)
+
+Other sites use GeekPresent as a **package**, `@geekpresent/core`, installed from a tarball attached
+to a GitHub Release — never npmjs.com. Spec: `specs/DISTRIBUTION-1.md`. What to keep in mind when
+you change the framework:
+
+- **Ships:** all of `src/lib` (as source — `.svelte` and `.ts`, compiled by the project's Vite), the
+  Vite plugin compiled to `vite.js`, and the framework route stubs under `routes/`. **Stays here:**
+  every deck, the landing page, tests, specs, scripts, the booth. `utils/pack-core.mjs` builds it;
+  `scripts/pack.sh` runs it locally.
+- **`$lib` imports are rewritten to relative paths on the way out** (in a project `$lib` is the
+  project's own folder). Only import specifiers move. Code that writes an import INTO a slide (ADJUST
+  / ANNOTATE adding a `<Draw>`) must not hard-code `'$lib/draw'` — use `drawModule(SITE)`, which a
+  project's settings turn into `@geekpresent/core/draw`. `tests/packCore.test.ts` fails on any `$lib`
+  import the rewrite would miss.
+- **Framework routes are stubs.** `_handout`, `_recorder`, `_source-edit`, `robots.txt` and
+  `sitemap.xml` under `src/routes/` only re-export from `$lib/framework/`; the code lives there. A
+  project copies the same stubs (`node_modules/@geekpresent/core/routes/`). Keep them thin — a test
+  checks.
+- **Per-project values are settings** (`geekpresent.config.ts`, see *Gotchas*), never edits to a
+  framework file.
+- **Two buttons, both manual** (Actions tab): **Release @geekpresent/core** (`release.yml`: pick
+  patch/minor/major → tests, bump `packages/core/package.json`, pack, commit + tag `vX.Y.Z`, push,
+  GitHub Release with the `.tgz`) and **Build and deploy the presentation** (`deploy-pages.yml`: the
+  showcase site with every example deck). Neither runs on push; `verify.yml` still does.
+- **A project changes framework code with `pnpm patch @geekpresent/core`** (a diff in its
+  `patches/`). It reapplies on upgrade, and fails the install loudly if upstream changed the same
+  lines. That only works because the dependency is a tarball URL — pnpm refuses to patch a git
+  dependency.
 
 ## Rules you must follow
 
@@ -1661,12 +1692,19 @@ vanishes). The convention, on the component's root element:
   cards, and `canonical` in its prerendered HTML. Set per-deck defaults with the `description` /
   `image` props in a deck's `+layout.svelte`, and per-slide overrides via `description` / `image`
   in `pages.ts`. The absolute-only tags (`og:url`, `og:image`, `twitter:image`, `canonical`) and the
-  emitted `sitemap.xml` / `robots.txt` are built from `GEEKPRESENT_SITE_URL` (default: the GitHub
-  Pages URL; set it empty to omit those tags). Keep in-page **assets relative** — only metadata URLs
-  are absolute. The base URL is injected via Vite `define` (see `vite.config.ts` → `$lib/seo/config.ts`).
-  When you add a presentation, its slides are picked up by the sitemap automatically (it reads every
-  `pages.ts`); a brand-new standalone Text route must be added to `TEXT_ROUTES` in
-  `src/lib/seo/routes.ts`.
+  emitted `sitemap.xml` / `robots.txt` are built from `siteUrl` in **`geekpresent.config.ts`**, which
+  the env var `GEEKPRESENT_SITE_URL` overrides per build (set it empty to omit those tags). Keep
+  in-page **assets relative** — only metadata URLs are absolute. When you add a presentation, its
+  slides are picked up by the sitemap automatically (it reads every `pages.ts`); a brand-new
+  standalone Text route must be added to `textRoutes` in `geekpresent.config.ts`.
+- **Site settings live in `geekpresent.config.ts`, never in a framework file.** Site URL, brand name,
+  default description, OG alt text, the copyright notice and `textRoutes`. `vite.config.ts` hands
+  them to the `geekpresent(site)` plugin (`src/lib/vite.ts`), which resolves them once
+  (`config/siteConfigCore.ts`) and injects them as the `__GEEKPRESENT_CONFIG__` define; code reads
+  them as `SITE` from `$lib/config/site`. Both vitest configs inject the same define via
+  `configDefine(site, …)` — anything that reads `SITE` (every `<SlideDeck>`, through `<Seo>`) dies
+  on a bare `ReferenceError` without it. A new per-project knob belongs there too: a project that
+  installs the package cannot edit `src/lib`.
 - **`name` ending in `.html` is intentional.** Route folders are literally `title.html/`, so the URL is
   `/slides/title.html`. Don't "fix" it.
 - **`.note` is a RESERVED class name — do not use it on a slide.** `src/lib/styles/note.css` is

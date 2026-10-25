@@ -565,11 +565,14 @@ and a `pages.ts` entry can add a per-slide `description` / `image`.
 In-page **assets stay relative** (so the build is portable to any sub-path or off
 disk), but a handful of metadata fields — `og:url`, `og:image`, `twitter:image`,
 `canonical`, and the sitemap — **must be absolute** (scrapers and search engines
-can't resolve relative URLs). One build-time variable supplies that base URL:
+can't resolve relative URLs). That base URL is `siteUrl` in
+[`geekpresent.config.ts`](geekpresent.config.ts) — the file that also holds the site name,
+default description, copyright notice and the Text routes for the sitemap — and one
+build-time variable overrides it:
 
 | Variable               | Default                                 | Meaning                                                                                                                                                                                                                                                                                                               |
 | ---------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GEEKPRESENT_SITE_URL` | `https://nawaman.github.io/GeekPresent` | Absolute base URL for the absolute-only metadata. Set it to your custom domain (`GEEKPRESENT_SITE_URL=https://my.site pnpm build`). Set it **empty** (`GEEKPRESENT_SITE_URL=`) to omit the absolute-only tags entirely — useful when you don't yet know the deploy URL, so no half-formed `og:url`/`canonical` ships. |
+| `GEEKPRESENT_SITE_URL` | `siteUrl` in `geekpresent.config.ts` | Absolute base URL for the absolute-only metadata, overriding the config for one build (`GEEKPRESENT_SITE_URL=https://my.site pnpm build`). Set it **empty** (`GEEKPRESENT_SITE_URL=`) to omit the absolute-only tags entirely — useful when you don't yet know the deploy URL, so no half-formed `og:url`/`canonical` ships. |
 
 It flows through `scripts/build-static.sh` too (env is inherited), e.g.
 `GEEKPRESENT_SITE_URL=https://my.site scripts/build-static.sh ./dist`. A single-route

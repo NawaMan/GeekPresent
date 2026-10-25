@@ -28,7 +28,7 @@
 	</li>
 	<li>
 		<strong>Add another Text:</strong> copy the whole <code>src/routes/__NAME__/</code> folder,
-		then add its route to <code>TEXT_ROUTES</code> in <code>src/lib/seo/routes.ts</code> — a Text
+		then add its route to <code>textRoutes</code> in <code>geekpresent.config.ts</code> — a Text
 		is not discovered automatically, so without that line it builds but never reaches the sitemap.
 	</li>
 	<li>

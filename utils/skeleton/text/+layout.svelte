@@ -8,7 +8,7 @@
   All the machinery (scroll container, column, typography, nav) lives in <TextPage>; this
   layout only names the page. The title and description below are the SEO surface, so say
   something real. To add a second Text, copy this whole folder and add its route to
-  TEXT_ROUTES in src/lib/seo/routes.ts, or it will not reach the sitemap.
+  textRoutes in geekpresent.config.ts, or it will not reach the sitemap.
 -->
 <script lang="ts">
 	import TextPage from '$lib/components/TextPage.svelte';

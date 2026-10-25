@@ -93,7 +93,7 @@ describe('adopt-geekpresent.sh --mode skeleton --kind deck', () => {
 
 	it('points the landing page at the new deck, and trims the sitemap to what still exists', () => {
 		expect(read('src/routes/(home)/+page.svelte')).toContain('{base}/slides/title.html');
-		expect(read('src/lib/seo/routes.ts')).toContain(`const TEXT_ROUTES = ['/'];`);
+		expect(read('geekpresent.config.ts')).toContain(`textRoutes: ['/'],`);
 	});
 
 	// The terminal says all this once and scrolls away; the landing page is the copy an
@@ -114,7 +114,7 @@ describe('adopt-geekpresent.sh --mode skeleton --kind deck', () => {
 // Adopting GeekPresent for a docs site rather than a talk: one long page that scrolls,
 // no deck at all. The catch that makes this worth a test — a Text is NOT discovered by
 // the sitemap's pages.ts glob (that finds decks). It reaches the sitemap only by being
-// listed in TEXT_ROUTES, so a scaffold that forgets that line builds fine and is silently
+// listed in textRoutes (geekpresent.config.ts), so a scaffold that forgets that line builds fine and is silently
 // never indexed.
 describe('adopt-geekpresent.sh --mode skeleton --kind text', () => {
 	const gp = adopt('--mode', 'skeleton', '--kind', 'text', '--name', 'guide.html');
@@ -131,8 +131,10 @@ describe('adopt-geekpresent.sh --mode skeleton --kind text', () => {
 		expect(existsSync(join(gp, 'src/routes/slides'))).toBe(false);
 	});
 
-	it('registers the Text in TEXT_ROUTES, or it would never reach the sitemap', () => {
-		expect(read('src/lib/seo/routes.ts')).toContain(`const TEXT_ROUTES = ['/', '/guide.html'];`);
+	it('registers the Text in textRoutes, or it would never reach the sitemap', () => {
+		expect(read('geekpresent.config.ts')).toContain(`textRoutes: ['/', '/guide.html'],`);
+		// Only that line moves; the settings around it are the project's.
+		expect(read('geekpresent.config.ts')).toContain(`siteUrl: ''`);
 	});
 
 	it('gives it a landing page that points at the page, not at a deck', () => {
@@ -155,7 +157,7 @@ describe('adopt-geekpresent.sh --mode skeleton --kind none', () => {
 		expect(existsSync(join(gp, 'src/routes/guide.html'))).toBe(false);
 		expect(existsSync(join(gp, 'src/routes/(home)'))).toBe(true);
 		expect(existsSync(join(gp, 'src/routes/robots.txt'))).toBe(true);
-		expect(read('src/lib/seo/routes.ts')).toContain(`const TEXT_ROUTES = ['/'];`);
+		expect(read('geekpresent.config.ts')).toContain(`textRoutes: ['/'],`);
 	});
 
 	// With nothing to click into, the landing page IS the documentation — and the thing
@@ -164,7 +166,7 @@ describe('adopt-geekpresent.sh --mode skeleton --kind none', () => {
 		const home = read('src/routes/(home)/+page.svelte');
 		expect(home).toContain('trailingSlash = "always"'); // the deck
 		expect(home).toContain('trailingSlash = "never"'); // each slide
-		expect(home).toContain('TEXT_ROUTES'); // how a Text gets indexed
+		expect(home).toContain('textRoutes'); // how a Text gets indexed
 		// It must not link to a deck it did not create.
 		expect(home).not.toContain('href=');
 	});
@@ -268,7 +270,7 @@ describe('adopt-geekpresent.sh — docs', () => {
 
 	it('matches the advice to what was scaffolded', () => {
 		const text = adopt('--mode', 'skeleton', '--kind', 'text', '--name', 'guide.html');
-		expect(readFileSync(join(text, 'README.md'), 'utf8')).toContain('TEXT_ROUTES');
+		expect(readFileSync(join(text, 'README.md'), 'utf8')).toContain('textRoutes');
 
 		const none = adopt('--mode', 'skeleton', '--kind', 'none');
 		expect(readFileSync(join(none, 'README.md'), 'utf8')).toContain("trailingSlash = 'always'");

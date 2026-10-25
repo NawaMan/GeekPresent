@@ -43,7 +43,7 @@ A Text is one long page that scrolls — docs, an essay, a README site. `src/rou
 with a `+layout.svelte` wrapping `<TextPage>`, a `+page.svelte` of prose, and a `+layout.js` with
 `trailingSlash = 'never'`. No `pages.ts` — it is not a deck.
 
-Then **add `'/guide.html'` to `TEXT_ROUTES` in `src/lib/seo/routes.ts`.** A deck is *discovered* by
+Then **add `'/guide.html'` to `textRoutes` in `geekpresent.config.ts`.** A deck is *discovered* by
 the sitemap; a Text is **not**. Miss that line and the page builds fine and is never indexed.
 
 ## Reference

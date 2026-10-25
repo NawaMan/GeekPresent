@@ -92,9 +92,10 @@ Split by what the other one *cannot* see. Don't write the same assertions twice.
 
 ## Two things both configs do for you
 
-- **`define: { __GEEKPRESENT_SITE_URL__ }`** — anything that renders `<SlideDeck>` pulls in `<Seo>`, which
-  hits a bare `ReferenceError` without this global. If a test dies on an unexplained `ReferenceError`, this
-  is why; the value is irrelevant, its presence is not.
+- **`define: configDefine(site, 'https://example.test')`** — the site's settings (`geekpresent.config.ts`)
+  as the `__GEEKPRESENT_CONFIG__` global. Anything that renders `<SlideDeck>` pulls in `<Seo>`, which reads
+  them and hits a bare `ReferenceError` without it. If a test dies on an unexplained `ReferenceError`, this
+  is why. The site URL is pinned to example.test so no test depends on where the real site deploys.
 - **`$app/*` aliased to `tests/stubs/`** — `$app/environment`, `$app/stores`, `$app/navigation`. There is no
   Kit runtime under vitest.
 

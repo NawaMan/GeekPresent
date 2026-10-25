@@ -44,8 +44,8 @@
 	A Text is one long page that scrolls. Create <code>src/routes/&lt;name&gt;.html/</code> with a
 	<code>+layout.js</code> (<code>trailingSlash = "never"</code>), a <code>+layout.svelte</code>
 	wrapping <code>&lt;TextPage&gt;</code>, and a <code>+page.svelte</code> of prose — then add
-	<code>'/&lt;name&gt;.html'</code> to <code>TEXT_ROUTES</code> in
-	<code>src/lib/seo/routes.ts</code>, or it will never reach the sitemap.
+	<code>'/&lt;name&gt;.html'</code> to <code>textRoutes</code> in
+	<code>geekpresent.config.ts</code>, or it will never reach the sitemap.
 </p>
 
 <h2>Or let the script do it</h2>

@@ -598,16 +598,16 @@ if [ "$MODE" = "minimal" ] || [ "$MODE" = "skeleton" ]; then
 		ok "Scaffolded nothing (--kind none) — src/routes holds only the landing page"
 	fi
 
-	# Keep the sitemap's hardcoded standalone-route list in sync with what's left. Decks
-	# are globbed from their pages.ts, but a Text is NOT discovered — it reaches the
-	# sitemap only by being listed here, so a scaffolded Text has to be registered or it
-	# builds and is never indexed.
-	SEO_ROUTES="$TARGET/src/lib/seo/routes.ts"
+	# Keep the sitemap's standalone-route list in sync with what's left. Decks are globbed
+	# from their pages.ts, but a Text is NOT discovered — it reaches the sitemap only by being
+	# listed in `textRoutes` (geekpresent.config.ts), so a scaffolded Text has to be
+	# registered or it builds and is never indexed.
+	SITE_CONFIG="$TARGET/geekpresent.config.ts"
 	TEXT_LIST="['/']"
 	[ "$MODE" = "skeleton" ] && [ "$KIND" = "text" ] && TEXT_LIST="['/', '/$NAME']"
-	if [ -f "$SEO_ROUTES" ] && grep -q 'TEXT_ROUTES' "$SEO_ROUTES"; then
-		sed -i "s|^const TEXT_ROUTES =.*|const TEXT_ROUTES = $TEXT_LIST;|" "$SEO_ROUTES"
-		ok "Set sitemap's standalone-route list to $TEXT_LIST"
+	if [ -f "$SITE_CONFIG" ] && grep -q 'textRoutes:' "$SITE_CONFIG"; then
+		sed -i "s|^\\([[:space:]]*\\)textRoutes: \\[[^]]*\\]|\\1textRoutes: $TEXT_LIST|" "$SITE_CONFIG"
+		ok "Set sitemap's standalone-route list (textRoutes) to $TEXT_LIST"
 	fi
 
 	# The landing page hardcodes links to the sample decks; rewrite it so prerender
@@ -841,7 +841,7 @@ fi
 				;;
 			text)
 				echo "  • Write your page:           ${DIM}$DIR/src/routes/$NAME/+page.svelte${RST}"
-				echo "  • Add another Text:          copy that folder, then list it in ${DIM}src/lib/seo/routes.ts${RST}"
+				echo "  • Add another Text:          copy that folder, then list it in ${DIM}textRoutes${RST} in ${DIM}geekpresent.config.ts${RST}"
 				;;
 			none)
 				echo "  • Nothing was scaffolded.    The landing page tells you what to write."

@@ -177,7 +177,7 @@ export function freezeSnippet(
     — so freezing one underline does not tell the author to import Rect and Line as well.
     Emitted alongside the snippet by the clipboard path; the source-write path adds it only
     when the slide is missing one (see freezeInsert). */
-export function freezeImport(tags: string[]): string {
+export function freezeImport(tags: string[], from: string = '$lib/draw'): string {
 	const used = new Set<string>();
 	for (const tag of tags) {
 		const m = /^<([A-Za-z]+)/.exec(tag);
@@ -185,5 +185,5 @@ export function freezeImport(tags: string[]): string {
 	}
 	if (used.size === 0) return '';
 	const names = ['Draw', ...['Line', 'Polyline', 'Rect'].filter((n) => used.has(n))];
-	return `import { ${names.join(', ')} } from '$lib/draw';`;
+	return `import { ${names.join(', ')} } from '${from}';`;
 }

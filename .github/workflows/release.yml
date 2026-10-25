@@ -1,0 +1,101 @@
+name: Release @geekpresent/core
+
+# Run by hand: Actions → "Release @geekpresent/core" → Run workflow → pick the bump.
+#
+# A release is a tag and a GitHub Release with the package TARBALL attached. Projects install
+# it by that asset's URL — there is no npm registry in the loop:
+#
+#   "@geekpresent/core": "https://github.com/NawaMan/GeekPresent/releases/download/v1.4.0/geekpresent-core-1.4.0.tgz"
+#
+# Why a tarball and not a git reference (github:…#tag): pnpm refuses `pnpm patch` on a git
+# dependency, and a git dependency needs a working `git` at install time, which a linked
+# worktree's booth does not have. See specs/DISTRIBUTION-1.md.
+#
+# Order matters: everything that can fail (tests, pack) runs BEFORE anything is pushed, so a
+# red run leaves no tag, no version commit and no release behind.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Which part of the version to raise
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+
+permissions:
+  contents: write # push the version commit + tag, create the release
+
+# Two releases at once would race for the same version number.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  Release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0 # the tags, to refuse a version that is already released
+
+      # Same toolchain as verify.yml.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync SvelteKit generated types
+        run: pnpm exec svelte-kit sync
+
+      - name: Check types (svelte-check)
+        run: pnpm run check
+
+      - name: Run the test suite
+        run: pnpm test
+
+      - name: Bump the version
+        id: version
+        run: |
+          VERSION=$(node utils/pack-core.mjs bump "${{ inputs.bump }}")
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "::error::v$VERSION is already tagged — fix packages/core/package.json's version first."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # Before the push: a pack that fails (a $lib import the rewrite cannot place) stops here.
+      - name: Pack
+        run: node utils/pack-core.mjs
+
+      # The one push that happens without a person typing `git push` — a person pressed the
+      # button. If main is branch-protected, this needs a bypass for the Actions bot.
+      - name: Commit, tag and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/core/package.json
+          git commit -m "Release v${{ steps.version.outputs.version }}"
+          git tag "v${{ steps.version.outputs.version }}"
+          git push origin HEAD:main "v${{ steps.version.outputs.version }}"
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          URL="https://github.com/${{ github.repository }}/releases/download/v$VERSION/geekpresent-core-$VERSION.tgz"
+          printf 'Install:\n\n```json\n"@geekpresent/core": "%s"\n```\n' "$URL" > notes.md
+          gh release create "v$VERSION" .pack/geekpresent-core-"$VERSION".tgz \
+            --title "v$VERSION" --notes-file notes.md --generate-notes

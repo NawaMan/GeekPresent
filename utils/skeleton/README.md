@@ -46,7 +46,7 @@ addressed with a trailing slash, each slide without one.
 
 A Text is one hand-authored page that scrolls, wrapped in `<TextPage>`. The catch worth knowing:
 a deck is **discovered** by the sitemap (it globs `pages.ts`), but a Text is **not** — it reaches
-the sitemap only by being listed in `TEXT_ROUTES` in `src/lib/seo/routes.ts`. The script adds that
+the sitemap only by being listed in `textRoutes` in `geekpresent.config.ts`. The script adds that
 line; if you add a second Text by hand, you must too, or it builds and is never indexed.
 
 ## Why these are real files

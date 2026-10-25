@@ -462,6 +462,29 @@ describe('patchSlideSource — insert brings its imports', () => {
 		expect(source.startsWith('<script lang="ts">')).toBe(true);
 		expect(source).toContain("import { Draw, Rect } from '$lib/draw';");
 	});
+
+	// A project that installs the package reaches the framework as @geekpresent/core, and
+	// the browser sends that setting with the change (config/site → importFrom).
+	it('merges into the import the change names (a project using the package)', () => {
+		const src = "<script>\n\timport { Draw, Line } from '@geekpresent/core/draw';\n</script>\n<Draw>\n</Draw>";
+		const change = { ...insert(['Draw', 'Rect']), importFrom: '@geekpresent/core/draw' };
+		const { source } = patchSlideSource(src, [change]);
+		expect(source).toContain("import { Draw, Line, Rect } from '@geekpresent/core/draw';");
+		expect(source).not.toContain('$lib/draw');
+	});
+
+	it('adds an import from the module the change names', () => {
+		const change = { ...insert(['Draw', 'Rect']), importFrom: '@geekpresent/core/draw' };
+		const { source } = patchSlideSource('<script>\n</script>\n<Draw>\n</Draw>', [change]);
+		expect(source).toContain("import { Draw, Rect } from '@geekpresent/core/draw';");
+	});
+
+	it('writes no importFrom that is not a plain module name — it falls back instead', () => {
+		const change = { ...insert(['Draw', 'Rect']), importFrom: "x'; alert(1); '" };
+		const { source } = patchSlideSource('<script>\n</script>\n<Draw>\n</Draw>', [change]);
+		expect(source).toContain("import { Draw, Rect } from '$lib/draw';");
+		expect(source).not.toContain('alert');
+	});
 });
 
 // A <Sprite>'s editable state is a stops ARRAY: too big to be a box (so geometry

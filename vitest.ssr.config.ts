@@ -1,5 +1,7 @@
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vitest/config';
+import { configDefine } from './src/lib/vite';
+import site from './geekpresent.config';
 
 // SSR test project: node environment, NO svelteTesting() (that plugin
 // prepends the `browser` resolve condition, which would pull in svelte's
@@ -9,11 +11,9 @@ import { defineConfig } from 'vitest/config';
 // vitest.workspace.ts.
 export default defineConfig({
 	plugins: [svelte()],
-	// Same build-time global vite.config.ts injects (see $lib/seo/config.ts) — needed
-	// by anything that renders <SlideDeck>, which pulls in <Seo>.
-	define: {
-		__GEEKPRESENT_SITE_URL__: JSON.stringify('https://example.test')
-	},
+	// Same build-time settings global the geekpresent() plugin injects (see
+	// $lib/config/site.ts) — needed by anything that renders <SlideDeck>, which pulls in <Seo>.
+	define: configDefine(site, 'https://example.test'),
 	resolve: {
 		alias: {
 			$lib: new URL('./src/lib', import.meta.url).pathname,

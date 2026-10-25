@@ -192,7 +192,7 @@ describe('the build-environment prompt — [Bh]', () => {
 	it('removing the booth touches nothing else — the deck still builds on the host', () => {
 		const { dir } = typeAtPrompts({ env: 'h' });
 		expect(existsSync(join(dir, 'src/routes/slides/pages.ts'))).toBe(true);
-		expect(existsSync(join(dir, 'src/lib/seo/routes.ts'))).toBe(true);
+		expect(existsSync(join(dir, 'geekpresent.config.ts'))).toBe(true);
 	});
 });
 

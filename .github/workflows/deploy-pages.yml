@@ -1,8 +1,9 @@
 name: Build and deploy the presentation
 
+# Run by hand: Actions → "Build and deploy the presentation" → Run workflow. The live site
+# (every example deck) changes when someone presses the button, the same as a package
+# release (release.yml) — not on every push. verify.yml still checks every push.
 on:
-  push:
-    branches: ["main"]
   workflow_dispatch:
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
