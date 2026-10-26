@@ -73,6 +73,15 @@ describe('normalizeLines', () => {
 		expect(normalizeLines([{ cmd: '' }])).toEqual([{ kind: 'cmd', text: '', tone: 'plain' }]);
 	});
 
+	it('keeps a tone on a command, which colours the typed text (a typed shell comment)', () => {
+		expect(normalizeLines([{ cmd: '# list them', tone: 'comment' }])).toEqual([
+			{ kind: 'cmd', text: '# list them', tone: 'comment' }
+		]);
+		expect(normalizeLines([{ cmd: 'ls', tone: 'nope' as never }])).toEqual([
+			{ kind: 'cmd', text: 'ls', tone: 'plain' }
+		]);
+	});
+
 	it("carries an output line's lead, and only when there is one", () => {
 		expect(normalizeLines([{ lead: '├── ', out: '(T) user', tone: 'ok' }])).toEqual([
 			{ kind: 'out', text: '(T) user', tone: 'ok', lead: '├── ' }

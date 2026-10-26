@@ -437,7 +437,7 @@ Twitter card tags and `canonical` into each slide's prerendered HTML. The `sitem
 `robots.txt` route stubs list every deck found by its `pages.ts`.
 
 - **Site settings** go in `geekpresent.config.ts` at the project root (all optional):
-  `siteUrl`, `siteName`, `siteDescription`, `ogImageAlt`, `copyright: { name, url }`, `textRoutes`.
+  `siteUrl`, `siteName`, `siteTitle` (default tab title; defaults to `siteName`), `siteDescription`, `ogImageAlt`, `copyright: { name, url }`, `textRoutes`.
 - **Absolute tags need `siteUrl`.** `og:url`, `og:image`, `twitter:image`, `canonical` and the
   sitemap are built from it. `''` (the default) omits them. The env var `GEEKPRESENT_SITE_URL`
   overrides `siteUrl` for one build.

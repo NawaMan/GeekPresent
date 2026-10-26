@@ -252,10 +252,10 @@ frame 0 behind a play button, with a transport bar and a tick per command.
 | `cmd`  | command | Typed after the prompt, character by character. |
 | `cont` | command | `true`: continues the command above (after a trailing `\`): no prompt, aligned under it. |
 | `out`  | output  | Printed whole (fades in). A string, or a list of pieces to mix colours on one line: a bare string takes the line's `tone`, `{ text, tone }` its own. |
-| `tone` | output  | `plain` (default), `ok`, `warn`, `error`, `muted`, `comment`, `dir`. Colours the whole line. |
+| `tone` | both    | `plain` (default), `ok`, `warn`, `error`, `muted`, `comment`, `dir`. Colours an output line whole; on a command it colours the typed text, not the prompt. |
 | `lead` | output  | Text before `out` in the plain colour whatever the tone (a tree's `├── `). |
 
-A shell comment is an output line with `tone: 'comment'`; a folder as `ls` draws it is `tone: 'dir'`.
+A shell comment is `tone: 'comment'` — typed after the prompt as `{ cmd: '# list them', tone: 'comment' }`, or printed whole as an `out` line; a folder as `ls` draws it is `tone: 'dir'`.
 In TypeScript, write tones `as const` (or type the array as `TerminalInput[]` from
 `@geekpresent/core/utils/terminalCore`), or the string widens and fails the type-check.
 

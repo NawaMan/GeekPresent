@@ -14,7 +14,13 @@ import site from '../geekpresent.config';
 describe('resolveConfig', () => {
 	it('fills every field a project leaves out', () => {
 		expect(resolveConfig()).toEqual(DEFAULTS);
-		expect(resolveConfig({ siteName: 'Mine' })).toEqual({ ...DEFAULTS, siteName: 'Mine' });
+		expect(resolveConfig({ siteName: 'Mine' })).toEqual({ ...DEFAULTS, siteName: 'Mine', siteTitle: 'Mine' });
+	});
+
+	it('takes siteTitle on its own when set, else follows siteName', () => {
+		expect(resolveConfig({ siteName: 'Blog', siteTitle: 'The Blog' }).siteTitle).toBe('The Blog');
+		expect(resolveConfig({ siteName: 'Blog' }).siteTitle).toBe('Blog');
+		expect(resolveConfig({ siteTitle: 7 } as never).siteTitle).toBe(DEFAULTS.siteName);
 	});
 
 	it('keeps a copyright half the project did not set', () => {

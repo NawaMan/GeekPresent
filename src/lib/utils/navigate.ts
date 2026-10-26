@@ -1,3 +1,5 @@
+import { SITE } from '$lib/config/site';
+
 export interface Page {
     path: string;
     /** The slide's name. Drives the Table of Contents and nav labels, AND the
@@ -58,8 +60,9 @@ export interface Page {
 
 /** Site-wide default document title — the deck/site name used when neither a
     presentation nor a page sets one. The <title> counterpart to the site favicon
-    in app.html (which is the global default in the favicon cascade). */
-export const SITE_TITLE = 'GeekPresent';
+    in app.html (which is the global default in the favicon cascade). A project's
+    `siteTitle` setting (default: its `siteName`), see $lib/config/siteConfigCore. */
+export const SITE_TITLE: string = SITE.siteTitle;
 
 /** Compose the browser-tab <title> from the cascade
 

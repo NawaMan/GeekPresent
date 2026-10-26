@@ -14,7 +14,7 @@ how a site fits together, every component indexed, one file per group, for this 
 
 ```json
 "dependencies": {
-	"@geekpresent/core": "https://github.com/NawaMan/GeekPresent/releases/download/v0.1.3/geekpresent-core-0.1.3.tgz"
+	"@geekpresent/core": "https://github.com/NawaMan/GeekPresent/releases/download/v0.1.4/geekpresent-core-0.1.4.tgz"
 }
 ```
 

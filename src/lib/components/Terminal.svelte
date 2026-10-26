@@ -68,7 +68,8 @@
   `error` / `muted` / `comment` / `dir` / `plain`; every colour is a roles.css token
   (`--terminal-*`). A tone colours the whole line; to keep the start of it plain (a tree's
   `├── `), put that part in `lead`: `{ lead: '│   └── ', out: '(T) region', tone: 'ok' }`.
-  A shell comment is an output line in tone `comment`: `{ out: '# list them', tone: 'comment' }`.
+  A shell comment is tone `comment`: typed after the prompt as `{ cmd: '# list them', tone: 'comment' }`
+  (the prompt keeps its colour), or printed whole as `{ out: '# list them', tone: 'comment' }`.
   A folder, as `ls` draws one, is tone `dir`. To mix colours on one line, give `out` as a list:
   a bare string takes the line's tone, `{ text, tone }` its own —
   `{ out: ['GH_TOKEN <- [', { text: 'gh/token', tone: 'warn' }, ']'] }`.
@@ -469,7 +470,7 @@
 						{#if prompt}<span class="prompt" class:cont={line.cont} aria-hidden="true"
 								>{prompt}</span
 							>{/if}<span
-							class="typed"
+							class="typed tone-{line.tone}"
 							style={typedStyle(line.chars, line.delayMs, line.durationMs)}>{line.text}</span
 						>{#if caret && animating}<span
 								class="gate"

@@ -20,8 +20,11 @@ export interface GeekPresentConfig {
 	    metadata that must be absolute (og:url, og:image, canonical, sitemap). '' omits
 	    those tags. The GEEKPRESENT_SITE_URL env var, when set, wins over this. */
 	siteUrl?: string;
-	/** Brand name: og:site_name and the title fallback. */
+	/** Brand name: og:site_name. */
 	siteName?: string;
+	/** The browser-tab title of a page or deck that sets none (and a Text's default title).
+	    Left out, it is siteName. */
+	siteTitle?: string;
 	/** Default description for a page or deck that has none (keep it under ~160 chars). */
 	siteDescription?: string;
 	/** Alt text of the default social card (static/og-default.png). */
@@ -42,6 +45,7 @@ export interface GeekPresentConfig {
 export interface SiteConfig {
 	siteUrl: string;
 	siteName: string;
+	siteTitle: string;
 	siteDescription: string;
 	ogImageAlt: string;
 	copyright: { name: string; url: string };
@@ -54,6 +58,7 @@ export interface SiteConfig {
 export const DEFAULTS: SiteConfig = {
 	siteUrl: '',
 	siteName: 'GeekPresent',
+	siteTitle: 'GeekPresent',
 	siteDescription: 'Presentation slides and long-form texts, built with GeekPresent.',
 	ogImageAlt: 'Presentation slides and long-form texts, built with GeekPresent.',
 	copyright: { name: 'GeekPresent', url: 'https://github.com/NawaMan/GeekPresent' },
@@ -82,9 +87,11 @@ export function resolveConfig(
 	const routes = Array.isArray(user.textRoutes)
 		? user.textRoutes.filter((r): r is string => typeof r === 'string')
 		: DEFAULTS.textRoutes;
+	const siteName = str(user.siteName, DEFAULTS.siteName);
 	return {
 		siteUrl,
-		siteName: str(user.siteName, DEFAULTS.siteName),
+		siteName,
+		siteTitle: str(user.siteTitle, siteName),
 		siteDescription: str(user.siteDescription, DEFAULTS.siteDescription),
 		ogImageAlt: str(user.ogImageAlt, DEFAULTS.ogImageAlt),
 		copyright: {

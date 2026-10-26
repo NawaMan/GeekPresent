@@ -39,7 +39,8 @@ export interface TerminalLine {
 	/** Program output: rendered without a prompt, revealed all at once. A list of pieces mixes
 	 *  colours on one line: `['GH_TOKEN <- [', { text: 'gh/token', tone: 'warn' }, ']']`. */
 	out?: string | OutPart[];
-	/** Colour role for an output line. Ignored on a command. */
+	/** Colour role for the line. On a command it colours the typed text, not the prompt:
+	 *  `{ cmd: '# list them', tone: 'comment' }`. */
 	tone?: Tone;
 	/** Text drawn before an output line's `out`, in the plain colour whatever the tone —
 	 *  e.g. a tree's `├── ` in front of a coloured item. Ignored on a command. */
@@ -129,7 +130,7 @@ export function normalizeLines(
 
 		const tone = TONES.includes(entry.tone as Tone) ? (entry.tone as Tone) : 'plain';
 		if (typeof entry.cmd === 'string') {
-			const line: NormalizedLine = { kind: 'cmd', text: entry.cmd, tone: 'plain' };
+			const line: NormalizedLine = { kind: 'cmd', text: entry.cmd, tone };
 			if (entry.cont === true) line.cont = true;
 			lines.push(line);
 		} else if (typeof entry.out === 'string' || Array.isArray(entry.out)) {
