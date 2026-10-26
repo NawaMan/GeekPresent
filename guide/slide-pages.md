@@ -493,11 +493,12 @@ The route also needs `+layout.js` (`prerender = true; trailingSlash = "never"`) 
 
 | prop | type | default | meaning |
 | --- | --- | --- | --- |
-| `title` | `string` | site name | Browser-tab title. |
+| `title` | `string` | `siteTitle` | Browser-tab title. |
 | `description` | `string` | site description | SEO description. |
 | `image` | `string` | site OG image | Social image (absolute URL or site-relative path). |
 | `imageAlt` | `string` | default card alt | Alt text for it. |
 | `type` | `'website' \| 'article'` | `'website'` | OpenGraph type. |
+| `noindex` | `boolean` | `false` | Emit `<meta name="robots" content="noindex">` — for a draft: leave the route out of `textRoutes` and every link list too. |
 | `style` / `id` / `class` | `string` | `''` | On the flowing column. |
 
 Gotchas:
