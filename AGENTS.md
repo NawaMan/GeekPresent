@@ -702,6 +702,12 @@ you change the framework:
   checks.
 - **Per-project values are settings** (`geekpresent.config.ts`, see *Gotchas*), never edits to a
   framework file.
+- **`guide/` ships too** — the authoring guide a PROJECT's agent reads from
+  `node_modules/@geekpresent/core/guide/`: `README.md` (how a site fits together + the component
+  index) and one file per group (`slide-pages`, `layout`, `content`, `code`, `media`, `data`, `draw`,
+  `features`). A new or renamed author-facing component goes into its group file AND the index in
+  the same change — `tests/guide.test.ts` fails otherwise (framework-internal ones are listed in
+  its `INTERNAL` set). Write imports in the package form (`@geekpresent/core/…`), never `$lib`.
 - **Two buttons, both manual** (Actions tab): **Release @geekpresent/core** (`release.yml`: pick
   patch/minor/major → tests, bump `packages/core/package.json`, pack, commit + tag `vX.Y.Z`, push,
   GitHub Release with the `.tgz`) and **Build and deploy the presentation** (`deploy-pages.yml`: the

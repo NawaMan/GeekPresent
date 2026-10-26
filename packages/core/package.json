@@ -8,7 +8,7 @@
 		"directory": "packages/core"
 	},
 	"type": "module",
-	"files": ["src", "routes", "vite.js", "README.md"],
+	"files": ["src", "routes", "vite.js", "guide", "README.md"],
 	"exports": {
 		".": "./src/index.ts",
 		"./vite": {

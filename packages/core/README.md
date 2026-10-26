@@ -7,11 +7,14 @@ tarball on each [GitHub Release](https://github.com/NawaMan/GeekPresent/releases
 **Starting a new site?** [GeekPresentStarter](https://github.com/NawaMan/GeekPresentStarter) is all
 of the below already done — *Use this template*, enable Pages, deploy.
 
+**Authoring with an AI agent?** Point it at `node_modules/@geekpresent/core/guide/README.md` —
+how a site fits together, every component indexed, one file per group, for this exact version.
+
 ## Install
 
 ```json
 "dependencies": {
-	"@geekpresent/core": "https://github.com/NawaMan/GeekPresent/releases/download/v0.1.2/geekpresent-core-0.1.2.tgz"
+	"@geekpresent/core": "https://github.com/NawaMan/GeekPresent/releases/download/v0.1.3/geekpresent-core-0.1.3.tgz"
 }
 ```
 

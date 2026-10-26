@@ -13,6 +13,22 @@ the whole presentation is a static site, and it deploys to GitHub Pages.
 
 ---
 
+## Built to be authored with an AI agent
+
+A GeekPresent deck is plain text, one folder per slide — exactly what a coding agent (Claude Code,
+Cursor, Codex, Copilot…) is good at. Describe the slide you want in plain words — *"add a slide
+comparing the two designs as a diagram with arrows"*, *"turn these notes into a five-slide
+deck"* — and let the agent write it. You stay in the loop where it matters: the dev server shows
+every change live, and **ADJUST** lets you drag what the agent placed to exactly where you want it,
+then **SAVE** writes it back into the source for the agent's next pass.
+
+The agent's manual ships with the framework. A project that installs `@geekpresent/core` has
+**`node_modules/@geekpresent/core/guide/`** — one file on how a site fits together plus a component
+index, and one file per group of components (layout & diagrams, content, code, media, charts &
+tables, drawing & animation, deck features) — written for an agent, always matching the installed
+version. [GeekPresentStarter](https://github.com/NawaMan/GeekPresentStarter) points every agent at
+it out of the box (`AGENTS.md`, plus a Claude Code skill). In this repo it is [`guide/`](guide/).
+
 ## Why this project exists
 
 If you do any front-end work you already know HTML + CSS + JS, and you've probably wished you could just _use_ that to make slides instead of fighting a WYSIWYG tool. GeekPresent lets you do exactly that — and takes care of the tedious parts:

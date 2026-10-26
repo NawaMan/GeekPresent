@@ -235,6 +235,9 @@ async function main() {
 	pkg.exports = { '.': dot, ...moduleExports(walk(lib)), ...rest };
 	writeFileSync(join(stage, 'package.json'), JSON.stringify(pkg, null, '\t') + '\n');
 	if (existsSync(join(pkgDir, 'README.md'))) cpSync(join(pkgDir, 'README.md'), join(stage, 'README.md'));
+	// The authoring guide for a project's AI agent: guide/README.md and one file per group of
+	// components, read from node_modules so it always matches the installed version.
+	cpSync(join(root, 'guide'), join(stage, 'guide'), { recursive: true });
 	const { name, version } = pkg;
 	execFileSync('pnpm', ['pack', '--pack-destination', out], { cwd: stage, stdio: 'inherit' });
 	const tgz = `${name.replace(/^@/, '').replace('/', '-')}-${version}.tgz`;
