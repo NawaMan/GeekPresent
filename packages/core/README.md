@@ -4,11 +4,14 @@ GeekPresent's framework — slides and long-form texts in HTML, CSS and Svelte �
 It ships **source** (`.svelte`, `.ts`); your project's Vite compiles it. It is published as a
 tarball on each [GitHub Release](https://github.com/NawaMan/GeekPresent/releases), not on npm.
 
+**Starting a new site?** [GeekPresentStarter](https://github.com/NawaMan/GeekPresentStarter) is all
+of the below already done — *Use this template*, enable Pages, deploy.
+
 ## Install
 
 ```json
 "dependencies": {
-	"@geekpresent/core": "https://github.com/NawaMan/GeekPresent/releases/download/v0.1.0/geekpresent-core-0.1.0.tgz"
+	"@geekpresent/core": "https://github.com/NawaMan/GeekPresent/releases/download/v0.1.2/geekpresent-core-0.1.2.tgz"
 }
 ```
 

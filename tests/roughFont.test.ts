@@ -12,8 +12,8 @@ const css = () => readFileSync(resolve(root, 'src/lib/styles/global.css'), 'utf8
 const bytes = (p: string) => statSync(resolve(root, p)).size;
 
 const FILES = [
-	'static/fonts/Excalifont-Regular-latin.woff2',
-	'static/fonts/Excalifont-Regular-latin-ext.woff2'
+	'src/lib/styles/fonts/Excalifont-Regular-latin.woff2',
+	'src/lib/styles/fonts/Excalifont-Regular-latin-ext.woff2'
 ];
 
 describe('Excalifont — the bundled hand-lettering face', () => {
@@ -34,7 +34,7 @@ describe('Excalifont — the bundled hand-lettering face', () => {
 	it('is @font-face-d under the name the label stack asks for', () => {
 		const s = css();
 		expect(s).toContain("font-family: 'Excalifont'");
-		for (const f of FILES) expect(s).toContain(f.replace('static', ''));
+		for (const f of FILES) expect(s).toContain(f.replace('src/lib/styles/', './'));
 	});
 
 	it('declares unicode-range on both faces, so an English deck fetches one file', () => {
@@ -59,7 +59,7 @@ describe('Excalifont — the bundled hand-lettering face', () => {
 	});
 
 	it('carries its licence, as the OFL requires', () => {
-		const lic = readFileSync(resolve(root, 'static/fonts/Excalifont-OFL.txt'), 'utf8');
+		const lic = readFileSync(resolve(root, 'src/lib/styles/fonts/Excalifont-OFL.txt'), 'utf8');
 		expect(lic).toContain('SIL OPEN FONT LICENSE Version 1.1');
 		expect(lic).toContain('PERMISSION & CONDITIONS');
 		expect(lic).toContain('Excalidraw');

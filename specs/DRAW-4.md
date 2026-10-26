@@ -54,14 +54,14 @@ An **option** that renders the whole Draw family by hand instead of by machine �
 
 Half the Excalidraw look is the typeface, not the geometry. Labels on a rough shape get `class="hand"` and the family comes from `--draw-font-family`, defaulting to a stack of system handwriting faces ending in `cursive` — so *something* handwritten shows with no webfont installed.
 
-**Excalifont is bundled** — the face Excalidraw itself uses, under the SIL Open Font License 1.1 (the licence and attribution are in `static/fonts/Excalifont-OFL.txt`, copied verbatim from the font's own name table). It is `@font-face`'d in `global.css` and sits first in the `.draw-label.hand` fallback stack, so rough labels pick it up with no configuration.
+**Excalifont is bundled** — the face Excalidraw itself uses, under the SIL Open Font License 1.1 (the licence and attribution are in `src/lib/styles/fonts/Excalifont-OFL.txt`, copied verbatim from the font's own name table). It is `@font-face`'d in `global.css` and sits first in the `.draw-label.hand` fallback stack, so rough labels pick it up with no configuration.
 
 Two decisions worth keeping:
 
 - **Only the Latin and Latin-Extended-A subsets ship** (25 KB + 12 KB). Upstream also has Cyrillic, Greek and combining-mark subsets; a deck's shape labels do not need them, and the repo should not carry them. The `unicode-range` descriptors are preserved, so an English deck fetches only the first file.
 - **`font-display: swap`.** A slide must never block on a font. Labels paint immediately in the system-handwriting fallback and re-letter when Excalifont lands.
 
-To use a different face instead, drop it in `static/fonts/`, `@font-face` it alongside, and set `--draw-font-family`. Virgil and Caveat are also OFL and suitable.
+To use a different face instead, drop it in `src/lib/styles/fonts/`, `@font-face` it alongside, and set `--draw-font-family`. Virgil and Caveat are also OFL and suitable.
 
 ## Deliverables
 
