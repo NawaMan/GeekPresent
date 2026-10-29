@@ -88,11 +88,14 @@ describe('moreMenuKeyIntent — ☰ row letters', () => {
 		expect(moreMenuKeyIntent(key({ key: 'r' }), false, false)).toBe('ignore');
 	});
 
-	it('maps O/K/B/C/R/S/E while the drop is open (even if arm timed out)', () => {
+	it('maps O/K/B/I/C/R/S/E while the drop is open (even if arm timed out)', () => {
 		expect(moreMenuKeyIntent(key({ key: 'o' }), true, false)).toBe('overview');
 		expect(moreMenuKeyIntent(key({ key: 'k' }), true, false)).toBe('kiosk');
 		expect(moreMenuKeyIntent(key({ key: 'b' }), true, false)).toBe('bars');
 		expect(moreMenuKeyIntent(key({ key: 'B' }), true, false)).toBe('bars');
+		// POINTER is I — P is PRESENT on the bar.
+		expect(moreMenuKeyIntent(key({ key: 'i' }), true, false)).toBe('pointer');
+		expect(moreMenuKeyIntent(key({ key: 'I' }), true, false)).toBe('pointer');
 		expect(moreMenuKeyIntent(key({ key: 'c' }), true, false)).toBe('capture');
 		expect(moreMenuKeyIntent(key({ key: 'C' }), true, false)).toBe('capture');
 		// PRINT is R — P is PRESENT on the bar.

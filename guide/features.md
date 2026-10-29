@@ -157,6 +157,30 @@ Gotchas:
   forbids reading another document's pixels. CAPTURE answers **NOT ALLOWED** and names the embed.
   `<canvas>` and `<video>` are fine; they are snapshotted into the file.
 
+## Live pointer (for screen recorders)
+
+Some screen recorders leave the mouse cursor out of the video: GNOME's built-in screencast, and
+any capture of a browser tab (the deck's own ● REC included). The live pointer is a glyph the
+page draws where the mouse is, so the recording has a pointer anyway. The real cursor is hidden
+while it is on, so you see one pointer, not two. A press flashes a ripple, so clicks show too.
+
+- **Turn it on:** ☰ → **DRAW POINTER** (Alt+. then **i**), or open any slide with `?pointer`.
+  `?pointer=off` (or the same menu row) turns it off. The choice is sticky across slides.
+- **Deck default:** `<SlideDeck {pages} pointer pointerShape="arrow" pointerSize={40} />`.
+  `pointerShape` is `arrow` / `dot` / `ring` (the same glyphs as `Cursor`); `pointerSize` is in
+  screen px. The speaker's choice outranks the prop.
+- Colours are role tokens: `--live-pointer-fill`, `--live-pointer-outline`, `--live-pointer-glow`,
+  `--live-pointer-ripple` (a bright yellow by default, brighter than `Cursor`'s orange).
+- It is not `Cursor`: that one is scripted and plays on the animation timeline. This one follows
+  the real mouse and needs nothing on the slide.
+
+Gotchas:
+
+- Over an `<iframe>` (`YouTube`, `WebSite`, `WebPage`) the page gets no mouse events, so the drawn
+  pointer stops at the iframe's edge until the mouse comes back.
+- It is `no-print`: CAPTURE and printing leave it out. A screen recorder still sees it.
+- ● REC timelines do not record the pointer, so a REPLAY shows it standing still.
+
 ## KIOSK (unattended auto-advance)
 
 For a booth screen or lobby loop: the deck advances itself and loops.
@@ -395,7 +419,7 @@ use. While armed:
 | u | pause/resume a running kiosk |
 | k | kiosk: setup dialog, or show/hide the panel while one runs |
 
-With ☰ open (or chrome armed): **o** OVERVIEW, **k** KIOSK, **b** hide/show bars, **c** CAPTURE, **r** PRINT (flyout keys `c C w W t T`:
+With ☰ open (or chrome armed): **o** OVERVIEW, **k** KIOSK, **b** hide/show bars, **i** draw/hide the live pointer, **c** CAPTURE, **r** PRINT (flyout keys `c C w W t T`:
 current slide, + notes, whole deck, + notes, thumbnail grid, notes grid), **s** SOURCE, **e**
 EDIT. While the chrome is up, ←/→ walk the top bar, ↓ on ☰ opens it, ↑/↓ walk its rows, Enter
 activates. **Esc** disarms. Letter keys never fire while the focus is in a text field.
@@ -418,6 +442,7 @@ HTML.
 | `?annotate` / `?annotate=off` | offer / withdraw ANNOTATE | yes |
 | `?capture` / `?capture=off` | offer / withdraw CAPTURE | yes |
 | `?kiosk` / `?kiosk=off` | offer and auto-start KIOSK / stop and withdraw it | yes |
+| `?pointer` / `?pointer=off` | draw a pointer where the mouse is (for screen recorders) / stop | yes |
 | `?onboard` | show the first-visit hint now and clear its "seen" flag | no |
 
 "Sticky" means saved in `localStorage` for the whole origin: once seen, it applies to every deck

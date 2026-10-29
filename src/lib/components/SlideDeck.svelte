@@ -47,6 +47,14 @@
 		applyBareParam,
 		toggleBars
 	} from '$lib/stores/chromeBare';
+	import LivePointer from '$lib/components/LivePointer.svelte';
+	import {
+		livePointer,
+		setLivePointerDeck,
+		applyPointerParam,
+		togglePointer
+	} from '$lib/stores/livePointer';
+	import { DEFAULT_POINTER_SIZE, type PointerShape } from '$lib/pointer/livePointerCore';
 	import OnboardHint from '$lib/components/OnboardHint.svelte';
 	import { markOnboarded } from '$lib/stores/onboard';
 	import { DEFAULT_ONBOARD_DELAY_MS, isBeyondFirst, isFirstSlide } from '$lib/onboard/onboardCore';
@@ -377,6 +385,14 @@
 	/** Idle ms on the first slide before that hint appears (a stray Enter/click/scroll
 	   brings it at once). */
 	export let onboardDelayMs = DEFAULT_ONBOARD_DELAY_MS;
+	/** Draw a pointer where the mouse is, and hide the real one (see <LivePointer>) — for a
+	   screen recorder that leaves the OS cursor out of the video. This is the deck's DEFAULT;
+	   a sticky `?pointer` / `?pointer=off` or ☰ → POINTER (Alt+. → I) outranks it. */
+	export let pointer = false;
+	/** The live pointer's glyph: `arrow` / `dot` / `ring`. */
+	export let pointerShape: PointerShape = 'arrow';
+	/** The live pointer's size in screen px. */
+	export let pointerSize = DEFAULT_POINTER_SIZE;
 
 	let viewport: HTMLElement;
 	let container: HTMLElement;
@@ -562,6 +578,8 @@
 	$: if (browser) applyAnnotateParam($page.url);
 	$: if (browser) setChromeBareDeck(hideChrome);
 	$: if (browser) applyBareParam($page.url);
+	$: if (browser) setLivePointerDeck(pointer);
+	$: if (browser) applyPointerParam($page.url);
 	$: inkStaleAfterMs.set(Math.max(0, Number(inkStaleAfter) || 24) * 60 * 60 * 1000);
 
 	// Point the ink at THIS slide. Ink is persisted per slide (stores/annotation.inkBook), so
@@ -943,6 +961,10 @@
 					toggleBars();
 					// No keepChromeArmed after hiding: the raise is what would hold the bars up.
 					return;
+				case 'pointer':
+					togglePointer();
+					closeMoreMenu();
+					break;
 				case 'capture':
 					if (canCapture) onCapture();
 					closeMoreMenu();
@@ -1732,6 +1754,39 @@
 					</button>
 				{/snippet}
 
+				<!-- POINTER — draw a pointer where the mouse is and hide the real one, for a screen
+		     recorder that leaves the cursor out. The same sticky choice as `?pointer`. -->
+				{#snippet pointerItem()}
+					<button
+						type="button"
+						class="annot-tool"
+						title={$livePointer
+							? 'Stop drawing the pointer — show the real cursor again (I)'
+							: 'Draw a pointer where the mouse is, for screen recorders that leave the cursor out (I)'}
+						aria-keyshortcuts="i"
+						aria-pressed={$livePointer}
+						on:click={togglePointer}
+					>
+						<span class="tool-ico" aria-hidden="true">
+							<!-- an arrow pointer -->
+							<svg
+								viewBox="0 0 16 16"
+								width="1em"
+								height="1em"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.4"
+								stroke-linejoin="round"
+							>
+								<path d="M3 2l3.3 11 1.8-4.6L13 6.6z" />
+							</svg>
+						</span>
+						<span class="tool-label"
+							>{$livePointer ? 'HIDE' : 'DRAW'} PO<span class="tool-mn">I</span>NTER</span
+						>
+					</button>
+				{/snippet}
+
 				<!-- PRESENT — the anchor. Ensures the presenter console is running (opens it, or
 		     re-focuses the existing one); it is not a mode, so it carries no on/off state.
 		     Hidden with the whole overlay inside the console itself (the overlay is gated
@@ -2075,6 +2130,13 @@
      window cannot change what the replay is filming (the keyboard is held in onMount). -->
 {#if browser && $replaying && !present}
 	<div class="replay-shield" aria-hidden="true"></div>
+{/if}
+
+<!-- The live pointer — after the replay shield, so it paints above it. Top window only: an
+     OVERVIEW tile or a console preview is an iframe of this deck, and a second pointer
+     drawn inside it would sit apart from the first. -->
+{#if browser && isTopWindow && !present}
+	<LivePointer shape={pointerShape} size={pointerSize} />
 {/if}
 
 <!-- Presenter console (this window loaded with ?present). Mounts OVER the hidden

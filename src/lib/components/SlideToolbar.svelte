@@ -53,6 +53,8 @@
 		kioskItem?: Snippet;
 		/** Hide / show both bars (bare chrome) menu row. */
 		barsItem?: Snippet;
+		/** Draw / hide the live pointer menu row. */
+		pointerItem?: Snippet;
 	}
 
 	let {
@@ -65,7 +67,8 @@
 		printBtn,
 		sourceItem,
 		kioskItem,
-		barsItem
+		barsItem,
+		pointerItem
 	}: Props = $props();
 
 	/** The menu root — so an outside click can tell "in the drop" from "elsewhere". */
@@ -236,7 +239,7 @@
 				aria-haspopup="menu"
 				aria-expanded={$moreMenuOpen}
 				aria-label="More tools (M)"
-				title="More — Overview, Kiosk, Bars, Capture, Print, Source, Edit · GeekPresent {GEEKPRESENT_VERSION}"
+				title="More — Overview, Kiosk, Bars, Pointer, Capture, Print, Source, Edit · GeekPresent {GEEKPRESENT_VERSION}"
 				onclick={() => toggleMoreMenu()}>☰ (M)</button
 			>
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -259,6 +262,7 @@
 				{@render overviewBtn?.()}
 				{@render kioskItem?.()}
 				{@render barsItem?.()}
+				{@render pointerItem?.()}
 				<div class="menu-sep" role="separator"></div>
 				{@render captureItem?.()}
 				{@render printBtn?.()}

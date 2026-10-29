@@ -566,7 +566,12 @@ than misleading the next agent.
   `no-print` but deliberately not `gp-chrome`, so `fadeChrome` doesn't ghost it; off under
   `?clean`. `<SlideDeck stepDots={false}>` / `stepDots: false` in `pages.ts` opt out;
   `stepDotsAt` puts it at any edge or corner for the deck, `stepDots: '<position>'` for one slide
-  (on `left`/`right` it runs vertically). Maths in `utils/stepDotsCore.ts`), plus `OnboardHint` (window-fixed, outside the canvas: the first-visit hint.
+  (on `left`/`right` it runs vertically). Maths in `utils/stepDotsCore.ts`), plus `LivePointer` (window-fixed: a pointer glyph drawn
+  where the real mouse is, with the real cursor hidden, for screen recorders that leave the
+  cursor out — GNOME's screencast, any tab capture. Sticky `?pointer` / `?pointer=off`, ☰ →
+  POINTER (Alt+. → **i**), or the deck's `pointer` prop; `pointerShape` / `pointerSize`.
+  `.no-print`, so CAPTURE omits it. Not `Cursor`, which is scripted. Core
+  `pointer/livePointerCore.ts`, store `stores/livePointer.ts`), plus `OnboardHint` (window-fixed, outside the canvas: the first-visit hint.
   A viewer who sits on the deck's first visible slide without paging or opening a bar is
   told about →/Space/← and the two edge bars — after `onboardDelayMs` (default 8 s) of
   nothing, or at once on a stray Enter/↑/↓, click or scroll. A paging key, a bar hover or
@@ -1159,7 +1164,7 @@ stay out of the audience's way. A speaker who is actively using one often wants 
   ☰); → on PRINT opens its flyout; ← leaves a flyout or drop back toward the bar. Enter activates
   the focused control. Yields to the DISPLAY zoom menu while that menu is open. Prevents deck
   paging from stealing the arrows.
-- **☰ menu groups.** Navigate (OVERVIEW **O**, KIOSK **K**) · export (CAPTURE **C**, PRINT **R**
+- **☰ menu groups.** Navigate (OVERVIEW **O**, KIOSK **K**, BARS **B**, POINTER **I**) · export (CAPTURE **C**, PRINT **R**
   with nested flyout **cCwWtT**) · source (SOURCE **S**, EDIT **E**). A dim footer under the last group
   names the version (`GeekPresent 0.1.0`; `-dev` when built from this repo, `$lib/version`), also in
   the ☰ tooltip — text, not a row, so roving and mnemonics skip it. After **m** opens the drop

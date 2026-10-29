@@ -13,7 +13,7 @@ const all = docs.map((d) => d.text).join('\n');
 
 /** Framework machinery no slide places: SlideDeck mounts it, or another component uses it. */
 const INTERNAL = new Set([
-	'Annotate', 'ControlBar', 'Copyright', 'CtrlBtn', 'KioskDialog', 'KioskIndicator', 'KioskRunner',
+	'Annotate', 'ControlBar', 'Copyright', 'CtrlBtn', 'KioskDialog', 'KioskIndicator', 'KioskRunner', 'LivePointer',
 	'NavigationBar', 'NoteEditor', 'OnboardHint', 'OverviewPage', 'PresenterAnim', 'PresenterView',
 	'Seo', 'SizeMode', 'SlideMap', 'SlideToolbar', 'Spotlight', 'StepDots', 'TableOfContent', 'DrawHandle',
 	'JavaCode', 'JavaCodeBox',

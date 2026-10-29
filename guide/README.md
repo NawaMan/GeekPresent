@@ -212,6 +212,6 @@ One line each; the group file has the props, an example and the traps.
 - `AnimationScene`, `SpriteStudio` · triggers (`fireTrigger`, `<Note data-trigger>`)
 
 **[features.md](features.md) — things a deck turns on**
-- presenter console (`?present`), ANNOTATE pen, Spotlight, CAPTURE to PNG, KIOSK auto-advance,
+- presenter console (`?present`), ANNOTATE pen, Spotlight, live pointer, CAPTURE to PNG, KIOSK auto-advance,
   OVERVIEW grid, search, handout and printing, state (`persisted`), progress, keyboard shortcuts,
   URL flags, chrome bars, onboarding hint, SEO
