@@ -23,6 +23,11 @@ export default defineConfig({
 		// `ENOSPC: System limit for number of file watchers reached`.
 		watch: {
 			ignored: ['**/.pnpm-store/**', '**/worktree/**']
+		},
+		// src/lib/version.ts imports packages/core/package.json, which sits outside the
+		// folders SvelteKit lets the dev server read — every page 500s without this.
+		fs: {
+			allow: ['packages/core']
 		}
 	},
 	optimizeDeps: {
