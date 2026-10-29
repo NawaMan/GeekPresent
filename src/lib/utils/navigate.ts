@@ -1,4 +1,5 @@
 import { SITE } from '$lib/config/site';
+import type { StepDotsPosition } from '$lib/utils/stepDotsCore';
 
 export interface Page {
     path: string;
@@ -33,6 +34,11 @@ export interface Page {
         control everywhere regardless, and a speaker's sticky `?adjust=off` still
         outranks this. See lib/adjust/adjustAccessCore.ts for the precedence. */
     adjust?: boolean;
+    /** The build indicator (<StepDots>) on this one slide: `false` hides it (a build
+        whose progress is itself the reveal), and a position — 'top', 'bottom', 'left',
+        'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right' — moves it there
+        (a slide whose deck-wide spot is busy). Overrides the deck's `stepDotsAt`. */
+    stepDots?: boolean | StepDotsPosition;
     /** Keep this slide OUT of the deck's linear order and its Table of Contents.
 
         The appendix flag. A hidden slide is still a real, prerendered, linkable

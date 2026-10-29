@@ -34,6 +34,12 @@ export type ActiveSteps = {
 	/** Take a step back — the same action as Shift+Space. (What a VOD replay's
 	    `step back` calls.) */
 	prev?: () => void;
+	/** How many steps have been taken, 0..total (Fragments revealed, chapters
+	    reached, commands run). With `total`, what <StepDots> draws; a build that
+	    leaves either out simply shows no dots. */
+	index?: number;
+	/** How many steps the build has in all. */
+	total?: number;
 };
 
 export const activeSteps = writable<ActiveSteps | null>(null);

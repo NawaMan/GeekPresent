@@ -167,6 +167,8 @@
 	import { consoleIsLive, CONSOLE_BEAT_MS, CONSOLE_TTL_MS } from '$lib/utils/consoleLiveCore';
 	import { roleOf } from '$lib/utils/relayCore';
 	import Spotlight from '$lib/components/Spotlight.svelte';
+	import StepDots from '$lib/components/StepDots.svelte';
+	import type { StepDotsPosition } from '$lib/utils/stepDotsCore';
 	import { setHighlight } from '$lib/stores/highlightTarget';
 	import { fireTrigger } from '$lib/stores/triggers';
 	import { collectFinite, applyState } from '$lib/utils/slideAnim';
@@ -364,6 +366,14 @@
 	   without paging or opening a bar is told about →/Space/← and the two bars. Per
 	   viewer, once per origin; never on a screen an audience watches. `false` opts out. */
 	export let onboardHint = true;
+	/** The build indicator (see <StepDots>): a faint row of dots near the bottom of the
+	   canvas while the slide has a Space-driven build, filling as it advances. On by
+	   default; `false` drops it deck-wide, `stepDots: false` on a pages.ts entry for one slide. */
+	export let stepDots = true;
+	/** Where the build indicator sits: 'top' / 'bottom' / 'left' / 'right' (an edge's
+	   midpoint) or 'top-left' / 'top-right' / 'bottom-left' / 'bottom-right'. A slide's
+	   `stepDots: '<position>'` in pages.ts overrides it for that slide. */
+	export let stepDotsAt: StepDotsPosition = 'bottom';
 	/** Idle ms on the first slide before that hint appears (a stray Enter/click/scroll
 	   brings it at once). */
 	export let onboardDelayMs = DEFAULT_ONBOARD_DELAY_MS;
@@ -538,6 +548,10 @@
 	// both (adjust/adjustAccessCore). Browser-guarded so url.searchParams is never read
 	// during prerender.
 	$: slideOffersAdjust = pages.find((p) => p.path === currentSlide)?.adjust === true;
+	// A slide's own `stepDots` entry: false hides it there, a position string moves it.
+	$: slideStepDots = pages.find((p) => p.path === currentSlide)?.stepDots;
+	$: showStepDots = stepDots && !clean && slideStepDots !== false;
+	$: stepDotsPosition = typeof slideStepDots === 'string' ? slideStepDots : stepDotsAt;
 	$: adjustOffered = slideOffersAdjust || adjust;
 	$: if (browser) setAdjustOffered(adjustOffered);
 	$: if (browser) applyAdjustParam($page.url);
@@ -1581,6 +1595,10 @@
 			     inert until a <Note> line or a slide sets the highlightTarget store.
 			     Placed after the slot so it paints over the slide's own blocks. -->
 				<Spotlight canvasWidth={width} canvasHeight={height} />
+				<!-- The build indicator: draws only while a Space-driven build holds activeSteps. -->
+				{#if showStepDots}
+					<StepDots canvasWidth={width} canvasHeight={height} position={stepDotsPosition} />
+				{/if}
 				<!-- The speaker's ink, the other canvas-level singleton. After Spotlight, so a
 			     stroke lands on top of the cue it is drawn next to. Renders nothing at all
 			     until there is ink or the pen is armed — so it is inert (and SSR-inert) on
