@@ -411,6 +411,10 @@
 	--progress-fill: var(--ACCENT, #2980b9);
 	--progress-track: color-mix(in srgb, var(--progress-fill) 20%, transparent);
 
+	/* Build indicator (StepDots.svelte) — the faint row of dots under a Space-driven
+	   build. The canvas ink, so it follows the theme; the fallback is the dark default. */
+	--stepdots-fg: var(--INK, #c0f1ff);
+
 	/* Diagram node (TextBlock.svelte) — a bordered box on the canvas surface, its
 	   border and label in the canvas ink. Fallbacks are the dark default. */
 	--textblock-fg: var(--INK, #c0f1ff);
@@ -443,6 +447,13 @@
 
 	/* Progress bar: its thickness (ProgressBar.svelte). */
 	--progress-height: 6px;
+
+	/* Build indicator (StepDots.svelte): dot size, spacing, how far up from the canvas
+	   bottom it sits, and how faint it rests between steps. */
+	--stepdots-size: 12px;
+	--stepdots-gap: 14px;
+	--stepdots-inset: 36px;
+	--stepdots-idle: 0.3;
 
 	/* Diagram node (TextBlock.svelte): border weight and corner rounding. */
 	--textblock-border-width: 2px;

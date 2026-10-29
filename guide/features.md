@@ -341,6 +341,29 @@ captures and printouts:
 `getProgress()` reads context set by `setPages()`, so call it in a component under a deck layout
 that has called `setPages`.
 
+### Step dots (progress inside a build)
+
+A slide with a Space-driven build (a `Steps` run of Fragments, a `Terminal` with `keys="global"`,
+a `Video` stepping its chapters) shows a faint row of dots near the bottom of the canvas: filled
+for steps taken, the larger one for the step just taken, a ring for each step still to come. It
+brightens on arrival and on each step, then settles back. When the last step is taken the row
+fades out, which tells the speaker that the next Space pages the deck. A build of more than 12
+steps gets one segmented bar instead of dots.
+
+`SlideDeck` mounts it (`StepDots`); no slide places it. It is on by default:
+
+- `<SlideDeck stepDots={false}>` turns it off for the whole deck.
+- `stepDots: false` on a `pages.ts` entry turns it off for that slide.
+- `<SlideDeck stepDotsAt="bottom-left">` moves it for the whole deck. The positions are the four
+  edges (`top`, `bottom`, `left`, `right` — the middle of that edge) and the four corners
+  (`top-left`, `top-right`, `bottom-left`, `bottom-right`). The default is `bottom`. On `left` and
+  `right` the dots run down the edge.
+- `stepDots: 'top-right'` (any position) on a `pages.ts` entry moves it for that slide only, when
+  the deck's spot collides with something on it.
+- It never shows under `?clean`, in a CAPTURE, a printout or a `?shot` PNG.
+- Restyle with role tokens: `--stepdots-fg`, `--stepdots-idle` (resting opacity, default `0.3`),
+  `--stepdots-size`, `--stepdots-gap`, `--stepdots-inset` (distance from the canvas edge).
+
 ## Keyboard shortcuts
 
 **Paging (deck window):**

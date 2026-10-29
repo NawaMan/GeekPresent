@@ -15,7 +15,7 @@ const all = docs.map((d) => d.text).join('\n');
 const INTERNAL = new Set([
 	'Annotate', 'ControlBar', 'Copyright', 'CtrlBtn', 'KioskDialog', 'KioskIndicator', 'KioskRunner',
 	'NavigationBar', 'NoteEditor', 'OnboardHint', 'OverviewPage', 'PresenterAnim', 'PresenterView',
-	'Seo', 'SizeMode', 'SlideMap', 'SlideToolbar', 'Spotlight', 'TableOfContent', 'DrawHandle',
+	'Seo', 'SizeMode', 'SlideMap', 'SlideToolbar', 'Spotlight', 'StepDots', 'TableOfContent', 'DrawHandle',
 	'JavaCode', 'JavaCodeBox',
 	// rendered by the charts and DataTable themselves
 	'Axis', 'ChartTooltip', 'Pagination', 'SearchBox'

@@ -554,11 +554,19 @@ than misleading the next agent.
   `ProgressBar` (a thin "how far through the deck" bar that fills as you page — it reads `getProgress()`,
   so it needs no props; drop it in a deck's `+layout.svelte` after `setPages`, tagged `gp-chrome no-print`
   so it bows out of captures and printouts. geeklight wears one deck-wide),
-  plus two canvas-level **singletons** `SlideDeck` mounts for you — no slide places them:
+  plus three canvas-level **singletons** `SlideDeck` mounts for you — no slide places them:
   `Spotlight` (dims the canvas and rings a *named* `Block`, driven by a `<Note>` line the
-  speaker covers in the console) and `Annotate` (the speaker's **pen** — freehand ink on the
+  speaker covers in the console), `Annotate` (the speaker's **pen** — freehand ink on the
   live slide, persisted per slide; see its playbook, and note the deck must pass `annotate`
-  to offer it), plus `OnboardHint` (window-fixed, outside the canvas: the first-visit hint.
+  to offer it) and `StepDots` (the build indicator — a faint row of dots near the canvas
+  bottom while a Space-driven build holds `activeSteps`, so `Steps`, a global `Terminal` and
+  a stepping `Video` all get it; filled = taken, ring = to come, it brightens on each step and
+  fades out once the build is spent. It reads the store's optional `index`/`total`, so a NEW
+  kind of build must publish both or it shows no dots. Over 12 steps it is one segmented bar.
+  `no-print` but deliberately not `gp-chrome`, so `fadeChrome` doesn't ghost it; off under
+  `?clean`. `<SlideDeck stepDots={false}>` / `stepDots: false` in `pages.ts` opt out;
+  `stepDotsAt` puts it at any edge or corner for the deck, `stepDots: '<position>'` for one slide
+  (on `left`/`right` it runs vertically). Maths in `utils/stepDotsCore.ts`), plus `OnboardHint` (window-fixed, outside the canvas: the first-visit hint.
   A viewer who sits on the deck's first visible slide without paging or opening a bar is
   told about →/Space/← and the two edge bars — after `onboardDelayMs` (default 8 s) of
   nothing, or at once on a stray Enter/↑/↓, click or scroll. A paging key, a bar hover or

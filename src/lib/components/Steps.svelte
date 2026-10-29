@@ -160,7 +160,16 @@
 	// Only the keyboard-owning instance registers, matching who Space would drive.
 	const token = {};
 	$: drivesChrome = browser && !isText && keys === 'global';
-	$: if (drivesChrome) activeSteps.set({ owner: token, hasNext: !atEnd, hasPrev: !atStart, next, prev });
+	$: if (drivesChrome)
+		activeSteps.set({
+			owner: token,
+			hasNext: !atEnd,
+			hasPrev: !atStart,
+			next,
+			prev,
+			index: $revealed,
+			total: $total
+		});
 
 	onDestroy(() => {
 		// Only clear it if we're still the registered build (a later Steps may own it).
@@ -210,4 +219,6 @@
      where they sit in the parent's flow. `let:revealed` hands the slide the
      current step, for anything a Fragment can't express — a Group camera that
      moves on each Space, say (see animation/scene-camera.html). -->
-<div class="steps {klass}" id={id || undefined} style="display: contents; {style}"><slot revealed={Math.min($revealed, $total)} /></div>
+<div class="steps {klass}" id={id || undefined} style="display: contents; {style}">
+	<slot revealed={Math.min($revealed, $total)} />
+</div>

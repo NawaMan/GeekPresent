@@ -210,7 +210,10 @@
 
 	$: build = {
 		hasNext: nextCheckpoint(markers, playhead) !== null,
-		hasPrev: prevCheckpoint(markers, playhead) !== null
+		hasPrev: prevCheckpoint(markers, playhead) !== null,
+		// commands run so far, for <StepDots>
+		index: reached,
+		total: markers.length
 	};
 
 	// Only the keyboard-owning instance publishes itself, matching who Space would drive.
