@@ -41,7 +41,7 @@ export const pages = [
     { path: "adjust-style-guard.html", title: "style vs. ADJUST", adjust: true },
     { path: "highlight-component.html", title: "Highlight Component" },
     { path: "carousel-component.html", title: "Carousel Component" },
-    { path: "steps-component.html",   title: "Steps & Fragment", stepDots: "bottom-left" },
+    { path: "steps-component.html",   title: "Steps & Fragment", stepDots: "bottom-left" as const },
     { path: "datatable-component.html", title: "DataTable — Static Data" },
     { path: "datatable-tools.html",   title: "DataTable — Table Tools" },
     { path: "datatable-server.html",  title: "DataTable — Server-Side Data" },

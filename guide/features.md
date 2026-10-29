@@ -359,7 +359,8 @@ steps gets one segmented bar instead of dots.
   (`top-left`, `top-right`, `bottom-left`, `bottom-right`). The default is `bottom`. On `left` and
   `right` the dots run down the edge.
 - `stepDots: 'top-right'` (any position) on a `pages.ts` entry moves it for that slide only, when
-  the deck's spot collides with something on it.
+  the deck's spot collides with something on it. In an untyped `pages` array write it
+  `stepDots: 'top-right' as const`, or TypeScript widens it to `string` and `setPages` rejects it.
 - It never shows under `?clean`, in a CAPTURE, a printout or a `?shot` PNG.
 - Restyle with role tokens: `--stepdots-fg`, `--stepdots-idle` (resting opacity, default `0.3`),
   `--stepdots-size`, `--stepdots-gap`, `--stepdots-inset` (distance from the canvas edge).
