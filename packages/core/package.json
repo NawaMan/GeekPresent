@@ -1,6 +1,6 @@
 {
 	"name": "@geekpresent/core",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"description": "GeekPresent — presentation slides and long-form texts in HTML, CSS and Svelte. Shipped as source; installed from a GitHub Release tarball.",
 	"repository": {
 		"type": "git",
