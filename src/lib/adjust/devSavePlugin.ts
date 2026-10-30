@@ -8,6 +8,10 @@ import { deckToPagesFile, deckToSlideDir } from '../deckEdit/routeToDeck';
 import {
 	insertPagesEntry,
 	removePagesEntry,
+	renamePagesEntry,
+	duplicatePagesEntry,
+	countSlideRefs,
+	rewriteSlideRefs,
 	normalizeSlidePath,
 	normalizeTemplate,
 	scaffoldPage,
@@ -27,7 +31,12 @@ import { fingerprint, readNote, writeNote, REFUSAL_TEXT } from '../note/noteSour
 //   POST /__geekpresent/source-save   — ViewSource EDIT: full +page.svelte overwrite
 //   GET  /__geekpresent/source-load   — ViewSource EDIT REFRESH: read +page.svelte
 //   POST /__geekpresent/page-add      — Overview EDIT: new slide folder + pages.ts entry
-//   POST /__geekpresent/page-remove   — Overview EDIT: unlist from pages.ts (folder stays)
+//   POST /__geekpresent/page-remove   — Overview EDIT: unlist from pages.ts; `deleteFiles`
+//                                       also removes the slide folder
+//   POST /__geekpresent/page-duplicate — Overview EDIT: copy a slide folder + entry after it
+//   POST /__geekpresent/page-rename   — Overview EDIT: new title and/or path (moves the
+//                                       folder and rewrites links to it under src/routes)
+//   GET  /__geekpresent/page-refs     — Overview EDIT: which route files link to a slide
 //   GET  /__geekpresent/note-load     — presenter NOTE EDIT: the <Note>'s inner source
 //   POST /__geekpresent/note-save     — presenter NOTE EDIT: splice it back (see noteSourceCore)
 //
@@ -39,6 +48,9 @@ const SOURCE_SAVE_ENDPOINT = '/__geekpresent/source-save';
 const SOURCE_LOAD_ENDPOINT = '/__geekpresent/source-load';
 const PAGE_ADD_ENDPOINT = '/__geekpresent/page-add';
 const PAGE_REMOVE_ENDPOINT = '/__geekpresent/page-remove';
+const PAGE_DUPLICATE_ENDPOINT = '/__geekpresent/page-duplicate';
+const PAGE_RENAME_ENDPOINT = '/__geekpresent/page-rename';
+const PAGE_REFS_ENDPOINT = '/__geekpresent/page-refs';
 const NOTE_LOAD_ENDPOINT = '/__geekpresent/note-load';
 const NOTE_SAVE_ENDPOINT = '/__geekpresent/note-save';
 
@@ -77,6 +89,25 @@ interface PageAddRequest {
 interface PageRemoveRequest {
 	deck: string;
 	path: string;
+	/** Also delete the slide folder (not just the pages.ts line). */
+	deleteFiles?: boolean;
+}
+
+interface PageDuplicateRequest {
+	deck: string;
+	/** The slide to copy. */
+	path: string;
+	/** The copy's folder name. */
+	newPath: string;
+	title: string;
+}
+
+interface PageRenameRequest {
+	deck: string;
+	path: string;
+	/** Omit (or equal `path`) to keep the folder; title-only rename. */
+	newPath?: string;
+	title?: string;
 }
 
 function readBody(req: import('node:http').IncomingMessage, maxBytes: number): Promise<string> {
@@ -369,7 +400,8 @@ async function handlePageAdd(server: ViteDevServer, body: string) {
 	};
 }
 
-async function handlePageRemove(server: ViteDevServer, body: string) {
+/** Exported for tests/pageEditPlugin.test.ts. */
+export async function handlePageRemove(server: ViteDevServer, body: string) {
 	const req = JSON.parse(body) as PageRemoveRequest;
 	const deck = String(req.deck ?? '').trim();
 	const norm = normalizeSlidePath(String(req.path ?? '')) ?? String(req.path ?? '').trim();
@@ -399,7 +431,18 @@ async function handlePageRemove(server: ViteDevServer, body: string) {
 		return { status: 400, payload: { error: edited.error } };
 	}
 
+	const slideDir = req.deleteFiles ? deckToSlideDir(deck, norm, root) : null;
+	if (req.deleteFiles) {
+		if (!slideDir || !(await exists(slideDir))) {
+			return { status: 404, payload: { error: `no slide folder for "${norm}"` } };
+		}
+	}
+	// Who still links here — reported, never rewritten: a deleted slide has no new address.
+	const refs = req.deleteFiles ? await findSlideRefs(root, deck, norm) : [];
+
+	// pages.ts first, so the deck stops listing the slide before its route disappears.
 	await fs.writeFile(pagesFile, edited.source, 'utf8');
+	if (slideDir) await fs.rm(slideDir, { recursive: true, force: true });
 
 	return {
 		status: 200,
@@ -407,10 +450,174 @@ async function handlePageRemove(server: ViteDevServer, body: string) {
 			ok: true,
 			path: norm,
 			pages: path.relative(root, pagesFile),
-			// Phase 1: folder intentionally left on disk (unlist only).
-			unlisted: true
+			unlisted: true,
+			deleted: !!slideDir,
+			refs
 		}
 	};
+}
+
+async function exists(p: string): Promise<boolean> {
+	try {
+		await fs.access(p);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/** Every .svelte / .ts / .js / .md file under `dir`, recursively. */
+async function routeSourceFiles(dir: string): Promise<string[]> {
+	const out: string[] = [];
+	let entries: import('node:fs').Dirent[];
+	try {
+		entries = await fs.readdir(dir, { withFileTypes: true });
+	} catch {
+		return out;
+	}
+	for (const e of entries) {
+		const p = path.join(dir, e.name);
+		if (e.isDirectory()) out.push(...(await routeSourceFiles(p)));
+		else if (/\.(svelte|ts|js|md)$/.test(e.name)) out.push(p);
+	}
+	return out;
+}
+
+/** Route files OUTSIDE the slide's own folder (and not its deck's pages.ts, whose
+    entry is edited on purpose) that link to `<deck>/<name>`. */
+async function findSlideRefs(root: string, deck: string, name: string) {
+	const routesDir = path.resolve(root, 'src/routes');
+	const deckDir = path.join(routesDir, deck);
+	const own = path.join(deckDir, name) + path.sep;
+	const pagesFile = path.join(deckDir, 'pages.ts');
+	const refs: { file: string; count: number }[] = [];
+	for (const file of await routeSourceFiles(routesDir)) {
+		if (file.startsWith(own) || file === pagesFile) continue;
+		const sameDeck = file.startsWith(deckDir + path.sep);
+		const count = countSlideRefs(await fs.readFile(file, 'utf8'), deck, name, sameDeck);
+		if (count) refs.push({ file: path.relative(root, file), count });
+	}
+	return refs;
+}
+
+/** Point a slide's own files (its ViewSource `path` literal) at its new folder name. */
+async function retargetOwnFiles(dir: string, deck: string, from: string, to: string) {
+	for (const file of await routeSourceFiles(dir)) {
+		const src = await fs.readFile(file, 'utf8');
+		const next = rewriteSlideRefs(src, deck, from, to, false);
+		if (next.count) await fs.writeFile(file, next.source, 'utf8');
+	}
+}
+
+/** Shared validation for duplicate / rename: deck, pages.ts and both folders. */
+async function resolveSlidePair(server: ViteDevServer, deck: string, from: string, to: string) {
+	const root = server.config.root;
+	const pagesFile = deckToPagesFile(deck, root);
+	const fromDir = deckToSlideDir(deck, from, root);
+	const toDir = deckToSlideDir(deck, to, root);
+	if (!pagesFile || !fromDir || !toDir) {
+		return { error: { status: 400, payload: { error: `invalid deck or path ("${deck}" / "${from}" → "${to}")` } } };
+	}
+	if (!(await exists(fromDir))) {
+		return { error: { status: 404, payload: { error: `no slide folder for "${from}"` } } };
+	}
+	if (fromDir !== toDir && (await exists(toDir))) {
+		return {
+			error: { status: 409, payload: { error: `slide folder already exists: ${path.relative(root, toDir)}` } }
+		};
+	}
+	let pagesSource: string;
+	try {
+		pagesSource = await fs.readFile(pagesFile, 'utf8');
+	} catch {
+		return {
+			error: { status: 404, payload: { error: `no pages.ts for deck "${deck}" (${path.relative(root, pagesFile)})` } }
+		};
+	}
+	return { root, pagesFile, fromDir, toDir, pagesSource };
+}
+
+/** Exported for tests/pageEditPlugin.test.ts. */
+export async function handlePageDuplicate(server: ViteDevServer, body: string) {
+	const req = JSON.parse(body) as PageDuplicateRequest;
+	const deck = String(req.deck ?? '').trim();
+	const from = normalizeSlidePath(String(req.path ?? ''));
+	const to = normalizeSlidePath(String(req.newPath ?? ''));
+	const title = String(req.title ?? '').trim();
+	if (!deck || !from || !to || !title) {
+		return { status: 400, payload: { error: 'deck, path, newPath and title are required' } };
+	}
+	if (from === to) return { status: 400, payload: { error: 'the copy needs a different path' } };
+	const r = await resolveSlidePair(server, deck, from, to);
+	if ('error' in r) return r.error!;
+
+	const edited = duplicatePagesEntry(r.pagesSource, from, to, title);
+	if (!edited.ok) return { status: 400, payload: { error: edited.error } };
+
+	await fs.cp(r.fromDir, r.toDir, { recursive: true, errorOnExist: true, force: false });
+	await retargetOwnFiles(r.toDir, deck, from, to);
+	await fs.writeFile(r.pagesFile, edited.source, 'utf8');
+	return {
+		status: 200,
+		payload: { ok: true, path: to, file: path.relative(r.root, path.join(r.toDir, '+page.svelte')) }
+	};
+}
+
+/** Exported for tests/pageEditPlugin.test.ts. */
+export async function handlePageRename(server: ViteDevServer, body: string) {
+	const req = JSON.parse(body) as PageRenameRequest;
+	const deck = String(req.deck ?? '').trim();
+	const from = normalizeSlidePath(String(req.path ?? ''));
+	const to = req.newPath == null || req.newPath === '' ? from : normalizeSlidePath(String(req.newPath));
+	const title = req.title == null ? undefined : String(req.title).trim();
+	if (!deck || !from || !to) {
+		return { status: 400, payload: { error: 'deck, path and a valid newPath are required' } };
+	}
+	if (title === '') return { status: 400, payload: { error: 'title is required' } };
+	const r = await resolveSlidePair(server, deck, from, to);
+	if ('error' in r) return r.error!;
+
+	const edited = renamePagesEntry(r.pagesSource, from, { path: to, title });
+	if (!edited.ok) return { status: 400, payload: { error: edited.error } };
+
+	const updated: string[] = [];
+	if (to !== from) {
+		// Read every link BEFORE moving anything, so a failure leaves the tree as it was.
+		const refs = await findSlideRefs(r.root, deck, from);
+		await fs.rename(r.fromDir, r.toDir);
+		await retargetOwnFiles(r.toDir, deck, from, to);
+		const deckDir = path.resolve(r.root, 'src/routes', deck);
+		for (const ref of refs) {
+			const abs = path.resolve(r.root, ref.file);
+			const src = await fs.readFile(abs, 'utf8');
+			const next = rewriteSlideRefs(src, deck, from, to, abs.startsWith(deckDir + path.sep));
+			if (next.count) {
+				await fs.writeFile(abs, next.source, 'utf8');
+				updated.push(ref.file);
+			}
+		}
+	}
+	// pages.ts last: its reload should find the folder already at its new name.
+	if (edited.source !== r.pagesSource) await fs.writeFile(r.pagesFile, edited.source, 'utf8');
+	return { status: 200, payload: { ok: true, path: to, updated } };
+}
+
+/** Exported for tests/pageEditPlugin.test.ts. */
+export async function handlePageRefs(server: ViteDevServer, url: string) {
+	let deck = '';
+	let name: string | null = null;
+	try {
+		const u = new URL(url, 'http://dev.local');
+		deck = (u.searchParams.get('deck') ?? '').trim();
+		name = normalizeSlidePath(u.searchParams.get('path') ?? '');
+	} catch {
+		// fall through to the 400
+	}
+	const root = server.config.root;
+	if (!deck || !name || !deckToPagesFile(deck, root)) {
+		return { status: 400, payload: { error: 'deck and path are required' } };
+	}
+	return { status: 200, payload: { refs: await findSlideRefs(root, deck, name) } };
 }
 
 /** Dev-only: stamp every Block-family tag in a route file with the file it was
@@ -457,23 +664,28 @@ export function adjustSavePlugin(): Plugin {
 				const isPageRemove =
 					pathOnly === PAGE_REMOVE_ENDPOINT ||
 					pathOnly.startsWith(PAGE_REMOVE_ENDPOINT + '/');
+				const isPageDuplicate = pathOnly === PAGE_DUPLICATE_ENDPOINT;
+				const isPageRename = pathOnly === PAGE_RENAME_ENDPOINT;
+				const isPageRefs = pathOnly === PAGE_REFS_ENDPOINT;
 				const isNoteLoad = pathOnly === NOTE_LOAD_ENDPOINT;
 				const isNoteSave = pathOnly === NOTE_SAVE_ENDPOINT;
 				if (
 					!isAdjust && !isSourceSave && !isSourceLoad && !isPageAdd && !isPageRemove &&
-					!isNoteLoad && !isNoteSave
+					!isNoteLoad && !isNoteSave && !isPageDuplicate && !isPageRename && !isPageRefs
 				) {
 					return next();
 				}
 
 				try {
-					if (isSourceLoad || isNoteLoad) {
+					if (isSourceLoad || isNoteLoad || isPageRefs) {
 						if (req.method !== 'GET') {
 							res.statusCode = 405;
 							res.end('method not allowed');
 							return;
 						}
-						const { status, payload } = isNoteLoad
+						const { status, payload } = isPageRefs
+							? await handlePageRefs(server, req.url)
+							: isNoteLoad
 							? await handleNoteLoad(server, req.url)
 							: await handleSourceLoad(server, req.url);
 						res.statusCode = status;
@@ -492,6 +704,10 @@ export function adjustSavePlugin(): Plugin {
 					const body = await readBody(req, maxBytes);
 					const { status, payload } = isNoteSave
 						? await handleNoteSave(server, body)
+						: isPageDuplicate
+						? await handlePageDuplicate(server, body)
+						: isPageRename
+						? await handlePageRename(server, body)
 						: isPageAdd
 						? await handlePageAdd(server, body)
 						: isPageRemove

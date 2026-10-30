@@ -11,7 +11,11 @@ import {
 	removePagesEntry,
 	scaffoldPage,
 	LAYOUT_JS,
-	normalizeTemplate
+	normalizeTemplate,
+	renamePagesEntry,
+	duplicatePagesEntry,
+	countSlideRefs,
+	rewriteSlideRefs
 } from '../src/lib/deckEdit/pageEditCore';
 
 const PAGES = `export const pages = [
@@ -169,5 +173,93 @@ describe('scaffoldPage / LAYOUT_JS', () => {
 		expect(normalizeTemplate('title')).toBe('title');
 		expect(normalizeTemplate('nope')).toBe('content');
 		expect(normalizeTemplate(null)).toBe('content');
+	});
+});
+
+describe('renamePagesEntry', () => {
+	const RICH = `export const pages = [
+    { path: "intro.html",  title: "Intro", adjust: true },
+    { path: "gc.html",     title: 'GC "marks"', hidden: true, image: "/og/gc.png" },
+    {
+        path: "multi.html", title: "Multi"
+    },
+];
+`;
+	it('changes the title only, keeping the other fields and spacing', () => {
+		const r = renamePagesEntry(RICH, 'intro.html', { title: 'Hello "there"' });
+		expect(r.ok && r.source.split('\n')[1]).toBe(
+			'    { path: "intro.html",  title: "Hello \\"there\\"", adjust: true },'
+		);
+	});
+
+	it('changes the path and title together', () => {
+		const r = renamePagesEntry(RICH, 'gc.html', { path: 'gc-marks', title: 'GC' });
+		expect(r.ok && r.source.split('\n')[2]).toBe(
+			'    { path: "gc-marks.html",     title: "GC", hidden: true, image: "/og/gc.png" },'
+		);
+	});
+
+	it('refuses a path already listed, a bad path, an empty title, a missing or multi-line entry', () => {
+		expect(renamePagesEntry(RICH, 'intro.html', { path: 'gc.html' }).ok).toBe(false);
+		expect(renamePagesEntry(RICH, 'intro.html', { path: '../x' }).ok).toBe(false);
+		expect(renamePagesEntry(RICH, 'intro.html', { title: '  ' }).ok).toBe(false);
+		expect(renamePagesEntry(RICH, 'nope.html', { title: 'X' }).ok).toBe(false);
+		expect(renamePagesEntry(RICH, 'multi.html', { title: 'X' }).ok).toBe(false);
+	});
+});
+
+describe('duplicatePagesEntry', () => {
+	const SRC = `export const pages = [
+    { path: "a.html", title: "A", hidden: true, image: "/og/a.png" },
+    { path: "b.html", title: "B" },
+];`;
+	it('inserts the copy right after the original, dropping image', () => {
+		const r = duplicatePagesEntry(SRC, 'a.html', 'a-copy.html', 'A (copy)');
+		expect(r.ok && r.source.split('\n').slice(1, 4)).toEqual([
+			'    { path: "a.html", title: "A", hidden: true, image: "/og/a.png" },',
+			'    { path: "a-copy.html", title: "A (copy)", hidden: true },',
+			'    { path: "b.html", title: "B" },'
+		]);
+	});
+
+	it('refuses an existing target, a bad path, an empty title, a missing source', () => {
+		expect(duplicatePagesEntry(SRC, 'a.html', 'b.html', 'X').ok).toBe(false);
+		expect(duplicatePagesEntry(SRC, 'a.html', 'x/y', 'X').ok).toBe(false);
+		expect(duplicatePagesEntry(SRC, 'a.html', 'c.html', ' ').ok).toBe(false);
+		expect(duplicatePagesEntry(SRC, 'z.html', 'c.html', 'X').ok).toBe(false);
+	});
+});
+
+describe('countSlideRefs / rewriteSlideRefs', () => {
+	const SAME = `<AppendixLink to="old.html">a</AppendixLink>
+<Link href="./old.html?x">b</Link>
+<a href="bold.html">not it</a> <a href="old.html.bak">nor this</a>
+const path = 'src/routes/slides/old.html/+page.svelte';`;
+	const OTHER = `<a href="../slides/old.html">x</a> <a href="old.html">its own deck's old</a>`;
+
+	it('in the same deck, rewrites bare and qualified references only', () => {
+		expect(countSlideRefs(SAME, 'slides', 'old.html', true)).toBe(3);
+		const r = rewriteSlideRefs(SAME, 'slides', 'old.html', 'new.html', true);
+		expect(r.count).toBe(3);
+		expect(r.source).toContain('to="new.html"');
+		expect(r.source).toContain('href="./new.html?x"');
+		expect(r.source).toContain("'src/routes/slides/new.html/+page.svelte'");
+		expect(r.source).toContain('href="bold.html"');
+		expect(r.source).toContain('href="old.html.bak"');
+	});
+
+	it('from another deck, rewrites only the deck-qualified reference', () => {
+		const r = rewriteSlideRefs(OTHER, 'slides', 'old.html', 'new.html', false);
+		expect(r.count).toBe(1);
+		expect(r.source).toBe(`<a href="../slides/new.html">x</a> <a href="old.html">its own deck's old</a>`);
+	});
+
+	it("catches the deck index redirect's pathname + '/name.html'", () => {
+		const r = rewriteSlideRefs(`location.pathname + '/old.html'`, 'slides', 'old.html', 'new.html', true);
+		expect(r.source).toBe(`location.pathname + '/new.html'`);
+	});
+
+	it('does not match a deck whose name merely ends the same way', () => {
+		expect(countSlideRefs('href="../myslides/old.html"', 'slides', 'old.html', false)).toBe(0);
 	});
 });

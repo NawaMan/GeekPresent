@@ -592,9 +592,12 @@ than misleading the next agent.
   `OverviewPage` (the all-slides grid — press **O**, click a slide to jump, Escape closes. `SlideDeck`
   mounts it; no slide places it. Tiles are live `?clean` iframes, lazy-mounted; `hidden` appendices
   are omitted. In **`pnpm dev`**, **EDIT** (or **E**) arms deck-structure editing: **ADD**, between-page
-  **+**, and **×** unlist (writes route folder + `pages.ts` via `/__geekpresent/page-add` /
-  `page-remove`; production answers NOT ALLOWED). Spec: `specs/DECK-EDIT-1.md`. Core:
-  `utils/overviewPageCore.ts` + `deckEdit/pageEditCore.ts`),
+  **+**, and per tile **✎** rename (title and/or path — a path change moves the folder and rewrites
+  links to it under `src/routes`), **⧉** duplicate (folder + assets, entry after the original) and
+  **×** remove (a dialog: **Unlist** keeps the folder, **Delete files** removes it, after listing who
+  still links there). Writes go through `/__geekpresent/page-add` / `page-remove` / `page-rename` /
+  `page-duplicate` (+ `page-refs`); production answers NOT ALLOWED. Specs: `specs/DECK-EDIT-1.md`,
+  `specs/DECK-EDIT-2.md`. Core: `utils/overviewPageCore.ts` + `deckEdit/pageEditCore.ts`),
   `SizeMode`, `Seo` (renders SEO/social metadata
   into `<svelte:head>` — see the SEO note under *Gotchas*).
 - Package manager is **pnpm**, but **only inside the booth** — always

@@ -486,6 +486,116 @@ describe('OverviewPage — EDIT deck mode', () => {
 	});
 });
 
+describe('OverviewPage — rename, duplicate, remove', () => {
+	const originalFetch = globalThis.fetch;
+	let posts: Array<{ url: string; body: Record<string, unknown> }> = [];
+	beforeEach(() => {
+		posts = [];
+		globalThis.fetch = vi.fn(async (url: string, init?: RequestInit) => {
+			if (init?.method === 'POST') posts.push({ url, body: JSON.parse(String(init.body)) });
+			const body = String(url).includes('page-refs')
+				? { refs: [{ file: 'src/routes/slides/title.html/+page.svelte', count: 1 }] }
+				: { ok: true, updated: [] };
+			return new Response(JSON.stringify(body), { status: 200 });
+		}) as unknown as typeof fetch;
+	});
+	afterEach(() => {
+		globalThis.fetch = originalFetch;
+	});
+
+	async function editGrid() {
+		stubObserver();
+		render(OverviewPageHost);
+		await openGrid();
+		await fireEvent.click(screen.getByRole('button', { name: /EDIT/i }));
+		await tick();
+	}
+	const input = (label: string) =>
+		[...document.querySelectorAll('.add-form label')]
+			.find((l) => l.querySelector('span')?.textContent === label)
+			?.querySelector('input') as HTMLInputElement;
+
+	it('shows rename, duplicate and remove on every tile in EDIT', async () => {
+		await editGrid();
+		expect(document.querySelectorAll('.tile-rename').length).toBe(3);
+		expect(document.querySelectorAll('.tile-duplicate').length).toBe(3);
+		expect(document.querySelectorAll('.tile-remove').length).toBe(3);
+	});
+
+	it('rename prefills the tile, and a title edit leaves the path alone', async () => {
+		await editGrid();
+		await fireEvent.click(screen.getByRole('button', { name: 'Rename Outro' }));
+		await tick();
+		expect(document.querySelector('.add-form-title')?.textContent?.trim()).toBe('Rename outro.html');
+		expect(input('Title').value).toBe('Outro');
+		expect(input('Path').value).toBe('outro.html');
+		// No template / position for a rename.
+		expect(document.querySelectorAll('.add-form select').length).toBe(0);
+
+		await fireEvent.input(input('Title'), { target: { value: 'Goodbye' } });
+		await tick();
+		expect(input('Path').value).toBe('outro.html');
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+		await tick();
+		expect(posts[0].url).toContain('page-rename');
+		expect(posts[0].body).toEqual({ deck: 'slides', path: 'outro.html', newPath: 'outro.html', title: 'Goodbye' });
+	});
+
+	it('duplicate prefills a (copy) title and path and posts the copy', async () => {
+		await editGrid();
+		await fireEvent.click(screen.getByRole('button', { name: 'Duplicate Outro' }));
+		await tick();
+		expect(input('Title').value).toBe('Outro (copy)');
+		expect(input('Path').value).toBe('outro-copy.html');
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Duplicate' }));
+		await tick();
+		expect(posts[0].url).toContain('page-duplicate');
+		expect(posts[0].body).toEqual({ deck: 'slides', path: 'outro.html', newPath: 'outro-copy.html', title: 'Outro (copy)' });
+	});
+
+	it('× opens a dialog naming the links, and Unlist / Delete files post the choice', async () => {
+		await editGrid();
+		await fireEvent.click(screen.getByRole('button', { name: 'Remove Outro from deck' }));
+		await vi.waitFor(() =>
+			expect(document.querySelector('.remove-dialog .refs')?.textContent).toContain('title.html/+page.svelte')
+		);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Unlist' }));
+		expect(posts[0].body).toEqual({ deck: 'slides', path: 'outro.html', deleteFiles: false });
+		await vi.waitFor(() => expect(document.querySelector('.remove-dialog')).toBeNull());
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Remove Outro from deck' }));
+		await tick();
+		await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Delete files' }).hasAttribute('disabled')).toBe(false));
+		await fireEvent.click(screen.getByRole('button', { name: 'Delete files' }));
+		expect(posts[1].body).toEqual({ deck: 'slides', path: 'outro.html', deleteFiles: true });
+	});
+
+	it('Esc closes the remove dialog before leaving EDIT', async () => {
+		await editGrid();
+		await fireEvent.click(screen.getByRole('button', { name: 'Remove Outro from deck' }));
+		await tick();
+		expect(document.querySelector('.remove-dialog')).not.toBeNull();
+
+		await fireEvent.keyDown(window, { key: 'Escape' });
+		expect(document.querySelector('.remove-dialog')).toBeNull();
+		expect(document.querySelector('.head-title')?.textContent).toBe('EDIT DECK');
+		expect(posts.length).toBe(0);
+	});
+
+	it('refuses with NOT ALLOWED instead of opening a form on a static host', async () => {
+		await editGrid();
+		canEditDeck.set(false);
+		await tick();
+		await fireEvent.click(screen.getByRole('button', { name: 'Rename Outro' }));
+		await tick();
+		expect(document.querySelector('.add-form')).toBeNull();
+		expect(screen.getByRole('button', { name: /NOT ALLOWED/i })).toBeTruthy();
+	});
+});
+
 describe('OverviewPage — keys it must not steal', () => {
 	it('ignores `o` while the speaker is typing', async () => {
 		stubObserver();
