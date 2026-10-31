@@ -78,14 +78,7 @@ beforeEach(() => {
 	canAnnotate.set(true);
 	annotationMode.set(false);
 	annotateTool.set('pen');
-	annotateColor.set({
-		pen: null,
-		line: null,
-		arrow: null,
-		rectangle: null,
-		highlighter: null,
-		text: null
-	});
+	annotateColor.set(null);
 	inkStaleAfterMs.set(INK_STALE_AFTER_MS);
 	barPos.set(null);
 	inkPath.set('');
@@ -133,14 +126,7 @@ describe('Annotate — armed', () => {
 	});
 
 	it('paints a picked colour as the FILL of a freehand mark, the stroke of any other', () => {
-		annotateColor.set({
-			pen: '#E5484D',
-			line: '#3FA9F5',
-			arrow: null,
-			rectangle: null,
-			highlighter: null,
-			text: null
-		});
+		annotateColor.set('#E5484D');
 		render(AnnotateHost);
 		stroke(surfaceAt(), [
 			[100, 100],
@@ -157,7 +143,7 @@ describe('Annotate — armed', () => {
 		]);
 		const marks = document.querySelectorAll('.annot-stroke');
 		expect(marks).toHaveLength(2);
-		expect((marks[1].getAttribute('style') ?? '').replace(/\s/g, '')).toBe('stroke:#3FA9F5;');
+		expect((marks[1].getAttribute('style') ?? '').replace(/\s/g, '')).toBe('stroke:#E5484D;');
 	});
 
 	it('files the ink under the SLIDE, and survives paging away and back', () => {
@@ -627,15 +613,15 @@ describe('Annotate — armed', () => {
 	it('picks colours with Shift + the digit keys, by physical key', async () => {
 		render(AnnotateHost, { props: { inkColors: [null, '#E5484D', '#3FA9F5'] } });
 		await fireEvent.keyDown(window, { key: '@', code: 'Digit2', shiftKey: true });
-		expect(get(annotateColor).pen).toBe('#E5484D');
+		expect(get(annotateColor)).toBe('#E5484D');
 		await fireEvent.keyDown(window, { key: '!', code: 'Digit1', shiftKey: true });
-		expect(get(annotateColor).pen).toBeNull(); // the theme swatch
+		expect(get(annotateColor)).toBeNull(); // the theme swatch
 		expect(screen.getByLabelText('Colour #3FA9F5').getAttribute('title')).toBe('#3FA9F5 (Shift+3)');
 
 		// No colour to pick while erasing — the key does nothing rather than recolouring the pen.
 		annotateTool.set('eraser');
 		await fireEvent.keyDown(window, { key: '#', code: 'Digit3', shiftKey: true });
-		expect(get(annotateColor).pen).toBeNull();
+		expect(get(annotateColor)).toBeNull();
 	});
 
 	it('offers swatches only — no custom colour picker on the bar', () => {
@@ -919,13 +905,44 @@ describe('Annotate — armed', () => {
 		expect(latest.color).toBeUndefined();
 	});
 
-	it('remembers a colour per tool', async () => {
+	it('keeps ONE colour across tool switches — colour and tool are chosen independently', async () => {
 		render(AnnotateHost, { props: { inkColors: [null, '#E5484D'] } });
 		await fireEvent.click(screen.getByLabelText('Colour #E5484D'));
-		expect(get(annotateColor).pen).toBe('#E5484D');
-		// Switching tools must not drag the pen's colour onto the highlighter.
+		expect(get(annotateColor)).toBe('#E5484D');
+
+		for (const label of ['Highlight', 'Line', 'Pen']) {
+			await fireEvent.click(screen.getByLabelText(label));
+			expect(get(annotateColor)).toBe('#E5484D');
+			expect(screen.getByLabelText('Colour #E5484D').getAttribute('aria-pressed')).toBe('true');
+		}
+
+		// A round trip through a mode with no colour (the eraser) does not lose it either.
+		await fireEvent.click(screen.getByLabelText('Erase'));
+		await fireEvent.click(screen.getByLabelText('Highlight'));
+		stroke(surfaceAt(), [
+			[50, 50],
+			[200, 50]
+		]);
+		expect(get(strokes)[0].color).toBe('#E5484D');
+	});
+
+	it('the THEME swatch still lets each tool paint in its own token colour', async () => {
+		render(AnnotateHost);
+		stroke(surfaceAt(), [
+			[50, 50],
+			[200, 120]
+		]);
 		annotateTool.set('highlighter');
-		expect(get(annotateColor).highlighter).toBe(null);
+		await tick();
+		stroke(surfaceAt(), [
+			[50, 200],
+			[200, 200]
+		]);
+		// No colour stored on either: the pen's token paints one, the highlighter's the other.
+		expect(get(strokes).map((s) => s.color)).toEqual([undefined, undefined]);
+		const marks = document.querySelectorAll('.annot-stroke');
+		expect(marks[1].classList.contains('highlighter')).toBe(true);
+		expect(marks[1].getAttribute('style') ?? '').toBe('');
 	});
 
 	it('puts the pen down on the close (×) and on Escape', async () => {

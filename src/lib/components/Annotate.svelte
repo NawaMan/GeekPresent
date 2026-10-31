@@ -185,9 +185,9 @@
 	const drawTool = $derived<AnnotateTool>(
 		picking || $annotateTool === 'text' ? 'pen' : ($annotateTool as AnnotateTool)
 	);
-	// The colour the next mark uses — the selected tool's own, or null while picking (neither
-	// the eraser, freeze nor pointer paints anything). Text is colourable, so it keeps its swatch.
-	const color = $derived(picking ? null : $annotateColor[$annotateTool as AnnotateTool]);
+	// The colour the next mark uses — the one shared colour, whichever tool draws it — or null
+	// while picking (neither the eraser, freeze nor pointer paints anything).
+	const color = $derived(picking ? null : $annotateColor);
 
 	let surface: SVGSVGElement | undefined = $state();
 	let live: Point[] = $state([]);
@@ -746,7 +746,7 @@
 
 	function setColor(c: string | null): void {
 		if (picking) return; // neither the eraser, freeze nor pointer has a colour to set
-		annotateColor.update((m) => ({ ...m, [$annotateTool]: c }));
+		annotateColor.set(c);
 	}
 
 	// The bar's mode buttons, as icons. Each carries its word as the aria-label AND the tooltip,

@@ -103,6 +103,8 @@ corners), text, eraser, freeze. Arm it from the **ANNOTATE** button in the top t
 - **Keys while the pen is armed:** **1–9** pick the bar's modes left to right (1 POINTER, 2 pen, 3
   line, 4 arrow, 5 rectangle, 6 highlight, 7 text, 8 erase, 9 freeze — each button shows its
   digit), **Shift+1–9** the colour swatches. So 1 → click the slide → 1 is back to drawing.
+- **One colour for every tool.** The picked swatch stays picked when you change tool; the theme
+  swatch lets each tool use its own theme colour (pen orange, highlighter yellow).
 
 Other props on `<SlideDeck>`:
 

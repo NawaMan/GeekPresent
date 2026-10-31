@@ -1132,7 +1132,9 @@ Nothing to place: `SlideDeck` mounts `<Annotate>` once, like `Spotlight`. One pr
   put it down.
 
 > Other props: `inkColors` (the swatches; `null` is the theme's own colour, so un-picked ink
-> follows a re-theme instead of freezing a hex), `penWidth` / `highlighterWidth`. Colours and
+> follows a re-theme instead of freezing a hex), `penWidth` / `highlighterWidth`. The picked
+> colour is ONE value shared by every tool (`annotateColor`), chosen independently of the tool —
+> switching tools keeps it; the theme swatch still gives each tool its own token colour. Colours and
 > the bar's resting opacity are `--annot-*` role tokens. The bar drags by its `⠿` grip and
 > remembers where it was put for as long as the pen stays armed — paging with ANNOTATE on
 > keeps it there, since `annotationMode` is itself persisted — but closing the pen (or
