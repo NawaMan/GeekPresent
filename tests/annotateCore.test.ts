@@ -16,6 +16,10 @@ import {
 	isStaleInk,
 	levelPoints,
 	rectD,
+	rectOutline,
+	fitBarScale,
+	annotateKeyIntent,
+	pickMode,
 	sanitizeInkBook,
 	sanitizeStrokes,
 	sanitizeText,
@@ -271,6 +275,39 @@ describe('arrowD — a straight shaft with a chevron head', () => {
 	});
 });
 
+describe('rectOutline — what the eraser tests a rectangle against', () => {
+	it('closes the four corners, normalised whichever way the box was dragged', () => {
+		const out = [
+			[10, 10],
+			[30, 10],
+			[30, 40],
+			[10, 40],
+			[10, 10]
+		];
+		expect(rectOutline([[10, 10], [30, 40]])).toEqual(out);
+		expect(rectOutline([[30, 40], [10, 10]])).toEqual(out);
+	});
+
+	it('hits the EDGES, not the diagonal the two stored corners would make', () => {
+		const corners: [number, number][] = [
+			[0, 0],
+			[200, 100]
+		];
+		// The box's centre lies ON the diagonal but 50px from any edge.
+		expect(hitStroke([100, 50], corners, 10)).toBe(true); // the old, wrong answer
+		expect(hitStroke([100, 50], rectOutline(corners), 10)).toBe(false);
+		// Mid-way along the top and right edges: ink you can see, nowhere near the diagonal.
+		expect(hitStroke([100, 2], rectOutline(corners), 10)).toBe(true);
+		expect(hitStroke([198, 50], rectOutline(corners), 10)).toBe(true);
+	});
+
+	it('is total: empty in → empty out, junk never yields NaN', () => {
+		expect(rectOutline([])).toEqual([]);
+		expect(rectOutline(null as unknown as [number, number][])).toEqual([]);
+		expect(rectOutline([[NaN, 0], [10, Infinity]] as [number, number][]).flat().some(Number.isNaN)).toBe(false);
+	});
+});
+
 describe('rectD — a box between two corners', () => {
 	it('draws a closed rectangle, normalising the corners', () => {
 		// Top-left then bottom-right, and the reverse, draw the SAME box — so dragging any
@@ -283,6 +320,34 @@ describe('rectD — a box between two corners', () => {
 		expect(rectD([])).toBe('');
 		expect(rectD(null as unknown as [number, number][])).toBe('');
 		expect(rectD([[NaN, 0], [10, Infinity]] as [number, number][])).not.toContain('NaN');
+	});
+
+	it('rounds the corners with a quarter arc each when given a radius', () => {
+		const d = rectD([[10, 10], [110, 70]], 12);
+		expect(d).toBe(
+			'M 22 10 L 98 10 A 12 12 0 0 1 110 22 L 110 58 A 12 12 0 0 1 98 70' +
+				' L 22 70 A 12 12 0 0 1 10 58 L 10 22 A 12 12 0 0 1 22 10 Z'
+		);
+		// Dragged the other way, the same rounded box.
+		expect(rectD([[110, 70], [10, 10]], 12)).toBe(d);
+	});
+
+	it('clamps the radius PER AXIS, the way SVG clamps <rect rx> (so a frozen <Rect> matches)', () => {
+		// 100 wide, 10 tall: rx stays 12, ry is held to half the height — flattened corners,
+		// never arcs that overrun the sides.
+		expect(rectD([[0, 0], [100, 10]], 12)).toContain('A 12 5 0 0 1');
+		// A radius larger than the whole box degenerates to a pill/ellipse, not a mess.
+		expect(rectD([[0, 0], [40, 20]], 999)).toContain('A 20 10 0 0 1');
+	});
+
+	it('draws square corners for a zero, negative or junk radius, and for a flat box', () => {
+		const square = 'M 10 10 L 30 10 L 30 40 L 10 40 Z';
+		expect(rectD([[10, 10], [30, 40]], 0)).toBe(square);
+		expect(rectD([[10, 10], [30, 40]], -5)).toBe(square);
+		expect(rectD([[10, 10], [30, 40]], NaN)).toBe(square);
+		// No height → nothing to round; still a drawable (degenerate) box.
+		expect(rectD([[10, 10], [30, 10]], 12)).toBe('M 10 10 L 30 10 L 30 10 L 10 10 Z');
+		expect(rectD([[NaN, 0], [10, Infinity]] as [number, number][], 12)).not.toContain('NaN');
 	});
 });
 
@@ -687,5 +752,88 @@ describe('readAnnotateParam / readSticky', () => {
 		expect(readSticky(null)).toBe(null);
 		// …so a garbage byte leaves a deck that ships the pen still shipping it.
 		expect(resolveCanAnnotate(false, readSticky('garbage'), true)).toBe(true);
+	});
+});
+
+describe('annotateKeyIntent — digits pick a mode, Shift+digits a colour', () => {
+	const k = (o: Record<string, unknown>) => o as { key: string };
+
+	it('reads a bare digit as the Nth mode, 0-based', () => {
+		expect(annotateKeyIntent(k({ key: '1', code: 'Digit1' }), 9, 5)).toEqual({ kind: 'tool', index: 0 });
+		expect(annotateKeyIntent(k({ key: '9', code: 'Digit9' }), 9, 5)).toEqual({ kind: 'tool', index: 8 });
+		expect(annotateKeyIntent(k({ key: '3', code: 'Numpad3' }), 9, 5)).toEqual({ kind: 'tool', index: 2 });
+	});
+
+	it('reads Shift+digit by its PHYSICAL key, whatever character the layout types', () => {
+		expect(annotateKeyIntent(k({ key: '!', code: 'Digit1', shiftKey: true }), 9, 5)).toEqual({
+			kind: 'color',
+			index: 0
+		});
+		expect(annotateKeyIntent(k({ key: '#', code: 'Digit3', shiftKey: true }), 9, 5)).toEqual({
+			kind: 'color',
+			index: 2
+		});
+		// AZERTY: the unshifted digit row types symbols — the code still says which key it was.
+		expect(annotateKeyIntent(k({ key: '&', code: 'Digit1' }), 9, 5)).toEqual({ kind: 'tool', index: 0 });
+	});
+
+	it('falls back to `key` when the event carries no code', () => {
+		expect(annotateKeyIntent(k({ key: '4' }), 9, 5)).toEqual({ kind: 'tool', index: 3 });
+	});
+
+	it('leaves alone: modifier chords, 0, letters, the paging keys, and digits past the list', () => {
+		expect(annotateKeyIntent(k({ key: '1', code: 'Digit1', ctrlKey: true }), 9, 5)).toBeNull();
+		expect(annotateKeyIntent(k({ key: '1', code: 'Digit1', metaKey: true }), 9, 5)).toBeNull();
+		expect(annotateKeyIntent(k({ key: '1', code: 'Digit1', altKey: true }), 9, 5)).toBeNull();
+		expect(annotateKeyIntent(k({ key: '0', code: 'Digit0' }), 9, 5)).toBeNull();
+		expect(annotateKeyIntent(k({ key: 'p', code: 'KeyP' }), 9, 5)).toBeNull();
+		for (const key of ['ArrowRight', 'ArrowLeft', ' ', 'PageDown', 'Home', 'End'])
+			expect(annotateKeyIntent(k({ key }), 9, 5)).toBeNull();
+		expect(annotateKeyIntent(k({ key: '6', code: 'Digit6', shiftKey: true }), 9, 5)).toBeNull(); // 5 swatches
+		expect(annotateKeyIntent(k({ key: '9', code: 'Digit9' }), 8, 5)).toBeNull();
+	});
+
+	it('is total', () => {
+		expect(annotateKeyIntent(null, 9, 5)).toBeNull();
+		expect(annotateKeyIntent(k({ key: '1' }), NaN, NaN)).toBeNull();
+		expect(annotateKeyIntent(k({ key: undefined, code: 42 }), 9, 5)).toBeNull();
+	});
+});
+
+describe('pickMode — POINTER twice hands you back your tool', () => {
+	it('returns to the tool before POINTER when POINTER is picked again', () => {
+		expect(pickMode('pointer', 'pointer', 'arrow')).toBe('arrow');
+		expect(pickMode('pointer', 'pointer', 'eraser')).toBe('eraser');
+	});
+
+	it('falls back to the pen with no (or a junk) previous tool', () => {
+		expect(pickMode('pointer', 'pointer', null)).toBe('pen');
+		expect(pickMode('pointer', 'pointer', 'pointer')).toBe('pen');
+	});
+
+	it('is a plain pick otherwise', () => {
+		expect(pickMode('pointer', 'pen', 'line')).toBe('pointer');
+		expect(pickMode('rectangle', 'rectangle', 'pen')).toBe('rectangle');
+		expect(pickMode('pen', 'pointer', 'arrow')).toBe('pen');
+	});
+});
+
+describe('fitBarScale — one line, shrunk to fit rather than wrapped', () => {
+	it('keeps the full scale when the bar fits the canvas', () => {
+		expect(fitBarScale(1000, 1920, 0.7)).toBe(0.7); // 700 px drawn, on a 1920 canvas
+	});
+
+	it('shrinks just enough to fit, leaving a margin at the edges', () => {
+		// A portrait canvas: 1080 wide, 4% margin → 1036.8 px of room for a 2000 px bar.
+		expect(fitBarScale(2000, 1080, 0.7)).toBeCloseTo(1036.8 / 2000, 6);
+		expect(fitBarScale(2000, 1080, 0.7, 0)).toBeCloseTo(0.54, 6);
+	});
+
+	it('uses the full scale until the bar has been measured, and never yields NaN', () => {
+		expect(fitBarScale(0, 1080, 0.7)).toBe(0.7);
+		expect(fitBarScale(NaN, 1080, 0.7)).toBe(0.7);
+		expect(fitBarScale(2000, NaN, 0.7)).toBe(0.7);
+		expect(fitBarScale(2000, 1080, NaN)).toBeLessThanOrEqual(1);
+		expect(Number.isFinite(fitBarScale(2000, 1080, 0.7, NaN))).toBe(true);
 	});
 });

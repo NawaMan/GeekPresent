@@ -52,6 +52,17 @@ describe('freezeTag — the per-tool mapping', () => {
 		expect(tag).toBe('<Rect x={100} y={200} width={200} height={200} thickness={6} />');
 	});
 
+	it('carries a rectangle corner radius as `rounded`, and omits it when there is none', () => {
+		const r = ink({ tool: 'rectangle', points: [[300, 400], [100, 200]] });
+		expect(freezeTag(r, { rectRadius: 12 })).toBe(
+			'<Rect x={100} y={200} width={200} height={200} rounded={12} thickness={6} />'
+		);
+		expect(freezeTag(r, { rectRadius: 0 })).not.toContain('rounded');
+		expect(freezeTag(r, { rectRadius: NaN })).not.toContain('rounded');
+		// Only a rectangle is rounded — a line never grows the attribute.
+		expect(freezeTag(ink({ tool: 'line' }), { rectRadius: 12 })).not.toContain('rounded');
+	});
+
 	it('refuses TEXT — the Draw family has no counterpart for a typed label', () => {
 		const label = ink({ tool: 'text', text: 'hello', points: [[10, 10]] });
 		expect(isFreezable(label)).toBe(false);

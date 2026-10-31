@@ -27,6 +27,9 @@ export interface FreezeOptions {
 	penWidth?: number;
 	/** Highlighter band width in canvas px — must match <Annotate>'s `highlighterWidth`. */
 	highlighterWidth?: number;
+	/** Rectangle corner radius in canvas px — must match <Annotate>'s `rectRadius`. Emitted
+	    as `rounded`, which Draw's <Rect> clamps exactly as annotateCore.rectD does. */
+	rectRadius?: number;
 	/** Leading whitespace on each emitted line (the indent of the paste site). */
 	indent?: string;
 }
@@ -94,7 +97,8 @@ function styleAttrs(stroke: Stroke, opts: FreezeOptions): string {
       - line/arrow  → <Line from to>, the two ends of the straight segment the stroke was
                       already shaped to; an arrow adds `arrow="end"`, which Line has.
       - rectangle   → <Rect x y width height>, the corners normalised the way rectD paints
-                      them, so a box dragged bottom-right-to-top-left freezes right way up. */
+                      them, so a box dragged bottom-right-to-top-left freezes right way up;
+                      plus `rounded` when the ink had rounded corners. */
 export function freezeTag(stroke: Stroke, opts: FreezeOptions = {}): string {
 	if (!isFreezable(stroke)) return '';
 	const pts = points(stroke);
@@ -118,7 +122,9 @@ export function freezeTag(stroke: Stroke, opts: FreezeOptions = {}): string {
 		const y = Math.min(a[1], b[1]);
 		const w = Math.abs(b[0] - a[0]);
 		const h = Math.abs(b[1] - a[1]);
-		return `<Rect x={${fmtNum(x)}} y={${fmtNum(y)}} width={${fmtNum(w)}} height={${fmtNum(h)}}${attrs} />`;
+		const r = Math.max(0, Number.isFinite(opts.rectRadius) ? (opts.rectRadius as number) : 0);
+		const rounded = r > 0 ? ` rounded={${fmtNum(r)}}` : '';
+		return `<Rect x={${fmtNum(x)}} y={${fmtNum(y)}} width={${fmtNum(w)}} height={${fmtNum(h)}}${rounded}${attrs} />`;
 	}
 
 	// pen + highlighter — both freehand point lists, both smoothed the way they were drawn.

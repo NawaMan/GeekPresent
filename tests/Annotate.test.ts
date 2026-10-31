@@ -524,14 +524,177 @@ describe('Annotate — armed', () => {
 		expect(list[0].points).toHaveLength(2); // two corners only
 
 		const d = document.querySelector('.annot-stroke')?.getAttribute('d') ?? '';
-		expect(d.startsWith('M 100 100')).toBe(true); // top-left corner, canvas px (client 50,50 → 100,100)
+		// Top-left corner at canvas 100,100 (client 50,50), rounded by the default 12px — so the
+		// path opens 12px along the top edge and turns each corner with an arc.
+		expect(d.startsWith('M 112 100')).toBe(true);
+		expect(d).toContain('A 12 12 0 0 1');
 		expect(d.endsWith('Z')).toBe(true); // a closed box
 		expect(d).not.toContain('C '); // not smoothed
 	});
 
+	it('ERASES a rectangle by its outline, not by the diagonal between its corners', () => {
+		render(AnnotateHost);
+		annotateTool.set('rectangle');
+		const svg = surfaceAt();
+		stroke(svg, [
+			[50, 50],
+			[250, 150]
+		]); // canvas box 100,100 → 500,300
+		expect(get(strokes)).toHaveLength(1);
+
+		annotateTool.set('eraser');
+		eraseAt(svg, [150, 100]); // canvas 300,200: the centre — on the diagonal, far from ink
+		expect(get(strokes)).toHaveLength(1);
+		eraseAt(svg, [150, 50]); // canvas 300,100: mid-way along the top edge
+		expect(get(strokes)).toHaveLength(0);
+	});
+
+	it('draws square RECTANGLE corners under rectRadius={0}', () => {
+		render(AnnotateHost, { props: { rectRadius: 0 } });
+		annotateTool.set('rectangle');
+		stroke(surfaceAt(), [
+			[50, 50],
+			[150, 120]
+		]);
+		const d = document.querySelector('.annot-stroke')?.getAttribute('d') ?? '';
+		expect(d).toBe('M 100 100 L 300 100 L 300 240 L 100 240 Z');
+	});
+
+	it('POINTER lets the mouse through to the slide while the bar stays up', async () => {
+		render(AnnotateHost, { props: { inkColors: [null, '#E5484D'] } });
+		const svg = surfaceAt();
+		expect(svg.style.pointerEvents).toBe('auto'); // armed pen: the surface owns the pointer
+
+		await fireEvent.click(screen.getByLabelText('Pointer'));
+		expect(get(annotateTool)).toBe('pointer');
+		expect(screen.getByLabelText('Pointer').getAttribute('aria-pressed')).toBe('true');
+		expect(svg.style.pointerEvents).toBe('none'); // clicks fall through to the slide
+		expect(get(annotationMode)).toBe(true); // still armed — the bar is still here
+		expect(screen.getByRole('toolbar', { name: 'Annotation tools' })).not.toBeNull();
+		expect(screen.queryByLabelText('Theme colour')).toBeNull(); // nothing to colour
+
+		// Even a gesture that does reach the surface draws nothing in this mode.
+		stroke(svg, [
+			[50, 50],
+			[150, 120]
+		]);
+		expect(get(strokes)).toHaveLength(0);
+
+		// Pick the pen again and the surface takes the pointer back.
+		await fireEvent.click(screen.getByLabelText('Pen'));
+		expect(svg.style.pointerEvents).toBe('auto');
+		stroke(svg, [
+			[50, 50],
+			[150, 120]
+		]);
+		expect(get(strokes)).toHaveLength(1);
+	});
+
+	it('picks modes with the digit keys, in bar order, and shows each key on its button', async () => {
+		render(AnnotateHost);
+		const press = (key: string, extra: Record<string, unknown> = {}) =>
+			fireEvent.keyDown(window, { key, code: /^[0-9]$/.test(key) ? `Digit${key}` : undefined, ...extra });
+
+		await press('5');
+		expect(get(annotateTool)).toBe('rectangle');
+		await press('8');
+		expect(get(annotateTool)).toBe('eraser');
+		await press('1');
+		expect(get(annotateTool)).toBe('pointer');
+		// 1 again: back to the tool you had.
+		await press('1');
+		expect(get(annotateTool)).toBe('eraser');
+
+		const rect = screen.getByLabelText('Rectangle');
+		expect(rect.getAttribute('title')).toBe('Rectangle (5)');
+		expect(rect.querySelector('.annot-key')?.textContent).toBe('5');
+
+		// Ctrl+1 is the browser's (tab switch), not ours.
+		await press('3', { ctrlKey: true });
+		expect(get(annotateTool)).toBe('eraser');
+	});
+
+	it('clicking POINTER twice also returns to the previous tool', async () => {
+		render(AnnotateHost);
+		annotateTool.set('arrow');
+		await tick();
+		await fireEvent.click(screen.getByLabelText('Pointer'));
+		expect(get(annotateTool)).toBe('pointer');
+		await fireEvent.click(screen.getByLabelText('Pointer'));
+		expect(get(annotateTool)).toBe('arrow');
+	});
+
+	it('picks colours with Shift + the digit keys, by physical key', async () => {
+		render(AnnotateHost, { props: { inkColors: [null, '#E5484D', '#3FA9F5'] } });
+		await fireEvent.keyDown(window, { key: '@', code: 'Digit2', shiftKey: true });
+		expect(get(annotateColor).pen).toBe('#E5484D');
+		await fireEvent.keyDown(window, { key: '!', code: 'Digit1', shiftKey: true });
+		expect(get(annotateColor).pen).toBeNull(); // the theme swatch
+		expect(screen.getByLabelText('Colour #3FA9F5').getAttribute('title')).toBe('#3FA9F5 (Shift+3)');
+
+		// No colour to pick while erasing — the key does nothing rather than recolouring the pen.
+		annotateTool.set('eraser');
+		await fireEvent.keyDown(window, { key: '#', code: 'Digit3', shiftKey: true });
+		expect(get(annotateColor).pen).toBeNull();
+	});
+
+	it('offers swatches only — no custom colour picker on the bar', () => {
+		render(AnnotateHost, { props: { inkColors: [null, '#E5484D'] } });
+		expect(document.querySelector('.annot-bar input[type="color"]')).toBeNull();
+		expect(document.querySelectorAll('.annot-swatch')).toHaveLength(2);
+	});
+
+	it('moves the digit badges from the modes to the swatches while Shift is held', async () => {
+		render(AnnotateHost, { props: { inkColors: [null, '#E5484D', '#3FA9F5'] } });
+		const toolKeys = () => document.querySelectorAll('.annot-btn .annot-key').length;
+		const swatchKeys = () =>
+			[...document.querySelectorAll('.annot-swatch .annot-key')].map((k) => k.textContent);
+		expect(toolKeys()).toBe(9);
+		expect(swatchKeys()).toEqual([]);
+
+		await fireEvent.keyDown(window, { key: 'Shift', shiftKey: true });
+		expect(toolKeys()).toBe(0);
+		expect(swatchKeys()).toEqual(['1', '2', '3']);
+
+		await fireEvent.keyUp(window, { key: 'Shift' });
+		expect(toolKeys()).toBe(9);
+		expect(swatchKeys()).toEqual([]);
+
+		// Shift let go in another window: losing focus must not leave the badges stuck.
+		await fireEvent.keyDown(window, { key: 'Shift', shiftKey: true });
+		await fireEvent.blur(window);
+		expect(toolKeys()).toBe(9);
+	});
+
+	it('does not switch tools while typing a TEXT label (or when the pen is down)', async () => {
+		render(AnnotateHost);
+		const input = document.createElement('input');
+		document.body.appendChild(input);
+		await fireEvent.keyDown(input, { key: '5', code: 'Digit5' });
+		expect(get(annotateTool)).toBe('pen');
+		input.remove();
+
+		annotationMode.set(false);
+		await tick();
+		await fireEvent.keyDown(window, { key: '5', code: 'Digit5' });
+		expect(get(annotateTool)).toBe('pen');
+	});
+
+	it('keeps the ink on screen in POINTER mode', () => {
+		render(AnnotateHost);
+		stroke(surfaceAt(), [
+			[50, 50],
+			[150, 120]
+		]);
+		annotateTool.set('pointer');
+		return tick().then(() => {
+			expect(document.querySelectorAll('.annot-stroke')).toHaveLength(1);
+		});
+	});
+
 	it('offers the tools as icon buttons with accessible names, and picks on click', async () => {
 		render(AnnotateHost);
-		for (const label of ['Pen', 'Line', 'Arrow', 'Rectangle', 'Highlight', 'Text', 'Erase']) {
+		for (const label of ['Pointer', 'Pen', 'Line', 'Arrow', 'Rectangle', 'Highlight', 'Text', 'Erase']) {
 			expect(screen.getByLabelText(label)).not.toBeNull();
 		}
 		await fireEvent.click(screen.getByLabelText('Rectangle'));
@@ -691,7 +854,7 @@ describe('Annotate — armed', () => {
 		expect(document.querySelector('.annot-stroke')?.getAttribute('d')).toBe('M 100 100 L 100 100');
 	});
 
-	it('takes back one stroke with UNDO and this slide with RESET', async () => {
+	it('takes back one stroke with Ctrl+Z and this slide with RESET (no UNDO button)', async () => {
 		render(AnnotateHost);
 		const svg = surfaceAt();
 		stroke(svg, [
@@ -704,7 +867,8 @@ describe('Annotate — armed', () => {
 		]);
 		expect(get(strokes)).toHaveLength(2);
 
-		await fireEvent.click(screen.getByText('UNDO'));
+		expect(screen.queryByText('UNDO')).toBeNull(); // the keyboard does it
+		await fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
 		expect(get(strokes)).toHaveLength(1);
 
 		await fireEvent.click(screen.getByText('RESET'));

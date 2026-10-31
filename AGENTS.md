@@ -1094,6 +1094,20 @@ Nothing to place: `SlideDeck` mounts `<Annotate>` once, like `Spotlight`. One pr
 - **The pen eats the POINTER, never the KEYBOARD.** ←/→/Space keep paging while armed. A
   speaker who cannot advance is worse off than one with a stray scribble. `Esc` puts the pen
   down *without* navigating, which is what makes it safe for `Esc` to exist here at all.
+- **POINTER hands the mouse back without putting the pen down.** It is a bar mode (first on
+  the bar, `AnnotateMode` `'pointer'`): the surface goes `pointer-events: none` and its handlers
+  refuse the gesture too, so a click reaches the slide underneath — a link, a button, a video's
+  controls — while the ink and the bar stay up. Picking a drawing tool takes the pointer back,
+  and picking POINTER again (click or key) returns to the tool you had (`pickMode`).
+- **Keys on an armed pen: 1–9 pick the bar's modes, Shift+1–9 its swatches**, both left to right
+  (each mode button wears its digit). Digits because nothing else in the slide window uses them;
+  read from `code` so Shift+digit and AZERTY work; never with Ctrl/Cmd/Alt, never in a text
+  field. Pure: `annotateKeyIntent` in `annotate/annotateCore.ts`.
+- **A rectangle has small rounded corners** (`rectRadius` on `Annotate`, default 12 canvas px;
+  `0` for square). `rectD` clamps the radius per axis exactly as SVG clamps `<rect rx>`, so FREEZE
+  emits `<Rect rounded={12}>` and the frozen box draws the same corners it had as ink. A
+  rectangle is STORED as two corners, so the eraser and FREEZE hit-test its `rectOutline`, not
+  those two points — read as a polyline they are the box's diagonal.
 - **A highlighter is not a pen.** A swipe is *levelled* — pinned to the y you pressed at and
   reduced to its horizontal extent (`levelPoints`), so the band sits on the row you swiped
   instead of sloping with your wrist. Anchored, not averaged: a mean y shifts as samples
@@ -1111,9 +1125,11 @@ Nothing to place: `SlideDeck` mounts `<Annotate>` once, like `Spotlight`. One pr
   pen commits with `simplifyPoints(…, 2)`, not 4: thinning reads the sample spacing, and the
   coarser decimation flattened it and made the stroke jump at the lift.
 - **Anything clickable must out-rank the ink surface** (z-index 40). While armed it owns every
-  pointer on the canvas — which is why the whole top-centre tool bar (the ANNOTATE toggle
-  included) and the pen's own bar live *inside* `Annotate` at 42/41, above the surface. Put a
-  control under the surface and the speaker can arm the pen but never put it down.
+  pointer on the canvas. The top-centre tool bar (the ANNOTATE toggle included) is
+  `SlideToolbar`, in `SlideDeck`'s window-fixed overlay at z-index 50; inside `Annotate`, the
+  pen's own bar sits at 41, the stale-ink notice at 42 and the text-label input at 43 — all
+  above the surface. Put a control under the surface and the speaker can arm the pen but never
+  put it down.
 
 > Other props: `inkColors` (the swatches; `null` is the theme's own colour, so un-picked ink
 > follows a re-theme instead of freezing a hex), `penWidth` / `highlighterWidth`. Colours and

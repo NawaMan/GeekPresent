@@ -12,6 +12,7 @@
 	import Block       from '$lib/components/Block.svelte';
 	import Callout     from '$lib/components/Callout.svelte';
 	import Hint        from '$lib/components/Hint.svelte';
+	import Kbd         from '$lib/components/Kbd.svelte';
 	import ViewSource  from '$lib/components/ViewSource.svelte';
 	import source      from './+page.svelte?raw';
 
@@ -30,7 +31,7 @@
 
 <Block name="keeping" x={65} y={400} width={860} height={280}>
 	<Callout kind="tip" title="Clearing it">
-		<p><b>UNDO</b> takes back the last stroke.</p>
+		<p><Kbd keys="Mod+Z" /> takes back the last stroke.</p>
 		<p style="margin-top: 0.4em;">
 			<b>RESET</b> clears this slide. <b>RESET ALL</b> clears every slide in the deck.
 		</p>

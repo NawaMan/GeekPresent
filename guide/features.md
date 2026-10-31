@@ -82,8 +82,9 @@ Gotchas:
 
 ## ANNOTATE (the speaker's pen)
 
-Freehand ink on the live slide: pen, levelled highlighter, line, arrow, rectangle, eraser. Arm it
-from the **ANNOTATE** button in the top tool bar (Alt+. then **a**).
+Freehand ink on the live slide: pen, levelled highlighter, line, arrow, rectangle (small rounded
+corners), text, eraser, freeze. Arm it from the **ANNOTATE** button in the top tool bar (Alt+. then
+**a**).
 
 - **Offer it:** `<SlideDeck {pages} annotate />`. The flag is deck-wide only; there is no per-slide
   `annotate` in `pages.ts`. Precedence: `vite dev` > sticky `?annotate` / `?annotate=off` > the
@@ -96,6 +97,12 @@ from the **ANNOTATE** button in the top tool bar (Alt+. then **a**).
   (key **A**).
 - The pen takes the pointer, never the keyboard: ←/→/Space keep paging while it is armed. **Esc**
   puts the pen down without navigating.
+- **POINTER** (first on the pen's bar) hands the mouse back without closing the pen: the ink stays
+  and the bar stays up, but clicks reach the slide — a link, a button, a video's controls. Pick a
+  drawing tool to draw again — or POINTER again, which returns to the tool you had.
+- **Keys while the pen is armed:** **1–9** pick the bar's modes left to right (1 POINTER, 2 pen, 3
+  line, 4 arrow, 5 rectangle, 6 highlight, 7 text, 8 erase, 9 freeze — each button shows its
+  digit), **Shift+1–9** the colour swatches. So 1 → click the slide → 1 is back to drawing.
 
 Other props on `<SlideDeck>`:
 

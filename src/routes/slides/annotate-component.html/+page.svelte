@@ -45,9 +45,13 @@
 			row you swiped, not sloping across it. No DOM ranges to select, so it works over code,
 			images and diagrams alike.
 		</p>
-		<p><b>Swatches</b> &mdash; pick a colour, or open the picker for any other.</p>
+		<p><b>Swatches</b> &mdash; pick a colour; the ring marks the one in use.</p>
 		<p>
-			<Kbd keys="Mod+Z" /> takes back a stroke &middot; <b>UNDO</b> does the same &middot;
+			<b>POINTER</b> &mdash; the ink stays, your clicks reach the slide &middot; keys
+			<b>1&ndash;9</b> pick a tool, <b>Shift+1&ndash;9</b> a colour.
+		</p>
+		<p>
+			<Kbd keys="Mod+Z" /> takes back a stroke &middot;
 			<Kbd keys="Escape" /> puts the pen down &middot; drag the bar by its <b>⠿</b> grip if it
 			is in your way.
 		</p>

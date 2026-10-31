@@ -11,6 +11,7 @@
 	export let inkColors: (string | null)[] = [null, '#E5484D', '#3FA9F5'];
 	export let snapPen = true;
 	export let freehand: import('../src/lib/annotate/freehandCore').FreehandInput | false = {};
+	export let rectRadius = 12;
 </script>
 
-<Annotate {canvasWidth} {canvasHeight} {inkColors} {snapPen} {freehand} />
+<Annotate {canvasWidth} {canvasHeight} {inkColors} {snapPen} {freehand} {rectRadius} />
