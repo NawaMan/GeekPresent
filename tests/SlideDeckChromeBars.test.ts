@@ -14,6 +14,8 @@ import {
 	closeMoreMenu,
 	disarmChrome
 } from '../src/lib/stores/chromeArm';
+import { annotationMode } from '../src/lib/stores/annotation';
+import { adjustMode } from '../src/lib/stores/adjustMode';
 import { kioskStatus, kioskPanelPinned, startKiosk, stopKiosk } from '../src/lib/stores/kiosk';
 
 const pages = [{ path: 'stub.html', title: 'Stub' }];
@@ -97,6 +99,40 @@ describe('SlideDeck chrome bars — Esc after Alt+.', () => {
 		expect(tools?.contains(document.activeElement as Node)).toBe(false);
 		expect(get(moreMenuOpen)).toBe(false);
 	});
+});
+
+// A / J enter a working mode where the bars are in the way. They used to keep chrome armed,
+// so the speaker had to reach for the mouse, or press Esc — which on an armed pen also puts
+// the pen down. Both now tuck the bars the way Esc does, leaving the mode on.
+describe('SlideDeck chrome bars — A / J retract after Alt+.', () => {
+	beforeEach(() => {
+		annotationMode.set(false);
+		adjustMode.set(false);
+	});
+	afterEach(() => {
+		annotationMode.set(false);
+		adjustMode.set(false);
+	});
+
+	for (const [letter, mode] of [
+		['a', annotationMode],
+		['j', adjustMode]
+	] as const) {
+		it(`${letter.toUpperCase()} turns its mode on and tucks both bars`, async () => {
+			const root = await mount({ annotate: true });
+			await fireEvent.keyDown(window, { key: '.', code: 'Period', altKey: true });
+			await tick();
+			const tools = root.querySelector('.annot-tools');
+			(tools?.querySelector('button') as HTMLElement | null)?.focus();
+			expect(tools?.contains(document.activeElement as Node)).toBe(true);
+
+			await fireEvent.keyDown(window, { key: letter, code: `Key${letter.toUpperCase()}` });
+			await tick();
+			expect(get(mode)).toBe(true);
+			expect(get(chromeArmed)).toBe(false);
+			expect(tools?.contains(document.activeElement as Node)).toBe(false);
+		});
+	}
 });
 
 describe('SlideDeck chrome bars — opt-out', () => {

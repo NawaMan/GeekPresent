@@ -1171,7 +1171,8 @@ stay out of the audience's way. A speaker who is actively using one often wants 
   **on**) drop the top authoring cluster or the bottom TOC/pager for a bare canvas. Independent
   of PIN. Hidden either way under `?clean` / `?present`.
 - **Alt+. (⌥. on macOS) raises both bars for keyboard.** Temporary arm (~5s, amber halo) — not
-  a pin. While armed: **a** ANNOTATE, **j** ADJUST, **z** open DISPLAY zoom menu, **p** PRESENT,
+  a pin. While armed: **a** ANNOTATE and **j** ADJUST (each toggles its mode and tucks both bars
+  at once, as Esc would — Esc on an armed pen would also put it down), **z** open DISPLAY zoom menu, **p** PRESENT,
   **m** ☰, **t** TOC, **u** pause/resume a *live* kiosk (inert otherwise — no kiosk running,
   no-op). When the letter lives in the word it is underlined (`PRESENT`, `ANNOTATE`,
   `ADJUST`, Table of Contents); when it does not, a trailing chip remains (`FITTED (Z)`,

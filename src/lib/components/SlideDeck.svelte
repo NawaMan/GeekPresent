@@ -987,6 +987,29 @@
 			return;
 		}
 
+		/**
+		 * Tuck both bars now. Drop the ☰ open latch, then un-arm. Alt+. puts focus on the
+		 * top bar so ←/→ work; that focus keeps the top bar seated via CSS `:focus-within`
+		 * even after `armed` is false — so this must blur ANY focus inside the chrome
+		 * overlay (top tool bar or bottom control bar), not only the ☰. A pointer still
+		 * hovering a bar keeps that bar open — plain hover, leave to tuck.
+		 */
+		function retractChrome(): void {
+			closeMoreMenu();
+			printMenuOpen = false;
+			if (browser && document.activeElement instanceof HTMLElement) {
+				const el = document.activeElement;
+				if (
+					el.closest?.('.overlay') ||
+					el.closest?.('.annot-tools') ||
+					el.closest?.('.ctrl-bar')
+				) {
+					el.blur();
+				}
+			}
+			disarmChrome();
+		}
+
 		const intent = chromeKeyIntent(e, $chromeArmed);
 		if (intent === 'ignore') return;
 		e.preventDefault();
@@ -998,32 +1021,17 @@
 				queueMicrotask(() => focusToolbarEl(barFocusables()[0]));
 				return;
 			case 'disarm':
-				// Drop the ☰ open latch, then un-arm. Alt+. puts focus on the top bar so ←/→
-				// work; that focus keeps the top bar seated via CSS `:focus-within` even after
-				// `armed` is false — so Esc must blur ANY focus inside the chrome overlay
-				// (top tool bar or bottom control bar), not only the ☰. A pointer still
-				// hovering a bar keeps that bar open — plain hover, leave to tuck.
-				closeMoreMenu();
-				printMenuOpen = false;
-				if (browser && document.activeElement instanceof HTMLElement) {
-					const el = document.activeElement;
-					if (
-						el.closest?.('.overlay') ||
-						el.closest?.('.annot-tools') ||
-						el.closest?.('.ctrl-bar')
-					) {
-						el.blur();
-					}
-				}
-				disarmChrome();
+				retractChrome();
 				return;
 			case 'annotate':
+				// A and J enter a working mode where the bars are in the way, so they tuck
+				// them at once — Esc would too, but on an armed pen Esc also puts it down.
 				if ($canAnnotate) annotationMode.update((v) => !v);
-				keepChromeArmed();
+				retractChrome();
 				return;
 			case 'adjust':
 				if ($canAdjust) adjustMode.update((v) => !v);
-				keepChromeArmed();
+				retractChrome();
 				return;
 			case 'display':
 				// Open (toggle) the DISPLAY zoom menu — same control a click on FITTED (Z)
