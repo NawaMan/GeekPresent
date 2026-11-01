@@ -57,6 +57,21 @@ describe('playGroup', () => {
 		expect(anims[2].playState).toBe('running');
 	});
 
+	it('an animation a hair short of its end counts as finished — the browser would rewind it', () => {
+		// A Terminal's last output line before a stop ends exactly ON the stop. Seeked there,
+		// the browser can read its currentTime back a fraction of a ms short of endTime, yet
+		// still treat it as finished (and auto-rewind it) on play(). It must be snapped, not played.
+		const anims = stagger();
+		seekTo(anims, 200);
+		anims[1].currentTime = 199.9999999;
+
+		playGroup(as(anims));
+
+		expect(anims[1].currentTime).toBe(200); // snapped onto its end, not rewound to 0
+		expect(anims[1].playState).toBe('idle');
+		expect(anims[2].playState).toBe('running');
+	});
+
 	it('plays everything from a fresh start', () => {
 		const anims = stagger();
 		playGroup(as(anims));
