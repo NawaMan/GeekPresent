@@ -54,6 +54,38 @@ export function stepDotsView(
 	return { kind: 'dots', dots, index: at, total: n, spent };
 }
 
+/** The "your turn" cue: the slide is waiting for Space. */
+export type StepCue =
+	/** No cue: no build, a step still playing, not settled yet, or nowhere to go. */
+	| 'none'
+	/** A step remains — blink the next dot, "SPACE for next step". */
+	| 'next'
+	/** Every step taken — "SPACE for next slide". */
+	| 'spent';
+
+/** How long the build must sit still before the cue shows, so it does not flash while
+    the speaker talks over the output they just revealed. */
+export const STEP_CUE_DELAY_MS = 1000;
+
+/** The cue's default wording. Overridable per deck (SlideDeck `stepCueNext` / `stepCueSpent`). */
+export const STEP_CUE_NEXT = 'SPACE for next step';
+export const STEP_CUE_SPENT = 'SPACE for next slide';
+
+/**
+ * Which cue to show. `busy` is the build's own report (a step still playing); `settled`
+ * is whether it has sat still for the cue delay since the last change — the component
+ * owns that timer, this only decides. A spent build cues only when there IS a next
+ * slide to page to; on the deck's last one Space goes nowhere, so nothing is promised.
+ */
+export function stepCue(
+	view: StepDotsView,
+	state: { busy?: boolean; settled: boolean; hasNextSlide: boolean }
+): StepCue {
+	if (view.kind === 'none' || state.busy || !state.settled) return 'none';
+	if (view.spent) return state.hasNextSlide ? 'spent' : 'none';
+	return 'next';
+}
+
 /** The accessible name: "Step 2 of 5". */
 export function stepDotsLabel(view: StepDotsView): string {
 	return view.kind === 'none' ? '' : `Step ${view.index} of ${view.total}`;

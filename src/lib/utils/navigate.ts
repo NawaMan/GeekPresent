@@ -39,6 +39,9 @@ export interface Page {
         'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right' — moves it there
         (a slide whose deck-wide spot is busy). Overrides the deck's `stepDotsAt`. */
     stepDots?: boolean | StepDotsPosition;
+    /** `false` drops the build's "SPACE for next step" cue on this one slide (see
+        SlideDeck `stepCue`). The dots themselves stay. */
+    stepCue?: boolean;
     /** Keep this slide OUT of the deck's linear order and its Table of Contents.
 
         The appendix flag. A hidden slide is still a real, prerendered, linkable

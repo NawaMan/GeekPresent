@@ -192,6 +192,7 @@ One line each; the group file has the props, an example and the traps.
 **[code.md](code.md) — showing code**
 - `QuickCode` — a short snippet · `CssSnippet` — highlighted code (Shiki) · `CodeDiff` — a diff
 - `Code` / `CodeBox` — the Monaco editor (needs internet) · `Terminal` — a console session typing itself
+- `StepTerminal` — a console whose commands are steps of a `Steps` build
 - `ViewSource` / `SourceView` — show the slide's own source
 
 **[media.md](media.md) — images, video, embeds**

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	STEP_DOTS_MAX,
 	STEP_DOTS_POSITIONS,
+	stepCue,
 	stepDotsAnchorStyle,
 	stepDotsLabel,
 	stepDotsPlacement,
@@ -90,5 +91,33 @@ describe('stepDotsAnchorStyle', () => {
 		expect(stepDotsAnchorStyle(stepDotsPlacement('top'), 1080, 1920, '36px')).toBe(
 			'left: 540px; top: 36px; transform: translate(-50%, 0);'
 		);
+	});
+});
+
+// The "your turn" cue. The component owns the timer (`settled`); this decides.
+describe('stepCue', () => {
+	const mid = stepDotsView(1, 3);
+	const done = stepDotsView(3, 3);
+	const calm = { busy: false, settled: true, hasNextSlide: true };
+
+	it('cues the next step once the build has settled and is not busy', () => {
+		expect(stepCue(mid, calm)).toBe('next');
+		expect(stepCue(stepDotsView(0, 3), calm)).toBe('next'); // before the first step too
+	});
+
+	it('waits while a step is still playing, and until the delay has passed', () => {
+		expect(stepCue(mid, { ...calm, busy: true })).toBe('none');
+		expect(stepCue(mid, { ...calm, settled: false })).toBe('none');
+	});
+
+	it('cues the next SLIDE once spent — but only when there is one', () => {
+		expect(stepCue(done, calm)).toBe('spent');
+		expect(stepCue(done, { ...calm, hasNextSlide: false })).toBe('none');
+	});
+
+	it('cues nothing without a build, and the bar form cues like the dots', () => {
+		expect(stepCue(stepDotsView(undefined, undefined), calm)).toBe('none');
+		expect(stepCue(stepDotsView(2, 30), calm)).toBe('next');
+		expect(stepCue(stepDotsView(30, 30), calm)).toBe('spent');
 	});
 });

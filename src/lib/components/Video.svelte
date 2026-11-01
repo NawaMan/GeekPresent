@@ -297,7 +297,15 @@
 	// which also keeps a mark at 0:00 from trapping the presenter on it.
 	$: nextMark = marks.find((m) => m.time > currentTime);
 	// `index` counts chapters reached (the active one included), for <StepDots>.
-	$: build = { hasNext: !!nextMark, hasPrev: active > 0, index: active + 1, total: marks.length };
+	// A step seeks at once, but a PLAYING tape is still going somewhere — busy, so <StepDots>
+	// cues the next Space only once it is paused (at a chapter, or by the speaker).
+	$: build = {
+		hasNext: !!nextMark,
+		hasPrev: active > 0,
+		index: active + 1,
+		total: marks.length,
+		busy: !paused
+	};
 
 	/** Seek to the next chapter. Also what CONTINUE and the presenter pulse do. */
 	function stepNext() {

@@ -376,8 +376,8 @@ that has called `setPages`.
 
 ### Step dots (progress inside a build)
 
-A slide with a Space-driven build (a `Steps` run of Fragments, a `Terminal` with `keys="global"`,
-a `Video` stepping its chapters) shows a faint row of dots near the bottom of the canvas: filled
+A slide with a Space-driven build (a `Steps` run of Fragments and `StepTerminal`s, a `Terminal`
+with `keys="global"`, a `Video` stepping its chapters) shows a faint row of dots near the bottom of the canvas: filled
 for steps taken, the larger one for the step just taken, a ring for each step still to come. It
 brightens on arrival and on each step, then settles back. When the last step is taken the row
 fades out, which tells the speaker that the next Space pages the deck. A build of more than 12
@@ -397,6 +397,24 @@ steps gets one segmented bar instead of dots.
 - It never shows under `?clean`, in a CAPTURE, a printout or a `?shot` PNG.
 - Restyle with role tokens: `--stepdots-fg`, `--stepdots-idle` (resting opacity, default `0.3`),
   `--stepdots-size`, `--stepdots-gap`, `--stepdots-inset` (distance from the canvas edge).
+
+**The "your turn" cue.** Once a step has been taken *and has finished playing* (a Fragment faded
+in, a command done typing, a video paused) and the slide has then sat still for a second, the row
+comes up to full strength, the next dot blinks, and a tooltip says **SPACE for next step**. When
+every step is taken it says **SPACE for next slide** instead (not on the deck's last slide). It
+clears the moment the next step is taken.
+
+- It is for the speaker, so it never shows in kiosk mode, on the audience screen while a presenter
+  console is live, while recording or replaying a video, or in an embed — on top of everywhere
+  the dots themselves don't show.
+- `<SlideDeck stepCue={false}>` turns it off for the deck; `stepCue: false` on a `pages.ts` entry
+  for one slide (the dots stay).
+- Wording: `<SlideDeck stepCueNext="…" stepCueSpent="…">`.
+- Colours: `--stepdots-cue` (the blinking dot, default amber), `--stepdots-cue-bg` /
+  `--stepdots-cue-fg` (the tooltip pill).
+- Under `prefers-reduced-motion` nothing blinks; the tooltip still shows.
+- A build reports "still playing" through its `activeSteps` entry's `busy` flag. A new kind of
+  build that leaves `busy` out is treated as never busy, so its cue shows a second after each step.
 
 ## Keyboard shortcuts
 

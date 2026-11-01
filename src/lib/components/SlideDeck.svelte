@@ -176,7 +176,12 @@
 	import { roleOf } from '$lib/utils/relayCore';
 	import Spotlight from '$lib/components/Spotlight.svelte';
 	import StepDots from '$lib/components/StepDots.svelte';
-	import type { StepDotsPosition } from '$lib/utils/stepDotsCore';
+	import {
+		STEP_CUE_NEXT,
+		STEP_CUE_SPENT,
+		type StepDotsPosition
+	} from '$lib/utils/stepDotsCore';
+	import { progressOf } from '$lib/utils/progressCore';
 	import { setHighlight } from '$lib/stores/highlightTarget';
 	import { fireTrigger } from '$lib/stores/triggers';
 	import { collectFinite, applyState } from '$lib/utils/slideAnim';
@@ -382,6 +387,15 @@
 	   midpoint) or 'top-left' / 'top-right' / 'bottom-left' / 'bottom-right'. A slide's
 	   `stepDots: '<position>'` in pages.ts overrides it for that slide. */
 	export let stepDotsAt: StepDotsPosition = 'bottom';
+	/** The build's "your turn" cue (see <StepDots>): once a step has played and the slide
+	   has sat still a second, the next dot blinks and a tooltip says "SPACE for next step"
+	   ("SPACE for next slide" once the build is spent). On by default wherever the dots
+	   show; `false` drops it deck-wide, `stepCue: false` on a pages.ts entry for one slide.
+	   Never in kiosk mode, while a presenter console is live, or while recording. */
+	export let stepCue = true;
+	/** The cue's wording. */
+	export let stepCueNext: string = STEP_CUE_NEXT;
+	export let stepCueSpent: string = STEP_CUE_SPENT;
 	/** Idle ms on the first slide before that hint appears (a stray Enter/click/scroll
 	   brings it at once). */
 	export let onboardDelayMs = DEFAULT_ONBOARD_DELAY_MS;
@@ -568,6 +582,20 @@
 	$: slideStepDots = pages.find((p) => p.path === currentSlide)?.stepDots;
 	$: showStepDots = stepDots && !clean && slideStepDots !== false;
 	$: stepDotsPosition = typeof slideStepDots === 'string' ? slideStepDots : stepDotsAt;
+	// The cue is for the SPEAKER: not on a booth (kiosk), not on the audience screen while a
+	// console is driving it, not in a recording or a replay, not inside an embed.
+	$: showStepCue =
+		stepCue &&
+		pages.find((p) => p.path === currentSlide)?.stepCue !== false &&
+		isTopWindow &&
+		!$kioskActive &&
+		!$consoleLive &&
+		!$recordingLook &&
+		!$replaying;
+	// A spent build's Space pages on — except on the deck's last slide. (A hidden
+	// appendix is not "present" in the march, and its Space returns to the caller.)
+	$: deckProgress = progressOf(pages, currentSlide ?? '');
+	$: hasNextSlide = !deckProgress.present || deckProgress.position < deckProgress.total;
 	$: adjustOffered = slideOffersAdjust || adjust;
 	$: if (browser) setAdjustOffered(adjustOffered);
 	$: if (browser) applyAdjustParam($page.url);
@@ -1627,7 +1655,15 @@
 				<Spotlight canvasWidth={width} canvasHeight={height} />
 				<!-- The build indicator: draws only while a Space-driven build holds activeSteps. -->
 				{#if showStepDots}
-					<StepDots canvasWidth={width} canvasHeight={height} position={stepDotsPosition} />
+					<StepDots
+						canvasWidth={width}
+						canvasHeight={height}
+						position={stepDotsPosition}
+						cue={showStepCue}
+						cueNext={stepCueNext}
+						cueSpent={stepCueSpent}
+						{hasNextSlide}
+					/>
 				{/if}
 				<!-- The speaker's ink, the other canvas-level singleton. After Spotlight, so a
 			     stroke lands on top of the cue it is drawn next to. Renders nothing at all

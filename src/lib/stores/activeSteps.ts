@@ -40,6 +40,10 @@ export type ActiveSteps = {
 	index?: number;
 	/** How many steps the build has in all. */
 	total?: number;
+	/** Is the step just taken still PLAYING (a Fragment fading in, a command typing, a
+	    video running on to its next chapter)? <StepDots> cues the next Space only once
+	    this goes false. Left out = never busy. */
+	busy?: boolean;
 };
 
 export const activeSteps = writable<ActiveSteps | null>(null);

@@ -222,6 +222,34 @@ describe('markersOf', () => {
 	it('a session of pure output has no markers — nothing to step to', () => {
 		expect(markersOf(scheduleLines(['just output'], TIMING))).toEqual([]);
 	});
+
+	// A `\`-continued command is ONE stop: stopping between its lines leaves half a
+	// command on screen.
+	it('folds a `cont` line into the command above it', () => {
+		const session = [
+			{ cmd: 'ab \\' },
+			{ cmd: 'cd', cont: true },
+			{ out: 'one' },
+			{ cmd: 'ef' },
+			{ out: 'two' }
+		];
+		const s = scheduleLines(session, TIMING);
+		const m = markersOf(s);
+		expect(m.map((x) => x.label)).toEqual(['ab \\', 'ef']);
+		// The first command spans its continuation and its output, up to `ef`.
+		expect(m[0].start).toBe(s.lines[0].delayMs);
+		expect(m[0].end).toBe(s.lines[3].delayMs);
+		expect(m.map((x) => x.index)).toEqual([0, 1]);
+	});
+
+	it('a comment typed as a command is still its own stop', () => {
+		const m = markersOf(scheduleLines([{ cmd: '# note', tone: 'comment' }, { cmd: 'ls' }], TIMING));
+		expect(m.map((x) => x.label)).toEqual(['# note', 'ls']);
+	});
+
+	it('a `cont` line with no command above it still counts as one', () => {
+		expect(markersOf(scheduleLines([{ cmd: 'x', cont: true }], TIMING))).toHaveLength(1);
+	});
 });
 
 describe('nextCheckpoint', () => {

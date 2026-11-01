@@ -481,7 +481,15 @@ than misleading the next agent.
   is seekable: it waits behind a play button, carries a transport with a tick per command, and
   `keys="global"` lets Space run it one command at a time and then page the deck. Don't put an
   `<AnimationBar />` on a Terminal slide — both would drive the same clock; pass
-  `controls={false}` if you want the bar to own it),
+  `controls={false}` if you want the bar to own it. A `cont: true` line is part of the
+  command above it, never a stop of its own — `terminalCore.markersOf` folds it),
+  `StepTerminal` (a Terminal whose commands are STEPS of the slide's `<Steps>` build — one
+  per logical command, in document order with the Fragments — so several consoles share one
+  Space sequence; a step plays the command, a step back or a jump seeks to its stop;
+  `autoplay` lets the first command ride the step before it. Its transport is hidden and it
+  never takes Space. Outside a `<Steps>` it is a plain Terminal. Members join a Steps through
+  `utils/stepsContext.ts` — `register(n)`, `revealed`, `setBusy`, `arrivedAtEnd` — the one
+  contract Fragment uses too; Terminal's `driven` prop + `playTo()` are what it drives),
   `Typewriter` (the same typewriter OUT of the console — ordinary slide text revealing itself
   one character at a time, in the deck's own font, wrapping like the prose it is. Terminal's
   reveal is a monospace span's width clipped to whole `ch`; this is one finite CSS animation
@@ -563,6 +571,12 @@ than misleading the next agent.
   a stepping `Video` all get it; filled = taken, ring = to come, it brightens on each step and
   fades out once the build is spent. It reads the store's optional `index`/`total`, so a NEW
   kind of build must publish both or it shows no dots. Over 12 steps it is one segmented bar.
+  Its CUE: once a step has played (the store's optional `busy` gone false) and the slide has
+  sat still `STEP_CUE_DELAY_MS` (1 s), the next dot blinks and a tooltip says "SPACE for next
+  step" — "SPACE for next slide" when spent, nothing on the deck's last slide. A build that
+  leaves `busy` out is never busy. SlideDeck holds the cue back in kiosk, while a console is
+  live, while recording/replaying and in an embed; `stepCue={false}` / `stepCue: false` in
+  `pages.ts` opt out, `stepCueNext` / `stepCueSpent` reword it.
   `no-print` but deliberately not `gp-chrome`, so `fadeChrome` doesn't ghost it; off under
   `?clean`. `<SlideDeck stepDots={false}>` / `stepDots: false` in `pages.ts` opt out;
   `stepDotsAt` puts it at any edge or corner for the deck, `stepDots: '<position>'` for one slide

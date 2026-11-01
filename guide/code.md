@@ -11,6 +11,7 @@ from a CDN at runtime, full editor with folding and minimap, but fragile).
 | A fixed-width snippet in a bordered card (CSS demos) | `CssSnippet`                | Shiki  |
 | A change: added / removed lines                     | `CodeDiff`                  | Shiki  |
 | A typed command and its output                      | `Terminal`                  | CSS    |
+| Several consoles stepped in one Space sequence      | `StepTerminal` in `Steps`   | CSS    |
 | A long file, scrollable, with folding and minimap   | `Code` (inline) / `CodeBox` (pop-up panel) | Monaco |
 | This slide's own source, via the ☰ menu             | `ViewSource` / `SourceView` | Monaco / Shiki |
 
@@ -290,13 +291,59 @@ Gotchas:
   animation on the slide, including the Terminal's, and its Play runs straight past your command
   stops. If you want the bar to own the clock, pass `controls={false}` (and leave `keys` off).
 - Only one build per slide may own Space. Do not combine `keys="global"` with a `Steps` run on the
-  same slide, or two stepping Terminals.
+  same slide, or two stepping Terminals. For several consoles in one sequence (with Fragments
+  between them), use `StepTerminal` inside a `Steps` — next section.
+- A command continued with `cont: true` is one stop with the line above it: Space never stops
+  halfway through a `\`-continued command, and the transport draws one tick for it.
 - With `controls={false}` and `keys="off"` nothing could start the session, so it autoplays.
 - In normal flow the console hugs its content. Wrap it in a `Block` to pin and size it; the screen
   then scrolls if the session is taller than the box.
 - Under `prefers-reduced-motion` the animation is removed and the transcript shows whole, with no
   transport. In a Text artifact it also prints whole.
 - Not a code viewer: no syntax highlighting. Use `QuickCode` / `Code` for source.
+- Each command (not the first, not a `cont` line) has `0.6em` of space above it, so commands read
+  apart. Change it with the `--terminal-cmd-gap` role token (`0` for a tight console).
+
+## StepTerminal
+
+A `Terminal` whose commands are steps of the slide's `Steps` build. Inside a `Steps`, each command
+takes one Space, in document order with every `Fragment` and other `StepTerminal` in it, so one
+Space sequence can walk several consoles and the text between them.
+
+```svelte
+<script lang="ts">
+  import Steps from '@geekpresent/core/components/Steps.svelte';
+  import Fragment from '@geekpresent/core/components/Fragment.svelte';
+  import StepTerminal from '@geekpresent/core/components/StepTerminal.svelte';
+</script>
+
+<Steps>
+  <StepTerminal title="laptop" lines={setup} autoplay />  <!-- 1st command plays on arrival, then a Space each -->
+  <Fragment tag="p">Now the server:</Fragment>             <!-- the next Space -->
+  <StepTerminal title="server" lines={deploy} />          <!-- one Space per command after that -->
+</Steps>
+```
+
+- A step forward **plays** the command (it types) and holds at the end of its output. A step back,
+  or a jump, puts the console straight at that stop. Paging BACK onto the slide opens the build
+  spent, every console finished, as Fragments are.
+- Before its first step a console shows its window and nothing in it.
+- **`autoplay`**: the first command takes no Space of its own; it plays together with the step
+  before it (on arrival, if the console comes first in the build). Set it per console.
+- A command continued with `cont: true` is one step with the line above it.
+- The transport (play button, track) is hidden and the console never takes Space itself: the
+  `Steps` owns the keyboard, CONTINUE and the step dots.
+- While a command types, the build is *busy*: the step dots' "SPACE for next step" cue waits for
+  the output to land (see `features.md` → Step dots).
+
+Props: `lines`, `autoplay`, `charMs`, `startMs`, `pauseMs`, `outMs`, `style`, `id`, `class`; any
+other `Terminal` prop (`title`, `prompt`, `chrome`, `caret`, …) passes through. Outside a `Steps`
+it is an ordinary `Terminal`, its props passed as given (so `autoplay` there means "run on load").
+
+Gotchas:
+- Don't give it `keys="global"`: the `Steps` drives it. Don't put an `<AnimationBar />` on the slide
+  either (same reason as for `Terminal`).
+- Under `prefers-reduced-motion`, and in a Text artifact, the transcript shows whole.
 
 ## ViewSource
 

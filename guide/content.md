@@ -318,6 +318,8 @@ How Space behaves:
 Gotchas:
 - Use ONE `Steps` with `keys="global"` per slide. Any extra instance needs `keys="off"` and a
   `bind:this` driver.
+- A console can take steps in a build too: `StepTerminal` inside the `Steps` claims one step per
+  command, in document order with the Fragments (see `code.md` → StepTerminal).
 - A hidden Fragment uses `visibility`, not `display`, so nothing reflows; it still takes space.
 - In a Text artifact every Fragment shows and stepping is off. A Fragment outside any Steps just
   renders visible.

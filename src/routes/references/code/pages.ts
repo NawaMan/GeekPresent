@@ -7,6 +7,7 @@ export const pages = [
 	{ path: "codebox.html", title: "CodeBox & JavaCodeBox" },
 	{ path: "codediff.html", title: "CodeDiff" },
 	{ path: "terminal.html", title: "Terminal" },
+	{ path: "stepterminal.html", title: "StepTerminal" },
 	{ path: "viewsource.html", title: "ViewSource" },
 	{ path: "sourceview.html", title: "SourceView" },
 ];

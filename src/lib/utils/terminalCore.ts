@@ -245,11 +245,21 @@ const EPS = 1;
 /**
  * The commands, in order, each spanning up to the next one. A session with no commands
  * (pure output) has no markers — nothing to step to, and the transport shows no ticks.
+ *
+ * A LOGICAL command: a `cont` line belongs to the command above it (it is the rest of a
+ * `\`-continued command), so it is not a stop of its own — a step that stopped there would
+ * leave half a command on screen. A `cont` line with no command above it still counts.
  */
 export function markersOf(schedule: Schedule): Marker[] {
+	let seenCmd = false;
 	const cmds = schedule.lines
 		.map((line, i) => ({ line, i }))
-		.filter(({ line }) => line.kind === 'cmd');
+		.filter(({ line }) => {
+			if (line.kind !== 'cmd') return false;
+			const starts = !line.cont || !seenCmd;
+			seenCmd = true;
+			return starts;
+		});
 
 	return cmds.map(({ line }, n) => {
 		const next = cmds[n + 1];
