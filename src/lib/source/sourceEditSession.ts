@@ -17,7 +17,7 @@ export interface SourceEditPayload {
 	path: string;
 	/** File bytes from the slide's `?raw` import. */
 	source: string;
-	/** Monaco language id (svelte → html). */
+	/** Monaco language id (`svelte` for a page; see monacoShiki). */
 	language: string;
 	/** Whether SAVE can write (vite dev). */
 	canSave: boolean;

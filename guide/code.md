@@ -157,7 +157,7 @@ folding and a minimap.
 | Prop             | Default    | Notes |
 | ---------------- | ---------- | ----- |
 | `code`           | `''`       | Buffer contents. A colocated file via `?raw` keeps it out of the slide. |
-| `language`       | `'java'`   | Monaco language id (`javascript`, `typescript`, `python`, `html`, `css`, `java`, …). |
+| `language`       | `'java'`   | Monaco language id (`javascript`, `typescript`, `python`, `html`, `css`, `java`, `svelte`, …). |
 | `width`, `height`| `'1200px'`, `'600px'` | CSS lengths (strings). |
 | `fontSize`       | `20`       | Monaco font in px; it ignores the slide's font size. |
 | `readOnly`       | `true`     | |
@@ -166,11 +166,11 @@ folding and a minimap.
 | `style`, `id`, `class` | | Standard (on the placeholder element). |
 
 Gotchas:
-- Needs internet: Monaco 0.21.2 is fetched from cdnjs on mount. Offline, the box stays empty.
+- Needs internet: Monaco (0.52.2) is fetched from cdnjs once per page. Offline, the box stays empty.
 - Blank after client-side navigation (View-Transition decks, appendices with `transition`). Use
   `QuickCode` / `CssSnippet` there.
 - `language` defaults to `'java'`. Always pass it.
-- Monaco has no `svelte` mode; use `'html'` for `.svelte` files.
+- `.svelte` files: pass `language="svelte"`. Monaco has no Svelte mode; GeekPresent colours it with Shiki's grammar.
 - The real editor is portaled into an unscaled `position: fixed` layer on `<body>` and tracks the
   placeholder every frame (so clicks land on the right character under the canvas scale). It paints
   above the slide at z-index 30; do not try to layer slide content over a `Code`.
@@ -364,7 +364,7 @@ window (`/_source-edit`). On a Text (no tool bar) it shows a corner "</> Source"
 | ---------- | -------------- | ----- |
 | `source`   | required       | The file's text, from Vite's `?raw` import. |
 | `path`     | `''`           | Shown in the title bar and used by EDIT. Not derived; pass it. |
-| `language` | `'html'`       | Monaco language (`html` reads best for `.svelte`). |
+| `language` | `'svelte'`     | Monaco language; `svelte` is coloured by Shiki's grammar. |
 | `text`     | `'</> Source'` | Corner-button label (Text mode only). |
 | `chrome`   | `true`         | Corner button recedes like other chrome; `false` for the accent look. |
 | `style`, `id`, `class` | | Standard. |

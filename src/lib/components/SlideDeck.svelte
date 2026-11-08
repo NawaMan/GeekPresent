@@ -1700,7 +1700,7 @@
 				{#if browser && $deckSourceFallback && !$pageSourceHasOwner}
 					<CodeBox
 						code={$deckSourceFallback.code}
-						language="html"
+						language="svelte"
 						title={$deckSourceFallback.path}
 						bind:expanded={deckSourceExpanded}
 						readOnly

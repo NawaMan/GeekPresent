@@ -27,4 +27,4 @@
 	</p>
 </ContentPage>
 
-<CodeBox code={source} language="html" title={path} bind:expanded={showCode} />
+<CodeBox code={source} language="svelte" title={path} bind:expanded={showCode} />
