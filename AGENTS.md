@@ -510,8 +510,20 @@ than misleading the next agent.
   CSS scale); **SAVE** / **REFRESH** / **CLOSE** as before — SAVE is NOT ALLOWED on a static
   host. In the edit window: **Ctrl/Cmd+S** SAVE, **Ctrl/Cmd+Shift+R** REFRESH, **Esc** CLOSE
   (dirty confirm); **Alt+.** arms **r**/**s**/**c** (one letter ends arm mode; Alt+. again
-  cancels). Capture-phase so Monaco cannot swallow Esc. On a Text (no tool bar) ViewSource
-  keeps the classic corner `</> Source` button)
+  cancels). Capture-phase so Monaco cannot swallow Esc. Under `pnpm dev` the window is a small
+  IDE over **`src/routes` + `src/lib`**: a file tree with a filter, one tab (one Monaco model)
+  per file, **Ctrl/Cmd+click on an import** (`$lib/…`, `./`, `../`) opens it, and ADJUST's
+  **`</>`** on a Block opens its file at its line (the source stamp adds `__line` next to
+  `__file`). SAVE is **fingerprinted**: a file changed on disk since it was loaded (an ADJUST
+  SAVE, your own IDE) answers **CONFLICT** instead of being overwritten. Tabs and unsaved
+  buffers survive a reload — saving a `$lib` file the window imports reloads it. **⏮ ◀ n/N ▶ ⏭**
+  page through the deck's visible slides (appendices skipped, as →/Space do): each opens that
+  slide's `+page.svelte` and moves the slides window that opened the editor there too
+  (`source/deckNavCore.ts`; the deck list is `source/editDecks.ts`, every `pages.ts`). Nothing is
+  created, renamed or deleted there. Endpoints `/__geekpresent/file-tree|file-load|file-save|
+  file-resolve` (`source/devFilePlugin.ts`); the allowlist is `source/fileAccessCore.ts` plus
+  a real-path check. On a Text (no tool bar) ViewSource keeps the classic corner
+  `</> Source` button)
   and `SourceView` (the same control, Shiki instead of Monaco for the in-slide panel — use it
   on any slide reached by a CLIENT-SIDE navigation, i.e. a View-Transition deck or an appendix
   with `transition`, because Monaco's CDN loader renders blank after a `goto`; EDIT still opens

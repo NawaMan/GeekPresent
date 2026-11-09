@@ -1,44 +1,77 @@
 <!--
-  Unscaled source editor — opened by ViewSource/SourceView EDIT into a separate window.
+  Unscaled source editor — opened by ViewSource/SourceView/☰ EDIT into a separate window.
 
   Why a window: the slide canvas uses CSS transform: scale(...). Monaco's caret
   and glyph metrics are computed in untransformed CSS pixels, so inside the
   canvas the caret drifts. Here there is no scale: 1 CSS px = 1 layout px.
 
-  SAVE    — Ctrl/Cmd+S, or Alt+. then s — write buffer; window stays open.
-  REFRESH — Ctrl/Cmd+Shift+R, or Alt+. then r — re-read disk. Confirms if buffer ≠ disk.
-  CLOSE   — Esc, or Alt+. then c — leave the editor; confirms if the buffer is dirty.
+  Under `vite dev` it is a small IDE over src/routes + src/lib: a file tree, one
+  tab per open file, Ctrl/Cmd+click on an import to open it. The EDIT that opened
+  the window opens (or focuses) that slide's page. On a static host it is what it
+  always was: the one page, read-only.
+
+  SAVE    — Ctrl/Cmd+S, or Alt+. then s — write the ACTIVE tab; refused when the
+            file changed on disk since it was loaded (CONFLICT), never clobbered.
+  REFRESH — Ctrl/Cmd+Shift+R, or Alt+. then r — re-read the active tab from disk.
+  CLOSE   — Esc, or Alt+. then c — leave the editor; confirms if any tab is dirty.
 
   Alt+. arms R/S/C for a few seconds (amber bar). Using any of those letters, or
   pressing Alt+. again, ends arm mode — so SAVE does not leave C live for a stray close.
-
   Keys are taken in the CAPTURE phase so Monaco cannot swallow Esc / the armed letters.
+
+  Tabs and unsaved buffers survive a reload (ideSessionCore): saving a $lib file
+  this window imports, or a dev-server restart, reloads it.
 -->
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
-	import Code from '$lib/components/Code.svelte';
-	import { savePageSource, loadPageSource } from '$lib/stores/sourceSave';
+	import { base } from '$app/paths';
+	import { loadPageSource } from '$lib/stores/sourceSave';
 	import {
-		SOURCE_EDIT_MSG,
 		SOURCE_EDIT_STORAGE_KEY,
 		isSourceEditMessage,
 		parseSourceEditPayload,
 		type SourceEditPayload
 	} from '$lib/source/sourceEditSession';
 	import { sourceEditKeyIntent } from '$lib/source/sourceEditKeyCore';
+	import {
+		IDE_SESSION_KEY,
+		closeTab,
+		emptySession,
+		encodeSession,
+		openTab,
+		parseSession,
+		setDraft,
+		tabLabel,
+		type Draft,
+		type IdeSession
+	} from '$lib/source/ideSessionCore';
+	import { listFiles, loadFile, resolveImport, saveFile, type Failure } from '$lib/source/sourceFiles';
+	import FileTree from '$lib/source/FileTree.svelte';
+	import IdeEditor from '$lib/source/IdeEditor.svelte';
+	import {
+		navTarget,
+		positionOfFile,
+		positionOfRoute,
+		stripBase,
+		type NavKind
+	} from '$lib/source/deckNavCore';
+	import { EDIT_DECKS } from '$lib/source/editDecks';
 
 	let payload: SourceEditPayload | null = null;
-	/** Baseline last loaded or saved — used for SAVE's NONE check. */
-	let baseline = '';
-	let codeRef: {
-		getValue: () => string;
-		isDirty: () => boolean;
-		markClean: () => void;
-		setValue: (next: string) => void;
-	} | undefined;
+	/** The dev file endpoints answered: tree, tabs and SAVE are live. */
+	let editable = false;
+	let files: string[] = [];
+	let session: IdeSession = emptySession();
+	/** The disk version each open tab was loaded or last saved as. */
+	let disk: Record<string, { content: string; fingerprint: string }> = {};
+	let dirty: Record<string, boolean> = {};
+	let ide: IdeEditor;
+	let tree: FileTree;
+	/** Static host: the one read-only page, keyed by its display path. */
+	let staticFile = '';
 
-	// Shared flash for SAVE and REFRESH (same badge slot).
+	// One flash slot for every action (SAVE / REFRESH / follow), parked on SAVE.
 	let actionLabel = 'SAVE';
 	let actionRefused = false;
 	let actionTip = '';
@@ -81,124 +114,279 @@
 		}, ms);
 	}
 
-	function applyPayload(next: SourceEditPayload, { force = false } = {}) {
-		if (
-			!force &&
-			payload &&
-			codeRef?.isDirty?.() &&
-			(next.route !== payload.route || next.source !== baseline)
-		) {
-			const ok = confirm(
-				'You have unsaved edits in the source editor.\n\nDiscard them and load the new source?'
-			);
-			if (!ok) return;
+	/** Say why a file call failed, in the author's terms. */
+	function flashFailure(r: Failure) {
+		if (r.status === 0) {
+			flashAction('OFFLINE', 4000, {
+				refused: true,
+				tip: 'The dev server is not answering (restarting?). Your edits are kept — try again.'
+			});
+		} else {
+			flashAction('ERROR', 4000, { refused: true, tip: r.error });
 		}
-		payload = next;
-		baseline = next.source;
-		document.title = next.path ? `Source — ${next.path}` : 'Source';
-		// Force Monaco onto the new bytes even if it still thinks it is dirty.
-		if (codeRef?.setValue) codeRef.setValue(next.source);
-		else codeRef?.markClean?.();
 	}
 
-	function readFromStorage() {
-		if (!browser) return;
-		try {
-			const raw = sessionStorage.getItem(SOURCE_EDIT_STORAGE_KEY);
-			const p = parseSourceEditPayload(raw);
-			if (p) applyPayload(p, { force: true });
-		} catch {
-			/* ignore */
+	// ── session ────────────────────────────────────────────────────────────────
+	let persistTimer: ReturnType<typeof setTimeout> | undefined;
+	function persist() {
+		clearTimeout(persistTimer);
+		persistTimer = setTimeout(() => {
+			try {
+				sessionStorage.setItem(IDE_SESSION_KEY, encodeSession(session));
+			} catch {
+				/* private mode / quota — tabs just won't survive a reload */
+			}
+		}, 250);
+	}
+
+	$: active = session.active;
+
+	// ── deck paging (FIRST / PREV / NEXT / LAST) ─────────────────────────────
+	/** The slide EDIT was opened on, or the one a button last went to. */
+	let slideRoute: string | null = null;
+	$: deckPos =
+		positionOfFile(EDIT_DECKS, active) ?? positionOfRoute(EDIT_DECKS, slideRoute);
+	$: navTo = {
+		first: navTarget(deckPos, 'first'),
+		prev: navTarget(deckPos, 'prev'),
+		next: navTarget(deckPos, 'next'),
+		last: navTarget(deckPos, 'last')
+	};
+
+	/** Open the slide's page in a tab, and move the slides window there too. */
+	async function goSlide(kind: NavKind) {
+		const target = navTarget(deckPos, kind);
+		if (!target) return;
+		if (!(await openFile(target.file))) return;
+		slideRoute = target.route;
+		const deckWin = window.opener as Window | null;
+		if (deckWin && !deckWin.closed) {
+			try {
+				deckWin.location.assign(base + target.route);
+				return;
+			} catch {
+				/* not ours any more */
+			}
 		}
+		flashAction('NO DECK', 4000, {
+			refused: true,
+			tip: 'The slides window that opened this editor is gone, so it cannot follow. Reopen EDIT from a slide.'
+		});
+	}
+	$: if (browser) document.title = active ? `Source — ${active}` : 'Source';
+
+	// ── files ──────────────────────────────────────────────────────────────────
+
+	/** Open `file` in a tab (or focus its tab), loading it from disk the first
+	    time. A `draft` (from a reload) replaces the loaded buffer. */
+	async function openFile(file: string, opts: { line?: number; draft?: Draft } = {}): Promise<boolean> {
+		if (ide.has(file)) {
+			session = openTab(session, file);
+			persist();
+			await ide.open(file, '', opts.line);
+			return true;
+		}
+		const r = await loadFile(file);
+		if (!r.ok) {
+			flashFailure(r);
+			return false;
+		}
+		disk = { ...disk, [file]: { content: r.content, fingerprint: r.fingerprint } };
+		session = openTab(session, file);
+		await ide.open(file, r.content, opts.line);
+		const draft = opts.draft;
+		if (draft && draft.content !== r.content) {
+			ide.setContent(file, draft.content);
+			// The draft was edited from the version it names; if that is no longer
+			// what is on disk, SAVE must refuse rather than overwrite the newer file.
+			disk = { ...disk, [file]: { content: r.content, fingerprint: draft.fingerprint } };
+			if (draft.fingerprint !== r.fingerprint) {
+				flashAction('CHANGED', 6000, {
+					refused: true,
+					tip: `${file} changed on disk since your unsaved edits. SAVE will refuse; REFRESH takes the disk version.`
+				});
+			}
+		}
+		onChange(file);
+		persist();
+		return true;
+	}
+
+	/** Open what an EDIT asked for: a named file at a line (ADJUST's </>), or
+	    else the page of the slide it came from. */
+	async function openPayload(p: SourceEditPayload) {
+		session = { ...session, payloadTs: p.ts };
+		slideRoute = stripBase(p.route, base);
+		if (p.file) {
+			await openFile(p.file, { line: p.line });
+			return;
+		}
+		const r = await loadPageSource(p.route);
+		if (!r.ok || !r.file) {
+			flashAction('ERROR', 4000, { refused: true, tip: r.error ?? 'could not find the page file' });
+			return;
+		}
+		await openFile(r.file);
+	}
+
+	async function start() {
+		session = parseSession(sessionStorage.getItem(IDE_SESSION_KEY));
+		payload = parseSourceEditPayload(sessionStorage.getItem(SOURCE_EDIT_STORAGE_KEY));
+		if (!payload?.canSave) {
+			if (payload) await showStatic(payload);
+			return;
+		}
+		const listed = await listFiles();
+		if (!listed.ok) {
+			flashFailure(listed);
+			await showStatic(payload);
+			return;
+		}
+		files = listed.files;
+		editable = true;
+		slideRoute = stripBase(payload.route, base);
+
+		const restore = session;
+		session = { ...emptySession(), payloadTs: restore.payloadTs };
+		for (const file of restore.tabs) await openFile(file, { draft: restore.drafts[file] });
+		if (payload.ts !== restore.payloadTs) await openPayload(payload);
+		else if (restore.active && ide.has(restore.active)) await openFile(restore.active);
+		persist();
+	}
+
+	/** Static host (or no dev endpoints): the one page EDIT was opened on, read-only. */
+	async function showStatic(p: SourceEditPayload) {
+		editable = false;
+		staticFile = p.path || 'page.svelte';
+		session = openTab(emptySession(), staticFile);
+		if (ide.has(staticFile)) ide.setContent(staticFile, p.source);
+		await ide.open(staticFile, p.source);
 	}
 
 	function onMessage(event: MessageEvent) {
 		if (event.origin !== window.location.origin) return;
 		if (!isSourceEditMessage(event.data)) return;
 		const p = parseSourceEditPayload(event.data);
-		if (p) applyPayload(p);
+		if (!p || p.ts === payload?.ts) return;
+		payload = p;
+		if (editable) openPayload(p);
+		else showStatic(p);
 	}
 
+	function onChange(file: string) {
+		const base = disk[file];
+		const buffer = ide.getContent(file);
+		if (!base || buffer === null) return;
+		const isDirty = buffer !== base.content;
+		if (dirty[file] !== isDirty) dirty = { ...dirty, [file]: isDirty };
+		if (!editable) return;
+		session = setDraft(session, file, isDirty ? { content: buffer, fingerprint: base.fingerprint } : null);
+		persist();
+	}
+
+	async function onFollow(from: string, spec: string) {
+		if (!editable) return;
+		const r = await resolveImport(from, spec);
+		if (!r.ok) {
+			flashAction('NOT EDITABLE', 3600, { refused: true, tip: r.error });
+			return;
+		}
+		await openFile(r.file);
+	}
+
+	async function closeFile(file: string) {
+		if (dirty[file] && !confirm(`${file} has unsaved edits.\n\nClose it without saving?`)) return;
+		ide.close(file);
+		session = closeTab(session, file);
+		const { [file]: _d, ...restDisk } = disk;
+		const { [file]: _x, ...restDirty } = dirty;
+		disk = restDisk;
+		dirty = restDirty;
+		if (session.active) await ide.open(session.active, '');
+		persist();
+	}
+
+	// ── actions ────────────────────────────────────────────────────────────────
+
 	async function onSave() {
-		if (!payload) return;
-		if (!payload.canSave) {
+		const file = session.active;
+		if (!file) return;
+		if (!editable) {
 			flashAction('NOT ALLOWED', 2600, { refused: true, tip: notAllowedTip });
 			return;
 		}
-		const content = codeRef?.getValue() ?? payload.source;
-		if (content === baseline) {
+		const content = ide.getContent(file);
+		const base = disk[file];
+		if (content === null || !base) return;
+		if (content === base.content && !dirty[file]) {
 			flashAction('NONE', 1600);
 			return;
 		}
-		const r = await savePageSource(content, payload.route);
+		const r = await saveFile(file, content, base.fingerprint);
 		if (!r.ok) {
-			flashAction('ERROR', 1600);
-			console.error('[source save] failed:', r.error);
+			if (r.reason === 'conflict') {
+				flashAction('CONFLICT', 7000, {
+					refused: true,
+					tip: `${file} changed on disk since you opened it. REFRESH loads the disk version (copy your edits first — it replaces them).`
+				});
+			} else flashFailure(r);
 			return;
 		}
-		baseline = content;
-		// Keep payload.source in step so a later REFRESH compares cleanly.
-		payload = { ...payload, source: content };
-		codeRef?.markClean();
+		disk = { ...disk, [file]: { content, fingerprint: r.fingerprint } };
+		onChange(file);
 		flashAction('SAVED', 1600);
 	}
 
 	async function onRefresh() {
-		if (!payload) return;
-		// Load endpoint only exists under vite dev — same gate as SAVE.
-		if (!payload.canSave) {
+		const file = session.active;
+		if (!file) return;
+		if (!editable) {
 			flashAction('NOT ALLOWED', 2600, { refused: true, tip: refreshNotAllowedTip });
 			return;
 		}
-
-		const r = await loadPageSource(payload.route);
-		if (!r.ok || typeof r.content !== 'string') {
-			flashAction('ERROR', 1600);
-			console.error('[source load] failed:', r.error);
+		const r = await loadFile(file);
+		if (!r.ok) {
+			flashFailure(r);
 			return;
 		}
-
-		const buffer = codeRef?.getValue() ?? payload.source;
+		const buffer = ide.getContent(file);
 		if (buffer === r.content) {
-			// Already matches disk — still reset baseline in case an external
-			// write matched by coincidence after we drifted and came back.
-			baseline = r.content;
-			payload = { ...payload, source: r.content };
-			codeRef?.markClean();
+			disk = { ...disk, [file]: { content: r.content, fingerprint: r.fingerprint } };
+			onChange(file);
 			flashAction('CURRENT', 1600);
 			return;
 		}
-
-		const ok = confirm(
-			'The editor buffer differs from the file on disk.\n\n' +
-				'Reload from disk and discard the buffer?\n\n' +
-				'(This picks up ADJUST SAVE and other external edits.)'
-		);
-		if (!ok) {
+		if (
+			dirty[file] &&
+			!confirm(
+				'The editor buffer differs from the file on disk.\n\n' +
+					'Reload from disk and discard the buffer?\n\n' +
+					'(This picks up ADJUST SAVE and other external edits.)'
+			)
+		) {
 			flashAction('KEEP', 1600);
 			return;
 		}
-
-		baseline = r.content;
-		payload = { ...payload, source: r.content };
-		if (codeRef?.setValue) codeRef.setValue(r.content);
-		else codeRef?.markClean?.();
+		disk = { ...disk, [file]: { content: r.content, fingerprint: r.fingerprint } };
+		ide.setContent(file, r.content);
+		onChange(file);
 		flashAction('RELOADED', 1600);
 	}
 
-	function isDirty(): boolean {
-		if (!payload) return false;
-		if (codeRef?.isDirty?.()) return true;
-		const buf = codeRef?.getValue?.();
-		return typeof buf === 'string' && buf !== baseline;
-	}
-
 	function onClose() {
-		if (isDirty()) {
+		const unsaved = Object.keys(dirty).filter((f) => dirty[f]);
+		if (unsaved.length) {
 			const ok = confirm(
-				'You have unsaved edits in the source editor.\n\nClose without saving?'
+				`Unsaved edits in:\n  ${unsaved.join('\n  ')}\n\nClose without saving?`
 			);
 			if (!ok) return;
+			// Closing on purpose: don't resurrect the discarded drafts next time.
+			session = { ...session, drafts: {} };
+			try {
+				sessionStorage.setItem(IDE_SESSION_KEY, encodeSession(session));
+			} catch {
+				/* ignore */
+			}
 		}
 		window.close();
 		setTimeout(() => {
@@ -218,6 +406,10 @@
 	function onKeydown(event: KeyboardEvent) {
 		const intent = sourceEditKeyIntent(event, keysArmed);
 		if (intent === 'ignore') return;
+		if (intent === 'close' && tree?.clearFilterIfFocused()) {
+			event.preventDefault();
+			return;
+		}
 
 		event.preventDefault();
 		event.stopPropagation();
@@ -244,10 +436,10 @@
 	}
 
 	onMount(() => {
-		readFromStorage();
 		window.addEventListener('message', onMessage);
 		// Capture = true: run before Monaco's bubble handlers.
 		window.addEventListener('keydown', onKeydown, true);
+		start();
 		return () => {
 			window.removeEventListener('message', onMessage);
 			window.removeEventListener('keydown', onKeydown, true);
@@ -257,13 +449,12 @@
 
 	onDestroy(() => {
 		clearTimeout(actionTimer);
+		clearTimeout(persistTimer);
 		disarmKeys();
 	});
 
-	$: pathLabel = payload?.path || '(no file loaded — open EDIT from a slide)';
-	$: canSave = payload?.canSave ?? false;
-	$: language = payload?.language || 'html';
-	$: code = payload?.source ?? '';
+	$: pathLabel = active || '(no file loaded — open EDIT from a slide)';
+	$: anyDirty = Object.values(dirty).some(Boolean);
 	// Show flash next to whichever control last acted; default badge parks on SAVE.
 	$: showFlash = actionLabel !== 'SAVE' || actionRefused;
 </script>
@@ -274,23 +465,62 @@
 
 <div class="shell">
 	<header class="bar" class:armed={keysArmed}>
-		<div class="path" title={pathLabel}>{pathLabel}</div>
+		<div class="path" title={pathLabel}>{pathLabel}{#if active && dirty[active]} ●{/if}</div>
+		{#if editable && deckPos}
+			<nav class="deck-nav" aria-label="Slides">
+				<button
+					type="button"
+					class="btn nav"
+					disabled={!navTo.first}
+					title={navTo.first ? `FIRST — ${navTo.first.title}` : 'FIRST — already there'}
+					aria-label="First slide"
+					on:click={() => goSlide('first')}>⏮</button
+				>
+				<button
+					type="button"
+					class="btn nav"
+					disabled={!navTo.prev}
+					title={navTo.prev ? `PREV — ${navTo.prev.title}` : 'PREV — this is the first slide'}
+					aria-label="Previous slide"
+					on:click={() => goSlide('prev')}>◀</button
+				>
+				<span class="deck-pos" title={deckPos.deck.slides[deckPos.index].title}
+					>{deckPos.index + 1}/{deckPos.deck.slides.length}</span
+				>
+				<button
+					type="button"
+					class="btn nav"
+					disabled={!navTo.next}
+					title={navTo.next ? `NEXT — ${navTo.next.title}` : 'NEXT — this is the last slide'}
+					aria-label="Next slide"
+					on:click={() => goSlide('next')}>▶</button
+				>
+				<button
+					type="button"
+					class="btn nav"
+					disabled={!navTo.last}
+					title={navTo.last ? `LAST — ${navTo.last.title}` : 'LAST — already there'}
+					aria-label="Last slide"
+					on:click={() => goSlide('last')}>⏭</button
+				>
+			</nav>
+		{/if}
 		<div class="actions">
 			<button
 				type="button"
 				class="btn refresh"
-				disabled={!payload}
-				title="REFRESH — Ctrl+Shift+R, or Alt+. then R (confirms if the buffer differs)"
-				on:click={onRefresh}
-			><span class="mn">R</span>EFRESH</button>
+				disabled={!active}
+				title="REFRESH — Ctrl+Shift+R, or Alt+. then R (confirms if the buffer has unsaved edits)"
+				on:click={onRefresh}><span class="mn">R</span>EFRESH</button
+			>
 			<span class="action-wrap" class:refused={actionRefused}>
 				<button
 					type="button"
 					class="btn save"
-					disabled={!payload}
+					disabled={!active}
 					title="SAVE — Ctrl+S, or Alt+. then S"
-					on:click={onSave}
-				><span class="mn">S</span>AVE</button>
+					on:click={onSave}><span class="mn">S</span>AVE</button
+				>
 				{#if showFlash}
 					<span class="action-pop">
 						{#if actionLabel !== 'SAVE'}
@@ -306,32 +536,65 @@
 				type="button"
 				class="btn close"
 				title="CLOSE — Esc, or Alt+. then C (confirms if unsaved)"
-				on:click={onClose}
-			><span class="mn">C</span>LOSE</button>
+				on:click={onClose}><span class="mn">C</span>LOSE{#if anyDirty} ●{/if}</button
+			>
 		</div>
 	</header>
 
-	<main class="editor">
-		{#if payload}
-			<Code
-				bind:this={codeRef}
-				{code}
-				{language}
-				width="100%"
-				height="100%"
-				fontSize={15}
-				readOnly={!canSave}
-			/>
-		{:else}
-			<p class="empty">
-				No source loaded. From a slide, open <b>☰ → EDIT</b> (or SOURCE then the
-				CodeBox <b>EDIT</b> button).
-			</p>
+	<div class="body" class:with-tree={editable}>
+		{#if editable}
+			<FileTree bind:this={tree} {files} {active} on:open={(e) => openFile(e.detail.file)} />
 		{/if}
-	</main>
+		<section class="main">
+			{#if session.tabs.length}
+				<div class="tabs" role="tablist">
+					{#each session.tabs as file (file)}
+						<div class="tab" class:active={file === active} class:dirty={dirty[file]} title={file}>
+							<button
+								type="button"
+								class="tab-name"
+								role="tab"
+								aria-selected={file === active}
+								on:click={() => openFile(file)}>{tabLabel(file, session.tabs)}</button
+							>
+							{#if editable}
+								<button
+									type="button"
+									class="tab-close"
+									aria-label="Close {file}"
+									title={dirty[file] ? 'Unsaved — close' : 'Close'}
+									on:click={() => closeFile(file)}>{dirty[file] ? '●' : '×'}</button
+								>
+							{/if}
+						</div>
+					{/each}
+				</div>
+			{/if}
+			<main class="editor">
+				<IdeEditor
+					bind:this={ide}
+					readOnly={!editable}
+					on:change={(e) => onChange(e.detail.file)}
+					on:follow={(e) => onFollow(e.detail.from, e.detail.spec)}
+				/>
+				{#if !session.tabs.length}
+					<p class="empty">
+						{#if editable}
+							Pick a file on the left, or open <b>☰ → EDIT</b> on a slide.
+						{:else}
+							No source loaded. From a slide, open <b>☰ → EDIT</b> (or SOURCE then the CodeBox
+							<b>EDIT</b> button).
+						{/if}
+					</p>
+				{/if}
+			</main>
+		</section>
+	</div>
 
-	{#if payload && !canSave}
+	{#if payload && !editable}
 		<p class="hint">Read-only here (not vite dev). SAVE / REFRESH answer NOT ALLOWED.</p>
+	{:else if editable}
+		<p class="hint">Ctrl/Cmd+click an import to open it.</p>
 	{/if}
 </div>
 
@@ -374,6 +637,23 @@
 		font-size: 13px;
 		font-weight: 600;
 		color: #fff;
+	}
+	.deck-nav {
+		flex: 0 0 auto;
+		display: flex;
+		align-items: center;
+		gap: 0.3em;
+		margin-left: auto;
+	}
+	.btn.nav {
+		padding: 0.35em 0.6em;
+		color: #c0f1ff;
+	}
+	.deck-pos {
+		min-width: 4.5em;
+		text-align: center;
+		font-size: 12px;
+		color: #aaa;
 	}
 	.actions {
 		flex: 0 0 auto;
@@ -442,7 +722,7 @@
 		border-color: #e5484d;
 	}
 	.action-tip {
-		max-width: 18em;
+		max-width: 22em;
 		text-align: right;
 		padding: 0.3em 0.7em;
 		border-radius: 6px;
@@ -452,19 +732,79 @@
 		color: #fff;
 		border: 1px solid #e5484d;
 	}
+	.body {
+		flex: 1 1 auto;
+		min-height: 0;
+		display: grid;
+		grid-template-columns: 1fr;
+	}
+	.body.with-tree {
+		grid-template-columns: minmax(180px, 260px) 1fr;
+	}
+	.main {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		min-height: 0;
+	}
+	.tabs {
+		flex: 0 0 auto;
+		display: flex;
+		overflow-x: auto;
+		background: #252526;
+		border-bottom: 1px solid #333;
+		font-size: 12.5px;
+	}
+	.tab {
+		display: flex;
+		align-items: center;
+		border-right: 1px solid #333;
+		background: #2d2d2d;
+		color: #aaa;
+		flex: 0 0 auto;
+	}
+	.tab.active {
+		background: #1e1e1e;
+		color: #fff;
+		box-shadow: inset 0 2px 0 #f0a33e;
+	}
+	.tab-name,
+	.tab-close {
+		border: 0;
+		background: none;
+		color: inherit;
+		font: inherit;
+		cursor: pointer;
+	}
+	.tab-name {
+		padding: 0.45em 0.4em 0.45em 0.8em;
+		white-space: nowrap;
+	}
+	.tab-close {
+		width: 1.8em;
+		padding: 0.45em 0;
+		opacity: 0.6;
+	}
+	.tab.dirty .tab-close {
+		color: #f0a33e;
+		opacity: 1;
+	}
+	.tab-close:hover {
+		opacity: 1;
+		background: rgba(255, 255, 255, 0.08);
+	}
 	.editor {
 		flex: 1 1 auto;
 		min-height: 0;
 		position: relative;
 	}
-	.editor :global(> div) {
-		width: 100% !important;
-		height: 100% !important;
-	}
 	.empty {
+		position: absolute;
+		inset: 0;
 		margin: 2em;
 		line-height: 1.5;
 		opacity: 0.85;
+		pointer-events: none;
 	}
 	.hint {
 		flex: 0 0 auto;
