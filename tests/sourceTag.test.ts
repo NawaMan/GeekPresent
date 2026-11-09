@@ -24,9 +24,9 @@ describe('stampSourceFile', () => {
 			'</Group>'
 		].join('\n');
 		const out = stampSourceFile(code, FILE);
-		expect(out).toContain(`<TextBlock __file="${FILE}" name="api"`);
-		expect(out).toContain(`<ImageBlock __file="${FILE}" name="logo"`);
-		expect(out).toContain(`<Block __file="${FILE}" name={item}`);
+		expect(out).toContain(`<TextBlock __file="${FILE}" __line={3} name="api"`);
+		expect(out).toContain(`<ImageBlock __file="${FILE}" __line={4} name="logo"`);
+		expect(out).toContain(`<Block __file="${FILE}" __line={5} name={item}`);
 		// Group itself reports nothing to SAVE, so it isn't stamped.
 		expect(out).toContain('<Group focus="api">');
 	});
