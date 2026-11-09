@@ -511,7 +511,7 @@ than misleading the next agent.
   host. In the edit window: **Ctrl/Cmd+S** SAVE, **Ctrl/Cmd+Shift+R** REFRESH, **Esc** CLOSE
   (dirty confirm); **Alt+.** arms **r**/**s**/**c** (one letter ends arm mode; Alt+. again
   cancels). Capture-phase so Monaco cannot swallow Esc. Under `pnpm dev` the window is a small
-  IDE over **`src/routes` + `src/lib`**: a file tree with a filter, one tab (one Monaco model)
+  IDE over **`src/routes` + `src/lib`**: a file tree with a filter (drag the divider to resize it; double-click resets), one tab (one Monaco model)
   per file, **Ctrl/Cmd+click on an import** (`$lib/…`, `./`, `../`) opens it, and ADJUST's
   **`</>`** on a Block opens its file at its line (the source stamp adds `__line` next to
   `__file`). SAVE is **fingerprinted**: a file changed on disk since it was loaded (an ADJUST

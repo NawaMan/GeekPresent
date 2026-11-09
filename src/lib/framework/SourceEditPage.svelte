@@ -57,6 +57,8 @@
 		type NavKind
 	} from '$lib/source/deckNavCore';
 	import { EDIT_DECKS } from '$lib/source/editDecks';
+	import { TREE_DEFAULT_WIDTH, clampTreeWidth } from '$lib/source/treeWidthCore';
+	import { treeWidth } from '$lib/stores/treeWidth';
 
 	let payload: SourceEditPayload | null = null;
 	/** The dev file endpoints answered: tree, tabs and SAVE are live. */
@@ -124,6 +126,28 @@
 		} else {
 			flashAction('ERROR', 4000, { refused: true, tip: r.error });
 		}
+	}
+
+	// ── tree / editor divider ─────────────────────────────────────────────────
+	let windowWidth = Infinity;
+	$: shownTreeWidth = clampTreeWidth($treeWidth, windowWidth);
+	let drag: { pointer: number; startX: number; startWidth: number } | null = null;
+
+	function dividerDown(e: PointerEvent) {
+		if (e.button !== 0) return;
+		e.preventDefault();
+		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+		drag = { pointer: e.pointerId, startX: e.clientX, startWidth: shownTreeWidth };
+	}
+
+	function dividerMove(e: PointerEvent) {
+		if (!drag || e.pointerId !== drag.pointer) return;
+		treeWidth.set(clampTreeWidth(drag.startWidth + e.clientX - drag.startX, windowWidth));
+	}
+
+	function dividerUp(e: PointerEvent) {
+		if (!drag || e.pointerId !== drag.pointer) return;
+		drag = null;
 	}
 
 	// ── session ────────────────────────────────────────────────────────────────
@@ -463,6 +487,8 @@
 	<title>Source</title>
 </svelte:head>
 
+<svelte:window bind:innerWidth={windowWidth} />
+
 <div class="shell">
 	<header class="bar" class:armed={keysArmed}>
 		<div class="path" title={pathLabel}>{pathLabel}{#if active && dirty[active]} ●{/if}</div>
@@ -541,9 +567,27 @@
 		</div>
 	</header>
 
-	<div class="body" class:with-tree={editable}>
+	<div
+		class="body"
+		class:with-tree={editable}
+		class:dragging={drag}
+		style={editable ? `grid-template-columns: ${shownTreeWidth}px 5px 1fr;` : undefined}
+	>
 		{#if editable}
 			<FileTree bind:this={tree} {files} {active} on:open={(e) => openFile(e.detail.file)} />
+			<!-- svelte-ignore a11y-no-static-element-interactions -->
+			<div
+				class="divider"
+				role="separator"
+				aria-orientation="vertical"
+				aria-label="Resize the file tree"
+				title="Drag to resize the file tree — double-click to reset"
+				on:pointerdown={dividerDown}
+				on:pointermove={dividerMove}
+				on:pointerup={dividerUp}
+				on:pointercancel={dividerUp}
+				on:dblclick={() => treeWidth.set(TREE_DEFAULT_WIDTH)}
+			></div>
 		{/if}
 		<section class="main">
 			{#if session.tabs.length}
@@ -738,8 +782,18 @@
 		display: grid;
 		grid-template-columns: 1fr;
 	}
-	.body.with-tree {
-		grid-template-columns: minmax(180px, 260px) 1fr;
+	.divider {
+		cursor: col-resize;
+		background: #252526;
+		touch-action: none;
+	}
+	.divider:hover,
+	.body.dragging .divider {
+		background: #0e639c;
+	}
+	.body.dragging {
+		cursor: col-resize;
+		user-select: none;
 	}
 	.main {
 		display: flex;
