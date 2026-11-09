@@ -1,8 +1,15 @@
 # AGENTS.md — Working on GeekPresent
 
-Guidance for an AI agent (Claude Code or similar) helping a user build a presentation with this
-framework. The user will usually ask in plain language ("help me add a YouTube link",
-"start me from scratch"); match it to a **playbook** below and follow the steps.
+<!-- start-redirect: adopt-geekpresent.sh --copy removes this block -->
+> **Asked to use GeekPresent to make a site for someone** — a presentation, a web page or a blog
+> in their own repository? This is the wrong file: read **[`START.md`](START.md)**. It asks the
+> right questions and runs one command. Everything below is for working on GeekPresent itself
+> (this repository: the framework, its showcase decks, its releases).
+<!-- /start-redirect -->
+
+Guidance for an AI agent (Claude Code or similar) working in this repository. The user will
+usually ask in plain language ("help me add a YouTube link", "start me from scratch"); match it
+to a **playbook** below and follow the steps.
 
 Read the `README.md` first for the user-facing overview. This file is the *operator's manual*.
 

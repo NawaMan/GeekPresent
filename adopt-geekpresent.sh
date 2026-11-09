@@ -3,7 +3,24 @@
 # adopt-geekpresent.sh — bootstrap GeekPresent into an existing project so you
 # can author docs / slides / promo material that build into a static site.
 #
-# What it does (each step is optional and confirmed before anything destructive):
+# Two ways to do it (--package is the default):
+#
+#   --package  The site's source goes into a subfolder; GeekPresent itself is a
+#              DEPENDENCY (@geekpresent/core, a GitHub Release tarball). You get the
+#              GeekPresentStarter's shape: settings, configs, scripts, a CodingBooth,
+#              and one of (--kind):
+#                deck — a slide deck (--name, default 'slides')
+#                text — one long page that scrolls, at the site root
+#                blog — an index of posts at the site root, and a first post
+#              You choose where the built site lands (--dist) and the address it is
+#              served at (--site-url, whose path becomes the base path). Upgrading is
+#              a version bump. SOURCE defaults to the GeekPresentStarter repository.
+#
+#   --copy     The older route: the whole framework SOURCE is copied into the
+#              subfolder for you to own and change. No package, no upgrades. Implied
+#              by --mode / --keep / --kind none. SOURCE defaults to GeekPresent.
+#
+# What --copy does (each step is optional and confirmed before anything destructive):
 #   1. Acquire GeekPresent into a subfolder of your project (git clone or copy).
 #   2. Strip its .git so it becomes part of YOUR repo (not an embedded clone).
 #   3. Samples:
@@ -37,13 +54,19 @@
 # Usage:
 #   adopt-geekpresent.sh [SOURCE] [options]
 #
-#   SOURCE   git URL or local path to GeekPresent.
-#            Default: https://github.com/NawaMan/GeekPresent.git
+#   SOURCE   git URL or local path of the template.
+#            --package: https://github.com/NawaMan/GeekPresentStarter.git
+#            --copy:    https://github.com/NawaMan/GeekPresent.git
 #
 # Run straight from GitHub, in the root of the project you want to add it to:
 #   # interactive (prompts read from your terminal even through the pipe):
 #   curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh | bash
-#   # non-interactive (pass flags after `bash -s --`):
+#   # a blog in blog/, built into site/blog/, served at https://example.com/blog:
+#   curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh | bash -s -- --package --dir blog --kind blog --dist site/blog --site-url https://example.com/blog --yes
+#   # a deck in talks/, deployed to this repo's GitHub Pages:
+#   curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh | bash -s -- --package --dir talks --kind deck --site-url https://you.github.io/my-repo --ci --yes
+#
+#   The rest are --copy examples:
 #   curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh | bash -s -- --dir docs-site --mode minimal --keep slides --yes
 #   # start from a clean slate instead (empty deck, no demo slides to delete):
 #   curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh | bash -s -- --mode skeleton --kind deck --name slides --yes
@@ -51,19 +74,28 @@
 #   curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh | bash -s -- --mode skeleton --kind text --name guide.html --yes
 #
 # Options:
+#   --package / --copy  how GeekPresent comes in   (prompted; default: --package)
 #   --dir <name>        subfolder to create        (default: geekpresent)
-#   --mode <mode>       full | minimal | skeleton  (prompted; default: minimal)
-#   --keep <deck>       deck to keep in minimal    (prompted; default: slides)
-#   --kind <kind>       what skeleton scaffolds    (prompted; default: deck)
-#                         deck — an empty slide deck (one title slide)
-#                         text — a long-form Text page (one page that scrolls)
-#                         none — nothing at all; the framework and an empty tree
-#   --name <name>       name of the deck/page scaffolded in skeleton mode
+#   --mode <mode>       --copy: full | minimal | skeleton  (prompted; default: minimal)
+#   --keep <deck>       --copy: deck to keep in minimal    (prompted; default: slides)
+#   --kind <kind>       what to scaffold           (prompted; default: deck)
+#                         --package: deck | text | blog
+#                         --copy (skeleton): deck | text | none
+#                           deck — an empty slide deck (one title slide)
+#                           text — a long-form Text page (one page that scrolls)
+#                           none — nothing at all; the framework and an empty tree
+#   --name <name>       name of the deck (--package), or of the deck/page that
+#                       --copy's skeleton scaffolds
 #                       (prompted; default: slides for a deck, guide.html for a text)
-#   --base </path>      GitHub Pages base path      (prompted; default: none)
+#   --site-url <url>    --package: the address the site is served at, e.g.
+#                       https://you.github.io/my-repo — sets siteUrl, and its path
+#                       is the default base path   (prompted; default: none)
+#   --base </path>      base path the site is served under (prompted; default:
+#                       none, or the path of --site-url)
 #   --dist <path>       build output folder, relative to WHERE YOU RUN THIS
-#                       (prompted; default: <dir>/dist). e.g. 'site' to publish
-#                       into a site/ at your repo root, beside <dir>.
+#                       (prompted; default: <dir>/build for --package, <dir>/dist
+#                       for --copy). e.g. 'site' to publish into a site/ at your
+#                       repo root, beside <dir>.
 #   --env <env>         booth | host               (prompted; default: booth)
 #   --booth             keep the CodingBooth       (same as --env booth)
 #   --no-booth          remove it; build on the host (same as --env host)
@@ -79,7 +111,10 @@ set -euo pipefail
 # Defaults
 # -----------------------------------------------------------------------------
 SOURCE_DEFAULT="https://github.com/NawaMan/GeekPresent.git"
+STARTER_DEFAULT="https://github.com/NawaMan/GeekPresentStarter.git"
 SOURCE=""
+METHOD=""        # package | copy           (resolved from flags, else prompted)
+SITE_URL=""      # --package: where the site is served, e.g. https://you.github.io/repo
 DIR="geekpresent"
 MODE=""          # full | minimal | skeleton   (resolved via prompt if empty)
 KIND=""          # deck | text | none          (skeleton only; prompted if empty)
@@ -100,6 +135,7 @@ ENV_KIND=""      # booth | host     (resolved via prompt if empty)
 DIST=""
 DO_CI=""         # yes | no         (resolved via prompt if empty)
 ASSUME_YES=0
+KEEP_GIVEN=0
 
 # Prompts read from the terminal, NOT stdin — stdin is the script itself when you run
 # this through `curl | bash`. Opened ONCE, on fd 3: a fresh `< "$TTY_IN"` per prompt
@@ -250,9 +286,12 @@ rel_from() {
 # -----------------------------------------------------------------------------
 while [ $# -gt 0 ]; do
 	case "$1" in
+		--package) METHOD="package"; shift;;
+		--copy)   METHOD="copy"; shift;;
 		--dir)    DIR="${2:?--dir needs a value}"; shift 2;;
 		--mode)   MODE="${2:?--mode needs a value}"; shift 2;;
-		--keep)   NAME="${2:?--keep needs a value}"; shift 2;;
+		--keep)   NAME="${2:?--keep needs a value}"; KEEP_GIVEN=1; shift 2;;
+		--site-url) SITE_URL="${2:?--site-url needs a value}"; shift 2;;
 		--name)   NAME="${2:?--name needs a value}"; shift 2;;
 		--deck)   NAME="${2:?--deck needs a value}"; KIND="deck"; shift 2;;
 		--kind)   KIND="${2:?--kind needs a value}"; shift 2;;
@@ -271,13 +310,601 @@ while [ $# -gt 0 ]; do
 done
 
 case "$MODE" in ""|full|minimal|skeleton) ;; *) die "--mode must be 'full', 'minimal' or 'skeleton'";; esac
-case "$KIND" in ""|deck|text|none) ;; *) die "--kind must be 'deck', 'text' or 'none'";; esac
+case "$KIND" in ""|deck|text|none|blog) ;; *) die "--kind must be 'deck', 'text', 'blog' or 'none'";; esac
 case "$ENV_KIND" in ""|booth|host) ;; *) die "--env must be 'booth' or 'host'";; esac
 
 # -----------------------------------------------------------------------------
 # Resolve configuration (flags win; otherwise prompt; otherwise default)
 # -----------------------------------------------------------------------------
 interactive && [ "$ASSUME_YES" != "1" ] && info "Type ${B}?${RST} at any prompt for help."
+
+# -----------------------------------------------------------------------------
+# Package or copy?
+# -----------------------------------------------------------------------------
+# The flags of the older copy route say which one you meant: --mode and --keep exist only
+# there, and so does --kind none. A blog exists only as a package. So an invocation written
+# before --package existed still does what it did, and only a bare run is asked.
+if [ -z "$METHOD" ]; then
+	if [ -n "$MODE" ] || [ "$KEEP_GIVEN" = "1" ] || [ "$KIND" = "none" ]; then
+		METHOD="copy"
+	elif [ "$KIND" = "blog" ] || [ -n "$SITE_URL" ]; then
+		METHOD="package"
+	else
+		METHOD="$(pick "Install — [p]ackage (recommended), [c]opy the framework source" "package" \
+"How GeekPresent comes into your project:
+
+  package  your folder holds the site — slides, pages, settings — and GeekPresent
+           is a dependency (@geekpresent/core). Upgrading is a version bump.
+           This is the recommended route.
+  copy     the whole framework source is copied into your folder, to own and
+           change as you like. No package, and no upgrades: the copy is yours." \
+			"p:package" "c:copy")"
+	fi
+fi
+case "$METHOD" in package|copy) ;; *) die "install method must be 'package' or 'copy'";; esac
+if [ "$METHOD" = "package" ]; then
+	[ -z "$MODE" ] || die "--mode is for --copy; with --package, pick what to make with --kind"
+	[ "$KIND" != "none" ] || die "--kind none is for --copy; with --package use deck, text or blog"
+else
+	[ "$KIND" != "blog" ] || die "--kind blog needs --package"
+	[ -z "$SITE_URL" ] || die "--site-url is for --package; with --copy use --base"
+fi
+
+# Edit one line of a file in place, and say so when the line is not there. The template is
+# another repository, so a line we expect can move; failing quietly would leave a site that
+# builds to the wrong folder, or for the wrong address, with nothing said.
+set_line() { # <file> <sed expression> <grep pattern that proves it landed> <what>
+	local file="$1" expr="$2" proof="$3" what="$4"
+	if [ -f "$file" ] && sed -i "$expr" "$file" && grep -q -- "$proof" "$file"; then
+		return 0
+	fi
+	warn "Could not set $what in ${file#"$PWD"/} — set it by hand."
+	return 1
+}
+
+# -----------------------------------------------------------------------------
+# --package: the site in a subfolder, GeekPresent as a dependency
+# -----------------------------------------------------------------------------
+adopt_package() {
+	[ -n "$SOURCE" ] || SOURCE="$(ask "Template (git URL or local path)" "$STARTER_DEFAULT" \
+"The site is made from GeekPresentStarter: the settings, configs, scripts and a
+CodingBooth a GeekPresent site needs, with the framework as a dependency. The
+default fetches it from GitHub; a local path works too.")"
+
+	DIR="$(ask "Folder for the site's source" "$DIR" \
+"The folder, in the repo you are standing in, that holds the site's SOURCE: its
+pages, settings and package.json. It is created; everything the site owns lives
+under it, and deleting it undoes this completely. Where the BUILT site goes is
+asked separately.")"
+
+	[ -n "$KIND" ] || KIND="$(pick "What are you making — [d]eck (slides), [t]ext (one long page), [b]log (posts)" \
+		"deck" \
+"  deck  a slide deck — many small pages you arrow through, on a fixed canvas.
+        You get a title slide and a content slide.
+  text  a web page — ONE long page that scrolls, at the site's root. For docs,
+        an essay, a project page.
+  blog  a blog — an index page at the root listing the posts, and a first post.
+        Each post is a page of its own; you add them by hand.
+
+A site can grow the others later: a deck and pages live side by side." \
+		"d:deck" "tp:text" "b:blog")"
+	case "$KIND" in deck|text|blog) ;; *) die "kind must be 'deck', 'text' or 'blog'";; esac
+
+	if [ "$KIND" = "deck" ]; then
+		[ -n "$NAME" ] || NAME="$(ask "Name for the deck" "slides" \
+"The deck's folder and URL: 'slides' gives you src/routes/slides/, served at
+/slides/title.html. Lower-case, no spaces.")"
+	fi
+	[ -n "$NAME" ] || NAME="slides"
+
+	SITE_URL="$(ask "Address the site will be served at (blank = not decided yet)" "$SITE_URL" \
+"The full address of the site's root page, e.g.
+  https://you.github.io/my-repo      a GitHub project page
+  https://example.com/blog           a folder of an existing site
+  https://talks.example.com          a domain of its own
+
+It goes into geekpresent.config.ts as siteUrl, for the tags that must be absolute
+(link previews, canonical, the sitemap). Its PATH is also where the site lives —
+/my-repo, /blog — which the build has to know, so it becomes the base path next.
+Blank leaves both for later.")"
+	SITE_URL="${SITE_URL%/}"
+	local url_path=""
+	case "$SITE_URL" in
+		http://*|https://*)
+			url_path="${SITE_URL#*://}"
+			case "$url_path" in */*) url_path="/${url_path#*/}";; *) url_path="";; esac;;
+		"") ;;
+		*) die "--site-url must start with http:// or https:// (got '$SITE_URL')";;
+	esac
+	[ -n "$BASE" ] || BASE="$url_path"
+	BASE="$(ask "Base path the site is served under (blank = the domain root)" "$BASE" \
+"The path part of the address: /my-repo for https://you.github.io/my-repo, blank
+for a domain of its own. Every page loads its scripts from under it, so a site
+built for the wrong path loads blank. It is written into svelte.config.js, so
+the dev server, local builds and CI all agree; GEEKPRESENT_BASE_PATH still
+overrides it for one build.")"
+	BASE="$(norm_path "$BASE")"
+	[ -z "$BASE" ] || BASE="/$BASE"
+	if [ -n "$url_path" ] && [ "$BASE" != "$url_path" ]; then
+		warn "Base path '$BASE' is not the path of '$SITE_URL' — the SEO tags will point elsewhere."
+	fi
+
+	DIST="$(ask "Where the built site goes (relative to here)" "${DIST:-$DIR/build}" \
+"The folder the build writes the finished static site into, relative to where
+you are standing:
+
+  $DIR/build    the default: inside the source folder, gitignored. CI deploys it.
+  site/blog        a folder of a site you already publish — for when the built
+                   output is what you commit and serve.
+
+The build DELETES this folder and writes it fresh every time, so it must hold
+nothing but this site: site/blog, never site itself.")"
+
+	[ -n "$ENV_KIND" ] || ENV_KIND="$(pick "Build environment — [b]ooth (container, no host deps), [h]ost (your own node/pnpm)" \
+		"booth" \
+"  booth  keep the CodingBooth that comes with the template: the scripts run in a
+         container, and this machine needs only Docker or Podman. No Node, no pnpm.
+  host   remove it ($DIR/booth and $DIR/.booth/) and use your own node + pnpm.
+         The same scripts then run here." \
+		"b:booth" "hn:host")"
+	case "$ENV_KIND" in booth|host) ;; *) die "environment must be 'booth' or 'host'";; esac
+
+	[ -n "$DO_CI" ] || { confirm "Scaffold a GitHub Actions workflow that deploys it to GitHub Pages?" \
+"Writes .github/workflows/deploy-$DIR.yml here: on every push to main that touches
+$DIR/, it builds the site and deploys it to this repository's GitHub Pages. Say no
+if the site is published some other way — e.g. you commit the built output into
+a site you already serve." \
+		&& DO_CI="yes" || DO_CI="no"; }
+
+	TARGET="$PWD/$DIR"
+	case "$DIR" in /*|..|../*|.|./) die "the source folder must be a new subfolder of here (got '$DIR')";; esac
+	case "$DIST" in /*) die "the output folder must be relative to here (got '$DIST')";; esac
+	CI_PATH="$(norm_path "$DIST")"
+	[ -n "$CI_PATH" ] || die "output folder '$DIST' resolves to the repo root — pick a folder, not '.'"
+	[ "$CI_PATH" != "$(norm_path "$DIR")" ] || die "the output folder cannot be the source folder itself"
+	OUT_REL="$(rel_from "$(norm_path "$DIR")" "$CI_PATH")"
+	DIST_ESCAPES=0
+	case "$OUT_REL" in ../*) DIST_ESCAPES=1;; esac
+
+	# The build commands for these answers, from inside $DIR. The booth mounts only $DIR, so it
+	# cannot write an output that lies outside it; that build runs on the host instead.
+	local dev_cmd="scripts/dev.sh" build_cmd="scripts/build.sh"
+	if [ "$ENV_KIND" = "booth" ] && [ "$DIST_ESCAPES" = "1" ]; then
+		build_cmd="NO_BOOTH=1 scripts/install.sh && NO_BOOTH=1 scripts/build.sh"
+	elif [ "$ENV_KIND" = "host" ]; then
+		dev_cmd="scripts/install.sh && scripts/dev.sh"
+		build_cmd="scripts/install.sh && scripts/build.sh"
+	fi
+
+	{
+		echo
+		echo "${B}Plan${RST}"
+		echo "  install    : package (@geekpresent/core), from $SOURCE"
+		echo "  source     : $DIR/"
+		case "$KIND" in
+			deck) echo "  making     : a slide deck at /$NAME/";;
+			text) echo "  making     : a web page at /";;
+			blog) echo "  making     : a blog — the index at /, a first post at /hello-world.html";;
+		esac
+		echo "  served at  : ${SITE_URL:-<not decided>}"
+		echo "  base path  : ${BASE:-<the domain root>}"
+		echo "  output     : $CI_PATH/  ${DIM}(deleted and rewritten by every build)${RST}"
+		case "$ENV_KIND" in
+			booth) echo "  build env  : CodingBooth (container; no host deps)";;
+			host)  echo "  build env  : host toolchain — REMOVE $DIR/booth + $DIR/.booth/";;
+		esac
+		echo "  workflow   : $DO_CI"
+		echo
+	} >&2
+	if [ "$DIST_ESCAPES" = "1" ] && [ -d "$PWD/$CI_PATH" ] && [ -n "$(ls -A "$PWD/$CI_PATH" 2>/dev/null)" ]; then
+		warn "$CI_PATH/ already has files in it. Every build DELETES it and writes it fresh."
+		warn "  That is right if it holds an earlier build of this site, and wrong otherwise."
+	fi
+	if [ "$DIST_ESCAPES" = "1" ] && [ "$ENV_KIND" = "booth" ]; then
+		warn "The booth only sees $DIR/, so it cannot write to '$CI_PATH/'. The build runs"
+		warn "  on the host (node + pnpm); the booth still runs the dev server and the tests."
+	fi
+	confirm "Proceed?" \
+"Everything above, in one go. Nothing is committed and nothing is built — the
+script only writes files, and you review them afterwards with 'git status'.
+
+Outside $DIR/ it writes only the deploy workflow, if you asked for one." \
+		|| die "aborted."
+
+	# --- acquire --------------------------------------------------------------
+	if [ -e "$TARGET" ]; then
+		confirm "$DIR already exists — overwrite it?" || die "aborted (target exists)."
+		rm -rf "$TARGET"
+	fi
+	info "Fetching the template into $DIR ..."
+	mkdir -p "$(dirname "$TARGET")"
+	if [ -d "$SOURCE" ]; then
+		git clone --depth 1 "file://$(cd "$SOURCE" && pwd)" "$TARGET" 2>/dev/null \
+			|| cp -a "$SOURCE" "$TARGET"
+	else
+		git clone --depth 1 "$SOURCE" "$TARGET"
+	fi
+	[ -f "$TARGET/package.json" ] && grep -q '@geekpresent/core' "$TARGET/package.json" \
+		|| die "$SOURCE does not look like GeekPresentStarter (no @geekpresent/core in package.json)"
+
+	# The template is a starting point, not a dependency: its history, its CI (which assumes it
+	# is a repository root), its licence and its README are about the template, not your site.
+	local wf_src="$TARGET/.github/workflows/deploy-pages.yml" pnpm_ver="" node_ver=""
+	if [ -f "$wf_src" ]; then
+		pnpm_ver="$(grep -A3 'pnpm/action-setup' "$wf_src" | sed -n 's/^[[:space:]]*version:[[:space:]]*//p' | head -1)"
+		node_ver="$(grep -A3 'actions/setup-node' "$wf_src" | sed -n 's/^[[:space:]]*node-version:[[:space:]]*//p' | head -1)"
+	fi
+	rm -rf "$TARGET/.git" "$TARGET/.github" "$TARGET/LICENSE" \
+		"$TARGET/node_modules" "$TARGET/.svelte-kit" "$TARGET/build" "$TARGET/dist"
+	ok "Copied the template into $DIR/ (its git history, CI and licence left out)"
+
+	if [ "$ENV_KIND" = "host" ]; then
+		rm -rf "$TARGET/booth" "$TARGET/.booth"
+		ok "Removed $DIR/booth and $DIR/.booth/ — the scripts use your own node + pnpm"
+	fi
+
+	# --- settings -------------------------------------------------------------
+	local pkg_name
+	pkg_name="$(basename "$DIR" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]/-/g')"
+	set_line "$TARGET/package.json" "s|\"name\": \"[^\"]*\"|\"name\": \"$pkg_name\"|" "\"name\": \"$pkg_name\"" "the package name" || true
+
+	local cfg="$TARGET/svelte.config.js"
+	set_line "$cfg" "s#GEEKPRESENT_OUT || '[^']*'#GEEKPRESENT_OUT || '$OUT_REL'#" "GEEKPRESENT_OUT || '$OUT_REL'" \
+		"the output folder ('$OUT_REL')" && ok "Builds write to $CI_PATH/"
+	if [ -n "$BASE" ]; then
+		set_line "$cfg" "s#GEEKPRESENT_BASE_PATH || '[^']*'#GEEKPRESENT_BASE_PATH || '$BASE'#" \
+			"GEEKPRESENT_BASE_PATH || '$BASE'" "the base path ('$BASE')" && ok "Base path $BASE"
+	fi
+
+	local site_cfg="$TARGET/geekpresent.config.ts"
+	if [ -n "$SITE_URL" ]; then
+		set_line "$site_cfg" "s#siteUrl: '[^']*'#siteUrl: '$SITE_URL'#" "siteUrl: '$SITE_URL'" "siteUrl" \
+			&& ok "siteUrl $SITE_URL"
+	fi
+
+	# An output folder inside $DIR that the template does not already ignore.
+	if [ "$DIST_ESCAPES" = "0" ] && ! grep -qx "/${OUT_REL%/}/" "$TARGET/.gitignore" 2>/dev/null; then
+		printf '/%s/\n' "${OUT_REL%/}" >> "$TARGET/.gitignore"
+	fi
+
+	# --- what to make ---------------------------------------------------------
+	local routes="$TARGET/src/routes" tests="$TARGET/tests"
+	[ -d "$routes/slides" ] || die "$SOURCE has no src/routes/slides — is it really GeekPresentStarter?"
+	case "$KIND" in
+		deck)
+			if [ "$NAME" != "slides" ]; then
+				mv "$routes/slides" "$routes/$NAME"
+				sed -i "s#/slides/#/$NAME/#g" "$routes/(home)/+page.svelte" 2>/dev/null || true
+				if [ -f "$tests/slides.ssr.test.ts" ]; then
+					sed "s#/slides/#/$NAME/#g" "$tests/slides.ssr.test.ts" > "$tests/$NAME.ssr.test.ts"
+					rm "$tests/slides.ssr.test.ts"
+				fi
+			fi
+			set_line "$site_cfg" "s#textRoutes: \[[^]]*\]#textRoutes: ['/']#" "textRoutes: \['/'\]" "textRoutes" || true
+			ok "A slide deck at src/routes/$NAME/ (title + content slide)"
+			;;
+		text)
+			rm -rf "$routes/slides" "$tests/slides.ssr.test.ts"
+			write_text_site "$routes" "$tests"
+			set_line "$site_cfg" "s#textRoutes: \[[^]]*\]#textRoutes: ['/']#" "textRoutes: \['/'\]" "textRoutes" || true
+			ok "A web page at src/routes/(home)/+page.svelte, served at /"
+			;;
+		blog)
+			rm -rf "$routes/slides" "$tests/slides.ssr.test.ts"
+			write_blog_site "$routes" "$tests"
+			set_line "$site_cfg" "s#textRoutes: \[[^]]*\]#textRoutes: ['/', '/hello-world.html']#" \
+				"textRoutes: \['/', '/hello-world.html'\]" "textRoutes" || true
+			ok "A blog: the index at src/routes/(home)/, the first post at src/routes/hello-world.html/"
+			;;
+	esac
+
+	write_package_readme
+
+	# --- CI -------------------------------------------------------------------
+	if [ "$DO_CI" = "yes" ]; then
+		local wf_dir="$PWD/.github/workflows" wf ci_out
+		wf="$wf_dir/deploy-$(basename "$DIR").yml"
+		ci_out="$(rel_from "$(norm_path "$DIR")" "$CI_PATH")"
+		mkdir -p "$wf_dir"
+		if [ -e "$wf" ] && ! confirm "${wf#"$PWD"/} exists — overwrite?"; then
+			warn "Kept existing ${wf#"$PWD"/}"
+		else
+			cat > "$wf" <<EOF
+name: Deploy $DIR (GeekPresent) to GitHub Pages
+
+# Builds $DIR/ and publishes it to this repository's GitHub Pages.
+# One-time setup: Settings -> Pages -> Source: GitHub Actions.
+on:
+  push:
+    branches: ["main"]
+    paths: ["$DIR/**", ".github/workflows/$(basename "$wf")"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages-$(basename "$DIR")"
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: $DIR
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${pnpm_ver:-12}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${node_ver:-24}
+          cache: pnpm
+          cache-dependency-path: $DIR/pnpm-lock.yaml
+      # The base path and siteUrl are in svelte.config.js and geekpresent.config.ts.
+      - name: Build
+        run: pnpm install --frozen-lockfile && pnpm build
+        env:
+          GEEKPRESENT_OUT: "$ci_out"
+      - uses: actions/configure-pages@v5
+      # include-hidden-files keeps .nojekyll; without it Pages runs Jekyll, which drops
+      # _app/, and every page loads blank.
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: $CI_PATH
+          include-hidden-files: true
+      - id: deployment
+        uses: actions/deploy-pages@v4
+EOF
+			ok "Wrote ${wf#"$PWD"/}"
+			[ -n "$BASE" ] || warn "No base path: a GitHub project page is served at /<repo>/ and needs one (--site-url)."
+		fi
+	fi
+
+	# --- next steps -----------------------------------------------------------
+	{
+		echo
+		echo "${GRN}${B}GeekPresent site created in $DIR/${RST}"
+		echo
+		echo "${B}Next steps${RST} ${DIM}(from inside $DIR/)${RST}"
+		echo "  • Run it:          ${DIM}$dev_cmd${RST}  (prints the URL${BASE:+; pages live under $BASE/})"
+		echo "  • Build it:        ${DIM}$build_cmd${RST}  → $CI_PATH/"
+		echo "  • Test it:         ${DIM}scripts/test.sh${RST}"
+		echo "  • Write it:        $DIR/README.md says where; an AI agent reads $DIR/AGENTS.md"
+		[ "$DO_CI" = "yes" ] && echo "  • Deploy it:       push, then Settings -> Pages -> Source: GitHub Actions"
+		echo "  • Nothing is committed — ${DIM}git add${RST} what you want to keep."
+		echo
+	} >&2
+	exit 0
+}
+
+# The web page (--kind text): the site's root page is the page. The (home) group already
+# wraps it in TextPage; this replaces the template's landing text with a page to write.
+write_text_site() { # <routes> <tests>
+	local routes="$1" tests="$2"
+	cat > "$routes/(home)/+layout.svelte" <<'EOF'
+<!-- The page at / is a Text: one long page that scrolls. TextPage gives it the shell
+     (scrolling, SEO tags, the TOP control); the content is +page.svelte next to this. -->
+<script lang="ts">
+	import TextPage from '@geekpresent/core/components/TextPage.svelte';
+</script>
+
+<TextPage title="My Page" description="What this page is about, in under 160 characters.">
+	<slot />
+</TextPage>
+EOF
+	cat > "$routes/(home)/+page.svelte" <<'EOF'
+<!-- The site's page, served at /. Plain HTML and Svelte, plus GeekPresent's components:
+     node_modules/@geekpresent/core/guide/README.md lists them. Pictures go next to this
+     file and are imported: import photo from './photo.jpg', then <img src={photo} alt="…" />. -->
+<h1>My Page</h1>
+
+<p class="lede">One sentence on what this page is about.</p>
+
+<h2>A section</h2>
+
+<p>Write here. The page scrolls; the column follows the window, up to 1080px wide.</p>
+
+<style>
+	h1, h2, p { font-family: sans-serif; }
+	.lede { font-size: 1.25em; opacity: 0.8; }
+</style>
+EOF
+	cat > "$tests/page.ssr.test.ts" <<'EOF'
+// The page renders on the server — the same render the build's prerender does.
+import { render } from 'svelte/server';
+import { expect, it } from 'vitest';
+import Page from '../src/routes/(home)/+page.svelte';
+
+it('renders the page', () => {
+	expect(render(Page).body).toContain('My Page');
+});
+EOF
+}
+
+# The blog (--kind blog): an index at / and one post, each post a Text page of its own —
+# the shape of a hand-written blog, with nothing to generate. Adding a post is a folder, a
+# line in the index and a line in textRoutes; the README says so.
+write_blog_site() { # <routes> <tests>
+	local routes="$1" tests="$2" today
+	today="$(date +%Y-%m-%d)"
+	cat > "$routes/(home)/+layout.svelte" <<'EOF'
+<!-- The blog's index, at /, is a Text: one page that scrolls. -->
+<script lang="ts">
+	import TextPage from '@geekpresent/core/components/TextPage.svelte';
+</script>
+
+<TextPage title="My Blog" description="What this blog is about, in under 160 characters.">
+	<slot />
+</TextPage>
+EOF
+	cat > "$routes/(home)/+page.svelte" <<EOF
+<!-- The blog's index, served at /.
+
+     To add a post:
+       1. copy src/routes/hello-world.html/ to src/routes/<slug>.html/ and write it
+          (its +layout.svelte holds the title and description);
+       2. add it to the top of \`posts\` below;
+       3. add '/<slug>.html' to textRoutes in geekpresent.config.ts (the sitemap). -->
+<script lang="ts">
+	// '' at the domain root, the base path otherwise — so the links work on both.
+	import { base } from '\$app/paths';
+
+	// Newest first.
+	const posts = [
+		{
+			path: 'hello-world.html',
+			title: 'Hello, world',
+			date: '$today',
+			summary: 'The first post.'
+		}
+	];
+</script>
+
+<h1>My Blog</h1>
+
+<p class="intro">One or two sentences on what this blog is about.</p>
+
+<ul class="posts">
+	{#each posts as post}
+		<li>
+			<span class="date">{post.date}</span>
+			<a href="{base}/{post.path}">{post.title}</a>
+			<span class="summary">— {post.summary}</span>
+		</li>
+	{/each}
+</ul>
+
+<style>
+	h1, p, li { font-family: sans-serif; }
+	.posts { list-style: none; padding: 0; }
+	.posts li { margin: 0.6em 0; }
+	.date { opacity: 0.6; margin-right: 0.6em; font-variant-numeric: tabular-nums; }
+	.summary { opacity: 0.8; }
+</style>
+EOF
+	mkdir -p "$routes/hello-world.html"
+	cat > "$routes/hello-world.html/+layout.js" <<'EOF'
+export const prerender = true;
+export const trailingSlash = "never";
+EOF
+	cat > "$routes/hello-world.html/+layout.svelte" <<'EOF'
+<!-- A post is a Text: one page that scrolls. The title and description here are the page's
+     <title> and its link preview. -->
+<script lang="ts">
+	import TextPage from '@geekpresent/core/components/TextPage.svelte';
+</script>
+
+<TextPage title="Hello, world" description="The first post." type="article">
+	<slot />
+</TextPage>
+EOF
+	cat > "$routes/hello-world.html/+page.svelte" <<EOF
+<!-- A post. Plain HTML and Svelte, plus GeekPresent's components
+     (node_modules/@geekpresent/core/guide/README.md). Pictures go next to this file and
+     are imported: import photo from './photo.jpg', then <img src={photo} alt="…" />. -->
+<script lang="ts">
+	import { base } from '\$app/paths';
+</script>
+
+<p class="dateline">$today</p>
+
+<h1>Hello, world</h1>
+
+<p>The first post. Write here.</p>
+
+<p class="back"><a href="{base}/">← All posts</a></p>
+
+<style>
+	h1, p { font-family: sans-serif; }
+	.dateline { opacity: 0.6; }
+</style>
+EOF
+	cat > "$tests/blog.ssr.test.ts" <<'EOF'
+// The blog renders on the server — the same render the build's prerender does.
+import { render } from 'svelte/server';
+import { expect, it } from 'vitest';
+import Index from '../src/routes/(home)/+page.svelte';
+import Post from '../src/routes/hello-world.html/+page.svelte';
+
+it('lists the first post on the index', () => {
+	expect(render(Index).body).toContain('hello-world.html');
+});
+
+it('renders the first post', () => {
+	expect(render(Post).body).toContain('Hello, world');
+});
+EOF
+}
+
+# The folder's README: what this is, and the commands for the answers given.
+write_package_readme() {
+	local what add
+	case "$KIND" in
+		deck)
+			what="A slide deck, at \`/$NAME/\`."
+			add="Add a slide: a folder \`src/routes/$NAME/<name>.html/\` with \`+page.svelte\` and \`+layout.js\`
+(copy \`content.html/\`), then its entry in \`src/routes/$NAME/pages.ts\`.";;
+		text)
+			what="A web page, at \`/\`."
+			add="Write the page in \`src/routes/(home)/+page.svelte\`. Another page: copy that folder's pair
+of files to \`src/routes/<name>.html/\`, add \`+layout.js\` (\`prerender = true; trailingSlash = \"never\"\`),
+and add \`'/<name>.html'\` to \`textRoutes\` in \`geekpresent.config.ts\`.";;
+		blog)
+			what="A blog: the index at \`/\`, each post a page of its own."
+			add="Add a post: copy \`src/routes/hello-world.html/\` to \`src/routes/<slug>.html/\` and write it
+(its \`+layout.svelte\` holds the title and description), list it at the top of \`posts\` in
+\`src/routes/(home)/+page.svelte\`, and add \`'/<slug>.html'\` to \`textRoutes\` in \`geekpresent.config.ts\`.";;
+	esac
+	local base_note=""
+	[ -z "$BASE" ] || base_note=" Pages are served under \`$BASE/\`, the dev server's too (it is set in \`svelte.config.js\`)."
+	cat > "$TARGET/README.md" <<EOF
+# $DIR
+
+$what Built with [GeekPresent](https://github.com/NawaMan/GeekPresent) (\`@geekpresent/core\`)
+into a static site.
+
+$add
+
+## Commands
+
+Run them from this folder.
+
+| | |
+| --- | --- |
+| Dev server (prints the URL) | \`$dev_cmd\` |
+| Build into \`$CI_PATH/\` | \`$build_cmd\` |
+| Tests | \`scripts/test.sh\` |
+| Type-check | \`scripts/check.sh\` |
+
+The build deletes \`$CI_PATH/\` and writes it fresh.$base_note
+
+## Writing it with an AI agent
+
+\`AGENTS.md\` is the agent's manual, and it sends the agent to the authoring guide shipped in the
+package: \`node_modules/@geekpresent/core/guide/README.md\`.
+
+## Settings, upgrades
+
+Site settings (name, description, address, copyright) are in \`geekpresent.config.ts\`. To upgrade
+GeekPresent, change the version in the \`@geekpresent/core\` URL in \`package.json\` (it appears
+twice) and follow *Upgrading GeekPresent* in the guide.
+EOF
+	ok "Wrote $DIR/README.md"
+}
+
+[ "$METHOD" = "package" ] && adopt_package
+
+# -----------------------------------------------------------------------------
+# --copy: the framework source, copied in to own
+# -----------------------------------------------------------------------------
 
 [ -n "$SOURCE" ] || SOURCE="$(ask "GeekPresent source (git URL or local path)" "$SOURCE_DEFAULT" \
 "Where to copy GeekPresent FROM. The default fetches the latest from GitHub.
@@ -342,10 +969,11 @@ BASE="$(ask "GitHub Pages base path for a project site, e.g. /my-repo (blank = d
 "Only for a PROJECT site, served under a sub-path: https://you.github.io/my-repo/
 needs a base path of /my-repo, because the site does not live at the root.
 
-Leave it BLANK for a user/org site (you.github.io) or a custom domain — which is
-what GeekPresent is built for, and the path that actually works today: a base path
-currently breaks prerender, because the SEO wiring emits a root-absolute
-/sitemap.xml. The script will warn you again if you set one.")"
+Leave it BLANK for a user/org site (you.github.io) or a custom domain.
+
+It only affects the DEPLOY build: svelte.config.js reads it from the
+GEEKPRESENT_BASE_PATH variable, which the scaffolded workflow sets. Local builds
+and the dev server stay at the root.")"
 
 # Where the built site lands. One answer, two consumers (the build you run, and what CI
 # uploads) — before this they disagreed, with CI quietly writing somewhere else.
@@ -683,7 +1311,8 @@ EOF
 	#
 	# Moved, never deleted — same rule as the sample decks. GeekPresent's README in particular
 	# remains the framework's introduction and full reference; it just isn't YOUR README.
-	for doc in TODO.md AGENT.md; do
+	# START.md is the front door for making a site WITH GeekPresent — this folder already is one.
+	for doc in TODO.md AGENT.md START.md; do
 		[ -f "$TARGET/$doc" ] && mv "$TARGET/$doc" "$REF/$doc"
 	done
 	[ -f "$TARGET/README.md" ] && mv "$TARGET/README.md" "$REF/GeekPresent-README.md"
@@ -692,6 +1321,9 @@ EOF
 		[ -d "$TARGET/.claude/skills/$skill" ] && mv "$TARGET/.claude/skills/$skill" "$REF/claude-skills/"
 	done
 	ok "Moved GeekPresent's own README/AGENT/TODO + the TODO skills to .samples-ref/"
+	# AGENTS.md opens by sending an agent that is making a site to START.md. Here the site is
+	# made — this folder is it — so that pointer would send the agent away from its own manual.
+	[ -f "$TARGET/AGENTS.md" ] && sed -i '/^<!-- start-redirect/,/^<!-- \/start-redirect -->/d' "$TARGET/AGENTS.md"
 	# AGENTS.md stays: it is the AUTHORING manual, which is exactly what an adopter's agent needs.
 
 	# The README an adopter actually wants: what this folder is, and the build command for the
@@ -723,25 +1355,18 @@ fi
 # Step 4 — base path (project GitHub Pages served at /<repo>/)
 # -----------------------------------------------------------------------------
 if [ -n "$BASE" ]; then
+	# The base path is a DEPLOY-time setting, not a source edit: GeekPresent's svelte.config.js
+	# turns GEEKPRESENT_BASE_PATH into kit.paths.base, and every local build, `just serve-build`
+	# and the recorder expect the root. So nothing is patched here — the workflow below sets the
+	# variable. A source old enough not to read it gets told what to add instead.
 	CFG="$TARGET/svelte.config.js"
-	if grep -q 'paths:' "$CFG"; then
-		warn "svelte.config.js already defines kit.paths — set base manually to '$BASE'"
+	if grep -q 'GEEKPRESENT_BASE_PATH' "$CFG" 2>/dev/null; then
+		ok "Base path '$BASE': set GEEKPRESENT_BASE_PATH=$BASE for the deploy build"
 	else
-		# Insert a paths block that reads BASE_PATH (so CI can override per-repo).
-		awk -v base="$BASE" '
-			/kit: \{/ && !done {
-				print
-				print "\t\tpaths: { base: process.env.BASE_PATH || \x27" base "\x27 },"
-				done=1; next
-			}
-			{ print }
-		' "$CFG" > "$CFG.tmp" && mv "$CFG.tmp" "$CFG"
-		ok "Patched svelte.config.js: kit.paths.base = '$BASE' (override via BASE_PATH)"
-		warn "Heads up: stock GeekPresent assumes a DOMAIN-ROOT deploy. Its SEO wiring"
-		warn "emits a root-absolute /sitemap.xml, so prerender FAILS under a base path"
-		warn "until that (and any '/...'-absolute links you author) is made base-aware."
-		warn "For project-subpath Pages, prefer a custom domain or user/org root site."
+		warn "svelte.config.js does not read GEEKPRESENT_BASE_PATH — set kit.paths.base to"
+		warn "  '$BASE' for the deploy build yourself, or adopt from a newer GeekPresent."
 	fi
+	warn "End siteUrl in $DIR/geekpresent.config.ts with '$BASE' too, so the SEO tags match."
 fi
 
 # -----------------------------------------------------------------------------
@@ -795,7 +1420,7 @@ jobs:
         run: pnpm install && pnpm build
         env:
           GEEKPRESENT_OUT: "$OUT_REL"
-$( [ -n "$BASE" ] && printf '          BASE_PATH: "%s"\n' "$BASE" )
+$( [ -n "$BASE" ] && printf '          GEEKPRESENT_BASE_PATH: "%s"\n' "$BASE" )
       # One-time: repo Settings -> Pages -> Source: GitHub Actions
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

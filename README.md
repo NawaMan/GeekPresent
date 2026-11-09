@@ -13,6 +13,11 @@ the whole presentation is a static site, and it deploys to GitHub Pages.
 
 ---
 
+> **Want a presentation, a web page or a blog of your own?** Ask your AI agent: *"Use
+> https://github.com/NawaMan/GeekPresent to make a blog in this repository."* It reads
+> [`START.md`](START.md), asks where the source and the built site should go, and sets it up. Doing
+> it by hand: *[Use GeekPresent in another project](#use-geekpresent-in-another-project)*.
+
 ## Built to be authored with an AI agent
 
 A GeekPresent deck is plain text, one folder per slide — exactly what a coding agent (Claude Code,
@@ -85,15 +90,42 @@ scripts/build-static.sh ./dist geeklight   # ...or just one presentation/text
 
 ## Use GeekPresent in another project
 
-GeekPresent is **copy-and-own**, not an npm dependency: you drop it into your repo as a
-subfolder and author your docs / slides / promo site there, building to a static site you host
-on GitHub Pages. The `adopt-geekpresent.sh` script bootstraps that in one step.
+**A new repository just for the site:** make it from
+[GeekPresentStarter](https://github.com/NawaMan/GeekPresentStarter) (*Use this template*). It
+builds and deploys to that repository's GitHub Pages as it is.
+
+**A folder of an existing repository:** `adopt-geekpresent.sh --package` puts the site's source in
+a subfolder, with GeekPresent as a dependency (`@geekpresent/core`, so upgrading is a version
+bump). You say what to make — a deck, a web page or a blog — where the built site goes, and the
+address it is served at. From the root of that repository:
+
+```bash
+# interactive: it asks
+curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh | bash
+
+# a blog in blog/, built into an existing site's site/blog/, served at https://example.com/blog
+curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh \
+  | bash -s -- --package --dir blog --kind blog --dist site/blog --site-url https://example.com/blog --yes
+
+# a deck in talks/, deployed to this repository's GitHub Pages
+curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh \
+  | bash -s -- --package --dir talks --kind deck --site-url https://you.github.io/my-repo --ci --yes
+```
+
+It writes `<dir>/README.md` with the commands for your answers, commits nothing and builds nothing.
+[`START.md`](START.md) walks through the questions.
+
+### Copying the framework source instead (`--copy`)
+
+The older route, for owning and changing GeekPresent itself: the whole framework source is copied
+into your repo as a subfolder, with no package and no upgrades. Any of `--copy`, `--mode` or
+`--keep` picks it.
 
 From the **root of the project you want to add it to**:
 
 ```bash
 # interactive — asks for the subfolder, sample handling, etc. (works through the pipe):
-curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh | bash
+curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh | bash -s -- --copy
 
 # non-interactive — pass flags after `bash -s --`:
 curl -fsSL https://raw.githubusercontent.com/NawaMan/GeekPresent/main/adopt-geekpresent.sh \
@@ -197,9 +229,11 @@ may already have at its root.
 | `--ci` / `--no-ci`       | scaffold the deploy workflow                                   | prompted                |
 | `--yes`, `-y`            | accept defaults, skip prompts (for CI / `curl … \| bash`)      | off                     |
 
-> **Deploy at a domain root** (user/org Pages or a custom domain). A project sub-path (`--base`)
-> currently breaks prerender, because the SEO wiring emits a root-absolute `/sitemap.xml`. See
-> [`AGENT.md`](AGENT.md) for the full adoption + authoring guide (and the base-path details).
+> **Served at a project sub-path** (`https://<owner>.github.io/<repo>/`)? Pass `--base /<repo>`:
+> the scaffolded workflow then builds with `GEEKPRESENT_BASE_PATH=/<repo>`, which the copied
+> `svelte.config.js` reads, while local builds stay at the root. End `siteUrl` with the same path.
+> See [`AGENT.md`](AGENT.md) for the full adoption guide, and for when to install the
+> `@geekpresent/core` package instead of copying.
 
 ---
 

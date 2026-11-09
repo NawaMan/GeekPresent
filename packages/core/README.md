@@ -5,7 +5,9 @@ It ships **source** (`.svelte`, `.ts`); your project's Vite compiles it. It is p
 tarball on each [GitHub Release](https://github.com/NawaMan/GeekPresent/releases), not on npm.
 
 **Starting a new site?** [GeekPresentStarter](https://github.com/NawaMan/GeekPresentStarter) is all
-of the below already done — *Use this template*, enable Pages, deploy.
+of the below already done — *Use this template*, enable Pages, deploy. For a site in a folder of
+an existing repository, `adopt-geekpresent.sh --package` sets the same thing up there; see
+[`START.md`](https://github.com/NawaMan/GeekPresent/blob/main/START.md).
 
 **Authoring with an AI agent?** Point it at `node_modules/@geekpresent/core/guide/README.md` —
 how a site fits together, every component indexed, one file per group, for this exact version.
@@ -14,11 +16,13 @@ how a site fits together, every component indexed, one file per group, for this 
 
 ```json
 "dependencies": {
-	"@geekpresent/core": "https://github.com/NawaMan/GeekPresent/releases/download/v0.1.5/geekpresent-core-0.1.5.tgz"
+	"@geekpresent/core": "https://github.com/NawaMan/GeekPresent/releases/download/vX.Y.Z/geekpresent-core-X.Y.Z.tgz"
 }
 ```
 
-Upgrade by changing the version in that URL (it appears twice) and running `pnpm install`.
+Put the [latest release](https://github.com/NawaMan/GeekPresent/releases/latest)'s version in
+place of `X.Y.Z` (it appears twice). Upgrade the same way, then `pnpm install`; the guide's
+*Upgrading GeekPresent* has the full checklist.
 Peer dependencies: `svelte` 5, `@sveltejs/kit` 2, `vite` 5.
 
 ## Set up
@@ -68,6 +72,19 @@ cp -r node_modules/@geekpresent/core/routes/. src/routes/
 
 They give you the printable handout (`/_handout/<deck>.html`), the recorder and source-editor
 windows, `robots.txt` and `sitemap.xml`. Each is a few lines that import from the package.
+
+**4. Global styles** — the root `src/routes/+layout.svelte` imports them once:
+
+```svelte
+<script>
+	import '@geekpresent/core/styles/global.css';
+	import '@geekpresent/core/styles/tooltip.css';
+</script>
+
+<slot />
+```
+
+The guide's *Project wiring* (`guide/README.md`) lists every file a working project has.
 
 ## Use
 

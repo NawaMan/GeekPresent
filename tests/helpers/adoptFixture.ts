@@ -11,6 +11,11 @@ import { join } from 'node:path';
 export const REPO = process.cwd();
 export const SCRIPT = join(REPO, 'adopt-geekpresent.sh');
 
+/** The fixture's svelte.config.js: like the real one, it takes the base path from the
+ *  environment, so --base must not need to touch it. */
+export const FIXTURE_SVELTE_CONFIG =
+	"const base = process.env.GEEKPRESENT_BASE_PATH || '';\nexport default { kit: { paths: { base, relative: false } } };\n";
+
 const write = (path: string, body: string) => {
 	mkdirSync(join(path, '..'), { recursive: true });
 	writeFileSync(path, body);
@@ -33,6 +38,7 @@ export function fixtureSource(root: string) {
 		join(root, 'geekpresent.config.ts'),
 		`export default {\n\tsiteName: 'GeekPresent',\n\ttextRoutes: ['/', '/text.html', '/seo.html'],\n\tsiteUrl: ''\n};\n`
 	);
+	write(join(root, 'svelte.config.js'), FIXTURE_SVELTE_CONFIG);
 	write(join(root, 'tests/PathDemoSource.ssr.test.ts'), '// reads the demo slides\n');
 	write(join(root, 'tests/Other.test.ts'), '// a framework test — must survive\n');
 	write(join(root, '.gitignore'), '/docs/\n');
@@ -41,7 +47,11 @@ export function fixtureSource(root: string) {
 	// backlog, so they would happily aim an adopter's agent at building GeekPresent.
 	write(join(root, 'README.md'), '# GeekPresent\n\nA copy-and-own deck framework.\n');
 	write(join(root, 'AGENT.md'), '# AGENT.md — Adopting GeekPresent into a project\n');
-	write(join(root, 'AGENTS.md'), '# AGENTS.md — authoring guide\n'); // the one that must SURVIVE
+	write(
+		join(root, 'AGENTS.md'),
+		'# AGENTS.md — authoring guide\n\n<!-- start-redirect: removed on adoption -->\n> Making a site? Read START.md.\n<!-- /start-redirect -->\n\nThe playbooks.\n'
+	); // the one that must SURVIVE
+	write(join(root, 'START.md'), '# Using GeekPresent for your own site\n');
 	write(join(root, 'TODO.md'), '# TODO\n\n- [ ] a GeekPresent framework feature\n');
 	for (const skill of ['todo', 'pick-todo', 'new-slide']) {
 		write(join(root, `.claude/skills/${skill}/SKILL.md`), `---\nname: ${skill}\n---\n`);
@@ -56,4 +66,50 @@ export function fixtureSource(root: string) {
 	// The skeleton the script copies is real source in this repo, not a heredoc — so the
 	// fixture gets the genuine article, and these tests fail if it ever goes missing.
 	cpSync(join(REPO, 'utils/skeleton'), join(root, 'utils/skeleton'), { recursive: true });
+}
+
+/** A GeekPresentStarter, for `--package`: just the lines the script edits, in the Starter's own
+ *  spelling (svelte.config.js's GEEKPRESENT_OUT / GEEKPRESENT_BASE_PATH defaults, siteUrl,
+ *  textRoutes, the package name), the sample deck it renames or removes, and the files it
+ *  drops because they are about the template rather than the site. Not a git repo, so the
+ *  script copies it — the same path the GeekPresent fixture takes. */
+export function fixtureStarter(root: string) {
+	write(
+		join(root, 'package.json'),
+		'{\n\t"name": "geekpresent-starter",\n\t"dependencies": {\n\t\t"@geekpresent/core": "https://github.com/NawaMan/GeekPresent/releases/download/v0.7.1/geekpresent-core-0.7.1.tgz"\n\t}\n}\n'
+	);
+	write(
+		join(root, 'svelte.config.js'),
+		"const outDir = process.env.GEEKPRESENT_OUT || 'build';\n" +
+			"const basePath = (process.env.GEEKPRESENT_BASE_PATH || '').trim();\n" +
+			'export default { kit: { paths: { base: basePath, relative: false } } };\n'
+	);
+	write(
+		join(root, 'geekpresent.config.ts'),
+		"export default {\n\tsiteUrl: '',\n\tsiteName: 'My Talks',\n\ttextRoutes: ['/']\n};\n"
+	);
+	const routes = join(root, 'src/routes');
+	write(join(routes, '+layout.svelte'), '<slot />\n');
+	write(join(routes, '(home)/+layout.svelte'), '<slot />\n');
+	write(join(routes, '(home)/+page.svelte'), '<a href="{base}/slides/title.html">The sample deck</a>\n');
+	write(join(routes, 'slides/pages.ts'), "export const pages = [{ path: 'title.html', title: 'Title' }];\n");
+	write(join(routes, 'slides/title.html/+page.svelte'), '<h1>My Deck</h1>\n');
+	write(
+		join(root, 'tests/slides.ssr.test.ts'),
+		"page: readable({ url: new URL('https://example.test/slides/content.html') })\n" +
+			"import Title from '../src/routes/slides/title.html/+page.svelte';\n"
+	);
+	write(join(root, '.gitignore'), 'node_modules/\n/build/\n/dist/\n');
+	write(join(root, 'README.md'), '# GeekPresent Starter\n');
+	write(join(root, 'LICENSE'), 'MIT\n');
+	write(join(root, 'AGENTS.md'), '# AGENTS.md — working on this site\n');
+	write(
+		join(root, '.github/workflows/deploy-pages.yml'),
+		'      - uses: pnpm/action-setup@v4\n        with:\n          version: 12\n' +
+			'      - uses: actions/setup-node@v4\n        with:\n          node-version: 24\n'
+	);
+	write(join(root, 'scripts/build.sh'), '#!/bin/sh\n');
+	write(join(root, 'booth'), '#!/bin/sh\necho "booth stub"\n');
+	chmodSync(join(root, 'booth'), 0o755);
+	write(join(root, '.booth/Boothfile'), '# syntax=codingbooth/boothfile:1\n');
 }

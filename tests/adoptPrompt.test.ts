@@ -67,7 +67,7 @@ function typeAtPrompts(keys: Keys, raw?: string[]) {
 	const tty = join(work, 'keystrokes');
 	writeFileSync(tty, lines.map((l) => `${l}\n`).join(''));
 
-	const run = spawnSync('bash', [SCRIPT, source, '--dir', 'gp', '--no-ci'], {
+	const run = spawnSync('bash', [SCRIPT, source, '--copy', '--dir', 'gp', '--no-ci'], {
 		cwd: host,
 		encoding: 'utf8',
 		env: { ...process.env, GP_TTY: tty }

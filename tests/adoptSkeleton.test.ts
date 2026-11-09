@@ -22,7 +22,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { fixtureSource, SCRIPT } from './helpers/adoptFixture';
+import { FIXTURE_SVELTE_CONFIG, fixtureSource, SCRIPT } from './helpers/adoptFixture';
 
 const workspaces: string[] = [];
 afterAll(() => workspaces.forEach((w) => rmSync(w, { recursive: true, force: true })));
@@ -243,6 +243,16 @@ describe('adopt-geekpresent.sh — docs', () => {
 		expect(existsSync(join(gp, '.samples-ref/AGENT.md'))).toBe(true);
 	});
 
+	// START.md is the front door for MAKING a site with GeekPresent, and AGENTS.md opens by
+	// pointing there. In an adopted folder the site is already made, so both would send the
+	// agent away from its own manual.
+	it("retires START.md and drops AGENTS.md's pointer to it, keeping the rest", () => {
+		expect(existsSync(join(gp, 'START.md'))).toBe(false);
+		expect(existsSync(join(gp, '.samples-ref/START.md'))).toBe(true);
+		expect(read('AGENTS.md')).not.toContain('START.md');
+		expect(read('AGENTS.md')).toContain('authoring guide');
+	});
+
 	it("preserves GeekPresent's own README — still the framework's introduction, just not yours", () => {
 		expect(read('.samples-ref/GeekPresent-README.md')).toContain('# GeekPresent');
 	});
@@ -355,6 +365,29 @@ describe('adopt-geekpresent.sh --dist', () => {
 
 	it('refuses an output that resolves to the repo root — that is not a folder, that is your repo', () => {
 		expect(() => adopt('--mode', 'skeleton', '--dist', '.')).toThrow(/repo root/i);
+	});
+});
+
+// svelte.config.js reads GEEKPRESENT_BASE_PATH, so the base path is a deploy-time variable,
+// not a source edit. The script used to set BASE_PATH in the workflow — a name nothing reads,
+// so a project-page deploy built for the root and loaded blank.
+describe('adopt-geekpresent.sh --base', () => {
+	const workflow = (gp: string) => readFileSync(join(gp, '../.github/workflows/deploy-gp.yml'), 'utf8');
+
+	it('sets GEEKPRESENT_BASE_PATH for the deploy build, under the name svelte.config.js reads', () => {
+		const gp = adopt('--mode', 'skeleton', '--base', '/my-repo', '--ci');
+		expect(workflow(gp)).toContain('GEEKPRESENT_BASE_PATH: "/my-repo"');
+		expect(workflow(gp)).not.toMatch(/^\s+BASE_PATH:/m);
+	});
+
+	it('leaves svelte.config.js alone — local builds stay at the root', () => {
+		const gp = adopt('--mode', 'skeleton', '--base', '/my-repo', '--ci');
+		expect(readFileSync(join(gp, 'svelte.config.js'), 'utf8')).toBe(FIXTURE_SVELTE_CONFIG);
+	});
+
+	it('sets no base path when none was given', () => {
+		const gp = adopt('--mode', 'skeleton', '--ci');
+		expect(workflow(gp)).not.toContain('BASE_PATH');
 	});
 });
 
