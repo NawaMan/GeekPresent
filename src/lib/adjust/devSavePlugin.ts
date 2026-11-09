@@ -28,8 +28,7 @@ import { fingerprint, readNote, writeNote, REFUSAL_TEXT } from '../note/noteSour
 // Endpoints share the route→file mapping:
 //
 //   POST /__geekpresent/adjust-save   — ADJUST mode: surgical Block/Draw patches
-//   POST /__geekpresent/source-save   — ViewSource EDIT: full +page.svelte overwrite
-//   GET  /__geekpresent/source-load   — ViewSource EDIT REFRESH: read +page.svelte
+//   GET  /__geekpresent/source-load   — EDIT: which file is a slide's +page.svelte, and its bytes
 //   POST /__geekpresent/page-add      — Overview EDIT: new slide folder + pages.ts entry
 //   POST /__geekpresent/page-remove   — Overview EDIT: unlist from pages.ts; `deleteFiles`
 //                                       also removes the slide folder
@@ -41,10 +40,10 @@ import { fingerprint, readNote, writeNote, REFUSAL_TEXT } from '../note/noteSour
 //   POST /__geekpresent/note-save     — presenter NOTE EDIT: splice it back (see noteSourceCore)
 //
 // Tags ADJUST cannot confidently place come back as `unmatched` so the UI can
-// tell the author to paste those by hand. Source SAVE writes the whole buffer.
+// tell the author to paste those by hand. The EDIT window saves through
+// source/devFilePlugin.ts (file-save), which refuses a stale write.
 
 const ADJUST_ENDPOINT = '/__geekpresent/adjust-save';
-const SOURCE_SAVE_ENDPOINT = '/__geekpresent/source-save';
 const SOURCE_LOAD_ENDPOINT = '/__geekpresent/source-load';
 const PAGE_ADD_ENDPOINT = '/__geekpresent/page-add';
 const PAGE_REMOVE_ENDPOINT = '/__geekpresent/page-remove';
@@ -61,12 +60,6 @@ interface AdjustSaveRequest {
 	    see sourceTag.ts) — a Block in a shared scene component, say. Without
 	    one, the change belongs to the slide's own +page.svelte. */
 	changes: (LayoutChange & { file?: string })[];
-}
-
-interface SourceSaveRequest {
-	route: string;
-	/** Full new contents of the slide's `+page.svelte`. */
-	content: string;
 }
 
 interface NoteSaveRequest {
@@ -242,40 +235,6 @@ export async function handleAdjustSave(server: ViteDevServer, body: string) {
 				reason: c.reason
 			}))
 		}
-	};
-}
-
-async function handleSourceSave(server: ViteDevServer, body: string) {
-	const { route, content } = JSON.parse(body) as SourceSaveRequest;
-	if (!route || typeof content !== 'string') {
-		return { status: 400, payload: { error: 'route and content are required' } };
-	}
-	// Empty would wipe the slide; refuse rather than write zero bytes.
-	if (content.length === 0) {
-		return { status: 400, payload: { error: 'refusing to write empty content' } };
-	}
-
-	const root = server.config.root;
-	const file = routeToPageFile(route, server.config.base, root);
-	if (!file) {
-		return { status: 400, payload: { error: `cannot map route "${route}" to a file` } };
-	}
-
-	// The file must already exist — never create a page from a bad route mapping.
-	try {
-		await fs.access(file);
-	} catch {
-		return {
-			status: 404,
-			payload: { error: `no +page.svelte for route "${route}" (${path.relative(root, file)})` }
-		};
-	}
-
-	await fs.writeFile(file, content, 'utf8');
-
-	return {
-		status: 200,
-		payload: { file: path.relative(root, file) }
 	};
 }
 
@@ -653,9 +612,6 @@ export function adjustSavePlugin(): Plugin {
 				const pathOnly = req.url.split('?')[0];
 				const isAdjust =
 					pathOnly === ADJUST_ENDPOINT || pathOnly.startsWith(ADJUST_ENDPOINT + '/');
-				const isSourceSave =
-					pathOnly === SOURCE_SAVE_ENDPOINT ||
-					pathOnly.startsWith(SOURCE_SAVE_ENDPOINT + '/');
 				const isSourceLoad =
 					pathOnly === SOURCE_LOAD_ENDPOINT ||
 					pathOnly.startsWith(SOURCE_LOAD_ENDPOINT + '/');
@@ -670,7 +626,7 @@ export function adjustSavePlugin(): Plugin {
 				const isNoteLoad = pathOnly === NOTE_LOAD_ENDPOINT;
 				const isNoteSave = pathOnly === NOTE_SAVE_ENDPOINT;
 				if (
-					!isAdjust && !isSourceSave && !isSourceLoad && !isPageAdd && !isPageRemove &&
+					!isAdjust && !isSourceLoad && !isPageAdd && !isPageRemove &&
 					!isNoteLoad && !isNoteSave && !isPageDuplicate && !isPageRename && !isPageRefs
 				) {
 					return next();
@@ -699,9 +655,7 @@ export function adjustSavePlugin(): Plugin {
 						res.end('method not allowed');
 						return;
 					}
-					// Source saves carry a whole file; structure edits and ADJUST patches are tiny.
-					const maxBytes = isSourceSave ? 5_000_000 : 1_000_000;
-					const body = await readBody(req, maxBytes);
+					const body = await readBody(req, 1_000_000);
 					const { status, payload } = isNoteSave
 						? await handleNoteSave(server, body)
 						: isPageDuplicate
@@ -712,9 +666,7 @@ export function adjustSavePlugin(): Plugin {
 						? await handlePageAdd(server, body)
 						: isPageRemove
 							? await handlePageRemove(server, body)
-							: isSourceSave
-								? await handleSourceSave(server, body)
-								: await handleAdjustSave(server, body);
+							: await handleAdjustSave(server, body);
 					res.statusCode = status;
 					res.setHeader('content-type', 'application/json');
 					res.end(JSON.stringify(payload));
