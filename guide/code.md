@@ -255,6 +255,7 @@ frame 0 behind a play button, with a transport bar and a tick per command.
 | `out`  | output  | Printed whole (fades in). A string, or a list of pieces to mix colours on one line: a bare string takes the line's `tone`, `{ text, tone }` its own. |
 | `tone` | both    | `plain` (default), `ok`, `warn`, `error`, `muted`, `comment`, `dir`. Colours an output line whole; on a command it colours the typed text, not the prompt. |
 | `lead` | output  | Text before `out` in the plain colour whatever the tone (a tree's `├── `). |
+| `prompt` | command | This row's own prompt in place of the console's: `{ cmd: 'Ada', prompt: 'Your name:' }` for a program that asks. `''` draws none. |
 
 A shell comment is `tone: 'comment'` — typed after the prompt as `{ cmd: '# list them', tone: 'comment' }`, or printed whole as an `out` line; a folder as `ls` draws it is `tone: 'dir'`.
 In TypeScript, write tones `as const` (or type the array as `TerminalInput[]` from
@@ -331,12 +332,30 @@ Space sequence can walk several consoles and the text between them.
 - **`autoplay`**: the first command takes no Space of its own; it plays together with the step
   before it (on arrival, if the console comes first in the build). Set it per console.
 - A command continued with `cont: true` is one step with the line above it.
+- **`stopAt`** names the stops instead of "after each command", for one command with a long run of
+  output or a program that asks questions. Each entry is an index into `lines`: `n` stops once
+  line n has landed; `{ before: n }` stops as line n begins, its prompt up and nothing typed (a
+  console waiting for input, with the caret on that row). The last step plays to the end, so
+  `stopAt` of two entries is three steps. An entry that names no line, or does not come after the
+  one before it, is dropped. It is read once, when the console mounts.
+
+  ```svelte
+  <StepTerminal autoplay stopAt={[{ before: 2 }, { before: 3 }, 4]} lines={[
+    { cmd: 'vault init' },
+    'Setting up a new vault.',
+    { cmd: 'Ada Lovelace', prompt: 'Your name:' },   <!-- a question: its own prompt -->
+    { cmd: '', prompt: 'Master password:' },         <!-- typed blind: an empty command -->
+    { out: '✓ vault created', tone: 'ok' }
+  ]} />
+  ```
+- To make such a console go on by itself after a wait, give its `Steps` a `timeoutMs` (see
+  `features.md` → Auto levels).
 - The transport (play button, track) is hidden and the console never takes Space itself: the
   `Steps` owns the keyboard, CONTINUE and the step dots.
 - While a command types, the build is *busy*: the step dots' "SPACE for next step" cue waits for
   the output to land (see `features.md` → Step dots).
 
-Props: `lines`, `autoplay`, `charMs`, `startMs`, `pauseMs`, `outMs`, `style`, `id`, `class`; any
+Props: `lines`, `autoplay`, `stopAt`, `charMs`, `startMs`, `pauseMs`, `outMs`, `style`, `id`, `class`; any
 other `Terminal` prop (`title`, `prompt`, `chrome`, `caret`, …) passes through. Outside a `Steps`
 it is an ordinary `Terminal`, its props passed as given (so `autoplay` there means "run on load").
 

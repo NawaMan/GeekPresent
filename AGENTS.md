@@ -493,7 +493,12 @@ than misleading the next agent.
   `StepTerminal` (a Terminal whose commands are STEPS of the slide's `<Steps>` build — one
   per logical command, in document order with the Fragments — so several consoles share one
   Space sequence; a step plays the command, a step back or a jump seeks to its stop;
-  `autoplay` lets the first command ride the step before it. Its transport is hidden and it
+  `autoplay` lets the first command ride the step before it. `stopAt` names the stops instead
+  of "after each command" — `n` once line n has landed, `{ before: n }` as line n begins (its
+  prompt up, nothing typed: a console waiting for input); the stops are
+  `terminalCore.stepStopsOf`, which drops what names no line. A command row may carry its own
+  `prompt` (`{ cmd: 'Ada', prompt: 'Your name:' }`), and an empty command still gets a caret
+  window, so a row held `{ before }` shows one. Its transport is hidden and it
   never takes Space. Outside a `<Steps>` it is a plain Terminal. Members join a Steps through
   `utils/stepsContext.ts` — `register(n)`, `revealed`, `setBusy`, `arrivedAtEnd` — the one
   contract Fragment uses too; Terminal's `driven` prop + `playTo()` are what it drives),
@@ -1207,7 +1212,7 @@ stay out of the audience's way. A speaker who is actively using one often wants 
   a pin. While armed: **a** ANNOTATE and **j** ADJUST (each toggles its mode and tucks both bars
   at once, as Esc would — Esc on an armed pen would also put it down), **z** open DISPLAY zoom menu, **p** PRESENT,
   **m** ☰, **t** TOC, **u** pause/resume a *live* kiosk (inert otherwise — no kiosk running,
-  no-op). When the letter lives in the word it is underlined (`PRESENT`, `ANNOTATE`,
+  no-op), **h** hold/release a build's auto-step (inert where the author set no wait). When the letter lives in the word it is underlined (`PRESENT`, `ANNOTATE`,
   `ADJUST`, Table of Contents); when it does not, a trailing chip remains (`FITTED (Z)`,
   `☰ (M)`). **z** opens (toggles) the zoom menu — ↑/↓ / Home/End walk the presets, **c** jumps
   to the CUSTOM % field, Enter applies, Esc closes — it does **not** flip FITTED/SCALED by itself.
@@ -1333,6 +1338,54 @@ sticky `?kiosk` / always in `pnpm dev`); **running** is a separate session.
   `KioskRunner.svelte`. Note lines publish from `<Note>` while kiosk + show-notes is on
   (source node stays visually hidden; the panel is window-fixed so it is not trapped under the
   canvas `transform`).
+
+### "Let a build go on by itself after a wait (the auto levels)"
+
+How much of a deck moves without the viewer has three levels, the VIEWER's choice within what
+the author switched on:
+
+| Level | Steps | Pages | What shows it |
+|---|---|---|---|
+| kiosk | auto | auto, loops | the kiosk panel |
+| normal | auto, after the wait | manual | the "SPACE for next step" cue ends in a round countdown |
+| pause | manual | manual | the same cue, its round showing pause bars |
+
+```svelte
+<SlideDeck {pages} stepTimeoutMs={5000} />          <!-- every build in the deck -->
+<Steps timeoutMs={5000}> … </Steps>                 <!-- one build -->
+```
+`stepTimeoutMs` on a `pages.ts` entry sets it for one slide. The narrowest wins; `0` opts out.
+
+- **Normal exists only where the author gave a wait.** With none the level is `manual`: the
+  deck behaves as it always has, the cue is plain, and there is nothing to click. That is why
+  the feature changes nothing for a deck that does not ask for it.
+- **Steps only, never the page turn.** No countdown on a spent build, and "SPACE for next
+  slide" never has one.
+- **The wait counts from when the step settles** — the build's `busy` report in `activeSteps`,
+  the same one the cue waits on. An author never computes play times. A new kind of build that
+  leaves `busy` out counts from the step itself.
+- **ONE clock.** `SlideDeck` owns the countdown (`auto/stepTimer.ts`) and publishes it as
+  `stepCountdown`; `StepDots` only draws it. Do not add a second timer to the hint: the number
+  on screen and the moment the step is taken would drift apart.
+- **Normal ↔ pause:** a click on the cue, or Alt+. then **H**. `stepHold` is persisted
+  (`sync: false`), so it survives the full page load a page turn is. A step BACK holds that
+  slide (`stepBackHold`, not stored) until the next step forward. The pointer resting on the
+  cue freezes the countdown with the time left kept.
+- **`?auto=all | steps | off`**, applied ONCE per load (a click must not be undone by a URL
+  that still says `?auto=off`). `all` is `?kiosk` under its newer name; `steps` and `off` also
+  stop a running kiosk without revoking its offer. `?kiosk` / `?kiosk=off` are unchanged.
+- **Forced off** (`stepAutoForced` in `SlideDeck`): an embed, a prerendering page, the
+  `?present` console, `?shot`, a live console, recording, replay, ADJUST on. `?shot` matters
+  most: EnvFolioPromotion renders its videos frame by frame through it, and a real-time timer
+  there would break the timing. A live kiosk keeps its own `kioskStepMs`.
+- **The cue is a `<button>` only when it toggles**, and then it out-ranks the ANNOTATE ink
+  surface (z-index 44 > 40). It blurs itself on click: Space is not a step while a button has
+  focus (`utils/stepKeys.ts`).
+- **A trap met on the way:** the step-back hold is tracked with a plain `activeSteps.subscribe`,
+  not a `$:` statement. A reactive statement that set the store ran after the level had already
+  been computed in the same flush, so the hold was true and the countdown still ran.
+
+Pure rules: `auto/stepAutoCore.ts`. Stores: `stores/stepAuto.ts`. Demo: `slides/auto-step.html`.
 
 ### "Record the talk as a video (VOD Recorder)"
 

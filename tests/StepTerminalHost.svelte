@@ -7,6 +7,8 @@
 
 	export let inSteps = true;
 	export let autoplay = false;
+	/** The first console's `stopAt`; undefined leaves one step per command. */
+	export let stopAt: (number | { before: number })[] | undefined = undefined;
 
 	// Two logical commands: the second is continued over two lines.
 	const first = [
@@ -26,7 +28,7 @@
 
 {#if inSteps}
 	<Steps>
-		<StepTerminal title="first" lines={first} {autoplay} />
+		<StepTerminal title="first" lines={first} {autoplay} {stopAt} />
 		<Fragment tag="p">between</Fragment>
 		<StepTerminal title="second" lines={second} />
 	</Steps>

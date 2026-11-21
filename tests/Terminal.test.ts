@@ -43,7 +43,9 @@ class FakeAnimation {
 		if (this.currentTime >= this.endTime) this.currentTime = 0;
 		this.playState = 'running';
 	}
-	pause() { this.playState = 'paused'; }
+	pause() {
+		this.playState = 'paused';
+	}
 }
 
 // The session is NOT one animation: every line has its own, with its own end. That is
@@ -131,7 +133,8 @@ function press(key: string, opts: { shiftKey?: boolean } = {}) {
 const terminal = (root: ParentNode) => root.querySelector('.terminal') as HTMLElement;
 const rows = (root: ParentNode) => Array.from(root.querySelectorAll('.line')) as HTMLElement[];
 const gates = (root: ParentNode) => Array.from(root.querySelectorAll('.gate')) as HTMLElement[];
-const ticks = (root: ParentNode) => Array.from(root.querySelectorAll('.tick')) as HTMLButtonElement[];
+const ticks = (root: ParentNode) =>
+	Array.from(root.querySelectorAll('.tick')) as HTMLButtonElement[];
 const overlay = (root: ParentNode) => root.querySelector('.overlay') as HTMLButtonElement | null;
 const transport = (root: ParentNode) => root.querySelector('.transport');
 
@@ -180,7 +183,9 @@ describe('Terminal — transcript', () => {
 		// Without an explicit delay the row's `terminal-in` would run at duration 0s under
 		// fill-mode `both` — already finished — parking a bare `$` under a blank transcript.
 		expect(rest.style.animationDelay).toBe(`${ENVELOPE}ms`);
-		expect((container.querySelector('.rest-gate') as HTMLElement).style.animationDelay).toBe(`${ENVELOPE}ms`);
+		expect((container.querySelector('.rest-gate') as HTMLElement).style.animationDelay).toBe(
+			`${ENVELOPE}ms`
+		);
 	});
 });
 
@@ -226,7 +231,7 @@ describe('Terminal — the clock', () => {
 		expect(overlay(container)).toBeNull();
 	});
 
-	it('the ticks are drawn AT the stops Space walks, not at the commands\' starts', async () => {
+	it("the ticks are drawn AT the stops Space walks, not at the commands' starts", async () => {
 		// The reported bug: ticks sat at command starts (100, 190) while Space stopped at
 		// command ends (190, 280). The first Space therefore appeared to skip the first tick
 		// and land on the second. The marks must be the stops.
@@ -382,7 +387,7 @@ describe('Terminal — click to seek, drag to scrub', () => {
 describe('Terminal — Space stepping (keys="global")', () => {
 	const step = { lines: SESSION, keys: 'global' as const };
 
-	it('registers as the slide\'s build, so CONTINUE and Space agree', async () => {
+	it("registers as the slide's build, so CONTINUE and Space agree", async () => {
 		render(TerminalHost, { props: step });
 		await tick();
 
@@ -532,7 +537,7 @@ describe('Terminal — Space stepping (keys="global")', () => {
 		expect(anim().currentTime).toBe(CHECKPOINT_1);
 	});
 
-	it('the presenter console\'s CONTINUE pulse takes the same step', async () => {
+	it("the presenter console's CONTINUE pulse takes the same step", async () => {
 		render(TerminalHost, { props: step });
 		await tick();
 
@@ -616,5 +621,26 @@ describe('Terminal — degradation', () => {
 		const { container } = render(TerminalHost, { props: { lines } });
 		await tick();
 		expect(rows(container)).toHaveLength(3); // 1 command + 1 output + resting prompt
+	});
+});
+
+describe('a per-line prompt, and the caret on an empty command', () => {
+	it("draws the line's own prompt in place of the console's", () => {
+		const { container } = render(TerminalHost, {
+			props: {
+				lines: [{ cmd: 'ls' }, { cmd: 'Ada', prompt: 'Your name:' }, { cmd: 'x', prompt: '' }]
+			}
+		});
+		const cmds = [...container.querySelectorAll('.line.cmd:not(.rest)')];
+		expect(cmds[0].querySelector('.prompt')?.textContent).toBe('$');
+		expect(cmds[1].querySelector('.prompt')?.textContent).toBe('Your name:');
+		expect(cmds[2].querySelector('.prompt')).toBeNull();
+	});
+
+	it('gives an empty command a caret window that outlasts a stop as it begins', () => {
+		const { container } = render(TerminalHost, { props: { lines: [{ cmd: '' }] } });
+		const gate = container.querySelector('.line.cmd:not(.rest) .gate') as HTMLElement;
+		const ms = Number(/animation-duration:\s*(\d+)ms/.exec(gate.getAttribute('style') ?? '')?.[1]);
+		expect(ms).toBeGreaterThan(1);
 	});
 });

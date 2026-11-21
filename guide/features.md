@@ -416,6 +416,52 @@ clears the moment the next step is taken.
 - A build reports "still playing" through its `activeSteps` entry's `busy` flag. A new kind of
   build that leaves `busy` out is treated as never busy, so its cue shows a second after each step.
 
+### Auto levels: a build that goes on by itself
+
+How much of a deck moves without the viewer has three levels:
+
+| Level  | Steps                | Pages       | What shows it |
+| ------ | -------------------- | ----------- | ------------- |
+| kiosk  | auto                 | auto, loops | the kiosk panel (see KIOSK) |
+| normal | auto, after the wait | manual      | the **SPACE for next step** cue ends in a round countdown |
+| pause  | manual               | manual      | the same cue, its round showing pause bars |
+
+**Normal only exists where the author gave a wait.** Without one a deck behaves as it always has:
+the plain cue, nothing counting, nothing to click. Set the wait (ms) at any of three levels; the
+narrowest wins, and `0` opts a slide or a build out of a wider one:
+
+```svelte
+<SlideDeck {pages} stepTimeoutMs={5000} />                    <!-- every build in the deck -->
+```
+```ts
+{ path: 'init.html', title: 'Init', stepTimeoutMs: 8000 },   // one slide
+```
+```svelte
+<Steps timeoutMs={5000}> … </Steps>                           <!-- one build -->
+```
+
+- The wait counts from when the step before it has **finished playing** (a Fragment faded in, a
+  command done typing), so you never work out play times. On arrival it counts from the first
+  frame, or from the end of what plays on arrival.
+- **Steps only.** When the build is spent nothing counts, and the page turn is the viewer's Space.
+  **SPACE for next slide** never has a countdown.
+- Space still steps sooner; the next wait counts from there.
+- **The viewer chooses normal or pause:** a click on the cue, or `Alt+.` then **H**. The choice is
+  remembered in that browser across page turns and reloads. Resting the pointer on the cue freezes
+  the countdown. A step back (Shift+Space) holds that slide until the next step forward.
+- **Links:** `?auto=steps` (normal), `?auto=off` (pause), `?auto=all` (kiosk). All three are
+  applied once on load and remembered. `?kiosk` and `?kiosk=off` still work.
+- **Never** while recording or replaying, with a presenter console live (audience window and
+  console both), in an embed, in `?shot` (a frame-by-frame render keeps its own time), or while
+  ADJUST is on. A live kiosk uses its own `kioskStepMs`, not this wait.
+- A `Terminal` with `keys="global"` and a stepping `Video` are builds too, so a deck or slide wait
+  applies to them. Only `Steps` has a prop of its own.
+- `stepCue={false}` hides the cue and with it the countdown and the click; the wait still runs and
+  `Alt+.` **H** still holds it.
+- Colours: `--stepdots-count-bg` / `--stepdots-count-fg` (the round), `--stepdots-count-spent` (the
+  part of it already used up), `--stepdots-count-held-bg` (the round when held). Under
+  `prefers-reduced-motion` the number still counts; the sweep is dropped.
+
 ## Keyboard shortcuts
 
 **Paging (deck window):**
@@ -444,6 +490,7 @@ use. While armed:
 | m | ☰ menu |
 | t | Table of Contents |
 | u | pause/resume a running kiosk |
+| h | hold / release a build's auto-step (where the author set a wait) |
 | k | kiosk: setup dialog, or show/hide the panel while one runs |
 
 With ☰ open (or chrome armed): **o** OVERVIEW, **k** KIOSK, **b** hide/show bars, **i** draw/hide the live pointer, **c** CAPTURE, **r** PRINT (flyout keys `c C w W t T`:
@@ -469,6 +516,7 @@ HTML.
 | `?annotate` / `?annotate=off` | offer / withdraw ANNOTATE | yes |
 | `?capture` / `?capture=off` | offer / withdraw CAPTURE | yes |
 | `?kiosk` / `?kiosk=off` | offer and auto-start KIOSK / stop and withdraw it | yes |
+| `?auto=all` / `?auto=steps` / `?auto=off` | the auto level: kiosk / steps go on after the author's wait / nothing moves by itself | yes |
 | `?pointer` / `?pointer=off` | draw a pointer where the mouse is (for screen recorders) / stop | yes |
 | `?onboard` | show the first-visit hint now and clear its "seen" flag | no |
 

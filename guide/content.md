@@ -318,6 +318,8 @@ How Space behaves:
 Gotchas:
 - Use ONE `Steps` with `keys="global"` per slide. Any extra instance needs `keys="off"` and a
   `bind:this` driver.
+- `timeoutMs={5000}` on the `Steps` makes the build take its next step by itself after that wait
+  (never the page turn); a deck or a slide can set the same. See `features.md` → Auto levels.
 - A console can take steps in a build too: `StepTerminal` inside the `Steps` claims one step per
   command, in document order with the Fragments (see `code.md` → StepTerminal).
 - A hidden Fragment uses `visibility`, not `display`, so nothing reflows; it still takes space.

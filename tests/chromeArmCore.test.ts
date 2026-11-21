@@ -58,6 +58,9 @@ describe('chromeKeyIntent', () => {
 		expect(chromeKeyIntent(key({ key: 't' }), true)).toBe('toc');
 		expect(chromeKeyIntent(key({ key: 'u' }), true)).toBe('kiosk-pause');
 		expect(chromeKeyIntent(key({ key: 'U' }), true)).toBe('kiosk-pause');
+		// H holds / releases a build's auto-step.
+		expect(chromeKeyIntent(key({ key: 'h' }), true)).toBe('step-hold');
+		expect(chromeKeyIntent(key({ key: 'h' }), false)).toBe('ignore');
 	});
 
 	it('falls back to the physical key on a non-Latin layout', () => {

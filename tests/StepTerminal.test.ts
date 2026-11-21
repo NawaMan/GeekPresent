@@ -53,6 +53,19 @@ describe('StepTerminal inside Steps', () => {
 		expect(container.querySelector('.terminal .overlay')).toBeNull();
 	});
 
+	it('with stopAt, claims one step per named stop plus the run to the end', async () => {
+		// first: 2 named stops → 3 steps; then the Fragment (1) and the second console (2)
+		render(StepTerminalHost, { props: { stopAt: [{ before: 2 }, 3] } });
+		await tick();
+		expect(get(activeSteps)?.total).toBe(6);
+	});
+
+	it('with stopAt, a stop that names no line claims nothing', async () => {
+		render(StepTerminalHost, { props: { stopAt: [99, { before: -1 }] } });
+		await tick();
+		expect(get(activeSteps)?.total).toBe(4); // 1 + the Fragment + 2
+	});
+
 	it('reports the build not busy when nothing is playing', async () => {
 		render(StepTerminalHost);
 		await tick();

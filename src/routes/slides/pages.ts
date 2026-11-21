@@ -42,6 +42,9 @@ export const pages = [
     { path: "highlight-component.html", title: "Highlight Component" },
     { path: "carousel-component.html", title: "Carousel Component" },
     { path: "steps-component.html",   title: "Steps & Fragment", stepDots: "bottom-left" as const },
+    // A build that takes its next step by itself after a wait (the "normal" auto level),
+    // on a console that stops where it asks for input (StepTerminal `stopAt`).
+    { path: "auto-step.html",         title: "Auto-step after a wait" },
     { path: "datatable-component.html", title: "DataTable — Static Data" },
     { path: "datatable-tools.html",   title: "DataTable — Table Tools" },
     { path: "datatable-server.html",  title: "DataTable — Server-Side Data" },

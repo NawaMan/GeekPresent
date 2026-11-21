@@ -11,7 +11,9 @@ import {
 	reachedCount,
 	scheduleLines,
 	snapTime,
-	stepsFor
+	stepsFor,
+	stepStopsOf,
+	BEFORE_STOP_MS
 } from '../src/lib/utils/terminalCore';
 import type { Tone } from '../src/lib/utils/terminalCore';
 
@@ -394,5 +396,79 @@ describe('snapTime', () => {
 		expect(snapTime(137, cps, 0)).toBe(137);
 		expect(snapTime(137, cps, NaN)).toBe(137);
 		expect(snapTime(NaN, cps, 10)).toBeNaN();
+	});
+});
+
+describe('a per-line prompt', () => {
+	it('keeps a prompt the line gave, the empty one included', () => {
+		const lines = normalizeLines([
+			{ cmd: 'Ada', prompt: 'Your name:' },
+			{ cmd: '', prompt: '' },
+			{ cmd: 'ls' }
+		]);
+		expect(lines[0].prompt).toBe('Your name:');
+		expect(lines[1].prompt).toBe('');
+		expect('prompt' in lines[2]).toBe(false);
+	});
+
+	it('ignores one that is not a string, and one on output', () => {
+		const lines = normalizeLines([
+			{ cmd: 'ls', prompt: 3 as unknown as string },
+			{ out: 'hello', prompt: '>' }
+		]);
+		expect('prompt' in lines[0]).toBe(false);
+		expect('prompt' in lines[1]).toBe(false);
+	});
+});
+
+describe('stepStopsOf', () => {
+	// charMs 10, startMs 100, pauseMs 50, outMs 20:
+	//   0 cmd 'init'   100..140, then the pause → 190
+	//   1 out 'Name?'  190..210
+	//   2 cmd 'Ada'    210..240, pause → 290
+	//   3 out 'done'   290..310 = the end
+	const timing = { charMs: 10, startMs: 100, pauseMs: 50, outMs: 20 };
+	const schedule = scheduleLines(
+		[{ cmd: 'init' }, { out: 'Name?' }, { cmd: 'Ada' }, { out: 'done' }],
+		timing
+	);
+
+	it('with no stopAt, stops at the end of each logical command', () => {
+		expect(stepStopsOf(schedule)).toEqual([0, 210, 310]);
+		expect(stepStopsOf(schedule, null)).toEqual([0, 210, 310]);
+	});
+
+	it('with no command at all, is one step: the whole session', () => {
+		const s = scheduleLines(['a', 'b'], timing);
+		expect(stepStopsOf(s)).toEqual([0, s.envelopeMs]);
+	});
+
+	it('stops once a named line has landed', () => {
+		expect(stepStopsOf(schedule, [1])).toEqual([0, 210, 310]);
+		expect(stepStopsOf(schedule, [0])).toEqual([0, 140, 310]);
+	});
+
+	it('stops as a line begins: the row is up, nothing typed', () => {
+		expect(stepStopsOf(schedule, [{ before: 2 }])).toEqual([0, 210 + BEFORE_STOP_MS, 310]);
+	});
+
+	it('an empty list is one step', () => {
+		expect(stepStopsOf(schedule, [])).toEqual([0, 310]);
+	});
+
+	it('drops what names no line, and what does not move forward', () => {
+		expect(stepStopsOf(schedule, [9, -1, 1.5, NaN, { before: 7 }])).toEqual([0, 310]);
+		// out of order, a repeat, and the end of the session (already the last stop)
+		expect(stepStopsOf(schedule, [2, 0, 2, 3])).toEqual([0, 240, 310]);
+		expect(
+			stepStopsOf(schedule, ['1' as unknown as number, null as unknown as number, {} as never])
+		).toEqual([0, 310]);
+	});
+
+	it('is always strictly increasing, 0 first and the end last', () => {
+		const stops = stepStopsOf(schedule, [{ before: 0 }, 0, { before: 2 }, 2, 3]);
+		expect(stops[0]).toBe(0);
+		expect(stops[stops.length - 1]).toBe(310);
+		for (let i = 1; i < stops.length; i++) expect(stops[i]).toBeGreaterThan(stops[i - 1]);
 	});
 });
