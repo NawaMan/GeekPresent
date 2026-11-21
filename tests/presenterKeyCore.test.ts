@@ -57,8 +57,9 @@ describe('presenterKeyIntent — TOC browsing (↑/↓/Enter) while the menu is 
 		expect(presenterKeyIntent(key({ key: 'Enter' }), false, true)).toBe('tocSelect');
 	});
 
-	it('does nothing with those keys while the menu is closed', () => {
-		expect(presenterKeyIntent(key({ key: 'ArrowDown' }), false, false)).toBe('ignore');
+	it('with the menu closed, ↑/↓ belong to the note lines and Enter does nothing', () => {
+		expect(presenterKeyIntent(key({ key: 'ArrowDown' }), false, false)).toBe('noteDown');
+		expect(presenterKeyIntent(key({ key: 'ArrowUp' }), false, false)).toBe('noteUp');
 		expect(presenterKeyIntent(key({ key: 'Enter' }), false, false)).toBe('ignore');
 	});
 
@@ -194,5 +195,44 @@ describe('presenterKeyIntent — first / last and clicker keys', () => {
 	it('an open TOC still owns bare ↑/↓, but Cmd+↑ is FIRST', () => {
 		expect(presenterKeyIntent(key({ key: 'ArrowUp' }), false, true)).toBe('tocUp');
 		expect(presenterKeyIntent(key({ key: 'ArrowUp', metaKey: true }), false, true)).toBe('first');
+	});
+});
+
+describe('presenterKeyIntent — the note-line cursor', () => {
+	const space = (shiftKey = false) => key({ key: ' ', code: 'Space', shiftKey });
+
+	it('Space is CONTINUE while the cursor is away', () => {
+		expect(presenterKeyIntent(space(), false, false, false)).toBe('continue');
+		expect(presenterKeyIntent(space(true), false, false, false)).toBe('prev');
+	});
+
+	it('Space checks the line under the cursor, Shift+Space takes it back', () => {
+		expect(presenterKeyIntent(space(), false, false, true)).toBe('noteCheck');
+		expect(presenterKeyIntent(space(true), false, false, true)).toBe('noteUncheck');
+	});
+
+	it('Enter takes over CONTINUE while the cursor is out', () => {
+		expect(presenterKeyIntent(key({ key: 'Enter' }), false, false, true)).toBe('continue');
+	});
+
+	it('the arrows still page, and Esc still closes', () => {
+		expect(presenterKeyIntent(key({ key: 'ArrowRight' }), false, false, true)).toBe('next');
+		expect(presenterKeyIntent(key({ key: 'ArrowLeft' }), false, false, true)).toBe('prev');
+		expect(presenterKeyIntent(key({ key: 'Escape' }), false, false, true)).toBe('close');
+	});
+
+	it('an open TOC menu keeps ↑/↓/Enter for itself', () => {
+		expect(presenterKeyIntent(key({ key: 'ArrowDown' }), false, true, true)).toBe('tocDown');
+		expect(presenterKeyIntent(key({ key: 'Enter' }), false, true, true)).toBe('tocSelect');
+	});
+
+	it('never while typing, and never with a chord', () => {
+		const input = { tagName: 'INPUT' } as unknown as EventTarget;
+		expect(presenterKeyIntent(key({ key: 'ArrowDown', target: input }), false, false, true)).toBe(
+			'ignore'
+		);
+		expect(presenterKeyIntent(key({ key: 'ArrowDown', ctrlKey: true }), false, false, true)).toBe(
+			'ignore'
+		);
 	});
 });

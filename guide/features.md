@@ -39,6 +39,15 @@ audience window follows every page turn the console makes (and the reverse).
   menu (↑/↓/Enter walk it); **C** reset note checks; **A** reset ink (only when ANNOTATE is
   offered); **B** hide/show the audience's bars; **E** EDIT NOTE; **R** open the recorder;
   **Esc** closes menus.
+- **Note lines from the keyboard:** **↓ / ↑** move a cursor from line to line (the first ↓ lands
+  on the first line not yet checked). The line under the cursor acts as a hovered one, so a
+  `data-highlight` line lights its target without the mouse. While the cursor is out, **Space**
+  checks its line and moves on to the next, **Shift+Space** takes the last check back, and
+  **Enter** is the CONTINUE that Space was. **Esc** puts the cursor away and Space is CONTINUE
+  again. The mouse moves the same cursor: a hover shows it while the pointer is on the line, a
+  click leaves it there. For a script (Playwright, say): each line has `data-note-line="<index>"`
+  and the one under the cursor `aria-current="true"`; press the keys in the console window.
+  Colours: `--note-focus` (the bar) and `--note-focus-bg` (the tint).
 - **Note lines are checkboxes.** Each child element of a `<Note>` gets a checkbox in the console
   (click it, or double-click the line; Shift = check this line and every line above). Checks
   persist per slide.
@@ -128,7 +137,8 @@ part inside a `Group`). `SlideDeck` mounts it once; no slide places it. It looks
 same registry `Connector` uses, so it follows a Block dragged in ADJUST and needs no coordinates.
 
 - **From notes:** give a `<Note>` line `data-highlight="api"`. In the presenter console, hovering
-  that line lights the Block named `api` on the audience screen; leaving the line clears it.
+  that line — or moving the keyboard cursor onto it with ↓ / ↑ — lights the Block named `api` on
+  the audience screen; leaving the line clears it.
 - **From slide code:** call `setHighlight(name)` (a button, a build step). `null` or `''` clears.
 
 ```svelte

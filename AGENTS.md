@@ -621,6 +621,15 @@ than misleading the next agent.
   audience-screen cases above still hold it back. Rules in `onboard/onboardCore.ts`),
   plus framework-internal `Copyright`, `CtrlBtn`,
   `NavigationBar`, `TableOfContent`,
+  the note lines' **keyboard cursor** in the presenter console (no component of its own: the
+  `checklist` action in `Note.svelte` owns the lines, `chrome/presenterKeyCore.ts` the keys, and
+  the console sends what was pressed as `gp:note-key` window events — ↓/↑ move the cursor, the
+  line under it acts as a hovered one (a `data-highlight` line lights its target), Space checks
+  it and moves on, Shift+Space takes the last check back, Enter is CONTINUE meanwhile, Esc puts
+  it away. A cursor the mouse only HOVERED onto is drawn but not reported in the `noteFocus`
+  store, so a pointer resting on the notes never turns Space from "continue the build" into
+  "check this line"; a key or a click claims it. Lines carry `data-note-line`, the current one
+  `aria-current`, for a script. Arithmetic in `note/noteFocusCore.ts`),
   `NoteEditor` (the presenter console's **EDIT NOTE**, key **E** — edits the source between the
   slide's `<Note>` and `</Note>` in place over the notes panel; SAVE goes through the dev-only
   `/__geekpresent/note-load` / `note-save`, which find the note with Svelte's own parser (so a
