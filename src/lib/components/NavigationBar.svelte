@@ -4,7 +4,8 @@
 	import { browser }            from '$app/environment';
 	import { page }               from '$app/stores';
 	import { onMount, onDestroy } from 'svelte';
-	import { getMode, getViewTransitions, getPages, getHandout } from '$lib/presentation';
+	import { getMode, getViewTransitions, getPages, getHandout, getTransitionReverse } from '$lib/presentation';
+	import { turnKind } from '$lib/utils/transitionCore';
 	import { navigate as pageNavigate } from '$lib/utils/deckNav';
 	import { presenterMode } from '$lib/stores/presenter';
 	import { activeSteps } from '$lib/stores/activeSteps';
@@ -55,20 +56,20 @@
 	// (goto) wrapped in the View Transitions API, so a slide animates into the next.
 	const viewTransitions = getViewTransitions();
 	const pages = getPages();
+	const transitionReverse = getTransitionReverse();
 
 	// The current slide's chosen leave-transition, picked per DIRECTION: `transition`
-	// going forward (→), `transitionBack` going back (←). Both default to 'slide'.
-	// So a slide can show an effect forward and replay (or stay neutral) on the way
-	// back. See pages.ts / view-transitions.css.
+	// going forward (→), `transitionBack` going back (←). Forward defaults to 'slide';
+	// back defaults to undoing the turn that led in (utils/transitionCore.ts).
 	$: currentPath = $page.url.pathname.replace(/\/+$/, '').split('/').pop() || '';
 	$: currentPage = pages.find((p) => p.path === currentPath);
 
 	type Dir = 'forward' | 'back';
 
-	function kindFor(direction: Dir): string {
+	function kindFor(direction: Dir, href: string): string {
 		const override = direction === 'back' ? prevKind : nextKind;
 		if (override) return override;
-		return (direction === 'back' ? currentPage?.transitionBack : currentPage?.transition) ?? 'slide';
+		return turnKind(pages, currentPath, href, direction, transitionReverse);
 	}
 
 	// In the presenter console (?present) keep the flag across paging, so the
@@ -84,7 +85,7 @@
 	// PREV (and ← / Shift+Space) lands on the previous slide with its build spent,
 	// as it was left; FIRST is a fresh start, so it does not.
 	function navigate(href: string, direction: Dir, arriveAtEnd = false) {
-		pageNavigate(decorate(href), { viewTransitions, kind: kindFor(direction), direction, arriveAtEnd });
+		pageNavigate(decorate(href), { viewTransitions, kind: kindFor(direction, href), direction, arriveAtEnd });
 	}
 
 	$: onFirst = () => navigate(firstLink, 'back');

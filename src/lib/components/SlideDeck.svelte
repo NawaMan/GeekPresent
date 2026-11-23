@@ -140,7 +140,9 @@
 		readSticky
 	} from '$lib/capture/captureCore';
 	import { saveAdjust } from '$lib/stores/adjustSave';
-	import { getViewTransitions } from '$lib/presentation';
+	import { getViewTransitions, setTransitionReverse } from '$lib/presentation';
+	import { turnKind } from '$lib/utils/transitionCore';
+	import '$lib/styles/push-transitions.css';
 	import KioskDialog from '$lib/components/KioskDialog.svelte';
 	import KioskIndicator from '$lib/components/KioskIndicator.svelte';
 	import KioskRunner from '$lib/components/KioskRunner.svelte';
@@ -417,6 +419,13 @@
 	   kiosk. Never in a recording or a replay, with a presenter console live, in `?shot`,
 	   or while ADJUST is on. See auto/stepAutoCore.ts. */
 	export let stepTimeoutMs: number | undefined = undefined;
+	/* View-Transition decks: reverse pairs for the deck's OWN directional kinds, e.g.
+	   `{ 'swipe-up': 'swipe-down', 'swipe-down': 'swipe-up' }`. Paging back from a slide
+	   with no `transitionBack` undoes the turn that led in, and a kind named here is undone
+	   by its pair. The built-in left/right and rise/fall need no entry. Read once, at
+	   mount. See utils/transitionCore.ts. */
+	export let transitionReverse: Record<string, string> | null = null;
+	setTransitionReverse(transitionReverse);
 	/** Idle ms on the first slide before that hint appears (a stray Enter/click/scroll
 	   brings it at once). */
 	export let onboardDelayMs = DEFAULT_ONBOARD_DELAY_MS;
@@ -1413,8 +1422,7 @@
 					return;
 				}
 				const direction = a.back ? 'back' : 'forward';
-				const leaving = pages.find((p) => p.path === currentSlide);
-				const kind = (a.back ? leaving?.transitionBack : leaving?.transition) ?? 'slide';
+				const kind = turnKind(pages, currentSlide ?? '', target, direction, transitionReverse);
 				navigate(target, { viewTransitions, kind, direction, arriveAtEnd: a.end === true });
 				return;
 			}
@@ -1526,9 +1534,7 @@
 							const targetIndex = pages.findIndex((p) => p.path === path);
 							const direction =
 								targetIndex >= 0 && targetIndex < (currentIndex ?? 0) ? 'back' : 'forward';
-							const leaving = pages.find((p) => p.path === currentSlide);
-							const kind =
-								(direction === 'back' ? leaving?.transitionBack : leaving?.transition) ?? 'slide';
+							const kind = turnKind(pages, currentSlide ?? '', path, direction, transitionReverse);
 							navigate(target, { viewTransitions, kind, direction });
 						},
 						relayRole

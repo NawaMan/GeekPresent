@@ -995,6 +995,17 @@ is possible precisely *because* each slide is its own document. See the `transit
 examples (slide, flip, zoom, cross-fade, and shared-element `view-transition-name` morphs). No library,
 no client-side router — just a slide-scoped `<style>` opting navigation transitions in.
 
+**Which kind a turn uses is ONE function**, `utils/transitionCore.turnKind`, called by
+`NavigationBar`, the presenter console and `SlideDeck`'s follower and replay. Forward it is the
+leaving slide's `transition`. Back it is its `transitionBack` when set; otherwise the turn undoes
+the one that led in — the `transition` of the slide being paged back TO, reversed when that kind
+has a direction (`left` ↔ `right`, `rise` ↔ `fall`, plus a deck's own pairs in
+`<SlideDeck transitionReverse>`). So a deck writes `transition` only. Four push kinds are built
+in — `rise`, `fall`, `left`, `right` (`styles/push-transitions.css`, imported by `SlideDeck`).
+Two rules there are load-bearing: every selector sits in `:where()` so a deck's own rule for the
+same kind wins whatever the bundle order, and the keyframes are prefixed `gp-vt-` because decks
+name theirs `vt-…` and a keyframes name is global.
+
 ### "Place an element visually (ADJUST mode)"
 
 When a slide positions things at exact canvas pixels, you don't have to guess the

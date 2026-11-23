@@ -94,13 +94,22 @@ export function navigate(href: string, opts: NavigateOptions = {}): void {
 	const root = document.documentElement;
 	root.dataset.vtKind = kind;
 	root.dataset.vt = direction;
+	// A turn made while the one before is still running skips that one, and its
+	// `finished` settles AFTER the attributes above were set for the new turn. So
+	// only the latest turn may clear them, or a quick second press plays with no
+	// kind at all (the browser's plain cross-fade).
+	const turn = ++latestTurn;
 	// @ts-ignore
 	const transition = document.startViewTransition(() => goto(href));
 	transition.finished.finally(() => {
+		if (turn !== latestTurn) return;
 		delete root.dataset.vt;
 		delete root.dataset.vtKind;
 	});
 }
+
+/** Counts view-transition turns, so a superseded one does not clear its successor's attributes. */
+let latestTurn = 0;
 
 /** Run `then` once the view transition in progress (if any) has finished — at
     once when there is none. navigate() keeps data-vt-kind on <html> for exactly

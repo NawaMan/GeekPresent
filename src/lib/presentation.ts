@@ -120,3 +120,22 @@ export function setViewTransitions(on: boolean): void {
 export function getViewTransitions(): boolean {
 	return getContext<boolean>(VIEW_TRANSITIONS_KEY) ?? false;
 }
+
+// Reverse pairs for a deck's own directional view-transition kinds.
+//
+// Paging back with no `transitionBack` undoes the turn that led in, and a kind with a
+// direction is undone by its reverse (utils/transitionCore.ts knows left/right and
+// rise/fall). A deck that writes its own directional kinds names their pairs with
+// <SlideDeck transitionReverse={{ 'swipe-up': 'swipe-down', 'swipe-down': 'swipe-up' }}>,
+// and SlideDeck publishes the map here for the pagers inside it.
+const TRANSITION_REVERSE_KEY = Symbol('geekpresent.transitionReverse');
+
+/** Publish the deck's own reverse pairs. SlideDeck calls this; a deck sets the prop. */
+export function setTransitionReverse(map: Record<string, string> | null | undefined): void {
+	setContext(TRANSITION_REVERSE_KEY, map ?? null);
+}
+
+/** The deck's own reverse pairs, or null when it named none. */
+export function getTransitionReverse(): Record<string, string> | null {
+	return getContext<Record<string, string> | null>(TRANSITION_REVERSE_KEY) ?? null;
+}

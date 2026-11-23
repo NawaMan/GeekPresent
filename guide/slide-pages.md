@@ -166,8 +166,8 @@ export const pages = [
 | `image` | `string` | Per-slide social/OG image (absolute URL or site-relative path); falls back to the deck's. |
 | `imageAlt` | `string` | Alt text for that image. |
 | `favicon` | `string` | Per-slide favicon; `import` the asset. |
-| `transition` | `string` | View-Transition decks only: the animation used when paging AWAY from this slide forward. Default `'slide'`. |
-| `transitionBack` | `string` | Same, for paging backward (← / PREV). Default `'slide'`. |
+| `transition` | `string` | View-Transition decks only: the animation used when paging AWAY from this slide forward. Default `'slide'`. Built in: `'rise'`, `'fall'`, `'left'`, `'right'`. |
+| `transitionBack` | `string` | Same, for paging backward (← / PREV). Default: the reverse of the turn that led in (see *View-Transition decks*). |
 
 Gotchas:
 
@@ -539,8 +539,26 @@ html[data-vt-kind="slide"][data-vt="forward"]::view-transition-new(root) { anima
 ```
 
 - While a transition runs the deck sets `data-vt-kind` (the LEAVING slide's `transition` /
-  `transitionBack` from `pages.ts`, default `'slide'`) and `data-vt` (`forward` / `back`) on
-  `<html>`. Your stylesheet keys its animations off those; the keyframes are yours to write.
+  `transitionBack` from `pages.ts`) and `data-vt` (`forward` / `back`) on `<html>`. Your
+  stylesheet keys its animations off those; the keyframes are yours to write, except for the
+  built-in kinds below.
+- **Built-in push kinds**, with nothing to write or import: `transition: 'rise'` (the old slide
+  is pushed up, the new one comes from below), `'fall'` (pushed down, new from above), `'left'`
+  (old goes off to the left, new comes from the right) and `'right'` (the mirror). No fade. Each
+  names a direction of travel and ignores `data-vt`. They run 650 ms; a shared timing rule of
+  your own on `html[data-vt]` applies to them too. A rule of your own for the same kind name
+  replaces the built-in one. Under `prefers-reduced-motion` they are a plain cross-fade.
+- **Paging back undoes the turn that led in.** A slide with no `transitionBack` goes back with
+  the `transition` of the slide it goes back TO, reversed when that kind has a direction:
+  `left` ↔ `right`, `rise` ↔ `fall`. Any other kind is used as it is (`data-vt="back"` tells
+  its CSS the direction). So a deck normally writes `transition` only. Set `transitionBack`
+  where a slide wants something else, e.g. `transitionBack: 'slide'`.
+- A directional kind of your own needs its pair named once on the deck:
+  `<SlideDeck transitionReverse={{ 'swipe-up': 'swipe-down', 'swipe-down': 'swipe-up' }}>`.
+- An element with its own `view-transition-name` is not part of the slide's picture, so it does
+  not travel with a push: it stays in place. That suits a footer mark named on every slide. For
+  a part that should leave with its slide, give the name only during the kind that needs it
+  (`html[data-vt-kind='morph'] .x { view-transition-name: … }`).
 - Shared-element morphs: give matching elements the same `view-transition-name` on both slides.
 - Put the keyframes in a plain imported `.css` file. A Svelte component `<style>` scopes and
   mangles `::view-transition-*` selectors.

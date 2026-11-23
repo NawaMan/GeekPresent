@@ -1,0 +1,103 @@
+/*
+  Built-in PUSH transitions for a View-Transition deck: the old slide is pushed off
+  one edge while the new one follows it in from the opposite edge. No fade.
+
+    transition: 'rise'    old goes up,    new comes from below
+    transition: 'fall'    old goes down,  new comes from above
+    transition: 'left'    old goes left,  new comes from the right
+    transition: 'right'   old goes right, new comes from the left
+
+  A kind names a DIRECTION OF TRAVEL, so it ignores html[data-vt] (forward / back):
+  'left' pushes left whichever key was pressed. Paging back is covered by the kind
+  itself: a slide with no `transitionBack` goes back with the reverse of the kind that
+  led in (left <-> right, rise <-> fall; utils/transitionCore.ts).
+
+  Mechanics: deckNav wraps the goto() in document.startViewTransition() and sets
+  html[data-vt-kind] for its duration. SlideDeck imports this file, so every deck has
+  the four kinds; it is inert until a slide names one.
+
+  Two rules a change here must keep:
+  - Every selector is wrapped in :where(), which has no specificity. A deck that
+    writes its own rule for 'rise' (or its own shared timing on html[data-vt]) wins
+    whatever order the bundle puts the two stylesheets in.
+  - Keyframes are prefixed gp-vt-. Decks name theirs vt-…, and a keyframes name is
+    global: the later definition would silently replace the earlier one.
+
+  An element with its own view-transition-name is not part of the root picture, so it
+  does not travel with the push: it stays where it is. That is right for a footer mark
+  named on every slide, and wrong for a part that should leave with its slide. Name
+  such a part only during the kind that needs it (html[data-vt-kind='morph'] .x { … }),
+  as Group's `morphOn` does.
+
+  A viewer who asked for reduced motion gets none of this: the rules are not applied,
+  and the browser's own cross-fade is what is left.
+*/
+
+@media (prefers-reduced-motion: no-preference) {
+	:where(html[data-vt-kind='rise'])::view-transition-old(root) {
+		animation: gp-vt-out-up 650ms cubic-bezier(0.65, 0, 0.35, 1) both;
+	}
+	:where(html[data-vt-kind='rise'])::view-transition-new(root) {
+		animation: gp-vt-in-up 650ms cubic-bezier(0.65, 0, 0.35, 1) both;
+	}
+	:where(html[data-vt-kind='fall'])::view-transition-old(root) {
+		animation: gp-vt-out-down 650ms cubic-bezier(0.65, 0, 0.35, 1) both;
+	}
+	:where(html[data-vt-kind='fall'])::view-transition-new(root) {
+		animation: gp-vt-in-down 650ms cubic-bezier(0.65, 0, 0.35, 1) both;
+	}
+	:where(html[data-vt-kind='left'])::view-transition-old(root) {
+		animation: gp-vt-out-left 650ms cubic-bezier(0.65, 0, 0.35, 1) both;
+	}
+	:where(html[data-vt-kind='left'])::view-transition-new(root) {
+		animation: gp-vt-in-left 650ms cubic-bezier(0.65, 0, 0.35, 1) both;
+	}
+	:where(html[data-vt-kind='right'])::view-transition-old(root) {
+		animation: gp-vt-out-right 650ms cubic-bezier(0.65, 0, 0.35, 1) both;
+	}
+	:where(html[data-vt-kind='right'])::view-transition-new(root) {
+		animation: gp-vt-in-right 650ms cubic-bezier(0.65, 0, 0.35, 1) both;
+	}
+}
+
+/* "out" names where the old slide goes, "in" the same travel seen by the new one. */
+@keyframes gp-vt-out-up {
+	to {
+		transform: translateY(-100%);
+	}
+}
+@keyframes gp-vt-in-up {
+	from {
+		transform: translateY(100%);
+	}
+}
+@keyframes gp-vt-out-down {
+	to {
+		transform: translateY(100%);
+	}
+}
+@keyframes gp-vt-in-down {
+	from {
+		transform: translateY(-100%);
+	}
+}
+@keyframes gp-vt-out-left {
+	to {
+		transform: translateX(-100%);
+	}
+}
+@keyframes gp-vt-in-left {
+	from {
+		transform: translateX(100%);
+	}
+}
+@keyframes gp-vt-out-right {
+	to {
+		transform: translateX(100%);
+	}
+}
+@keyframes gp-vt-in-right {
+	from {
+		transform: translateX(-100%);
+	}
+}

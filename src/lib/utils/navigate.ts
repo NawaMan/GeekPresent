@@ -61,13 +61,16 @@ export interface Page {
         Names the animation used when paging AWAY from this slide — so a slide can be
         animated with the very transition it discusses. NavigationBar exposes it as
         `html[data-vt-kind="…"]`, which view-transitions.css keys its keyframes off.
-        Ignored by decks that don't opt into view transitions. Defaults to 'slide'. */
+        Ignored by decks that don't opt into view transitions. Defaults to 'slide'.
+        Built in, with no keyframes to write: 'rise', 'fall', 'left', 'right'
+        (styles/push-transitions.css). */
     transition?: string;
     /** Optional leave-transition specifically for paging BACKWARD (← / PREV) away
-        from this slide; `transition` is used for forward (→ / NEXT). Lets a slide
-        be neutral going forward but replay an effect on the way back (e.g. a "(to)"
-        slide that bridges forward with a plain slide yet re-runs its effect on ←).
-        Defaults to 'slide' when unset. */
+        from this slide; `transition` is used for forward (→ / NEXT). Unset, the turn
+        undoes the one that led in: the `transition` of the slide being paged back to,
+        reversed when that kind has a direction (left <-> right, rise <-> fall, plus the
+        deck's own pairs in `<SlideDeck transitionReverse>`). Set it when a slide wants
+        something else on the way back. See utils/transitionCore.ts. */
     transitionBack?: string;
 }
 

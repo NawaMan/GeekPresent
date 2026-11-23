@@ -35,7 +35,8 @@
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 	import { onMount, onDestroy } from 'svelte';
-	import { getViewTransitions } from '$lib/presentation';
+	import { getViewTransitions, getTransitionReverse } from '$lib/presentation';
+	import { turnKind } from '$lib/utils/transitionCore';
 	import { getPageNavigation } from '$lib/utils/navigate';
 	import { navigate } from '$lib/utils/deckNav';
 	import {
@@ -64,6 +65,7 @@
 	export let height = 1080;
 
 	const viewTransitions = getViewTransitions();
+	const transitionReverse = getTransitionReverse();
 
 	// Robust current path: strip trailing slash(es) then take the last segment, so
 	// it matches pages[].path (e.g. "intro.html") in dev and the flat-file build.
@@ -84,18 +86,18 @@
 		? ($page.url.pathname.replace(base, '').split('/').filter(Boolean)[0] ?? '')
 		: '';
 
-	function kindFor(direction: 'forward' | 'back'): string {
-		return (direction === 'back' ? currentPage?.transitionBack : currentPage?.transition) ?? 'slide';
+	function kindFor(direction: 'forward' | 'back', href: string): string {
+		return turnKind(pages, currentPage?.path ?? '', href, direction, transitionReverse);
 	}
 	// Console nav keeps the ?present flag so paging stays in the console; the
 	// audience window follows via the localStorage channel (SlideDeck).
 	function go(href: string | undefined, direction: 'forward' | 'back') {
 		if (!href) return;
-		navigate(href + '?present', { viewTransitions, kind: kindFor(direction), direction });
+		navigate(href + '?present', { viewTransitions, kind: kindFor(direction, href), direction });
 	}
 	function jump(path: string) {
 		tocOpen = false;
-		navigate(`./${path}?present`, { viewTransitions, kind: kindFor('forward'), direction: 'forward' });
+		navigate(`./${path}?present`, { viewTransitions, kind: kindFor('forward', path), direction: 'forward' });
 	}
 	// Relay an animation command to the audience window.
 	function relayAnim(cmd: AnimState) {
